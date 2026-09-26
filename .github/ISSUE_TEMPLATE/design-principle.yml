@@ -1,0 +1,33 @@
+name: Design principle
+description: Track how one design principle is implemented across the screens.
+title: "[Principle] "
+labels: ["type:principle"]
+body:
+  - type: textarea
+    id: principle
+    attributes:
+      label: Principle
+      description: The principle as stated in the report's checklist.
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why
+      description: The evidence behind it, with links.
+  - type: textarea
+    id: current
+    attributes:
+      label: Where the screens show it today
+  - type: textarea
+    id: gaps
+    attributes:
+      label: Gaps
+      description: Screens or flows where the principle is missing or only implied.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Done when
+      description: How a reviewer checks the principle holds everywhere.
+    validations:
+      required: true

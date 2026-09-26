@@ -1,0 +1,52 @@
+name: Mockup or site bug
+description: Something on the published site renders or behaves incorrectly.
+title: "[Bug] "
+labels: ["type:bug"]
+body:
+  - type: input
+    id: url
+    attributes:
+      label: Page URL
+      placeholder: https://theonlygeranium.github.io/project-tessera/prototype/#lesson
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the prototype
+        2. Click Resume
+        3. ...
+  - type: input
+    id: env
+    attributes:
+      label: Browser and viewport
+      placeholder: Safari 19, iPhone 16 portrait
+  - type: dropdown
+    id: a11y
+    attributes:
+      label: Is this an accessibility problem?
+      options:
+        - "No"
+        - Yes, keyboard or focus
+        - Yes, screen reader
+        - Yes, contrast or color
+        - Yes, other
+  - type: textarea
+    id: shots
+    attributes:
+      label: Screenshots
+      description: Drag images here.

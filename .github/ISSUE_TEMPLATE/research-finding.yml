@@ -1,0 +1,70 @@
+name: Research finding
+description: Add, correct, or challenge evidence in the research report.
+title: "[Research] "
+labels: ["type:research"]
+body:
+  - type: textarea
+    id: claim
+    attributes:
+      label: Claim
+      description: The finding in one or two sentences, stated as precisely as the source allows.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source URL
+      placeholder: https://
+    validations:
+      required: true
+  - type: input
+    id: date
+    attributes:
+      label: Publication date
+      placeholder: 2026-06-30
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Evidence type
+      options:
+        - Peer-reviewed study (RCT or quasi-experimental)
+        - Peer-reviewed study (survey, qualitative, or other)
+        - Meta-analysis or systematic review
+        - Standards body or regulation (QM, W3C, DOJ, etc.)
+        - Analyst or market data (Phil Hill, ListEdTech, Fosway, etc.)
+        - Vendor documentation or announcement
+        - Practitioner commentary, reviews, or forums
+        - Our own usability test or interview
+    validations:
+      required: true
+  - type: dropdown
+    id: effect
+    attributes:
+      label: What this does to the report
+      options:
+        - Adds new evidence
+        - Corrects an existing statement
+        - Contradicts or weakens an existing statement
+        - Updates a fast-moving fact (market, product status, regulation)
+    validations:
+      required: true
+  - type: input
+    id: section
+    attributes:
+      label: Report section affected
+      placeholder: "4. AI-Native LMS and AI-Assisted Authoring"
+  - type: textarea
+    id: implications
+    attributes:
+      label: Design implications
+      description: Which screens or principles should change if this holds up?
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I read the primary source, not only a summary of it
+          required: true
+        - label: Vendor claims are marked as vendor claims

@@ -48,3 +48,7 @@ code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;backgroun
 .prose th,.prose td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
 .prose th{background:#faf8f4}
 .prose hr{border:0;border-top:1px solid var(--line);margin:36px 0}
+
+.proto-callout{margin-top:40px;padding:22px 24px;border-radius:16px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent)}
+.proto-callout h2{margin:6px 0 8px}
+.proto-callout p{margin:0 0 16px;max-width:760px;color:#2a2825}

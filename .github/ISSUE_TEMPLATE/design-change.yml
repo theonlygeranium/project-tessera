@@ -1,0 +1,77 @@
+name: Design change
+description: Propose a change to a screen, flow, or the design system.
+title: "[Design] "
+labels: ["type:design"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Design changes should trace back to a design principle or a research finding. If the evidence is new, open a **Research finding** issue first and link it here.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      multiple: true
+      options:
+        - Today dashboard (learner)
+        - Focus lesson player (learner)
+        - Today on phone (learner)
+        - Clickable prototype (learner flow)
+        - Prompt-to-course canvas (author)
+        - Instructor command center
+        - Governance & outcomes console (admin)
+        - Design system (tokens, type, AI labeling)
+        - New screen or flow
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong or missing, and for which persona? Describe the user's situation, not the solution.
+      placeholder: A working learner on a phone can't tell which review cards came from the quiz they just took.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should change on the screen. Sketches, screenshots, or artboard file names welcome.
+    validations:
+      required: true
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Design principles this touches
+      description: From research/report.md, "Design Principles Checklist".
+      options:
+        - label: Modules are the single canonical spine
+        - label: Next action one click from login; unified Today
+        - label: Templates enforce cross-course consistency
+        - label: Chunked lessons with embedded retrieval checks
+        - label: Hint-first, source-grounded tutor set by instructor policy
+        - label: AI output is a labeled draft with provenance, diff, revert, and human approval
+        - label: System explains adaptations and offers undo
+        - label: Capabilities and limits disclosed; no sparkle-only AI cues
+        - label: Personalization on evidence-based variables, not learning styles
+        - label: WCAG 2.2 AA across UI and generated content
+        - label: Agentic actions are previewable change sets
+        - label: Quality/alignment linter before publish
+        - label: Interoperability (LTI 1.3, SIS/HRIS, SCORM, xAPI, cmi5, MCP)
+        - label: Visible AI governance
+        - label: Measured against learning outcomes, not engagement alone
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Link the research section, a study, usability finding, or user quote that supports this.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Done when
+      description: Observable criteria a reviewer can check on the published site.
+      placeholder: |
+        - New cards show a "new" tag and the source ("Added from Module 3 check")
+        - Screen passes WCAG 2.2 AA contrast for the new tag
+    validations:
+      required: true

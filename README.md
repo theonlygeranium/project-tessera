@@ -2,7 +2,7 @@
 
 An AI-native learning management system prototype for higher-education and industry audiences: course hosting plus a native, simplified authoring tool that drafts modular content from natural language, files, and existing material, customizable for a wide range of learner personas.
 
-**Live mockups:** https://theonlygeranium.github.io/project-tessera/
+**Live site:** https://theonlygeranium.github.io/project-tessera/ · **Clickable prototype:** https://theonlygeranium.github.io/project-tessera/prototype/
 
 *Tessera* is a working codename. It refers to the tiles of a mosaic: modular blocks that compose into a course.
 
@@ -11,6 +11,7 @@ An AI-native learning management system prototype for higher-education and indus
 | Path | Contents |
 |---|---|
 | `docs/` | Static microsite published with GitHub Pages (branch `main`, folder `/docs`). `index.html` is the gallery, `screens/` holds one standalone page per mockup, and `research.html` is the rendered report. |
+| `docs/prototype/` | Clickable learner flow: Today → lesson → hint-first tutor → module check → result → updated Today. Plain HTML, CSS, and JS. |
 | `design/canvas/` | Source artboards (`*.dc.html`) and `canvas.json` from the design canvas. These are the editable originals. |
 | `design/DESIGN-NOTES.md` | Design system tokens, the decisions the screens encode, and their research grounding. |
 | `research/report.md` | The research report the design is based on: LXD evidence, LMS UX benchmarks, why Canvas wins, AI-authoring patterns, persona research, and the five layout briefs. |
@@ -50,6 +51,10 @@ Open `docs/index.html` locally, or commit the regenerated `docs/` and push to `m
 The repository is private but the Pages site is public. Anything the site links to must live inside `docs/`; the build renders `research/report.md` to `docs/research.html` for that reason.
 
 Each artboard is a self-contained HTML file. The `*.dc.html` sources carry a small runtime header for the design canvas they were drawn in; the build script strips it and emits plain HTML. Links between screens (`href="LessonPlayer.dc.html"`) are rewritten to the `docs/screens/` names.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). Issues use forms (design change, research finding, site bug, design principle); pull requests follow the checklist in `.github/pull_request_template.md`.
 
 ## Status
 

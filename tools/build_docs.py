@@ -62,6 +62,8 @@ SCREENS = {
     ),
 }
 
+FAVICON = '<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e6b63%22/%3E%3Cpath d=%22M9 11h14M9 16h9M9 21h14%22 stroke=%22white%22 stroke-width=%222.4%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">'
+
 WRAPPER_CSS = """
 html,body{margin:0;background:#e9e5dd}
 .tessera-stage{display:flex;justify-content:center;padding:24px 16px 48px;box-sizing:border-box;min-height:100vh}
@@ -130,7 +132,7 @@ def convert(name: str, html: str, index: dict) -> str:
     )
     html = html[:body_open] + wrapped + html[body_close:]
 
-    head_extra = f"{helmet_html}\n<style>{WRAPPER_CSS}</style>\n"
+    head_extra = f"{helmet_html}\n{FAVICON}\n<style>{WRAPPER_CSS}</style>\n"
     html = html.replace("</head>", head_extra + "</head>", 1)
     return html
 
@@ -158,6 +160,7 @@ RESEARCH_TEMPLATE = """<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e6b63%22/%3E%3Cpath d=%22M9 11h14M9 16h9M9 21h14%22 stroke=%22white%22 stroke-width=%222.4%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Research report · Project Tessera</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
