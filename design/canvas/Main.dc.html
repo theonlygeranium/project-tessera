@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Today dashboard, learner</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; background: #f4f1eb; color: #1c1b19; font-size: 15px; line-height: 1.45; overflow: hidden">
+
+  <!-- Global rail -->
+  <nav aria-label="Global" style="width: 76px; flex-shrink: 0; box-sizing: border-box; padding: 20px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; border-right: 1px solid #e3ded4; background: #faf8f4">
+    <div style="width: 36px; height: 36px; border-radius: 10px; background: {{accent}}; display: flex; align-items: center; justify-content: center; margin-bottom: 14px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
+    </div>
+    <a href="Main.dc.html" aria-label="Today" style="width: 56px; height: 52px; border-radius: 12px; background: #e3f0ee; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; color: #0e6b63; font-size: 11px; font-weight: 600">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Today</a>
+    <a href="LessonPlayer.dc.html" aria-label="Learn" style="width: 56px; height: 52px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; color: #5f5b54; font-size: 11px; font-weight: 500">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h7a3 3 0 0 1 3 3v11a2 2 0 0 0-2-2H4z"/><path d="M20 5h-7a3 3 0 0 0-3 3v11a2 2 0 0 1 2-2h8z"/></svg>Learn</a>
+    <a href="#calendar" aria-label="Calendar" style="width: 56px; height: 52px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; color: #5f5b54; font-size: 11px; font-weight: 500">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendar</a>
+    <a href="#inbox" aria-label="Inbox" style="width: 56px; height: 52px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; color: #5f5b54; font-size: 11px; font-weight: 500">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l3-7h12l3 7v7H3z"/><path d="M3 12h5l2 3h4l2-3h5"/></svg>Inbox</a>
+    <div style="flex-grow: 1"></div>
+    <button type="button" aria-label="Search or ask (Command K)" style="width: 56px; height: 52px; border-radius: 12px; border: 1px dashed #c9c2b5; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #5f5b54; font-size: 11px; font-weight: 500; font-family: inherit; cursor: pointer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>⌘K</button>
+    <div style="width: 36px; height: 36px; border-radius: 50%; background: #d9cdb8; margin-top: 10px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #4a3f2c">PR</div>
+  </nav>
+
+  <!-- Main -->
+  <main style="flex-grow: 1; box-sizing: border-box; padding: 28px 36px 0 36px; display: flex; flex-direction: column; gap: 22px; min-width: 0">
+
+    <!-- Header -->
+    <header style="display: flex; align-items: flex-start; gap: 24px">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 13px; color: #5f5b54; font-weight: 500">Thursday, September 25</div>
+        <h1 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 34px; line-height: 1.1; letter-spacing: -0.01em">Good afternoon, Priya.</h1>
+        <div style="font-size: 15px; color: #5f5b54">Three things need you this week. About 2 h 10 m of work, and you have planned 4 h.</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <button type="button" style="height: 40px; padding: 0 14px 0 12px; border-radius: 10px; border: 1px solid #d5cfc4; background: #ffffff; display: flex; align-items: center; gap: 8px; font-family: inherit; font-size: 14px; font-weight: 500; color: #1c1b19; cursor: pointer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          Preset: Busy professional
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <!-- weekly time ring -->
+        <div style="display: flex; align-items: center; gap: 10px; padding: 6px 14px 6px 8px; border-radius: 12px; background: #ffffff; border: 1px solid #e3ded4">
+          <svg width="44" height="44" viewBox="0 0 44 44" aria-label="1 hour 50 minutes of 4 hours planned this week">
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#e8e3da" stroke-width="5"/>
+            <circle cx="22" cy="22" r="18" fill="none" stroke="{{accent}}" stroke-width="5" stroke-linecap="round" stroke-dasharray="52 113" transform="rotate(-90 22 22)"/>
+          </svg>
+          <div style="display: flex; flex-direction: column; line-height: 1.2">
+            <span style="font-size: 14px; font-weight: 600">1 h 50 m / 4 h</span>
+            <span style="font-size: 12px; color: #5f5b54">this week</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Body: two columns -->
+    <div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; flex-grow: 1; min-height: 0">
+
+      <!-- Left column: Do next + Review queue -->
+      <section aria-label="Do next" style="grid-column: span 7; display: flex; flex-direction: column; gap: 22px; min-width: 0">
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: baseline; justify-content: space-between">
+            <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Do next</h2>
+            <span style="font-size: 13px; color: #5f5b54">Ordered by due date, then your goal</span>
+          </div>
+
+          <!-- Card 1: resume -->
+          <a href="LessonPlayer.dc.html" style="display: flex; gap: 16px; align-items: center; padding: 16px 18px; border-radius: 14px; background: #ffffff; border: 1px solid #e3ded4; text-decoration: none; color: inherit">
+            <div style="width: 44px; height: 44px; border-radius: 12px; background: #e3f0ee; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="{{accent}}" stroke="none"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+            <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+              <div style="font-size: 16px; font-weight: 600">Resume: Bias in model evaluation</div>
+              <div style="font-size: 13px; color: #5f5b54">Responsible AI in Practice · Module 3 · 3 of 5 chunks done · 12 min left</div>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
+              <span style="font-size: 12px; font-weight: 600; color: #0e6b63; background: #e3f0ee; padding: 3px 8px; border-radius: 999px">Resume</span>
+              <span style="font-size: 12px; color: #5f5b54">Due Fri</span>
+            </div>
+          </a>
+
+          <!-- Card 2: quiz, moved up with why -->
+          <div style="display: flex; flex-direction: column; border-radius: 14px; background: #ffffff; border: 1px solid #e3ded4; overflow: hidden">
+            <a href="#quiz" style="display: flex; gap: 16px; align-items: center; padding: 16px 18px; text-decoration: none; color: inherit">
+              <div style="width: 44px; height: 44px; border-radius: 12px; background: #fbf1dc; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9a6a12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2 2 4-4"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
+              </div>
+              <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+                <div style="font-size: 16px; font-weight: 600">Ethics case check: consent in data reuse</div>
+                <div style="font-size: 13px; color: #5f5b54">Research Ethics 501 · 8 questions · about 15 min · 2 attempts allowed</div>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
+                <span style="font-size: 12px; font-weight: 600; color: #9a6a12; background: #fbf1dc; padding: 3px 8px; border-radius: 999px">Due tomorrow</span>
+                <span style="font-size: 12px; color: #5f5b54">Tutor: hint mode</span>
+              </div>
+            </a>
+            <div style="display: flex; align-items: center; gap: 10px; padding: 8px 18px; background: #faf8f4; border-top: 1px solid #ede8df; font-size: 12.5px; color: #5f5b54">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M11 12h1v4h1"/></svg>
+              Moved up because it is due in 26 hours and you set "finish the certificate by November."
+              <a href="#undo" style="margin-left: auto; font-weight: 600">Undo</a>
+            </div>
+          </div>
+
+          <!-- Card 3: discussion -->
+          <a href="#discussion" style="display: flex; gap: 16px; align-items: center; padding: 16px 18px; border-radius: 14px; background: #ffffff; border: 1px solid #e3ded4; text-decoration: none; color: inherit">
+            <div style="width: 44px; height: 44px; border-radius: 12px; background: #eeebf8; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5b4baf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg>
+            </div>
+            <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+              <div style="font-size: 16px; font-weight: 600">Reply to two peers: incident post-mortem</div>
+              <div style="font-size: 13px; color: #5f5b54">Cloud Ops Upskilling Path · Dr. Okafor replied to your post 2 h ago</div>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px">
+              <span style="font-size: 12px; color: #5f5b54">Due Mon</span>
+            </div>
+          </a>
+        </div>
+
+        <!-- Review queue -->
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: baseline; justify-content: space-between">
+            <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Review queue · 4 cards due</h2>
+            <a href="#review" style="font-size: 13px; font-weight: 600">Start 5-minute review</a>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px">
+            <div style="padding: 12px 14px; border-radius: 12px; background: #ffffff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 6px">
+              <span style="font-size: 11px; font-weight: 600; color: #5f5b54; text-transform: uppercase; letter-spacing: 0.05em">Recall</span>
+              <span style="font-size: 13.5px; line-height: 1.35">Name the three components of a fairness audit.</span>
+              <span style="font-size: 12px; color: #5f5b54; margin-top: auto">Last seen 6 days ago</span>
+            </div>
+            <div style="padding: 12px 14px; border-radius: 12px; background: #ffffff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 6px">
+              <span style="font-size: 11px; font-weight: 600; color: #5f5b54; text-transform: uppercase; letter-spacing: 0.05em">Apply</span>
+              <span style="font-size: 13.5px; line-height: 1.35">A dataset was collected for billing. Can it train a churn model?</span>
+              <span style="font-size: 12px; color: #5f5b54; margin-top: auto">Last seen 3 days ago</span>
+            </div>
+            <div style="padding: 12px 14px; border-radius: 12px; background: #ffffff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 6px">
+              <span style="font-size: 11px; font-weight: 600; color: #5f5b54; text-transform: uppercase; letter-spacing: 0.05em">Recall</span>
+              <span style="font-size: 13.5px; line-height: 1.35">What does a runbook's "blast radius" section state?</span>
+              <span style="font-size: 12px; color: #5f5b54; margin-top: auto">Last seen 9 days ago</span>
+            </div>
+            <div style="padding: 12px 14px; border-radius: 12px; background: #ffffff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 6px">
+              <span style="font-size: 11px; font-weight: 600; color: #5f5b54; text-transform: uppercase; letter-spacing: 0.05em">Explain</span>
+              <span style="font-size: 13.5px; line-height: 1.35">Why does test-set leakage inflate reported accuracy?</span>
+              <span style="font-size: 12px; color: #5f5b54; margin-top: auto">Last seen 12 days ago</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right column -->
+      <aside aria-label="Courses and instructors" style="grid-column: span 5; display: flex; flex-direction: column; gap: 22px; min-width: 0">
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; align-items: baseline; justify-content: space-between">
+            <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Courses &amp; paths</h2>
+            <a href="#all" style="font-size: 13px; font-weight: 600">All 5</a>
+          </div>
+
+          <div style="padding: 14px 16px; border-radius: 14px; background: #ffffff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+              <span style="font-size: 15px; font-weight: 600">Responsible AI in Practice</span>
+              <span style="font-size: 12px; color: #5f5b54; white-space: nowrap">Graduate certificate</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #5f5b54"><span>Mastery · 4 of 7 competencies</span><span>58%</span></div>
+              <div style="height: 6px; border-radius: 999px; background: #ece8e0; overflow: hidden"><div style="width: 58%; height: 6px; background: {{accent}}"></div></div>
+            </div>
+          </div>
+
+          <div style="padding: 14px 16px; border-radius: 14px; background: #ffffff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+              <span style="font-size: 15px; font-weight: 600">Data Privacy Essentials</span>
+              <span style="font-size: 12px; font-weight: 600; color: #b3382c; background: #fbe7e4; padding: 2px 8px; border-radius: 999px; white-space: nowrap">Compliance · 9 days left</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #5f5b54"><span>Required by your employer · 40 min</span><span>0%</span></div>
+              <div style="height: 6px; border-radius: 999px; background: #ece8e0; overflow: hidden"><div style="width: 2%; height: 6px; background: {{accent}}"></div></div>
+            </div>
+            <div style="display: flex; gap: 8px">
+              <a href="#start" style="font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; background: {{accent}}; color: #ffffff; text-decoration: none">Start</a>
+              <a href="#testout" style="font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 8px; border: 1px solid #d5cfc4; color: #1c1b19; text-decoration: none">Test out (15 min)</a>
+            </div>
+          </div>
+
+          <div style="padding: 14px 16px; border-radius: 14px; background: #ffffff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px">
+              <span style="font-size: 15px; font-weight: 600">Cloud Ops Upskilling Path</span>
+              <span style="font-size: 12px; color: #5f5b54; white-space: nowrap">Role path · SRE II</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #5f5b54"><span>Skills · 6 of 9 verified</span><span>67%</span></div>
+              <div style="height: 6px; border-radius: 999px; background: #ece8e0; overflow: hidden"><div style="width: 67%; height: 6px; background: {{accent}}"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instructor presence -->
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">From your instructors</h2>
+          <div style="padding: 14px 16px; border-radius: 14px; background: #ffffff; border: 1px solid #e3ded4; display: flex; gap: 12px; align-items: flex-start">
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: #c7d7d3; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #2f4d48">AO</div>
+            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+              <div style="font-size: 14px"><span style="font-weight: 600">Dr. Amara Okafor</span> <span style="color: #5f5b54">· Responsible AI · 2 h ago</span></div>
+              <div style="font-size: 13.5px; color: #3a3833; line-height: 1.4">Office hours moved to Thursday 5 pm PT so the evening cohort can join. Bring your Module 3 evaluation notes.</div>
+              <div style="display: flex; gap: 12px; font-size: 13px; font-weight: 600; margin-top: 2px"><a href="#book">Book a slot</a><a href="#thread">Open thread</a></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#0e6b63","options":["#0e6b63","#1f4f9c","#7a3e8f","#a24f1f"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#0e6b63' };
+  }
+}
+</script>
+</body>
+</html>

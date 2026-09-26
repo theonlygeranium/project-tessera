@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Governance and outcomes console</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; background: #f4f1eb; color: #1c1b19; font-size: 13.5px; line-height: 1.4; overflow: hidden">
+
+  <!-- Admin nav -->
+  <nav aria-label="Admin" style="width: 220px; flex-shrink: 0; box-sizing: border-box; padding: 18px 12px; border-right: 1px solid #e3ded4; background: #faf8f4; display: flex; flex-direction: column; gap: 2px; font-size: 13.5px">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px">
+      <div style="width: 30px; height: 30px; border-radius: 8px; background: {{accent}}; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h16"/></svg></div>
+      <div style="display: flex; flex-direction: column; line-height: 1.2"><span style="font-weight: 600">Meridian State</span><span style="font-size: 11.5px; color: #5f5b54">Institution admin</span></div>
+    </div>
+    <a href="#overview" style="padding: 8px 10px; border-radius: 8px; text-decoration: none; color: #3a3833">Overview</a>
+    <a href="#catalog" style="padding: 8px 10px; border-radius: 8px; text-decoration: none; color: #3a3833">Catalog &amp; enrollment</a>
+    <a href="#templates" style="padding: 8px 10px; border-radius: 8px; text-decoration: none; color: #3a3833">Templates &amp; brand</a>
+    <a href="#integrations" style="padding: 8px 10px; border-radius: 8px; text-decoration: none; color: #3a3833">Integrations</a>
+    <a href="#ai" aria-current="page" style="padding: 8px 10px; border-radius: 8px; text-decoration: none; color: #0e6b63; background: #e3f0ee; font-weight: 600">AI governance</a>
+    <a href="#access" style="padding: 8px 10px; border-radius: 8px; text-decoration: none; color: #3a3833">Accessibility</a>
+    <a href="#reports" style="padding: 8px 10px; border-radius: 8px; text-decoration: none; color: #3a3833">Reports</a>
+    <a href="#security" style="padding: 8px 10px; border-radius: 8px; text-decoration: none; color: #3a3833">Security &amp; audit</a>
+    <div style="flex-grow: 1"></div>
+    <div style="padding: 10px 12px; border-radius: 10px; background: #fff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 4px; font-size: 12px">
+      <span style="font-weight: 600; display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #2e7d4f"></span>All systems normal</span>
+      <span style="color: #5f5b54">Last incident: none in 180 days · status page</span>
+    </div>
+  </nav>
+
+  <main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 22px 26px; display: flex; flex-direction: column; gap: 18px; overflow: hidden">
+    <div style="display: flex; align-items: baseline; gap: 14px">
+      <h1 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 26px">AI governance</h1>
+      <span style="font-size: 13px; color: #5f5b54">Fall 2026 · 3,412 courses · 41,900 learners</span>
+      <button type="button" style="margin-left: auto; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid #d5cfc4; background: #fff; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer">Export audit (CSV)</button>
+      <button type="button" style="height: 34px; padding: 0 14px; border-radius: 9px; border: none; background: {{accent}}; color: #fff; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer">New policy</button>
+    </div>
+
+    <!-- KPI strip -->
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px">
+      <div style="padding: 14px 16px; border-radius: 12px; background: #fff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 12px; color: #5f5b54">Compliance completion</span>
+        <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.01em">91.4%</span>
+        <span style="font-size: 12px; color: #2e7d4f; font-weight: 600">+3.1 pts vs. last term</span>
+      </div>
+      <div style="padding: 14px 16px; border-radius: 12px; background: #fff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 12px; color: #5f5b54">Program outcomes mastered</span>
+        <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.01em">73%</span>
+        <span style="font-size: 12px; color: #5f5b54">median across 38 programs</span>
+      </div>
+      <div style="padding: 14px 16px; border-radius: 12px; background: #fff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 12px; color: #5f5b54">WCAG 2.2 AA conformance</span>
+        <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.01em">86%</span>
+        <span style="font-size: 12px; color: #9a6a12; font-weight: 600">412 courses with open issues</span>
+      </div>
+      <div style="padding: 14px 16px; border-radius: 12px; background: #fff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 12px; color: #5f5b54">AI review coverage</span>
+        <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.01em">94%</span>
+        <span style="font-size: 12px; color: #5f5b54">of published AI blocks human-checked</span>
+      </div>
+      <div style="padding: 14px 16px; border-radius: 12px; background: #fff; border: 1px solid #e3ded4; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 12px; color: #5f5b54">AI spend · month to date</span>
+        <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.01em">$18.2k</span>
+        <span style="font-size: 12px; color: #5f5b54">of $30k budget · tutor 61%, authoring 29%</span>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; flex-grow: 1; min-height: 0">
+      <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+
+        <!-- Policy matrix -->
+        <section aria-label="Policy matrix" style="border-radius: 12px; background: #fff; border: 1px solid #e3ded4; overflow: hidden">
+          <div style="padding: 10px 14px; border-bottom: 1px solid #ede8df; display: flex; align-items: center; gap: 10px">
+            <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Policy matrix · by program</span>
+            <span style="font-size: 12px; color: #5f5b54">Course-level overrides allowed only where marked</span>
+          </div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); padding: 8px 14px; background: #faf8f4; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #5f5b54"><span>Program</span><span>Tutor mode</span><span>Authoring AI</span><span>Retention</span><span>Model region</span><span>Override</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); padding: 9px 14px; border-top: 1px solid #f0ede6; align-items: center; background: #e3f0ee"><span style="font-weight: 600">Graduate certificates (12)</span><span>Hint-first</span><span>On · review required</span><span>1 year</span><span>US</span><span>Course</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); padding: 9px 14px; border-top: 1px solid #f0ede6; align-items: center"><span style="font-weight: 600">Undergraduate core (140)</span><span>Hint-first</span><span>On · review required</span><span>1 year</span><span>US</span><span>Dept.</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); padding: 9px 14px; border-top: 1px solid #f0ede6; align-items: center"><span style="font-weight: 600">Nursing &amp; clinical (9)</span><span>Off in assessments</span><span>On · dept. review</span><span>7 years</span><span>US</span><span>None</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); padding: 9px 14px; border-top: 1px solid #f0ede6; align-items: center"><span style="font-weight: 600">Workforce partners · EU (6)</span><span>Hint-first</span><span>On · review required</span><span>90 days</span><span>EU (GDPR)</span><span>None</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); padding: 9px 14px; border-top: 1px solid #f0ede6; align-items: center"><span style="font-weight: 600">Corporate compliance (31)</span><span>Open</span><span>Templates only</span><span>3 years</span><span>US</span><span>None</span></div>
+        </section>
+
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; flex-grow: 1; min-height: 0">
+          <!-- Integration health -->
+          <section aria-label="Integration health" style="border-radius: 12px; background: #fff; border: 1px solid #e3ded4; overflow: hidden; display: flex; flex-direction: column">
+            <div style="padding: 10px 14px; border-bottom: 1px solid #ede8df; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Integration health</div>
+            <div style="display: flex; flex-direction: column; font-size: 13px">
+              <div style="padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #f0ede6"><span style="width: 8px; height: 8px; border-radius: 50%; background: #2e7d4f"></span><span style="flex-grow: 1">SIS sync (Banner) · LTI 1.3 Advantage</span><span style="color: #5f5b54">12 min ago</span></div>
+              <div style="padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #f0ede6"><span style="width: 8px; height: 8px; border-radius: 50%; background: #2e7d4f"></span><span style="flex-grow: 1">HRIS (Workday) · roles &amp; paths</span><span style="color: #5f5b54">1 h ago</span></div>
+              <div style="padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #f0ede6"><span style="width: 8px; height: 8px; border-radius: 50%; background: #9a6a12"></span><span style="flex-grow: 1">xAPI → LRS · 2,140 statements queued</span><span style="color: #9a6a12; font-weight: 600">Delayed</span></div>
+              <div style="padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #f0ede6"><span style="width: 8px; height: 8px; border-radius: 50%; background: #2e7d4f"></span><span style="flex-grow: 1">SCORM / cmi5 imports · 38 this week</span><span style="color: #5f5b54">OK</span></div>
+              <div style="padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #f0ede6"><span style="width: 8px; height: 8px; border-radius: 50%; background: #2e7d4f"></span><span style="flex-grow: 1">SSO (SAML) · MCP agent endpoints</span><span style="color: #5f5b54">OK</span></div>
+            </div>
+          </section>
+
+          <!-- Accessibility audit -->
+          <section aria-label="Accessibility audit" style="border-radius: 12px; background: #fff; border: 1px solid #e3ded4; overflow: hidden; display: flex; flex-direction: column">
+            <div style="padding: 10px 14px; border-bottom: 1px solid #ede8df; display: flex; align-items: center; gap: 8px"><span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Accessibility · open issues</span><span style="margin-left: auto; font-size: 12px; color: #5f5b54">Title II deadline Apr 26, 2027</span></div>
+            <div style="padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13px">
+              <div style="display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><span>Missing alt text (AI-generated images)</span><span style="font-weight: 600">1,204</span></div><div style="height: 6px; border-radius: 999px; background: #ece8e0; overflow: hidden"><div style="width: 78%; height: 6px; background: #b3382c"></div></div></div>
+              <div style="display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><span>Uncaptioned video</span><span style="font-weight: 600">212</span></div><div style="height: 6px; border-radius: 999px; background: #ece8e0; overflow: hidden"><div style="width: 14%; height: 6px; background: #9a6a12"></div></div></div>
+              <div style="display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><span>Contrast below 4.5:1</span><span style="font-weight: 600">96</span></div><div style="height: 6px; border-radius: 999px; background: #ece8e0; overflow: hidden"><div style="width: 6%; height: 6px; background: #9a6a12"></div></div></div>
+              <div style="display: flex; flex-direction: column; gap: 4px"><div style="display: flex; justify-content: space-between"><span>Target size under 24 px (WCAG 2.2)</span><span style="font-weight: 600">31</span></div><div style="height: 6px; border-radius: 999px; background: #ece8e0; overflow: hidden"><div style="width: 2%; height: 6px; background: #9a6a12"></div></div></div>
+              <a href="#fix" style="font-size: 12.5px; font-weight: 600; margin-top: 2px">Queue AI alt-text drafts for instructor approval →</a>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Policy inspector -->
+      <aside aria-label="Policy inspector" style="border-radius: 12px; background: #fff; border: 1px solid #e3ded4; display: flex; flex-direction: column; overflow: hidden">
+        <div style="padding: 12px 16px; border-bottom: 1px solid #ede8df; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Inspector</span>
+          <span style="font-size: 15px; font-weight: 600">Graduate certificates</span>
+          <span style="font-size: 12px; color: #5f5b54">12 programs · 218 courses · 4,120 learners</span>
+        </div>
+        <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 13px; flex-grow: 1">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <label for="tutor-mode" style="font-weight: 600">Tutor mode default</label>
+            <select id="tutor-mode" style="height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid #d5cfc4; font-family: inherit; font-size: 13px; background: #fff">
+              <option>Hint-first (Socratic)</option><option>Explain</option><option>Open</option><option>Off in assessments</option>
+            </select>
+            <span style="font-size: 12px; color: #5f5b54">Instructors may set Explain or Open per activity.</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <label for="retention" style="font-weight: 600">Tutor transcript retention</label>
+            <select id="retention" style="height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid #d5cfc4; font-family: inherit; font-size: 13px; background: #fff">
+              <option>1 year</option><option>90 days</option><option>3 years</option><option>7 years</option>
+            </select>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-weight: 600">Data use</span>
+            <label style="display: flex; gap: 8px; align-items: center"><input type="checkbox" checked style="margin: 0"> Never used to train vendor models</label>
+            <label style="display: flex; gap: 8px; align-items: center"><input type="checkbox" checked style="margin: 0"> Instructor can view learner tutor transcripts</label>
+            <label style="display: flex; gap: 8px; align-items: center"><input type="checkbox" style="margin: 0"> Learners can export their own transcripts</label>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-weight: 600">Labeling</span>
+            <span style="font-size: 12.5px; color: #3a3833">All AI-drafted content shows an "AI draft" label and source until a person marks it reviewed. Cannot be disabled.</span>
+          </div>
+          <div style="margin-top: auto; padding: 10px 12px; border-radius: 10px; background: #fbf1dc; font-size: 12.5px; color: #7a5310; line-height: 1.45">
+            <strong>Simulation:</strong> changing retention to 90 days would delete 61,300 transcripts and affect 3 active accreditation reviews.
+          </div>
+        </div>
+        <div style="padding: 12px 16px; border-top: 1px solid #ede8df; display: flex; gap: 8px">
+          <button type="button" style="height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #d5cfc4; background: #fff; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Simulate</button>
+          <button type="button" style="height: 34px; padding: 0 12px; border-radius: 8px; border: none; background: {{accent}}; color: #fff; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Apply to 218 courses</button>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#0e6b63","options":["#0e6b63","#1f4f9c","#7a3e8f","#a24f1f"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#0e6b63' };
+  }
+}
+</script>
+</body>
+</html>

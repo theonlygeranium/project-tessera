@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Tessera · AI-native LMS UI concepts</title>
+<meta name="description" content="Research-grounded prototype screens for an AI-native learning management system for higher education and industry audiences.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Project Tessera · working prototype · September 2026</div>
+    <h1>An AI-native LMS that keeps the instructor in charge.</h1>
+    <p class="lede">Six prototype screens for a learning management system that hosts and authors courses for higher-education and industry audiences. The design borrows Canvas's predictable module-first backbone and adds an AI layer that drafts for authors, tutors learners with hints, and never publishes anything a person has not reviewed.</p>
+    <div class="cta">
+      <a class="btn" href="screens/today-dashboard.html">Open the first screen</a>
+      <a class="btn ghost" href="https://github.com/theonlygeranium/project-tessera">Repository</a>
+      <a class="btn ghost" href="https://github.com/theonlygeranium/project-tessera/blob/main/research/report.md">Research report</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="principles" aria-labelledby="p-h">
+    <h2 id="p-h">Seven decisions the screens make</h2>
+    <ol>
+      <li><strong>Modules are the spine.</strong> AI edits the same structure learners navigate; it never invents a parallel one.</li>
+      <li><strong>Plan before draft.</strong> Brief → Outline → Draft → Review → Publish, with human checkpoints where intervention is cheapest.</li>
+      <li><strong>Provenance on every block.</strong> "AI draft · from Week3_slides.pdf p. 4–7" beats a sparkle icon. Diff, revert, and a review-coverage meter.</li>
+      <li><strong>Hint-first tutor, bound by policy.</strong> The instructor sets hint-only / explain / open per activity; the tutor cites course sources; transcripts are visible under a stated policy.</li>
+      <li><strong>Personalize on evidence.</strong> Goals, time budget, language, accessibility, device, and role. Not "learning styles."</li>
+      <li><strong>Agents propose, people apply.</strong> A natural-language request becomes a previewable change set with conflicts surfaced.</li>
+      <li><strong>Quality and accessibility lint before publish.</strong> QM-style alignment checks and WCAG 2.2 AA on generated content.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="s-h">
+    <h2 id="s-h">Screens</h2>
+    <p class="muted">Each card is a live, scaled preview. Open a screen to view it at full size; links inside the screens move between them.</p>
+    <div id="grid" class="grid"></div>
+  </section>
+
+  <section class="system" aria-labelledby="d-h">
+    <h2 id="d-h">Design system used across all screens</h2>
+    <div class="cols">
+      <div>
+        <h3>Color</h3>
+        <ul class="swatches">
+          <li><span style="background:#f4f1eb"></span>Paper ground <code>#F4F1EB</code></li>
+          <li><span style="background:#1c1b19"></span>Ink <code>#1C1B19</code></li>
+          <li><span style="background:#0e6b63"></span>Accent (one) <code>#0E6B63</code></li>
+          <li><span style="background:#5b4baf"></span>AI content <code>#5B4BAF</code> + text label, always</li>
+          <li><span style="background:#2e7d4f"></span>Success <code>#2E7D4F</code></li>
+          <li><span style="background:#9a6a12"></span>Warning <code>#9A6A12</code></li>
+          <li><span style="background:#b3382c"></span>Error <code>#B3382C</code></li>
+        </ul>
+        <p class="muted">Semantic states differ in lightness, not hue alone. Text contrast ≥ 4.5:1.</p>
+      </div>
+      <div>
+        <h3>Type &amp; density</h3>
+        <p><span class="serif">Fraunces</span> for lesson reading (19px, ~68 characters per line) and page titles; <strong>IBM Plex Sans</strong> for UI; IBM Plex Mono for shortcuts and commands.</p>
+        <p>Comfortable density for learners, compact for instructors and admins. Motion limited to progress fills. Every AI element carries a tinted edge <em>and</em> a text label.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <p>Built from the evidence in <a href="https://github.com/theonlygeranium/project-tessera/blob/main/research/report.md">research/report.md</a>. Screens are prototypes; names, courses, and numbers are illustrative.</p>
+</footer>
+
+<script>
+fetch('screens.json').then(r => r.json()).then(list => {
+  const grid = document.getElementById('grid');
+  for (const s of list) {
+    const card = document.createElement('article');
+    card.className = 'card';
+    const scale = s.w > 600 ? 0.26 : 0.5;
+    card.innerHTML = `
+      <a class="preview" href="${s.file}" aria-label="Open ${s.title}">
+        <div class="viewport" style="height:${Math.round(s.h * scale)}px">
+          <iframe src="${s.file}?embed=1" title="${s.title} preview" loading="lazy" tabindex="-1"
+            style="width:${s.w}px;height:${s.h}px;transform:scale(${scale})"></iframe>
+        </div>
+      </a>
+      <div class="meta">
+        <span class="group">${s.group}</span>
+        <h3><a href="${s.file}">${s.title}</a></h3>
+        <p>${s.description}</p>
+      </div>`;
+    grid.appendChild(card);
+  }
+});
+</script>
+</body>
+</html>

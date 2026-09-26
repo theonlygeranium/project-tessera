@@ -1,0 +1,56 @@
+[
+  {
+    "file": "screens/today-dashboard.html",
+    "slug": "today-dashboard",
+    "group": "Learner",
+    "title": "C \u00b7 Adaptive Today dashboard (learner)",
+    "description": "Adaptive Today dashboard: one cross-course 'Do next' list, weekly time budget, spaced-review queue, persona preset, and a visible 'why this moved \u00b7 Undo' strip.",
+    "w": 1440,
+    "h": 900
+  },
+  {
+    "file": "screens/lesson-player.html",
+    "slug": "lesson-player",
+    "group": "Learner",
+    "title": "A \u00b7 Focus lesson player (learner)",
+    "description": "Focus lesson player: single reading column, chunk rail with time estimates, format switcher, inline knowledge check, and a hint-mode tutor that cites course sources.",
+    "w": 1440,
+    "h": 900
+  },
+  {
+    "file": "screens/mobile-today.html",
+    "slug": "mobile-today",
+    "group": "Learner",
+    "title": "C \u00b7 Today on phone",
+    "description": "Today on a phone: 15-minute session launcher, offline and low-bandwidth mode, review card.",
+    "w": 390,
+    "h": 844
+  },
+  {
+    "file": "screens/course-builder.html",
+    "slug": "course-builder",
+    "group": "Author",
+    "title": "B \u00b7 Prompt-to-course canvas (author)",
+    "description": "Prompt-to-course canvas: Brief \u2192 Outline \u2192 Draft \u2192 Review \u2192 Publish stepper, sources panel, provenance chips, tracked-changes diff, persona variants, and a publish-readiness bar.",
+    "w": 1440,
+    "h": 900
+  },
+  {
+    "file": "screens/instructor-command.html",
+    "slug": "instructor-command",
+    "group": "Instructor",
+    "title": "D \u00b7 Instructor command center",
+    "description": "Instructor command center: keyboard triage, submission + rubric side by side, labeled AI-drafted feedback, class misconceptions from tutor chats, and a \u2318K change-set preview.",
+    "w": 1440,
+    "h": 900
+  },
+  {
+    "file": "screens/admin-console.html",
+    "slug": "admin-console",
+    "group": "Admin",
+    "title": "E \u00b7 Governance & outcomes console (admin)",
+    "description": "Governance & outcomes console: KPI strip, AI policy matrix, integration health, accessibility audit, and a policy inspector that simulates before applying.",
+    "w": 1440,
+    "h": 900
+  }
+]
