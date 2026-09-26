@@ -211,7 +211,7 @@
       $('#ring-text').textContent = '2 h 18 m / 4 h';
       $('#today-sub').textContent = 'Two things left this week. About 1 h 30 m of work, and you have 1 h 42 m planned.';
       toast.hidden = false;
-      toast.innerHTML = `${icon.check}<span>Module 3 complete · ${score()}/${QUIZ.length} · mastery 58% → ${pct}% · ${cards.filter((c) => c[3]).length} review cards added</span>`;
+      toast.innerHTML = `${icon.check}<span>Module 3 complete · ${score()}/${QUIZ.length} · mastery 58% → ${pct}% · ${cards.filter((c) => c[3]).length} review card${cards.filter((c) => c[3]).length === 1 ? '' : 's'} added</span>`;
     } else {
       resume.innerHTML = RESUME_HTML;
       resume.dataset.go = 'lesson';
