@@ -10,11 +10,11 @@ An AI-native learning management system prototype for higher-education and indus
 
 | Path | Contents |
 |---|---|
-| `docs/` | Static microsite published with GitHub Pages. `index.html` is the gallery; `screens/` holds one standalone HTML page per mockup. |
+| `docs/` | Static microsite published with GitHub Pages (branch `main`, folder `/docs`). `index.html` is the gallery, `screens/` holds one standalone page per mockup, and `research.html` is the rendered report. |
 | `design/canvas/` | Source artboards (`*.dc.html`) and `canvas.json` from the design canvas. These are the editable originals. |
 | `design/DESIGN-NOTES.md` | Design system tokens, the decisions the screens encode, and their research grounding. |
 | `research/report.md` | The research report the design is based on: LXD evidence, LMS UX benchmarks, why Canvas wins, AI-authoring patterns, persona research, and the five layout briefs. |
-| `tools/build_docs.py` | Regenerates `docs/screens/` and `docs/screens.json` from `design/canvas/`. |
+| `tools/build_docs.py` | Regenerates `docs/screens/`, `docs/screens.json`, and `docs/research.html` from `design/canvas/` and `research/report.md`. Requires `pip install markdown`. |
 
 ## The six screens
 
@@ -45,7 +45,9 @@ Regenerate the site after editing an artboard source:
 python3 tools/build_docs.py
 ```
 
-Open `docs/index.html` locally, or push to `main` to publish.
+Open `docs/index.html` locally, or commit the regenerated `docs/` and push to `main` to publish. GitHub Pages serves `main` / `/docs` directly, so the build output must be committed.
+
+The repository is private but the Pages site is public. Anything the site links to must live inside `docs/`; the build renders `research/report.md` to `docs/research.html` for that reason.
 
 Each artboard is a self-contained HTML file. The `*.dc.html` sources carry a small runtime header for the design canvas they were drawn in; the build script strips it and emits plain HTML. Links between screens (`href="LessonPlayer.dc.html"`) are rewritten to the `docs/screens/` names.
 

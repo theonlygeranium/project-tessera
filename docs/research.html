@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research report · Project Tessera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="hero slim"><div class="wrap"><a href="index.html">← Project Tessera</a></div></header>
+<main class="wrap prose">
+<h1>Designing an AI-Native LMS for Higher Ed and Corporate Learning: Evidence Base, Design Principles, and Layout Briefs (September 2026)</h1>
+<p>The winning design for a new AI-native LMS copies Canvas's predictable, module-first structure and low-friction grading, and then adds an AI layer that stays under instructor control and is tuned for learning. The AI should show outlines before it drafts, label and explain what it produces, keep edits easy, and refuse to shortcut learning. The research is unusually clear that unguarded AI raises practice scores while lowering real skill. A tutor designed around pedagogy can do the opposite.</p>
+<h2>TL;DR</h2>
+<ul>
+<li><strong>Borrow Canvas's backbone, not its surface.</strong> Canvas leads North American higher ed (50% of enrollments, per Phil Hill's Year-End 2024 data). The reasons are mostly structural: a consistent Modules-based course layout, fast grading, cloud reliability and an open LTI/API ecosystem. Controlled usability studies find it only "above average" (a faculty SUS of 68.9). That leaves real room for a calmer, more focused interface to beat it on experience.</li>
+<li><strong>Build AI as a governed co-author and a Socratic tutor, not an answer machine.</strong> In a PNAS field experiment (Bastani et al., published June 25, 2025) with "nearly a thousand high school math students," an unguarded GPT-4 raised practice performance but hurt exam performance once it was removed. A guarded "tutor" version avoided that harm. A Harvard RCT of 194 intro-physics students (Kestin et al., Scientific Reports, June 2025) found a carefully designed AI tutor produced more than double the median learning gains of an active-learning class. The interface should therefore make "hint-first," human review, provenance labels and editability the default.</li>
+<li><strong>Personalize on evidence-based variables, not "learning styles."</strong> Those variables are prior knowledge, goals, time available, language, accessibility needs, device and bandwidth, and role or compliance requirements. Style-matching lacks support: a 2024 meta-analysis found only 26% of outcome measures showed the required crossover effect. Build accessibility (WCAG 2.2 AA, which is above the U.S. Title II legal floor of WCAG 2.1 AA) into the design system and the AI generator, not as an afterthought.</li>
+</ul>
+<h2>Executive Summary</h2>
+<p>The market context as of September 2026 favors a new entrant that combines Canvas-grade usability with credible AI.</p>
+<ul>
+<li><strong>Higher ed is consolidated and stable.</strong> The "Big Four" (Canvas, Brightspace, Blackboard, Moodle) have held the top four positions in North America for fifteen years. ListEdTech puts them at more than 84% of implementations.</li>
+<li><strong>The incumbents are each under pressure.</strong></li>
+<li>Blackboard's parent Anthology went through Chapter 11. When its plan took effect on Feb 27, 2026, "approximately $1.6 billion in funded debt was eliminated" (Davis Polk, creditor counsel), and it emerged as a debt-free "Blackboard" with approximately $70 million in new financing.</li>
+<li>Canvas suffered a major ShinyHunters breach and extortion incident in April–May 2026 that disrupted final exams.</li>
+<li>D2L is shipping AI in measured steps under its "Lumi" brand.</li>
+<li><strong>Corporate learning is being reshaped by AI-native players.</strong> Workday agreed to acquire Sana for "approximately $1.1 billion" (Sept 16, 2025 press release; the deal closed Nov 4, 2025), describing Sana Learn as "an end-to-end AI-native learning platform." Fosway CEO David Wilson cautions, in the 2026 9-Grid for Learning Systems, that "Delivered AI reality still lags market hype, but we are seeing big changes year on year, although corporate adoption is still patchy."</li>
+</ul>
+<p>For the product team, the evidence points to four strategic moves:</p>
+<ol>
+<li>Make course structure and navigation boringly predictable.</li>
+<li>Put the AI in a visible, reversible, source-grounded co-pilot role for authors, and in a Socratic, hint-first tutor role for learners.</li>
+<li>Treat accessibility, privacy and security as visible product features.</li>
+<li>Express persona customization through goals, pacing, language and format controls rather than pseudo-scientific learner "types."</li>
+</ol>
+<hr />
+<h2>1. Learning Experience Design: What Defines a High-Quality Learning Experience</h2>
+<h3>The research consensus</h3>
+<p>High-quality learning experiences reliably share a small set of mechanisms. Each one has a direct consequence for the interface.</p>
+<table>
+<thead>
+<tr>
+<th>Principle</th>
+<th>What the evidence says</th>
+<th>UI translation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Cognitive load management</strong></td>
+<td>Working memory is limited, so extraneous load (confusing navigation, clutter, split attention) steals capacity from learning. The Harvard AI-tutor RCT deliberately told its tutor to be brief, using no more than a few sentences, "to avoid cognitive overload."</td>
+<td>Single-column lesson reading, one primary action per screen, collapsible chrome, no competing sidebars during focused study.</td>
+</tr>
+<tr>
+<td><strong>Chunking / microlearning</strong></td>
+<td>Short, coherent segments lower load and fit adult schedules. Articulate's AI course drafts formalize this with formats from "Single Lesson" (under 5 minutes) to "Extended Course" (10+ lessons, 3+ hours).</td>
+<td>Content modeled as blocks and modules with visible time estimates. Authors see chunk length and are warned by a linter when a chunk runs long.</td>
+</tr>
+<tr>
+<td><strong>Retrieval practice &amp; spaced repetition</strong></td>
+<td>Testing yourself beats rereading. Spaced review beats massed review. D2L's "Lumi Study Support" turns quiz results into suggested review. A D2L executive said "Instead of the quiz being the end of the learning process, it helps learners learn even more."</td>
+<td>Low-stakes checks embedded in every lesson. A "Review queue" on the dashboard driven by spacing algorithms. Flashcards generated from course content, with the instructor able to approve them.</td>
+</tr>
+<tr>
+<td><strong>Scaffolding &amp; desirable difficulty</strong></td>
+<td>Learners need support that fades over time. Answer-giving AI removes productive struggle (Bastani et al., PNAS 2025).</td>
+<td>Tutor defaults to hints, worked examples and then fading. "Show answer" is gated or logged by course policy.</td>
+</tr>
+<tr>
+<td><strong>Feedback loops</strong></td>
+<td>Feedback that is timely, specific and actionable drives improvement. D2L's Lumi Feedback and Canvas's rubric tools draft feedback, and the instructor keeps control.</td>
+<td>Inline, rubric-anchored feedback on the artifact itself. Feed-forward ("next time try…"). Visible "feedback received" states.</td>
+</tr>
+<tr>
+<td><strong>Learner agency / self-regulated learning</strong></td>
+<td>Adults and graduate learners in particular benefit from planning, monitoring and reflection support.</td>
+<td>Goal setting at onboarding, a weekly plan, self-assessed confidence ratings, reflection prompts, and dashboards the learner owns.</td>
+</tr>
+<tr>
+<td><strong>Social / collaborative learning &amp; Community of Inquiry</strong></td>
+<td>The Community of Inquiry model's teaching, social and cognitive presence still frames online quality. In the EDUCAUSE 2025 data, students return to in-person settings for collaborative activities.</td>
+<td>Instructor presence surfaces (announcements with a face or video, office-hours booking), cohort activity that avoids a social-feed feel, and structured peer review.</td>
+</tr>
+<tr>
+<td><strong>Competency/mastery progression</strong></td>
+<td>Skills-first programs are now mainstream in workforce learning. Instructure launched Canvas Career as a "skills-first" product for adult learners.</td>
+<td>Map each activity to competencies. Mastery bars per skill rather than points alone. Mastery-gated paths as an option.</td>
+</tr>
+<tr>
+<td><strong>Backward design &amp; alignment</strong></td>
+<td>Outcomes → assessments → activities. QM's standards center alignment, and IgniteAI is positioned to "reinforce alignment between course objectives, assessment practices and evidence of student learning."</td>
+<td>The author workflow starts from outcomes. The AI flags gaps where an outcome has no assessment. An alignment matrix view is built in.</td>
+</tr>
+<tr>
+<td><strong>UDL / multimodal representation</strong></td>
+<td>Offering multiple means of representation, action and engagement helps everyone. This is different from "learning styles" (see Section 5).</td>
+<td>Every content block can carry a transcript, captions, alt text, an audio version and a plain-language variant. Learners choose among them freely.</td>
+</tr>
+</tbody>
+</table>
+<h3>Quality standards that should be native to the authoring tool</h3>
+<ul>
+<li><strong>Quality Matters (QM) Higher Education Rubric, Seventh Edition.</strong> It has 8 General Standards and 44 Specific Review Standards, scored out of 101 points.</li>
+<li>The Seventh Edition extended reviews to synchronous online and continuing-education (non-credit) courses.</li>
+<li>It "integrated" a focus on inclusion and belonging.</li>
+<li>It made Course Maps required in the review worksheet.</li>
+<li>QM has since released Version 2.0 of the Seventh Edition, which does not change the Standards themselves.</li>
+<li>Design implication: a built-in "QM-style readiness check" that audits objectives, alignment, navigation instructions, accessibility and learner support before publishing. It should cover both credit and corporate continuing-ed courses.</li>
+<li><strong>OSCQR (SUNY)</strong> and similar open rubrics can be offered as selectable checklists alongside QM. Institutions should be able to load their own rubric.</li>
+</ul>
+<p><strong>Interpretation:</strong> The literature converges on a message that fits AI-native design: the value lies in <em>structure</em> (alignment, chunking, retrieval, feedback) more than in <em>content volume</em>. AI makes content cheap. The LMS should therefore spend its UI budget on enforcing structure and quality, not on showcasing generation.</p>
+<hr />
+<h2>2. LMS UI/UX Best Practices</h2>
+<h3>What students and faculty actually value</h3>
+<ul>
+<li><strong>Basic functions drive satisfaction.</strong> In the EDUCAUSE 2025 Students and Technology Report:</li>
+<li>69% of students are satisfied with institutional technology services overall.</li>
+<li>That rises to about 85% where students perceive their institution as "cutting-edge" and falls to 34% where it is seen as lagging. Perceived modernity strongly colors satisfaction.</li>
+<li><strong>Consistency across courses is the pain point.</strong></li>
+<li>70% of students say hybrid courses set clear expectations.</li>
+<li>Only 59% feel instructors adapt effectively.</li>
+<li>Only 48% perceive consistency across courses. This is the strongest argument for institution-level course templates.</li>
+<li><strong>Students want an aggregated, time-oriented view.</strong> The University of Southern California (USC) presented a student-centered LMS transformation at EDUCAUSE 2025 based on a survey with 10,000+ responses. Students want "to manage multiple courses, due dates, and assignments," "integrated calendars, to-do lists, and performance views," and "flexible access, especially mobile/tablet," and they expect "predictable, consistent design."</li>
+</ul>
+<h3>Usability benchmarks (SUS)</h3>
+<p>The System Usability Scale averages 68, and roughly 80.3 or above is an "A" (MeasuringU).</p>
+<table>
+<thead>
+<tr>
+<th>Study</th>
+<th>Platform</th>
+<th>SUS / result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Abdulquadir et al., SIGITE '23 (R1 university faculty)</td>
+<td>Canvas</td>
+<td><strong>68.9</strong>: "above-average… with a lot of room for further improvements"; issues with organization and limited feature capabilities</td>
+</tr>
+<tr>
+<td>J. Information Systems &amp; Informatics, June 2024 (120 students)</td>
+<td>Moodle-based</td>
+<td><strong>71.52</strong> (SD 16.18)</td>
+</tr>
+<tr>
+<td>Gumasing et al., ICIEA 2022</td>
+<td>Blackboard vs Canvas</td>
+<td>Satisfaction means 3.56–3.88 vs 3.78–3.94; "no significant difference"</td>
+</tr>
+<tr>
+<td>IEEE 2023</td>
+<td>Blackboard, Google Classroom, Canvas</td>
+<td>ANOVA p = 0.054, no significant difference</td>
+</tr>
+<tr>
+<td>Vlachogianni &amp; Tselios, JRTE 2021/22 meta-review (104 papers, 170 surveys)</td>
+<td>Ed-tech broadly</td>
+<td>Mean <strong>70.09</strong>; "internet platforms" <strong>66.25</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Interpretation:</strong> Every major LMS sits near the SUS average. Canvas's market dominance is not explained by dramatically superior measured usability. It is explained by consistency, reliability, ecosystem and faculty perception relative to legacy systems. A new product that reaches the 80+ SUS band would be clearly differentiated. The evidence is thin, though: these are mostly small, single-institution studies.</p>
+<h3>Established best practices</h3>
+<ol>
+<li><strong>Navigation model.</strong> Use a persistent global navigation (Home/Dashboard, Courses, Calendar, Inbox, Search) and a consistent course-level navigation. Canvas's left course menu with Modules as the spine is the de facto mental model, and a new LMS should keep the same "course → modules → items" hierarchy.</li>
+<li><strong>Reduce clicks to content.</strong> The "next thing to do" should be one click from login. USC's findings and Canvas's To-Do list both point to a time-ordered action list as the primary entry point.</li>
+<li><strong>Consistent course templates.</strong> Institution- and program-level templates directly address the 48% "consistency" gap.</li>
+<li><strong>Progress visualization.</strong> Show module completion, mastery by competency and time remaining. Avoid leaderboard comparison as a default, especially for adults.</li>
+<li><strong>Notifications.</strong> Use digest-first delivery with per-course and per-type granularity. Critical items (deadlines, grades, instructor messages) should be separated from noise, and quiet hours should respect time zones.</li>
+<li><strong>Mobile responsiveness.</strong> Mobile should be a first-class learner surface covering reading, video, quizzes, discussion and notifications. Heavy authoring stays on desktop.</li>
+<li><strong>Onboarding.</strong> Use role-specific onboarding with a persona and goals setup (see Section 5). NN/G stresses that new users need support to learn what generative-AI tools can do. HAX Guideline 1 says "Make clear what the system can do."</li>
+<li><strong>Accessibility.</strong> The U.S. DOJ's ADA Title II rule makes WCAG 2.1 AA the enforceable standard for public institutions' web content, mobile apps and course materials.
+   - An April 20, 2026 Interim Final Rule moved the deadlines to April 26, 2027 for entities serving populations of 50,000+ and April 26, 2028 for smaller ones.
+   - The DOJ reportedly cited AI-generated content as an emerging accessibility risk.
+   - D2L is already aligning its authoring tools to WCAG 2.2 A/AA.
+   - A new LMS should target WCAG 2.2 AA natively, including focus appearance, target size, dragging alternatives and consistent help. Every AI-generated asset (alt text, captions, color contrast, headings) should be accessible by default.</li>
+</ol>
+<h3>Design-system guidance for learning products</h3>
+<ul>
+<li><strong>Typography.</strong> Use a highly legible humanist sans for UI and an optional reading serif for long-form lessons. Set a 16–18px base for reading, a line length of about 60–75 characters, generous line-height, and support for user-controlled text size and dyslexia-friendly spacing.</li>
+<li><strong>Density.</strong> Offer two density modes. "Comfortable" is the learner default. "Compact" suits instructors and admins in gradebooks and tables. Mature design systems commonly offer both.</li>
+<li><strong>Color.</strong> Use a calm neutral base with one brand accent. Semantic colors (success, warning, error, AI) must not rely on hue alone. Contrast must be at least 4.5:1 for text. Institutions need theming, but under contrast-safe constraints.</li>
+<li><strong>Motion.</strong> Keep motion minimal and purposeful: state transitions and progress feedback. Honor prefers-reduced-motion. Avoid celebratory animation in compliance contexts, where it feels patronizing.</li>
+<li><strong>AI visual language.</strong> Use a distinct, consistent, <em>labeled</em> treatment for AI content. Do not rely on the sparkle icon alone. NN/G's 2024 research found the ✨ icon is ambiguous: in its quantitative study (n=107), users associated it with favoriting (about 17%) and visual effects (about 17%), and "no one attributed the concept of 'artificial intelligence' to the icon."</li>
+</ul>
+<hr />
+<h2>3. Why Canvas Is So Popular and Effective, and How Competitors Compare</h2>
+<h3>Market position (dated data)</h3>
+<ul>
+<li><strong>North America higher ed by enrollment (Phil Hill &amp; Associates, Year-End 2024, published Feb 2025):</strong></li>
+<li>Canvas 50%, D2L Brightspace 20%, Blackboard 12%, Moodle 9%.</li>
+<li>Brightspace overtook Blackboard for second place by enrollment, driven largely by the SUNY and CUNY system migrations.</li>
+<li><strong>By institution count (ListEdTech):</strong></li>
+<li>Canvas holds about 43%.</li>
+<li>Moodle, Brightspace and Blackboard each hold 12–16%.</li>
+<li>"Others" total 3.4%.</li>
+<li><strong>Edutechnica, Spring 2025:</strong> Canvas holds more US higher-ed share than its next three competitors combined. This comes via Instructure's own blog, so treat the framing as vendor-amplified.</li>
+<li><strong>Outside North America, Moodle dominates by institution count</strong> (end-2023 data). Shares range from 73% in Latin America to 56% in Oceania, with a slow decline in most regions. For a global product, Moodle's long-tail, open-source, self-hosted market matters.</li>
+<li><strong>Ownership.</strong> KKR and Dragoneer completed their $4.8 billion take-private of Instructure in late 2024.</li>
+</ul>
+<p><strong>Vendor-claim caution:</strong> Instructure's marketing cites "a verified 100% uptime record throughout 2025 and early 2026," a "4.6 out of 5-star satisfaction rating" and "94% of faculty" praising organization tools. These are unaudited marketing claims. The 100% uptime claim in particular sits awkwardly next to the May 2026 incident, when Canvas was put into maintenance mode.</p>
+<h3>The product and UX reasons for Canvas's success</h3>
+<ol>
+<li><strong>Modules as a linear, legible spine.</strong> Instructors build a sequence of weeks or units, and students follow it top to bottom, with completion requirements and prerequisites when needed. This gives both roles the same mental model and is the single most copied pattern in LMS design.</li>
+<li><strong>Fast, low-friction grading (SpeedGrader).</strong> It combines a submission viewer, rubric, annotation and comment in one screen, which saves time on the heaviest recurring faculty task.</li>
+<li><strong>A clean, consistent UI built on a design system (Instructure UI / InstUI, open-source React components).</strong> Consistency across tools was the main contrast with legacy Blackboard.</li>
+<li><strong>Cloud-native from the start.</strong> Commentators note that Canvas "was cloud-native from day one while competitors were retrofitting legacy on-premise architectures." Phil Hill has long identified "intuitive design, cloud hosting &amp; scalability, and open integrations to third-party apps" as the defining LMS features of the past dozen years.</li>
+<li><strong>Open ecosystem.</strong> It offers LTI-based integrations, a large REST API, an open-source (AGPL) core, and Canvas Commons for sharing content.</li>
+<li><strong>Aggregated student views.</strong> The Dashboard, To-Do list, Calendar and mobile apps match exactly what USC's students asked for.</li>
+<li><strong>Community and network effects.</strong> Every institution in U.S. News' 2026 top 10 National Universities uses Canvas (Instructure claim). Faculty who move between institutions bring Canvas familiarity with them.</li>
+<li><strong>AI strategy (2025–2026).</strong>
+   - <strong>IgniteAI</strong> was announced at InstructureCon on July 23, 2025 as a "conductor" for AI, alongside a global <strong>OpenAI partnership</strong>.
+   - The first wave shipped in the November 2025 Canvas release, including a Rubric Generator, Discussion Insights and translations.
+   - The <strong>IgniteAI Agent</strong> is built on Model Context Protocol (MCP). It was planned for global availability by March 2026, with free access through June 30, 2026.
+   - The <strong>LLM-Enabled Assignment</strong> is in its experimental stage. It lets educators embed a structured conversational assistant in an assignment, define how the AI interacts and what evidence returns, and see students' AI interactions.
+   - <strong>Canvas Career</strong> is a skills-first, "AI-native" product for workforce learners. It was in beta from July 2025 and became broadly available in early 2026.</li>
+</ol>
+<p><strong>Canvas's weaknesses, which are the new entrant's openings:</strong>
+- Faculty-measured usability is only average, with the SIGITE study citing organization issues.
+- Course pages look inconsistent across instructors.
+- Notifications are noisy.
+- AI features arrive as a bolt-on "suite."
+- The April–May 2026 breach:
+  - ShinyHunters claimed 3.65 TB of data covering roughly 275 million users across about 8,809 schools.
+  - Instructure said passwords, birth dates, government IDs and financial data were not involved.
+  - A May 7 defacement took Canvas offline.
+  - Inside Higher Ed reported that Instructure paid a ransom. Instructure said the data was returned and copies destroyed.
+  - Reed Smith described it as Instructure's second compromise by the same group in about eight months.
+  - Security, transparency and "single point of failure" resilience are now purchasing criteria, not back-office details.</p>
+<h3>Competitor snapshot</h3>
+<table>
+<thead>
+<tr>
+<th>Platform</th>
+<th>What users tend to value</th>
+<th>Common complaints / risks</th>
+<th>2025–26 status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>D2L Brightspace</strong></td>
+<td>Strong usability gains; Phil Hill says it became "fully competitive with Instructure Canvas… in terms of general system usability and intuitive design"; competency tools; corporate push</td>
+<td>Deep configuration can overwhelm; older-looking areas</td>
+<td>Lumi Tutor, Study Support, Insights, Chat and Feedback shipped at Fusion 2025; Createspace authoring (limited availability Aug 2026, general availability planned Dec 2026); Lumi Remix (Fusion, July 9, 2026)</td>
+</tr>
+<tr>
+<td><strong>Blackboard (formerly Anthology)</strong></td>
+<td>Ultra modernized the UI; AI Design Assistant was adopted early, with 300+ institutions per Phil Hill in 2024</td>
+<td>Migration pain from Original to Ultra; institutional churn</td>
+<td>Chapter 11 filed Sept 29, 2025. Plan effective Feb 27, 2026, eliminating about $1.6B of debt; about $70M new financing; rebranded "Blackboard"; co-founder Matthew Pittinsky expected to return as CEO</td>
+</tr>
+<tr>
+<td><strong>Moodle</strong></td>
+<td>Open source, flexible, global, cheap to host</td>
+<td>Inconsistent UX that depends on theme and plugins; admin burden</td>
+<td>Dominant outside North America; slow share decline</td>
+</tr>
+<tr>
+<td><strong>Google Classroom</strong></td>
+<td>Simplicity, Google Workspace integration, free</td>
+<td>Shallow course structure for higher ed and corporate use</td>
+<td>Gemini "Guided Learning" launched Aug 2025 as a tutoring mode</td>
+</tr>
+<tr>
+<td><strong>Workday Learning + Sana</strong></td>
+<td>HRIS-native data; Sana's AI-native search, agents and content generation</td>
+<td>Josh Bersin (Sept 2025): Sana gives Workday "a badly-needed upgrade to its learning solution"</td>
+<td>Acquisition closed Nov 4, 2025 (about $1.0–1.1B); Sana Learn positioned as an "end-to-end AI-native learning platform"</td>
+</tr>
+<tr>
+<td><strong>SAP SuccessFactors Learning</strong></td>
+<td>Compliance depth, enterprise scale</td>
+<td>Admin-heavy UI</td>
+<td>"Strategic Challenger" in Fosway 2025 9-Grid</td>
+</tr>
+<tr>
+<td><strong>Docebo, Cornerstone, Absorb, TalentLMS, 360Learning</strong></td>
+<td>Automation, catalogs, compliance tracking; 360Learning's collaborative authoring</td>
+<td>Admin-oriented UIs; learners experience them as "a catalog, not a course"</td>
+<td>All marketing AI heavily; Fosway warns delivered AI lags marketing</td>
+</tr>
+<tr>
+<td><strong>Articulate Rise/Storyline</strong></td>
+<td>Beautiful block-based responsive authoring; AI Assistant drafts whole courses; Storyline Accessibility Checker</td>
+<td>Maestro Learning's review: AI "doesn't use Bloom's Taxonomy or other learning models"; don't rely on AI imagery or instructional content</td>
+<td>Q4 2025: AI captions, image generation, Manage Blocks, Quick Share</td>
+</tr>
+<tr>
+<td><strong>Creator platforms (Kajabi, Thinkific, Teachable, LearnWorlds)</strong></td>
+<td>Marketing and commerce, fast setup, attractive templates</td>
+<td>Weak pedagogy and assessment; limited accessibility and standards</td>
+<td>Useful benchmarks for storefront and onboarding polish</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>4. AI-Native LMS and AI-Assisted Authoring</h2>
+<h3>The learning evidence the UI must respect</h3>
+<ul>
+<li><strong>Guardrails decide whether AI helps or harms.</strong></li>
+<li>Bastani et al. (PNAS, June 2025) gave nearly a thousand high-school students either "GPT Base" (a ChatGPT-like interface) or "GPT Tutor" (prompts designed to safeguard learning).</li>
+<li>AI access improved practice performance, with GPT Tutor showing roughly 127% gains on practice problems.</li>
+<li>Students relying on the unguarded tool underperformed once access was removed.</li>
+<li>Safeguards, "especially asking the AI tutor to provide teacher-designed hints instead of giving away answers," mitigated the harm.</li>
+<li><strong>Pedagogically engineered tutors can outperform strong baselines.</strong></li>
+<li>Kestin et al. (Scientific Reports, June 2025) ran an RCT with 194 Harvard intro-physics students. Students "learn significantly more in less time" with a custom AI tutor than in an active-learning class, and "feel more engaged and more motivated."</li>
+<li>The tutor was given correct solutions (limiting hallucination), kept responses short, and followed research-based scaffolding.</li>
+<li>Caveat: this was one course at one elite institution, the author designed the tutor, and the outcome was short-term. The authors themselves say they cannot presume the result generalizes to higher-order synthesis tasks.</li>
+<li><strong>Consumer AI has converged on "study modes."</strong></li>
+<li>ChatGPT Study Mode launched in July 2025.</li>
+<li>Gemini Guided Learning launched Aug 6, 2025.</li>
+<li>Claude's "Learning" style launched in Claude for Education in April 2025 and was extended to all users on Aug 14, 2025.</li>
+<li>The common weak point is that answer-giving mode is one toggle away. An LMS can do better through <em>course-level policy</em>, meaning the instructor sets the tutor's mode per activity.</li>
+</ul>
+<h3>Leading examples and the UI patterns they establish</h3>
+<table>
+<thead>
+<tr>
+<th>Product</th>
+<th>Pattern</th>
+<th>Lesson for the new LMS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Articulate Rise AI course drafts</strong></td>
+<td>Staged wizard: describe or upload sources → AI proposes <strong>course details</strong> (duration, topic, tone, audience, goals, objectives) → <strong>outline</strong> → choose "text and interactive" vs "text only" → draft. There are inline "Edit with AI" controls at each stage, a <strong>"Reasoning"</strong> link explaining the recommended format, and thumbs up/down feedback.</td>
+<td>Show the plan before the product. Human checkpoints at objectives and outline are the most efficient place to intervene.</td>
+</tr>
+<tr>
+<td><strong>Instructure IgniteAI / LLM-Enabled Assignment</strong></td>
+<td>The educator defines AI behavior, objectives and evidence returned. Students converse in-LMS, and teachers see the interactions. The agent uses MCP to act across Canvas APIs.</td>
+<td>Frame the AI activity as an <em>assignment type</em> with a teacher-authored spec, plus a transcript for the teacher.</td>
+</tr>
+<tr>
+<td><strong>D2L Lumi</strong></td>
+<td>Course-grounded tutor (chat, quizzes, flashcards, study plans), post-quiz study suggestions, rubric-based draft feedback "Instructors stay in control and can edit," and outcome-alignment suggestions.</td>
+<td>Embed AI at moments in the workflow (after a quiz, while grading) rather than only in a chat box.</td>
+</tr>
+<tr>
+<td><strong>ChatGPT / Claude / Gemini study modes</strong></td>
+<td>Socratic questioning, hints, check-for-understanding.</td>
+<td>Make this the default tutor persona.</td>
+</tr>
+</tbody>
+</table>
+<h3>Human-AI interaction principles to encode</h3>
+<p><strong>Microsoft's Guidelines for Human-AI Interaction</strong> (Amershi et al., CHI 2019) set out 18 guidelines. They were validated with 49 design practitioners testing 20 AI products. The most relevant ones for an LMS are:
+- G1 "Make clear what the system can do."
+- G2 "Make clear how well the system can do what it can do."
+- G9 "Support efficient correction. Make it easy to edit, refine, or recover when the AI system is wrong."
+- G10 "Scope services when in doubt."
+- G11 "Make clear why the system did what it did."
+- G15 "Encourage granular feedback."
+- G17 "Provide global controls."
+- G18 "Notify users about changes."</p>
+<p><strong>Google PAIR's People + AI Guidebook</strong> has six chapters: User Needs + Defining Success, Data Collection + Evaluation, Mental Models, Explainability + Trust, Feedback + Control, and Errors + Graceful Failure. Two points matter most here:
+- "Help users calibrate their trust… the user shouldn't trust the system completely."
+- A warning against "AI magic" messaging, which "can establish mental models that overestimate what the product can actually do."</p>
+<p><strong>Nielsen Norman Group</strong> makes four relevant arguments:
+- <em>AI chatbots discourage error checking</em> (May 2025): "today's LLMs encourage users to take outputs at face value," and most tools "fail in this responsibility" of helping users catch errors.
+- <em>AI hallucinations</em> (Feb 2025): recommends source links, confidence cues and contextual warnings rather than a generic small-font disclaimer.
+- <em>Generative UI</em> (Mar 2024): interfaces "dynamically generated in real time by artificial intelligence." NN/G presents this explicitly as an anticipated direction with an unclear timeline, not a settled practice.
+- <em>The 5 Qualities of Site-Specific AI Chatbots</em> (July 2026): handoff willingness, flexibility, proactivity, emotional responsiveness and transparency.</p>
+<p><strong>Resulting pattern library for the LMS:</strong>
+1. <strong>Plan → Draft → Review → Publish</strong> as a visible pipeline, with AI output always landing as a <em>draft</em> and never auto-published to learners.
+2. <strong>Provenance on every block.</strong> Each block carries a label such as "AI-drafted from <em>Week3_slides.pdf</em>, p. 4–7" or "Edited by instructor" or "Human-authored," with a source link and a diff view.
+3. <strong>Granular regenerate/refine</strong> at block, section and course level (G9, G15), with version history and one-click revert.
+4. <strong>Explain-why popovers</strong> ("Why this quiz item?" → shows the outcome and source passage) (G11).
+5. <strong>Capability and limits disclosure</strong> at first use and in settings (G1, G2), in plain language.
+6. <strong>Global AI controls</strong> by institution, course and learner (G17): tutor mode, allowed tools, data retention and model region.
+7. <strong>Co-pilot, not autopilot.</strong> Agentic actions (bulk date shifts, re-aligning rubrics, messaging at-risk learners) are shown as a <em>proposed change set</em> that the instructor approves.</p>
+<h3>Ethical and pedagogical guardrails</h3>
+<ul>
+<li><strong>Academic integrity.</strong> Design assessments for the AI era: process-visible assignments, AI-use declarations and oral or reflective components. Tutor transcripts should be visible to instructors under a clear policy.</li>
+<li><strong>Hallucination.</strong> Ground generation in instructor-supplied sources and show citations. The Harvard tutor's use of supplied solutions is the model to follow. Flag low-confidence items for review.</li>
+<li><strong>Bias.</strong> Mitigate social biases (HAX G6). Run bias and representation checks on generated examples, names and images.</li>
+<li><strong>Over-automation.</strong> Fosway notes that task automation is reshaping instructional-design roles. Keep the human reviewer accountable and measure review depth, not just speed.</li>
+<li><strong>Privacy and security.</strong> Follow FERPA (U.S. higher ed) and GDPR (EU and corporate) obligations. Provide no-training-on-customer-data commitments, data-residency options and admin-visible AI logs. The Canvas incident shows that messages between students and teachers are highly sensitive data.</li>
+<li><strong>Accessibility of AI output.</strong> The DOJ reportedly flagged AI-generated content as an accessibility risk, so the generator must produce headings, alt text, captions and sufficient contrast by default.</li>
+</ul>
+<hr />
+<h2>5. Learner Personas and Personalization</h2>
+<h3>What to personalize, and what not to</h3>
+<ul>
+<li><strong>Do not personalize by "learning style."</strong></li>
+<li>Pashler et al. (2008) found "virtually no evidence" for the crossover interaction needed to validate style-matching.</li>
+<li>A 2024 meta-analysis (Clinton-Lisell &amp; Litzinger, 21 studies, 1,712 participants) found a small overall effect (g = 0.31). Only 26% of outcome measures showed the crossover pattern the meshing hypothesis requires, so the authors' evidence remains weak for the core claim.</li>
+<li>Melzner &amp; Kappes (Instructional Science, 2024, N = 222) found no support.</li>
+<li><em>The contested nuance:</em> offering multiple formats is good UDL practice. <em>Assigning</em> learners to one format based on a style quiz is not supported.</li>
+<li><strong>Do personalize on variables that matter:</strong></li>
+<li>prior knowledge (diagnostic pre-checks, placement out of mastered content)</li>
+<li>goals and motivation (degree, promotion, certification, compliance deadline)</li>
+<li>time available and pacing</li>
+<li>language and reading level</li>
+<li>accessibility needs</li>
+<li>device and bandwidth</li>
+<li>role or job context (corporate)</li>
+</ul>
+<h3>Persona-to-interface mapping</h3>
+<table>
+<thead>
+<tr>
+<th>Persona</th>
+<th>Primary need</th>
+<th>Interface expression</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Traditional undergrad</td>
+<td>Juggle multiple courses and deadlines</td>
+<td>Cross-course "This week" list, calendar, mobile push digests, study-group entry points</td>
+</tr>
+<tr>
+<td>Graduate / professional-degree</td>
+<td>Depth, autonomy, research</td>
+<td>Compact density, reading-heavy lesson player, citation export, fewer nudges</td>
+</tr>
+<tr>
+<td>Adult / working learner</td>
+<td>Fit learning into fragments of time</td>
+<td>Time-boxed "15-minute sessions," resume-where-you-left-off, flexible deadlines view, evening/weekend reminders</td>
+</tr>
+<tr>
+<td>Corporate compliance</td>
+<td>Finish correctly and fast; proof of completion</td>
+<td>Test-out option (place out via assessment), clear due date and certificate, minimal gamification, audit trail</td>
+</tr>
+<tr>
+<td>Corporate upskilling</td>
+<td>Skills tied to role and career</td>
+<td>Skills profile, role-based paths, manager visibility (opt-in), "ask the knowledge base"</td>
+</tr>
+<tr>
+<td>Certification candidate</td>
+<td>Exam readiness</td>
+<td>Blueprint-aligned mastery map, spaced review queue, timed practice exams</td>
+</tr>
+<tr>
+<td>Neurodivergent learners</td>
+<td>Reduced distraction, predictability</td>
+<td>Focus mode, reduced motion, chunk timers, explicit task checklists, consistent layouts</td>
+</tr>
+<tr>
+<td>ESL / multilingual</td>
+<td>Comprehension</td>
+<td>Interface and content translation (Canvas and D2L both now offer AI translation), glossaries, plain-language toggle, bilingual side-by-side</td>
+</tr>
+<tr>
+<td>Mobile-first / low-bandwidth</td>
+<td>Access anywhere</td>
+<td>Offline downloads, audio-only and text-only modes, lightweight pages, SMS/WhatsApp-style nudges</td>
+</tr>
+<tr>
+<td>Accessibility needs</td>
+<td>Equal access</td>
+<td>Screen-reader-first components, captions and transcripts everywhere, keyboard paths, user-controlled text size and contrast</td>
+</tr>
+</tbody>
+</table>
+<h3>How the interface should express customization</h3>
+<ol>
+<li><strong>Onboarding "learning profile."</strong> Ask about goals, weekly time budget, language, accessibility preferences, device and notification style. Profiles should be editable at any time and never forced.</li>
+<li><strong>Presets, not a hundred settings.</strong> Offer persona presets ("Busy professional," "Exam prep," "Focus &amp; low-distraction," "Low bandwidth") that set density, pacing, reminder cadence and format defaults.</li>
+<li><strong>Tone and difficulty controls on the AI tutor</strong>, bounded by instructor policy.</li>
+<li><strong>Transparent adaptivity.</strong> When the system adapts a path, say why ("Skipped Module 2 because you scored 92% on the pre-check; undo") (HAX G11, G16).</li>
+</ol>
+<p><strong>Evidence caveat:</strong> Rigorous evidence on <em>interface-level</em> persona customization (as opposed to adaptive sequencing) is thin. Personalization features should be A/B tested against learning outcomes, not just engagement.</p>
+<hr />
+<h2>6. Modern Product and UI Inspiration Beyond LMSs</h2>
+<p>The following benchmarks come from design practice rather than peer-reviewed research. They are widely cited as models for calm, focused, AI-native interfaces.</p>
+<table>
+<thead>
+<tr>
+<th>Product</th>
+<th>Pattern worth borrowing</th>
+<th>Ed-tech application</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Notion</strong></td>
+<td>Block-based editor; slash commands; inline AI on selection</td>
+<td>Course authoring as blocks (Rise already proves the model); "/quiz," "/reflection," "/case" commands</td>
+</tr>
+<tr>
+<td><strong>Linear</strong></td>
+<td>Speed, keyboard-first, command palette (⌘K), restrained color, opinionated workflows</td>
+<td>Instructor command palette ("Extend deadline for Section B," "Open SpeedGrader for Essay 2"); calm triage views</td>
+</tr>
+<tr>
+<td><strong>Figma</strong></td>
+<td>Multiplayer presence, comments pinned to objects, component libraries</td>
+<td>Co-authoring with presence; reviewer comments pinned to blocks; shared institutional block libraries</td>
+</tr>
+<tr>
+<td><strong>Duolingo</strong></td>
+<td>Streaks, tiny sessions, immediate feedback, spaced review</td>
+<td>Review queue and daily goals, <em>used selectively</em> (right for upskilling and language, wrong for compliance)</td>
+</tr>
+<tr>
+<td><strong>Claude / ChatGPT / Gemini</strong></td>
+<td>Conversational canvas + side-by-side artifact; study/learning modes</td>
+<td>Tutor side panel with artifacts (worked examples, diagrams) and a course-grounded knowledge scope</td>
+</tr>
+<tr>
+<td><strong>Perplexity</strong></td>
+<td>Answers with inline citations</td>
+<td>Every tutor answer cites the course source passage</td>
+</tr>
+<tr>
+<td><strong>Cursor</strong></td>
+<td>AI proposals shown as diffs to accept or reject</td>
+<td>Author reviews AI edits as tracked changes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Adoption signals in ed-tech:</strong> Block-based authoring (Rise, D2L Createspace), side-panel assistants (Lumi, IgniteAI), agentic actions via MCP (IgniteAI Agent) and study modes (all major labs) are already shipping. Generative UI remains mostly aspirational, per NN/G's own framing.</p>
+<hr />
+<h2>7. Synthesis: Design Guidance for the New AI-Native LMS</h2>
+<h3>(a) Learner experience</h3>
+<ul>
+<li><strong>Dashboard ("Today"):</strong> a single prioritized list across all courses (due items, review-queue cards, instructor messages); a weekly time budget against planned work; progress by competency; persona presets control density and nudges.</li>
+<li><strong>Course home:</strong> instructor welcome (presence); a "Start/Resume" primary button; a module map with time estimates and completion; outcomes visible; template enforced by institution or program.</li>
+<li><strong>Module/lesson player:</strong> focus mode with a single column; progress rail; embedded retrieval checks every few minutes; format switcher (video / transcript / audio / plain language); tutor in a collapsible side panel, hint-first and course-grounded, with citations.</li>
+<li><strong>Assessments:</strong> low-stakes checks everywhere; clear policies (AI allowed? attempts? timing?); accommodations applied automatically from the profile; test-out for corporate learners.</li>
+<li><strong>Feedback:</strong> rubric-anchored, inline on the artifact; AI-drafted and instructor-approved, labeled accordingly; a "next step" link to targeted review.</li>
+<li><strong>Progress:</strong> mastery by skill; completion certificates and credentials with a portable record; no default public leaderboards.</li>
+<li><strong>Social:</strong> structured discussion with AI-summarized threads for instructors; peer review; cohort presence in a light-touch form.</li>
+</ul>
+<h3>(b) Instructor/author experience</h3>
+<ul>
+<li><strong>Natural-language course builder:</strong> prompt + sources → course brief (audience, outcomes, duration, tone, persona targets) → outline → drafts. Human checkpoints at brief and outline, and a "Reasoning" view at each stage.</li>
+<li><strong>File-to-course ingestion:</strong> accepts slides, PDFs, docs, videos (auto-transcribed), SCORM packages and existing courses; content chunked into blocks with source anchors; duplicate and outdated detection.</li>
+<li><strong>Modular content blocks:</strong> text, media, interactive (H5P-style), knowledge check, scenario/role-play (LLM-enabled), reflection, discussion prompt, assignment. Each block has outcome tags, time estimate, accessibility status and provenance.</li>
+<li><strong>AI review/edit workflow:</strong> tracked-changes diffs; accept or reject per block; a "review coverage" meter; a quality linter (QM/OSCQR-style alignment, accessibility, reading level, bias).</li>
+<li><strong>Persona targeting:</strong> variants per persona (plain-language, 15-minute micro-path, compliance-only path) generated from one master and kept in sync.</li>
+<li><strong>Analytics:</strong> outcome mastery heatmaps; item analysis; at-risk signals with <em>suggested</em> interventions that need approval; tutor-conversation insights (common misconceptions).</li>
+</ul>
+<h3>(c) Admin/institution experience</h3>
+<ul>
+<li><strong>Integrations:</strong> LTI 1.3 / LTI Advantage; SIS (higher ed) and HRIS (Workday, SAP SuccessFactors); SSO; SCORM 1.2/2004 import, xAPI with an LRS, cmi5; open APIs plus MCP endpoints for agents.</li>
+<li><strong>Reporting:</strong> compliance completion and audit trails (corporate); program outcome and accreditation evidence (higher ed); accessibility conformance dashboard (Title II readiness).</li>
+<li><strong>AI governance console:</strong> model and provider choices; data residency and retention; tutor-mode policies by program; content-labeling rules; usage and cost monitoring; incident logs; opt-outs; security posture visible to customers.</li>
+</ul>
+<h3>Suggested information architecture</h3>
+<p><strong>Global navigation (left rail, collapsible):</strong> Today · Learn (My courses &amp; paths) · Calendar · Inbox · Search/Ask (⌘K) · Profile &amp; preferences.
+<strong>Instructor adds:</strong> Create (Studio) · Grade (triage queue) · Insights.
+<strong>Admin adds:</strong> Catalog &amp; enrollment · Integrations · AI Governance · Reports · Templates &amp; brand.
+<strong>Course level:</strong> Home · Modules (spine) · Assessments · Discussions · Grades/Mastery · People · Tutor (panel, not a page).
+<strong>Principle:</strong> Every object is reachable through the command palette and through the "Today" list. Modules remain the canonical structure that the AI edits, so AI never invents a parallel structure.</p>
+<h3>Signature interactions (differentiators)</h3>
+<ol>
+<li><strong>"Plan-first" course generation</strong> with an editable course brief and outline before any content is drafted.</li>
+<li><strong>Provenance chips and a diff-review mode</strong> on every AI-touched block, plus a review-coverage meter.</li>
+<li><strong>Policy-bound Socratic tutor.</strong> The instructor sets the mode per activity (hint-only / explain / open). The tutor cites course sources, and its transcripts are visible to the instructor.</li>
+<li><strong>Persona variants from one master course,</strong> kept in sync automatically.</li>
+<li><strong>Instructor command palette and agent change-sets.</strong> Natural-language requests like "Move Week 5 due dates by two days for Section B" produce a previewable change set.</li>
+<li><strong>Built-in quality and accessibility linter</strong> mapped to QM-style standards and WCAG 2.2 AA, which runs before publish.</li>
+<li><strong>Unified "Today" across degree courses, corporate paths and review cards,</strong> one interface for both markets.</li>
+</ol>
+<hr />
+<h2>8. Layout Concept Briefs (as built in <code>design/canvas/</code> and <code>docs/screens/</code>)</h2>
+<h3>Concept A: "Focus Lesson Player" (learner) — <code>LessonPlayer.dc.html</code></h3>
+<ul>
+<li><strong>Regions:</strong> slim top bar (course, lesson, progress %, exit focus); left progress rail with chunks and time estimates; center reading column (~680px); right tutor panel.</li>
+<li><strong>Key components:</strong> chunk cards with inline knowledge checks; format switcher; "Explain differently" and "Give me a hint," bounded by instructor policy; next-up action.</li>
+<li><strong>Interaction model:</strong> linear, one action at a time; answering a check reveals feedback inline; tutor responds in 2–4 sentences with a citation chip.</li>
+<li><strong>Grounding:</strong> cognitive load; retrieval practice; Harvard RCT tutor design (brevity, scaffolding); Bastani guardrails (hint-first); UDL; WCAG 2.2.</li>
+</ul>
+<h3>Concept B: "Prompt-to-Course Canvas" (author) — <code>CourseBuilder.dc.html</code></h3>
+<ul>
+<li><strong>Regions:</strong> left Sources panel with extraction status; center outline → block stack; right Co-author panel; bottom quality bar.</li>
+<li><strong>Key components:</strong> Brief card; outline tree; slash-command block library; provenance chips; diff view; persona-variant tabs; publish-readiness checklist.</li>
+<li><strong>Interaction model:</strong> Brief → Outline → Draft → Review → Publish stepper; every AI output lands as a draft; regenerate per block; version history.</li>
+<li><strong>Grounding:</strong> Articulate's staged draft flow; HAX G1, G9, G11, G15; PAIR trust calibration; NN/G on error checking and the sparkles icon; QM alignment.</li>
+</ul>
+<h3>Concept C: "Adaptive Today Dashboard" (learner) — <code>Main.dc.html</code>, <code>MobileToday.dc.html</code></h3>
+<ul>
+<li><strong>Regions:</strong> greeting and weekly time ring; "Do next" priority stack; review queue; courses and paths with mastery bars; instructor presence; persona preset switcher.</li>
+<li><strong>Interaction model:</strong> presets reconfigure density, card types and nudges; every adaptive choice carries a "why" and an undo.</li>
+<li><strong>Grounding:</strong> USC student feedback; EDUCAUSE consistency gap; evidence-based personalization; HAX G11, G16–G17.</li>
+</ul>
+<h3>Concept D: "Instructor Command Center" — <code>InstructorCommand.dc.html</code></h3>
+<ul>
+<li><strong>Regions:</strong> left triage queue; center submission viewer with rubric side by side; right insights panel; global ⌘K palette.</li>
+<li><strong>Key components:</strong> AI-drafted rubric feedback, labeled and editable; bulk actions as previewable change sets; misconception cards from tutor transcripts; nudge composer requiring approval.</li>
+<li><strong>Grounding:</strong> Canvas SpeedGrader efficiency; D2L Lumi Feedback; IgniteAI Discussion Insights; HAX co-pilot principles.</li>
+</ul>
+<h3>Concept E: "Governance &amp; Outcomes Console" (admin) — <code>AdminConsole.dc.html</code></h3>
+<ul>
+<li><strong>Regions:</strong> KPI strip; left navigation; center report canvas; right policy inspector.</li>
+<li><strong>Key components:</strong> AI policy matrix (program × tutor mode × retention × model region); integration health; accessibility audit; simulation before apply.</li>
+<li><strong>Grounding:</strong> Title II deadlines; FERPA/GDPR; lessons from the Canvas breach; Fosway's call for operational AI; HAX G17.</li>
+</ul>
+<hr />
+<h2>Design Principles Checklist</h2>
+<ul>
+<li>[ ] Modules are the single canonical course spine. AI edits it and never bypasses it.</li>
+<li>[ ] The next action is one click from login, and a unified "Today" list spans all courses and paths.</li>
+<li>[ ] Institution and program templates enforce cross-course consistency.</li>
+<li>[ ] Lessons are chunked with time estimates, and retrieval checks are embedded in every lesson.</li>
+<li>[ ] The AI tutor defaults to hints and Socratic prompts, grounded in course sources with citations. The mode is set by instructor policy.</li>
+<li>[ ] All AI output lands as a labeled draft with provenance, a diff and revert. A human approves it before learners see it.</li>
+<li>[ ] The system explains its adaptations and AI suggestions ("why") and offers undo.</li>
+<li>[ ] Capabilities and limits are disclosed. Avoid "AI magic" language and ambiguous sparkle-only icons.</li>
+<li>[ ] Personalization uses prior knowledge, goals, time, language, accessibility, device and role, never "learning styles."</li>
+<li>[ ] WCAG 2.2 AA holds across UI and generated content: captions, alt text, contrast, keyboard access, target size, reduced motion.</li>
+<li>[ ] Agentic actions appear as previewable change sets that need approval.</li>
+<li>[ ] A quality and alignment linter (QM/OSCQR-style) runs before publish.</li>
+<li>[ ] Interoperability covers LTI 1.3, SIS/HRIS, SCORM, xAPI and cmi5, plus open APIs and MCP.</li>
+<li>[ ] AI governance is visible: model choice, data residency, retention, logs and FERPA/GDPR controls.</li>
+<li>[ ] Features are measured against learning outcomes, not just engagement or authoring speed.</li>
+</ul>
+<hr />
+<h2>Caveats</h2>
+<ul>
+<li><strong>Market data differ by method.</strong> Phil Hill (enrollment-weighted), ListEdTech (institution counts) and Edutechnica (scraping) give different Canvas shares, from about 43% to 50% or more. All are North America-centric. Moodle leads elsewhere.</li>
+<li><strong>Vendor claims are unaudited.</strong> Articulate's "up to 9 times faster," Instructure's uptime and satisfaction figures, and vendor AI adoption numbers should be treated as marketing.</li>
+<li><strong>AI-tutor evidence is promising but narrow.</strong> Both headline studies (Bastani in high-school math, Kestin in Harvard physics) are single-context and short-term. Neither tests corporate compliance or long-term retention.</li>
+<li><strong>LMS usability studies are small,</strong> mostly single-institution, and consistently find no significant differences among the major LMSs.</li>
+<li><strong>Satisfaction and sentiment data (G2, Capterra, Reddit) were not systematically mined.</strong> Validate the competitor love/hate columns with primary review analysis and user interviews.</li>
+<li><strong>Rapidly moving facts.</strong> The Canvas breach investigation, Blackboard's leadership transition, D2L Createspace availability and IgniteAI pricing after June 30, 2026 are all in flux as of September 2026.</li>
+</ul>
+<h2>Sources</h2>
+<ol>
+<li>Phil Hill — State of Higher Ed LMS Market for US and Canada, Year-End 2024 — <a href="https://onedtech.philhillaa.com/p/state-of-higher-ed-lms-market-for-us-and-canada-year-end-2024-edition">https://onedtech.philhillaa.com/p/state-of-higher-ed-lms-market-for-us-and-canada-year-end-2024-edition</a></li>
+<li>ListEdTech — LMS HED, Instructure — <a href="https://compass.listedtech.com/zp81q-hed-xt3m-inst-a9wbl-k0y6d/">https://compass.listedtech.com/zp81q-hed-xt3m-inst-a9wbl-k0y6d/</a></li>
+<li>ListEdTech — LMS Market Share — <a href="https://listedtech.com/blog/lms-market-share/">https://listedtech.com/blog/lms-market-share/</a></li>
+<li>Reed Smith — Canvas/Instructure cyberattack — <a href="https://www.reedsmith.com/articles/canvasinstructure-cyberattack-key-developments-and-action-items-for-higher-education-institutions/">https://www.reedsmith.com/articles/canvasinstructure-cyberattack-key-developments-and-action-items-for-higher-education-institutions/</a></li>
+<li>Wikipedia — 2026 Canvas data breach — <a href="https://en.wikipedia.org/wiki/2026_Canvas_data_breach">https://en.wikipedia.org/wiki/2026_Canvas_data_breach</a></li>
+<li>Inside Higher Ed — Instructure Pays Ransom to Canvas Hackers — <a href="https://www.insidehighered.com/news/tech-innovation/administrative-tech/2026/05/11/instructure-pays-ransom-canvas-hackers">https://www.insidehighered.com/news/tech-innovation/administrative-tech/2026/05/11/instructure-pays-ransom-canvas-hackers</a></li>
+<li>Instructure — Security Incident Update &amp; FAQs — <a href="https://www.instructure.com/incident_update">https://www.instructure.com/incident_update</a></li>
+<li>Phil Hill — D2L Fusion Conference Notes 2025 — <a href="https://onedtech.philhillaa.com/p/d2l-fusion-conference-notes-2025">https://onedtech.philhillaa.com/p/d2l-fusion-conference-notes-2025</a></li>
+<li>Phil Hill — D2L Fusion 24 Conference Notes — <a href="https://onedtech.philhillaa.com/p/d2l-fusion-24-conference-notes">https://onedtech.philhillaa.com/p/d2l-fusion-24-conference-notes</a></li>
+<li>Phil Hill — Observations on the Higher Education LMS Market — <a href="https://onedtech.philhillaa.com/p/observations-on-higher-ed-lms-market">https://onedtech.philhillaa.com/p/observations-on-higher-ed-lms-market</a></li>
+<li>Hechinger Report — An AI tutor helped Harvard students learn more physics in less time — <a href="https://hechingerreport.org/proof-points-ai-tutor-harvard-physics/">https://hechingerreport.org/proof-points-ai-tutor-harvard-physics/</a></li>
+<li>Kestin et al., Scientific Reports 2025 — AI tutoring outperforms in-class active learning — <a href="https://www.nature.com/articles/s41598-025-97652-6">https://www.nature.com/articles/s41598-025-97652-6</a></li>
+<li>ETC Journal — Review of Kestin et al. — <a href="https://etcjournal.com/2025/11/10/review-of-kestin-et-al-s-june-2025-harvard-study-on-ai-tutoring/">https://etcjournal.com/2025/11/10/review-of-kestin-et-al-s-june-2025-harvard-study-on-ai-tutoring/</a></li>
+<li>Bastani et al., PNAS 2025 — Generative AI without guardrails can harm learning — <a href="https://www.pnas.org/doi/10.1073/pnas.2422633122">https://www.pnas.org/doi/10.1073/pnas.2422633122</a></li>
+<li>Bastani et al., SSRN preprint — <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4895486">https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4895486</a></li>
+<li>Articulate — AI Assistant in Rise 360: AI Course Drafts — <a href="https://www.articulatesupport.com/article/AI-Assistant-in-Rise-360-AI-Course-Drafts">https://www.articulatesupport.com/article/AI-Assistant-in-Rise-360-AI-Course-Drafts</a></li>
+<li>Articulate — Rise 360: Create Content with AI Assistant — <a href="https://www.articulatesupport.com/article/Rise-360-Create-Content-with-AI-Assistant">https://www.articulatesupport.com/article/Rise-360-Create-Content-with-AI-Assistant</a></li>
+<li>Articulate — Newest Feature Releases Q4 2025 — <a href="https://www.articulate.com/blog/articulate-360s-newest-feature-releases-q4-2025/">https://www.articulate.com/blog/articulate-360s-newest-feature-releases-q4-2025/</a></li>
+<li>Articulate — New Features and Updates Q2 2025 — <a href="https://www.articulate.com/blog/announcing-new-features-and-updates-q2-2025/">https://www.articulate.com/blog/announcing-new-features-and-updates-q2-2025/</a></li>
+<li>Maestro Learning — Articulate Rise 360 AI review — <a href="https://maestrolearning.com/blogs/articulate-rise-360-ai/">https://maestrolearning.com/blogs/articulate-rise-360-ai/</a></li>
+<li>D2L — Product Highlights From Fusion 2025 — <a href="https://www.d2l.com/blog/product-highlights-from-fusion-2025/">https://www.d2l.com/blog/product-highlights-from-fusion-2025/</a></li>
+<li>D2L — New Lumi features — <a href="https://www.d2l.com/newsroom/new-d2l-lumi-features-enhance-personalized-learning-and-language-capabilities/">https://www.d2l.com/newsroom/new-d2l-lumi-features-enhance-personalized-learning-and-language-capabilities/</a></li>
+<li>D2L via PR Newswire — Fusion 2026 announcements — <a href="https://www.prnewswire.com/news-releases/d2l-announces-new-ai-enhanced-content-creation-and-personalized-learning-at-fusion-2026-302822234.html">https://www.prnewswire.com/news-releases/d2l-announces-new-ai-enhanced-content-creation-and-personalized-learning-at-fusion-2026-302822234.html</a></li>
+<li>ListEdTech — D2L Fusion 2025 takeaways — <a href="https://listedtech.com/blog/d2l-fusion-2025/">https://listedtech.com/blog/d2l-fusion-2025/</a></li>
+<li>Instructure — IgniteAI and ecosystem updates — <a href="https://www.instructure.com/press-release/instructure-delivers-safe-simple-ai-promise-igniteai-and-major-ecosystem-updates">https://www.instructure.com/press-release/instructure-delivers-safe-simple-ai-promise-igniteai-and-major-ecosystem-updates</a></li>
+<li>Instructure — InstructureCon 2025 announcements — <a href="https://www.instructure.com/resources/blog/instructurecon-2025-partner-product-announcements">https://www.instructure.com/resources/blog/instructurecon-2025-partner-product-announcements</a></li>
+<li>Instructure — OpenAI partnership — <a href="https://www.instructure.com/press-release/instructure-and-openai-announce-global-partnership-embed-ai-learning-experiences">https://www.instructure.com/press-release/instructure-and-openai-announce-global-partnership-embed-ai-learning-experiences</a></li>
+<li>Government Technology — Instructure partners with OpenAI — <a href="https://www.govtech.com/education/instructure-partners-with-openai-launches-embedded-ai-features">https://www.govtech.com/education/instructure-partners-with-openai-launches-embedded-ai-features</a></li>
+<li>Instructure — Canvas Career launch — <a href="https://www.instructure.com/press-release/instructure-launches-canvas-career-skills-first-ai-powered-learning-experience">https://www.instructure.com/press-release/instructure-launches-canvas-career-skills-first-ai-powered-learning-experience</a></li>
+<li>Instructure — Canvas Career broad availability — <a href="https://www.instructure.com/press-release/instructure-advances-skills-first-workforce-learning-broad-availability-canvas-career">https://www.instructure.com/press-release/instructure-advances-skills-first-workforce-learning-broad-availability-canvas-career</a></li>
+<li>Instructure — Canvas LMS v. the Competition — <a href="https://www.instructure.com/resources/blog/canvas-lms-v-competition-why-higher-ed-chooses-canvas">https://www.instructure.com/resources/blog/canvas-lms-v-competition-why-higher-ed-chooses-canvas</a></li>
+<li>Wikipedia — Instructure — <a href="https://en.wikipedia.org/wiki/Instructure">https://en.wikipedia.org/wiki/Instructure</a></li>
+<li>Jeanne Beatrix Law — EDUCAUSE 2025 Students and Technology — <a href="https://jeannebealaw.substack.com/p/the-educause-2025-students-and-technology">https://jeannebealaw.substack.com/p/the-educause-2025-students-and-technology</a></li>
+<li>EDUCAUSE — USC's Student-Centered LMS Transformation — <a href="https://events.educause.edu/annual-conference/2025/agenda/from-feedback-to-functionality-uscs-student-centered-lms-transformation">https://events.educause.edu/annual-conference/2025/agenda/from-feedback-to-functionality-uscs-student-centered-lms-transformation</a></li>
+<li>Oregon State — QM Rubric 7th Edition: What's New — <a href="https://blogs.oregonstate.edu/inspire/2023/07/10/quality-matters-rubric-7th-edition-whats-new/">https://blogs.oregonstate.edu/inspire/2023/07/10/quality-matters-rubric-7th-edition-whats-new/</a></li>
+<li>Quality Matters — Higher Ed Rubric — <a href="https://www.qualitymatters.org/qa-resources/rubric-standards/higher-ed-rubric">https://www.qualitymatters.org/qa-resources/rubric-standards/higher-ed-rubric</a></li>
+<li>FGCU — QM Rubric 7th Edition changes — <a href="https://www.fgcu.edu/digitallearning/digital-learning-blog/2023-10-27-qm-7thed-rubric">https://www.fgcu.edu/digitallearning/digital-learning-blog/2023-10-27-qm-7thed-rubric</a></li>
+<li>MeasuringU — Measuring Usability with the SUS — <a href="https://measuringu.com/sus/">https://measuringu.com/sus/</a></li>
+<li>Abdulquadir et al., SIGITE '23 — Usability Study of an LMS — <a href="https://dl.acm.org/doi/fullHtml/10.1145/3585059.3611415">https://dl.acm.org/doi/fullHtml/10.1145/3585059.3611415</a></li>
+<li>JISI 2024 — SUS Evaluations in Online Learning Platform — <a href="https://journal-isi.org/index.php/isi/article/view/750">https://journal-isi.org/index.php/isi/article/view/750</a></li>
+<li>Gumasing et al., ICIEA 2022 — Blackboard vs Canvas — <a href="https://dl.acm.org/doi/fullHtml/10.1145/3523132.3523137">https://dl.acm.org/doi/fullHtml/10.1145/3523132.3523137</a></li>
+<li>IEEE 2023 — Blackboard, Google Classroom and Canvas — <a href="https://ieeexplore.ieee.org/document/10111426">https://ieeexplore.ieee.org/document/10111426</a></li>
+<li>Vlachogianni &amp; Tselios — SUS systematic review — <a href="https://eric.ed.gov/?id=EJ1365411">https://eric.ed.gov/?id=EJ1365411</a></li>
+<li>Microsoft — Guidelines for Human-AI Interaction — <a href="https://www.microsoft.com/en-us/research/wp-content/uploads/2019/01/Guidelines-for-Human-AI-Interaction-camera-ready.pdf">https://www.microsoft.com/en-us/research/wp-content/uploads/2019/01/Guidelines-for-Human-AI-Interaction-camera-ready.pdf</a></li>
+<li>Google PAIR — People + AI Guidebook — <a href="https://medium.com/google-design/people-ai-guidebook-41ec2ee5ec3f">https://medium.com/google-design/people-ai-guidebook-41ec2ee5ec3f</a></li>
+<li>Google PAIR — Explainability + Trust — <a href="https://pair.withgoogle.com/chapter/explainability-trust/">https://pair.withgoogle.com/chapter/explainability-trust/</a></li>
+<li>Google PAIR — Mental Models — <a href="https://pair.withgoogle.com/chapter/mental-models/">https://pair.withgoogle.com/chapter/mental-models/</a></li>
+<li>NN/G — The Proliferation and Problem of the Sparkles Icon — <a href="https://www.nngroup.com/articles/ai-sparkles-icon-problem/">https://www.nngroup.com/articles/ai-sparkles-icon-problem/</a></li>
+<li>NN/G — AI Chatbots Discourage Error Checking — <a href="https://www.nngroup.com/articles/ai-chatbots-discourage-error-checking/">https://www.nngroup.com/articles/ai-chatbots-discourage-error-checking/</a></li>
+<li>NN/G — AI Hallucinations — <a href="https://www.nngroup.com/articles/ai-hallucinations/">https://www.nngroup.com/articles/ai-hallucinations/</a></li>
+<li>NN/G — Generative UI and Outcome-Oriented Design — <a href="https://www.nngroup.com/articles/generative-ui/">https://www.nngroup.com/articles/generative-ui/</a></li>
+<li>NN/G — AI topic index — <a href="https://www.nngroup.com/topic/ai/">https://www.nngroup.com/topic/ai/</a></li>
+<li>UPCEA — DOJ Extends Accessibility Deadline — <a href="https://upcea.edu/doj-extends-accessibility-deadline-to-april-2027-policy-matters-april-2026/">https://upcea.edu/doj-extends-accessibility-deadline-to-april-2027-policy-matters-april-2026/</a></li>
+<li>accessiBe — Title II deadline extended — <a href="https://accessibe.com/accessibility-platform/reports/title-ii-higher-education/title-ii-deadline-extend-higher-ed">https://accessibe.com/accessibility-platform/reports/title-ii-higher-education/title-ii-deadline-extend-higher-ed</a></li>
+<li>Davis Polk — Anthology chapter 11 restructuring — <a href="https://www.davispolk.com/experience/anthology-chapter-11-restructuring">https://www.davispolk.com/experience/anthology-chapter-11-restructuring</a></li>
+<li>Campus Technology — Anthology Rebrands as Blackboard — <a href="https://campustechnology.com/articles/2026/03/03/anthology-rebrands-as-blackboard-following-financial-restructuring.aspx">https://campustechnology.com/articles/2026/03/03/anthology-rebrands-as-blackboard-following-financial-restructuring.aspx</a></li>
+<li>Yahoo Finance — Blackboard emerges debt-free — <a href="https://finance.yahoo.com/news/blackboard-formerly-anthology-emerges-debt-140000617.html">https://finance.yahoo.com/news/blackboard-formerly-anthology-emerges-debt-140000617.html</a></li>
+<li>Workday — Completes Acquisition of Sana — <a href="https://newsroom.workday.com/2025-11-04-Workday-Completes-Acquisition-of-Sana">https://newsroom.workday.com/2025-11-04-Workday-Completes-Acquisition-of-Sana</a></li>
+<li>Workday — Definitive Agreement to Acquire Sana — <a href="https://investor.workday.com/news-and-events/press-releases/news-details/2025/Workday-Signs-Definitive-Agreement-to-Acquire-Sana-09-16-2025/default.aspx">https://investor.workday.com/news-and-events/press-releases/news-details/2025/Workday-Signs-Definitive-Agreement-to-Acquire-Sana-09-16-2025/default.aspx</a></li>
+<li>SEC — Workday 10-Q FY2025 — <a href="https://www.sec.gov/Archives/edgar/data/1327811/000132781125000198/wday-20251031.htm">https://www.sec.gov/Archives/edgar/data/1327811/000132781125000198/wday-20251031.htm</a></li>
+<li>SAP — Strategic Challenger, 2025 Fosway 9-Grid — <a href="https://news.sap.com/2025/03/sap-strategic-challenger-2025-fosway-9-grid-learning-systems/">https://news.sap.com/2025/03/sap-strategic-challenger-2025-fosway-9-grid-learning-systems/</a></li>
+<li>Fosway — 9-Grid for Learning Systems — <a href="https://www.fosway.com/9-grid-2/learning-systems/">https://www.fosway.com/9-grid-2/learning-systems/</a></li>
+<li>Learning News — 2025 Fosway 9-Grid for Learning Systems — <a href="https://learningnews.com/news/fosway/2025/2025-fosway-9-grid-for-learning-systems">https://learningnews.com/news/fosway/2025/2025-fosway-9-grid-for-learning-systems</a></li>
+<li>Learning News — 2025 Fosway 9-Grid for Digital Learning — <a href="https://learningnews.com/news/fosway/2025/2025-fosway-9-grid-for-digital-learning">https://learningnews.com/news/fosway/2025/2025-fosway-9-grid-for-digital-learning</a></li>
+<li>TechCrunch — Gemini Guided Learning — <a href="https://techcrunch.com/2025/08/06/google-takes-on-chatgpts-study-mode-with-new-guided-learning-tool-in-gemini/">https://techcrunch.com/2025/08/06/google-takes-on-chatgpts-study-mode-with-new-guided-learning-tool-in-gemini/</a></li>
+<li>WinBuzzer — Claude Learning Modes — <a href="https://winbuzzer.com/2025/08/14/anthropic-launches-learning-modes-for-claude-catching-up-with-chatgpt-and-google-gemini-xcxwbn/">https://winbuzzer.com/2025/08/14/anthropic-launches-learning-modes-for-claude-catching-up-with-chatgpt-and-google-gemini-xcxwbn/</a></li>
+<li>Glasp — AI Study Modes compared — <a href="https://glasp.co/articles/ai-study-modes-compared">https://glasp.co/articles/ai-study-modes-compared</a></li>
+<li>Pashler et al. — Learning Styles: Concepts and Evidence — <a href="https://pubmed.ncbi.nlm.nih.gov/26162104/">https://pubmed.ncbi.nlm.nih.gov/26162104/</a></li>
+<li>Clinton-Lisell &amp; Litzinger 2024 — Frontiers in Psychology meta-analysis — <a href="https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2024.1428732/epub">https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2024.1428732/epub</a></li>
+<li>Melzner &amp; Kappes 2024 — Testing the meshing hypothesis — <a href="https://www.researchgate.net/publication/386048451_Testing_the_meshing_hypothesis_in_prospective_teachers_Are_there_effects_of_matching_learning_style_and_presentation_mode_on_learning_performance_and_on_metacognitive_aspects_of_learning">https://www.researchgate.net/publication/386048451_Testing_the_meshing_hypothesis_in_prospective_teachers_Are_there_effects_of_matching_learning_style_and_presentation_mode_on_learning_performance_and_on_metacognitive_aspects_of_learning</a></li>
+<li>Cubite — LMS Market Share 2026 — <a href="https://cubite.io/blogs/lms-market-share-2026">https://cubite.io/blogs/lms-market-share-2026</a></li>
+<li>HigherEdJobs — Emerging Trends in University LMSs — <a href="https://www.higheredjobs.com/Articles/articleDisplay.cfm?ID=3570">https://www.higheredjobs.com/Articles/articleDisplay.cfm?ID=3570</a></li>
+</ol>
+</main>
+</body>
+</html>

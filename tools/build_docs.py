@@ -151,6 +151,38 @@ def main() -> None:
     ]
     (ROOT / "docs" / "screens.json").write_text(json.dumps(manifest, indent=2))
     print("wrote docs/screens.json")
+    build_research()
+
+
+RESEARCH_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research report · Project Tessera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="hero slim"><div class="wrap"><a href="index.html">← Project Tessera</a></div></header>
+<main class="wrap prose">
+{body}
+</main>
+</body>
+</html>
+"""
+
+
+def build_research() -> None:
+    """Render research/report.md to docs/research.html (the repo is private; the site is public)."""
+    import markdown  # pip install markdown
+
+    md = (ROOT / "research" / "report.md").read_text()
+    body = markdown.markdown(md, extensions=["tables", "sane_lists"])
+    body = re.sub(r"(https?://[^\s<\"]+)(?![^<]*</a>)", r'<a href="\1">\1</a>', body)
+    (ROOT / "docs" / "research.html").write_text(RESEARCH_TEMPLATE.format(body=body))
+    print("wrote docs/research.html")
 
 
 if __name__ == "__main__":
