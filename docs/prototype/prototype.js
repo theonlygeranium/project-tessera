@@ -12,7 +12,7 @@
     check: '<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>',
     x: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     doc: '<svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/></svg>',
-    spark: '<svg viewBox="0 0 24 24" style="color:var(--accent)"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>',
+    mark: '<svg viewBox="0 0 24 24" style="color:var(--accent)" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
     up: '<svg viewBox="0 0 24 24" style="color:var(--ok)"><path d="M4 17l6-6 4 4 6-8"/><path d="M14 7h6v6"/></svg>',
     card: '<svg viewBox="0 0 24 24" style="color:var(--ai)"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M7 3h10"/></svg>',
     eye: '<svg viewBox="0 0 24 24" style="color:var(--muted)"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
@@ -259,7 +259,7 @@
         </div>
         <h1 id="lesson-h">Check: leakage and fairness</h1>
         <p class="prose">In the loan example, the team reported 94% accuracy. Two problems hid inside that number. First, the customer ID appeared in both the training and test sets, so the model partly memorized people rather than patterns. Second, accuracy was averaged across all applicants, which masked a 17-point gap between two age groups.</p>
-        <div class="callout row">${icon.spark}<span><strong>Remember:</strong> a single headline metric is a claim about the average person. Fairness questions are about who the average hides.</span></div>
+        <div class="callout row">${icon.mark}<span><strong>Remember:</strong> a single headline metric is a claim about the average person. Fairness questions are about who the average hides.</span></div>
         <section class="check" aria-label="Knowledge check">
           <div class="qhead"><span class="label">Quick check · not graded</span></div>
           <form id="kc-form"><fieldset><legend>${esc(KC.q)}</legend>${optionsHTML('kc', KC.options, S.kc, KC.correct, locked)}</fieldset>
@@ -316,11 +316,22 @@
     }
   }
 
+  let hintLabel = '';
   function addMsg(kind, text, cites) {
     const chat = $('#chat');
     const m = document.createElement('div');
-    m.className = 'msg ' + kind;
-    m.innerHTML = esc(text) + (cites && cites.length ? `<div class="cites">${cites.map((c) => `<span class="cite">${icon.doc} ${esc(c)}</span>`).join('')}</div>` : '');
+    if (kind === 'ai') {
+      // Shared AI markup contract (docs/assets/ai-voice.css): label, body with refs, numbered sources.
+      m.className = 'ai ai--chat';
+      const refs = cites && cites.length ? `<sup class="ai-ref">${cites.map((_, i) => i + 1).join(',')}</sup>` : '';
+      m.innerHTML = `<div class="ai-who">Course tutor${hintLabel ? ` <span class="ai-src">· ${esc(hintLabel)}</span>` : ''}</div>`
+        + `<div class="ai-body">${esc(text)}${refs}</div>`
+        + (cites && cites.length ? `<div class="ai-cites">${cites.map((c, i) => `<span class="ai-cite" data-n="${i + 1}">${esc(c)}</span>`).join('')}</div>` : '');
+      hintLabel = '';
+    } else {
+      m.className = 'msg ' + kind;
+      m.textContent = text;
+    }
     chat.appendChild(m);
     chat.scrollTop = chat.scrollHeight;
   }
@@ -342,6 +353,7 @@
     S.hintsUsed++;
     if (i < script.hints.length) {
       S.hintIdx[key] = i + 1;
+      hintLabel = `hint ${i + 1} of ${script.hints.length}`;
       aiReply(script.hints[i], [script.cites[i % script.cites.length]]);
     } else {
       aiReply('You have both hints for this one. Want a worked example on a different case? It uses the same idea without giving this answer away.', []);
@@ -404,9 +416,9 @@
     const act = el.dataset.act;
     switch (act) {
       case 'toggle-tutor': S.tutorOpen = !S.tutorOpen; renderTutor(); if (S.tutorOpen) $('#ask').focus(); return;
-      case 'open-tutor': S.tutorOpen = true; renderTutor(); if (S.chunk === 3 && S.kc) aiReply('Here is the same idea from a different angle.', []), setTimeout(() => aiReply(TUTOR.kc.worked, TUTOR.kc.cites), 700); $('#ask').focus(); return;
+      case 'open-tutor': S.tutorOpen = true; renderTutor(); if (S.chunk === 3 && S.kc) { hintLabel = 'worked example'; aiReply(TUTOR.kc.worked, TUTOR.kc.cites); } $('#ask').focus(); return;
       case 'hint': nextHint(); return;
-      case 'worked': { const k = tutorKey(); S.hintsUsed++; if (typeof k === 'number' && !S.answers[k]) aiReply('Here is a parallel case, not this question:\n' + TUTOR[k].worked, TUTOR[k].cites); else aiReply(TUTOR[k].worked, TUTOR[k].cites); return; }
+      case 'worked': { const k = tutorKey(); S.hintsUsed++; hintLabel = 'worked example'; if (typeof k === 'number' && !S.answers[k]) aiReply('Here is a parallel case, not this question:\n' + TUTOR[k].worked, TUTOR[k].cites); else aiReply(TUTOR[k].worked, TUTOR[k].cites); return; }
       case 'answer': askAnswer(); return;
       case 'kc-retry': S.kc = null; renderLesson(); return;
       case 'next-chunk': S.chunk = 4; renderLesson(); render(); return;
@@ -420,7 +432,7 @@
       case 'reset': S = initial(); $('#chat').innerHTML = ''; go('today'); window.scrollTo(0, 0); return;
       case 'undo-why': S.whyUndone = true; renderToday(); return;
       case 'redo-why': S.whyUndone = false; renderToday(); return;
-      case 'module4': { const t = $('#toast'); t.hidden = false; t.innerHTML = `${icon.spark}<span>Module 4 is outside this prototype. Use Reset to walk the flow again.</span>`; return; }
+      case 'module4': { const t = $('#toast'); t.hidden = false; t.innerHTML = `${icon.mark}<span>Module 4 is outside this prototype. Use Reset to walk the flow again.</span>`; return; }
     }
     if (el.dataset.go) go(el.dataset.go);
   });

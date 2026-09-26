@@ -49,6 +49,9 @@ code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;backgroun
 .prose th{background:#faf8f4}
 .prose hr{border:0;border-top:1px solid var(--line);margin:36px 0}
 
-.proto-callout{margin-top:40px;padding:22px 24px;border-radius:16px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent)}
+.proto-callout{margin-top:40px;padding:22px 24px;border-radius:16px;background:#fff;border:1px solid var(--line);position:relative;overflow:hidden}
+.proto-callout::after{content:"";position:absolute;right:22px;top:22px;width:10px;height:10px;border-radius:2px;background:var(--accent);box-shadow:14px 0 0 #cfe3df,0 14px 0 #cfe3df,14px 14px 0 var(--accent-soft)}
 .proto-callout h2{margin:6px 0 8px}
 .proto-callout p{margin:0 0 16px;max-width:760px;color:#2a2825}
+.switch-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 4px}
+.small{font-size:13px}

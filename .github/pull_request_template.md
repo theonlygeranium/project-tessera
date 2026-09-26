@@ -14,7 +14,7 @@
 
 - [ ] Ran `python3 tools/build_docs.py` and committed the regenerated `docs/`
 - [ ] Opened every changed page locally; links between screens still resolve
-- [ ] AI-produced elements carry a tinted edge **and** a text label (no sparkle-only cues)
+- [ ] AI-produced elements use the `.ai` markup contract (attribution + sources), with no left stripes, sparkles, or gradients
 - [ ] Text contrast ≥ 4.5:1; controls are real `<button>` / `<a>` / `<input>` with labels
 - [ ] New factual claims in the report cite a source with a date; vendor claims are marked
 - [ ] Nothing on the public site links into the private repository

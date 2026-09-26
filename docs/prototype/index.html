@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="prototype.css">
+<link rel="stylesheet" href="../assets/ai-voice.css">
+<script src="../assets/ai-voice.js"></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -148,9 +150,9 @@
           <section class="card">
             <h2 class="label">What changed</h2>
             <ul class="changes" id="changes"></ul>
-            <div class="ai-note">
-              <span class="chip violet">AI summary · from your answers and tutor chat</span>
-              <p class="small" id="ai-summary"></p>
+            <div class="ai ai--note">
+              <div class="ai-who">Summary <span class="ai-src">· written by the tutor from your answers and chat</span></div>
+              <div class="ai-body" id="ai-summary"></div>
             </div>
           </section>
         </div>

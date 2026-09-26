@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <title>Focus lesson player</title>
+<link rel="stylesheet" href="../assets/ai-voice.css">
+<script src="../assets/ai-voice.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
 <style>
@@ -94,7 +96,7 @@ body.tessera-embed .tessera-bar{display:none}
         <p style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 19px; line-height: 1.6; color: #2a2825">In the loan example, the team reported 94% accuracy. Two problems hid inside that number. First, the customer ID appeared in both the training and test sets, so the model partly memorized people rather than patterns. Second, accuracy was averaged across all applicants, which masked a 17-point gap between two age groups.</p>
 
         <aside style="padding: 14px 18px; border-radius: 12px; background: #ffffff; border: 1px solid #e3ded4; display: flex; gap: 12px">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0e6b63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0e6b63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
           <div style="font-size: 14.5px; line-height: 1.5"><strong>Remember:</strong> a single headline metric is a claim about the average person. Fairness questions are about who the average hides.</div>
         </aside>
 
@@ -138,19 +140,18 @@ body.tessera-embed .tessera-bar{display:none}
       <div style="flex-grow: 1; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; overflow: hidden">
         <div style="align-self: flex-end; max-width: 270px; padding: 10px 14px; border-radius: 14px 14px 4px 14px; background: #f0ede6; font-size: 14px; line-height: 1.45">Why isn't switching to F1 enough here?</div>
 
-        <div style="display: flex; flex-direction: column; gap: 8px; max-width: 300px">
-          <div style="padding: 12px 14px; border-radius: 14px 14px 14px 4px; background: #f7f5fc; border-left: 3px solid #5b4baf; font-size: 14px; line-height: 1.5">Think about what F1 is computed from. If the same customers sit in both sets, which inputs to F1 are already contaminated?</div>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap">
-            <a href="#src" style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #f0ede6; color: #3a3833; text-decoration: none"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/></svg>Week 3 slides, p. 4</a>
-            <a href="#src2" style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; background: #f0ede6; color: #3a3833; text-decoration: none"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/></svg>Reading 3.2, §2</a>
-          </div>
+        <div class="ai ai--chat" style="max-width: 300px">
+          <div class="ai-who">Course tutor <span class="ai-src">· hint 1 of 2</span></div>
+          <div class="ai-body">Think about what F1 is computed from.<sup class="ai-ref">1</sup> If the same customers sit in both sets, which inputs to F1 are already contaminated?<sup class="ai-ref">2</sup></div>
+          <div class="ai-cites"><span class="ai-cite" data-n="1">Week 3 slides, p. 4</span><span class="ai-cite" data-n="2">Reading 3.2, §2</span></div>
         </div>
 
         <div style="align-self: flex-end; max-width: 270px; padding: 10px 14px; border-radius: 14px 14px 4px 14px; background: #f0ede6; font-size: 14px; line-height: 1.45">Precision and recall, because the predictions on "test" rows are partly memorized.</div>
 
-        <div style="display: flex; flex-direction: column; gap: 8px; max-width: 300px">
-          <div style="padding: 12px 14px; border-radius: 14px 14px 14px 4px; background: #f7f5fc; border-left: 3px solid #5b4baf; font-size: 14px; line-height: 1.5">Exactly. Now apply that to the age-group gap: does a person-level split fix it, or is that a different problem?</div>
-          <div style="display: flex; gap: 8px; font-size: 12px; color: #5f5b54; align-items: center">
+        <div class="ai ai--chat" style="max-width: 300px">
+          <div class="ai-who">Course tutor <span class="ai-src">· follow-up</span></div>
+          <div class="ai-body">Exactly. Now apply that to the age-group gap: does a person-level split fix it, or is that a different problem?</div>
+          <div class="ai-actions" style="font-size: 12px; color: #5f5b54">
             <button type="button" aria-label="Helpful" style="width: 28px; height: 28px; border-radius: 6px; border: 1px solid #e3ded4; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #5f5b54"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1 2.5 2.5V10h5a2 2 0 0 1 2 2l-1.5 6a2 2 0 0 1-2 2H7"/></svg></button>
             <button type="button" aria-label="Not helpful" style="width: 28px; height: 28px; border-radius: 6px; border: 1px solid #e3ded4; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #5f5b54"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(180deg)"><path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1 2.5 2.5V10h5a2 2 0 0 1 2 2l-1.5 6a2 2 0 0 1-2 2H7"/></svg></button>
             <span>Report a mistake</span>

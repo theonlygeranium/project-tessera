@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <title>Instructor command center</title>
 <script src="./support.js"></script>
+<link rel="stylesheet" href="../../docs/assets/ai-voice.css">
+<script src="../../docs/assets/ai-voice.js"></script>
 </head>
 <body>
 <x-dc>
@@ -138,17 +140,15 @@ a{color:#0e6b63}a:hover{color:#0a4f49}
           </div>
         </div>
 
-        <div style="flex-grow: 1; border-radius: 12px; background: #fff; border: 1px solid #d0c8ea; border-left: 4px solid #5b4baf; display: flex; flex-direction: column; overflow: hidden">
-          <div style="padding: 10px 14px; border-bottom: 1px solid #ede8df; display: flex; align-items: center; gap: 8px">
-            <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Feedback</span>
-            <span style="font-size: 11.5px; font-weight: 600; color: #3f3380; background: #eeebf8; padding: 2px 7px; border-radius: 999px">AI draft · edit before sending</span>
+        <div class="ai ai--block" data-state="draft" style="flex-grow: 1; min-height: 0">
+          <div class="ai-who">Feedback · AI draft <span class="ai-src">· from the rubric and your 2 comments · edit before sending</span></div>
+          <div class="ai-body" style="display: flex; flex-grow: 1; min-height: 0">
+            <label for="fb" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Feedback text</label>
+            <textarea id="fb" style="flex-grow: 1; min-height: 150px; border: none; resize: none; padding: 0; overflow: auto; font: inherit; line-height: inherit; color: #2a2825; background: transparent; box-sizing: border-box">Marcus, your customer-level re-split is exactly the right first move, and you show its effect (94% → 88%), which most memos skip. Two things for next time: (1) name what leakage does to precision and recall, not just that it exists; (2) your 0.8 threshold is a good recommendation, so cite where it comes from. For the limitations section, say what you would do to test the tenure proxy. Next: review "Subgroup metrics" (3.2) before Essay 3.</textarea>
           </div>
-          <label for="fb" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Feedback text</label>
-          <textarea id="fb" style="flex-grow: 1; border: none; resize: none; padding: 12px 14px; font-family: inherit; font-size: 13.5px; line-height: 1.5; color: #2a2825; background: #fff; box-sizing: border-box">Marcus, your customer-level re-split is exactly the right first move, and you show its effect (94% → 88%), which most memos skip. Two things for next time: (1) name what leakage does to precision and recall, not just that it exists; (2) your 0.8 threshold is a good recommendation, so cite where it comes from. For the limitations section, say what you would do to test the tenure proxy. Next: review "Subgroup metrics" (3.2) before Essay 3.</textarea>
-          <div style="padding: 10px 14px; border-top: 1px solid #ede8df; display: flex; gap: 8px; align-items: center">
+          <div class="ai-actions">
             <button type="button" style="height: 32px; padding: 0 12px; border-radius: 8px; border: none; background: {{accent}}; color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer">Send 16/20 + feedback</button>
             <button type="button" style="height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid #d5cfc4; background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer">Return for revision</button>
-            <span style="margin-left: auto; font-size: 12px; color: #5f5b54">Draft grounded in rubric + your 2 comments</span>
           </div>
         </div>
       </section>
@@ -170,14 +170,14 @@ a{color:#0e6b63}a:hover{color:#0a4f49}
 
       <div style="display: flex; flex-direction: column; gap: 8px">
         <h2 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Misconceptions from tutor chats</h2>
-        <div style="padding: 10px 12px; border-radius: 10px; background: #f7f5fc; border-left: 3px solid #5b4baf; font-size: 12.5px; line-height: 1.45; display: flex; flex-direction: column; gap: 4px">
-          <span style="font-weight: 600">"F1 fixes leakage" · 19 of 46 learners</span>
-          <span style="color: #3a3833">Learners treat metric choice and data split as interchangeable. Suggest: a 3-minute worked contrast in 3.2.</span>
-          <a href="#draft" style="font-weight: 600; font-size: 12.5px">Draft the block →</a>
+        <div class="ai ai--note">
+          <div class="ai-who">Pattern in tutor chats <span class="ai-src">· 19 of 46 learners</span></div>
+          <div class="ai-body" style="font-size: 13.5px">"F1 fixes leakage." Learners treat metric choice and data split as interchangeable. Suggest a 3-minute worked contrast in 3.2.</div>
+          <div class="ai-actions"><a href="#draft" style="font-weight: 600; font-size: 12.5px">Draft the block →</a></div>
         </div>
-        <div style="padding: 10px 12px; border-radius: 10px; background: #f7f5fc; border-left: 3px solid #5b4baf; font-size: 12.5px; line-height: 1.45; display: flex; flex-direction: column; gap: 4px">
-          <span style="font-weight: 600">"Proxy variables are always unfair" · 11 learners</span>
-          <span style="color: #3a3833">Mostly in the evening cohort. Suggest: raise in Thursday office hours.</span>
+        <div class="ai ai--note">
+          <div class="ai-who">Pattern in tutor chats <span class="ai-src">· 11 learners</span></div>
+          <div class="ai-body" style="font-size: 13.5px">"Proxy variables are always unfair." Mostly in the evening cohort. Suggest raising it in Thursday office hours.</div>
         </div>
         <span style="font-size: 11.5px; color: #5f5b54">Aggregated from 212 tutor conversations. Individual transcripts open only from a submission.</span>
       </div>

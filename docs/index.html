@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css">
+<link rel="stylesheet" href="assets/ai-voice.css">
+<script src="assets/ai-voice.js"></script>
 </head>
 <body>
 <header class="hero">
@@ -50,6 +52,16 @@
   <section aria-labelledby="s-h">
     <h2 id="s-h">Screens</h2>
     <p class="muted">Each card is a live, scaled preview. Open a screen to view it at full size; links inside the screens move between them.</p>
+    <div class="switch-row">
+      <span class="small muted" id="switch-label">AI style</span>
+      <div class="ai-switch" role="group" aria-labelledby="switch-label" id="ai-switch">
+        <button type="button" data-ai="marginalia">Marginalia · current</button>
+        <button type="button" data-ai="tabs">Index tab</button>
+        <button type="button" data-ai="perforated">Perforated slip</button>
+        <button type="button" data-ai="tiles">Tessera tiles</button>
+      </div>
+      <a class="small" href="explorations/ai-voice.html">What are these?</a>
+    </div>
     <div id="grid" class="grid"></div>
   </section>
 
@@ -62,7 +74,7 @@
           <li><span style="background:#f4f1eb"></span>Paper ground <code>#F4F1EB</code></li>
           <li><span style="background:#1c1b19"></span>Ink <code>#1C1B19</code></li>
           <li><span style="background:#0e6b63"></span>Accent (one) <code>#0E6B63</code></li>
-          <li><span style="background:#5b4baf"></span>AI content <code>#5B4BAF</code> + text label, always</li>
+          <li><span style="background:#5b4baf"></span>AI content <code>#5B4BAF</code>, always with a text label</li>
           <li><span style="background:#2e7d4f"></span>Success <code>#2E7D4F</code></li>
           <li><span style="background:#9a6a12"></span>Warning <code>#9A6A12</code></li>
           <li><span style="background:#b3382c"></span>Error <code>#B3382C</code></li>
@@ -72,7 +84,7 @@
       <div>
         <h3>Type &amp; density</h3>
         <p><span class="serif">Fraunces</span> for lesson reading (19px, ~68 characters per line) and page titles; <strong>IBM Plex Sans</strong> for UI; IBM Plex Mono for shortcuts and commands.</p>
-        <p>Comfortable density for learners, compact for instructors and admins. Motion limited to progress fills. Every AI element carries a tinted edge <em>and</em> a text label.</p>
+        <p>Comfortable density for learners, compact for instructors and admins. Motion limited to progress fills. AI content is set as <em>marginalia</em>: the reading serif, a gutter glyph, a small-caps attribution, and numbered source footnotes. No stripes, no sparkles. <a href="explorations/ai-voice.html">Three alternative styles</a> are kept and switchable.</p>
       </div>
     </div>
   </section>
@@ -84,27 +96,45 @@
 </footer>
 
 <script>
-fetch('screens.json').then(r => r.json()).then(list => {
+(function () {
   const grid = document.getElementById('grid');
-  for (const s of list) {
-    const card = document.createElement('article');
-    card.className = 'card';
-    const scale = s.w > 600 ? 0.26 : 0.5;
-    card.innerHTML = `
-      <a class="preview" href="${s.file}" aria-label="Open ${s.title}">
-        <div class="viewport" style="height:${Math.round(s.h * scale)}px">
-          <iframe src="${s.file}?embed=1" title="${s.title} preview" loading="lazy" tabindex="-1"
-            style="width:${s.w}px;height:${s.h}px;transform:scale(${scale})"></iframe>
-        </div>
-      </a>
-      <div class="meta">
-        <span class="group">${s.group}</span>
-        <h3><a href="${s.file}">${s.title}</a></h3>
-        <p>${s.description}</p>
-      </div>`;
-    grid.appendChild(card);
+  let list = [];
+  let style = window.TesseraAI.style;
+  const q = (base) => base + (style === window.TesseraAI.DEFAULT ? '' : (base.includes('?') ? '&' : '?') + 'ai=' + style);
+  function draw() {
+    grid.innerHTML = '';
+    for (const s of list) {
+      const card = document.createElement('article');
+      card.className = 'card';
+      const scale = s.w > 600 ? 0.26 : 0.5;
+      card.innerHTML = `
+        <a class="preview" href="${q(s.file)}" aria-label="Open ${s.title}">
+          <div class="viewport" style="height:${Math.round(s.h * scale)}px">
+            <iframe src="${q(s.file + '?embed=1')}" title="${s.title} preview" loading="lazy" tabindex="-1"
+              style="width:${s.w}px;height:${s.h}px;transform:scale(${scale})"></iframe>
+          </div>
+        </a>
+        <div class="meta">
+          <span class="group">${s.group}</span>
+          <h3><a href="${q(s.file)}">${s.title}</a></h3>
+          <p>${s.description}</p>
+        </div>`;
+      grid.appendChild(card);
+    }
+    document.querySelectorAll('a[href^="prototype/"]').forEach(a => a.setAttribute('href', q('prototype/')));
+    document.querySelectorAll('#ai-switch button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.ai === style)));
   }
-});
+  document.getElementById('ai-switch').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-ai]'); if (!b) return;
+    style = b.dataset.ai;
+    document.documentElement.setAttribute('data-ai-style', style);
+    const u = new URL(location.href);
+    if (style === window.TesseraAI.DEFAULT) u.searchParams.delete('ai'); else u.searchParams.set('ai', style);
+    history.replaceState(null, '', u);
+    draw();
+  });
+  fetch('screens.json').then(r => r.json()).then(l => { list = l; draw(); });
+})();
 </script>
 </body>
 </html>

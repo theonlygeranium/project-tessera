@@ -14,7 +14,7 @@ Tokens, conventions, and the reasoning behind the six prototype screens. The res
 | `muted` | `#5F5B54` | Secondary text (6.3:1 on white) |
 | `accent` | `#0E6B63` | The single brand accent: primary buttons, progress, current-item markers |
 | `accent-soft` | `#E3F0EE` | Selected nav, accent tints |
-| `ai` | `#5B4BAF` | AI-produced content: tinted left edge, label chip, tutor bubbles |
+| `ai` | `#5B4BAF` | AI-produced content: gutter glyph, attribution, footnote numbers (never a stripe or a fill that carries meaning alone) |
 | `ai-soft` | `#EEEBF8` / `#F7F5FC` | AI chip and bubble fills |
 | `success` | `#2E7D4F` / `#E4F2E8` | Correct, reviewed, healthy |
 | `warning` | `#9A6A12` / `#FBF1DC` | Due soon, needs review, delayed |
@@ -34,7 +34,32 @@ Two modes. Learner surfaces use comfortable density (larger type, 14–16px card
 
 ## AI labeling rule
 
-Every element the AI produced carries **both** a tinted `ai` edge and a text label ("AI draft", "AI · hint mode", "AI agent · nothing applied yet"). Never a sparkle icon alone (NN/G: users do not read ✨ as "AI"). Labels also say what the AI is grounded in ("from Week3_slides.pdf p. 4–7", "Answers only from this course's materials") and who can see the output ("Your instructor can see this conversation").
+AI content uses one markup contract and a switchable visual style. The current style is **Marginalia**, chosen on Sept 26, 2026 over three alternatives (see `docs/explorations/ai-voice.html`).
+
+**Markup contract** (style-agnostic, in every screen and the prototype):
+
+```html
+<div class="ai ai--chat">                       <!-- tutor or co-author message -->
+<div class="ai ai--note">                       <!-- summary, AI feedback, insight card -->
+<div class="ai ai--block" data-state="draft">   <!-- authored content block; "kept" once reviewed -->
+  <div class="ai-who">Course tutor <span class="ai-src">· hint 1 of 2</span></div>
+  <div class="ai-body">Text…<sup class="ai-ref">1</sup></div>
+  <div class="ai-cites"><span class="ai-cite" data-n="1">Week 3 slides, p. 4</span></div>
+  <div class="ai-actions">…</div>
+</div>
+```
+
+**Marginalia rules.** The AI writes the way a scholar annotates a book. There's no box and no stripe.
+- A gutter glyph in `ai` violet marks who is speaking: ※ for the tutor and co-author, ¶ for drafted content blocks, † for summaries and insights.
+- The attribution (`.ai-who`) is set in Fraunces small caps and says what the AI is and what it is working from ("course tutor · hint 1 of 2", "AI draft · from Week3_slides.pdf p. 4–7").
+- The body is set in the reading serif, so AI text reads differently from human UI text (Plex Sans) even in grayscale.
+- Sources are numbered footnotes, with superscript markers in the text and a dotted rule above the note list.
+- Review state is spelled out in words ("not yet reviewed", "· kept"). It never relies on color alone.
+- Never use a sparkle icon, a colored left stripe, or a gradient to signal AI.
+
+**Switching styles.** `docs/assets/ai-voice.css` holds four styles: `marginalia`, `tabs`, `perforated` and `tiles`.
+- To preview a style on any page, add `?ai=tabs` (or `perforated`, `tiles`) to its URL. The gallery also has a switcher.
+- To change the site-wide style, edit `DEFAULT` in `docs/assets/ai-voice.js`. That one line is the only change needed.
 
 ## Interaction conventions
 

@@ -1,0 +1,106 @@
+/* Project Tessera — AI visual language.
+ *
+ * One markup contract, four interchangeable styles. The active style comes from
+ * <html data-ai-style="…">, set by ai-voice.js (default: marginalia; override
+ * any page with ?ai=marginalia|tabs|perforated|tiles).
+ *
+ * Markup contract (style-agnostic):
+ *   <div class="ai ai--chat">                 tutor / co-author message
+ *   <div class="ai ai--note">                 summary, AI feedback, insight card
+ *   <div class="ai ai--block" data-state="draft|kept">   authored content block
+ *     <div class="ai-who">Label <span class="ai-src">· source</span></div>
+ *     <div class="ai-body">Text<sup class="ai-ref">1</sup></div>
+ *     <div class="ai-cites"><span class="ai-cite" data-n="1">Week 3 slides, p. 4</span></div>
+ *     <div class="ai-actions">…buttons…</div>
+ *
+ * Rules every style keeps: a text label (.ai-who) is always visible; sources are
+ * always shown; review state (data-state) is always legible without color alone.
+ * No style uses a colored left stripe.
+ */
+:root{
+  --ai:#5b4baf;--ai-d:#3f3380;--ai-s:#eeebf8;--ai-s2:#f7f5fc;--ai-line:#d9d2f0;
+  --ai-ink:#2a2825;--ai-muted:#5f5b54;--ai-ok:#2e7d4f;
+  --ai-serif:'Fraunces',Georgia,serif;--ai-mono:'IBM Plex Mono',ui-monospace,monospace;
+  --ai-mark:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='1' width='6' height='6' rx='1.2' fill='%235b4baf'/%3E%3Crect x='9' y='1' width='6' height='6' rx='1.2' fill='%235b4baf' opacity='.45'/%3E%3Crect x='1' y='9' width='6' height='6' rx='1.2' fill='%235b4baf' opacity='.45'/%3E%3Crect x='10.2' y='10.2' width='3.6' height='3.6' rx='.8' fill='%235b4baf' transform='rotate(45 12 12)'/%3E%3C/svg%3E");
+}
+.ai{box-sizing:border-box;color:var(--ai-ink);font-size:14px;line-height:1.5}
+.ai-who{font-size:12px;font-weight:600;color:var(--ai-d)}
+.ai-src{font-weight:500;color:var(--ai-muted)}
+.ai-body{min-width:0}
+.ai-cites{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--ai-muted)}
+.ai-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ai--chat{align-self:flex-start;max-width:92%}
+sup.ai-ref{display:none}
+
+/* ================= 01 · Marginalia (default) =================
+   The AI writes in the margin: reading serif, a gutter glyph, small-caps
+   attribution, and numbered footnotes. No box, no stripe. */
+[data-ai-style="marginalia"] .ai{display:grid;grid-template-columns:22px minmax(0,1fr);column-gap:10px;row-gap:4px;align-content:start}
+[data-ai-style="marginalia"] .ai::before{content:"\203B";grid-column:1;grid-row:1/span 6;font-family:var(--ai-serif);font-style:italic;font-size:21px;line-height:1.05;color:var(--ai);text-align:center}
+[data-ai-style="marginalia"] .ai--block::before{content:"\00B6"}
+[data-ai-style="marginalia"] .ai--note::before{content:"\2020"}
+[data-ai-style="marginalia"] .ai>*{grid-column:2}
+[data-ai-style="marginalia"] .ai-who{font-family:var(--ai-serif);font-size:13px;font-weight:500;font-variant:small-caps;letter-spacing:.05em;color:var(--ai-d)}
+[data-ai-style="marginalia"] .ai-src{font-style:italic;font-variant:normal;letter-spacing:0;color:var(--ai-muted)}
+[data-ai-style="marginalia"] .ai-body{font-family:var(--ai-serif);font-size:15.5px;line-height:1.55}
+[data-ai-style="marginalia"] sup.ai-ref{display:inline;font-family:var(--ai-mono);font-size:10px;font-weight:600;color:var(--ai);margin-left:1px}
+[data-ai-style="marginalia"] .ai-cites{margin-top:4px;padding-top:6px;border-top:1px dotted #cfc6ea}
+[data-ai-style="marginalia"] .ai-cite::before{content:attr(data-n);font-family:var(--ai-mono);font-weight:600;color:var(--ai);margin-right:5px}
+[data-ai-style="marginalia"] .ai-actions{margin-top:6px}
+[data-ai-style="marginalia"] .ai--block{background:#fff;border:1px solid var(--line,#e3ded4);border-radius:12px;padding:12px 16px 14px 10px}
+[data-ai-style="marginalia"] .ai--block[data-state="kept"] .ai-who::after{content:" \00B7 kept";font-style:normal;color:var(--ai-ok)}
+
+/* ================= 02 · Index tab =================
+   A tinted card with a folder tab that carries the label. */
+[data-ai-style="tabs"] .ai{position:relative;margin-top:22px;background:var(--ai-s2);border-radius:0 12px 12px 12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+[data-ai-style="tabs"] .ai-who{position:absolute;left:0;top:-22px;height:22px;max-width:calc(100% - 16px);display:flex;align-items:center;gap:6px;padding:0 10px 0 9px;background:var(--ai-s2);border-radius:9px 9px 0 0;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+[data-ai-style="tabs"] .ai-who::before{content:"";width:13px;height:13px;flex-shrink:0;background:var(--ai-mark) center/contain no-repeat}
+[data-ai-style="tabs"] .ai-cite{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#fff;color:#3a3833;border:1px solid #e3def3}
+[data-ai-style="tabs"] .ai--block[data-state="kept"]{background:#fff;box-shadow:inset 0 0 0 1px var(--ai-line)}
+[data-ai-style="tabs"] .ai--block[data-state="kept"] .ai-who{background:#fff;box-shadow:inset 1px 1px 0 var(--ai-line),inset -1px 0 0 var(--ai-line)}
+
+/* ================= 03 · Perforated slip =================
+   Unreviewed drafts have a tear-off edge and a stamp; kept blocks turn solid. */
+[data-ai-style="perforated"] .ai{display:flex;flex-direction:column;gap:8px}
+[data-ai-style="perforated"] .ai--chat{background:var(--ai-s2);border-radius:14px 14px 14px 4px;padding:11px 14px}
+[data-ai-style="perforated"] .ai--chat .ai-who{font-family:var(--ai-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase}
+[data-ai-style="perforated"] .ai--chat .ai-src{display:none}
+[data-ai-style="perforated"] .ai--block,[data-ai-style="perforated"] .ai--note{position:relative;background:#fff;border:1.5px dashed #a79ad8;border-radius:12px;padding:14px 16px}
+[data-ai-style="perforated"] .ai--block::before,[data-ai-style="perforated"] .ai--block::after,
+[data-ai-style="perforated"] .ai--note::before,[data-ai-style="perforated"] .ai--note::after{content:"";position:absolute;top:50%;width:16px;height:16px;margin-top:-8px;border-radius:50%;background:#fff;border:1.5px dashed #a79ad8}
+[data-ai-style="perforated"] .ai--block::before,[data-ai-style="perforated"] .ai--note::before{left:-9px;clip-path:inset(0 0 0 50%)}
+[data-ai-style="perforated"] .ai--block::after,[data-ai-style="perforated"] .ai--note::after{right:-9px;clip-path:inset(0 50% 0 0)}
+[data-ai-style="perforated"] .ai--block .ai-who,[data-ai-style="perforated"] .ai--note .ai-who{align-self:flex-start;font-family:var(--ai-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;border:1.5px solid var(--ai);border-radius:4px;padding:2px 6px;transform:rotate(-1.5deg)}
+[data-ai-style="perforated"] .ai-src{text-transform:none;letter-spacing:0;font-family:inherit}
+[data-ai-style="perforated"] .ai--block[data-state="kept"]{border-style:solid;border-color:var(--line,#e3ded4)}
+[data-ai-style="perforated"] .ai--block[data-state="kept"]::before,[data-ai-style="perforated"] .ai--block[data-state="kept"]::after{display:none}
+[data-ai-style="perforated"] .ai--block[data-state="kept"] .ai-who{color:var(--ai-ok);border-color:var(--ai-ok);transform:rotate(1deg)}
+[data-ai-style="perforated"] .ai-cite,[data-ai-style="tiles"] .ai-cite{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:#3a3833}
+[data-ai-style="perforated"] .ai-cite::before,[data-ai-style="tiles"] .ai-cite::before{content:"";width:7px;height:7px;border-radius:1.5px;background:var(--ai);transform:rotate(45deg)}
+
+/* ================= 04 · Tessera tiles =================
+   Mosaic mark signs AI output; AI cards carry a faint tile cluster. */
+[data-ai-style="tiles"] .ai{display:flex;flex-direction:column;gap:8px}
+[data-ai-style="tiles"] .ai-who{display:flex;align-items:center;flex-wrap:wrap;gap:3px 7px}
+[data-ai-style="tiles"] .ai-who::before{content:"";width:14px;height:14px;flex-shrink:0;background:var(--ai-mark) center/contain no-repeat}
+[data-ai-style="tiles"] .ai--chat{position:relative;margin-left:36px;max-width:calc(92% - 36px);background:var(--ai-s2);border-radius:4px 14px 14px 14px;padding:10px 13px}
+[data-ai-style="tiles"] .ai--chat::before{content:"";position:absolute;left:-36px;top:0;width:26px;height:26px;border-radius:7px;background:var(--ai-s) var(--ai-mark) center/14px no-repeat}
+[data-ai-style="tiles"] .ai--chat .ai-who::before{display:none}
+[data-ai-style="tiles"] .ai--block,[data-ai-style="tiles"] .ai--note{position:relative;overflow:hidden;background:#fff;border:1px solid #e6e1f4;border-radius:14px;padding:14px 16px}
+[data-ai-style="tiles"] .ai--block .ai-who,[data-ai-style="tiles"] .ai--note .ai-who{padding-right:70px}
+[data-ai-style="tiles"] .ai--block::after,[data-ai-style="tiles"] .ai--note::after{content:"";position:absolute;right:-6px;top:-6px;width:84px;height:84px;pointer-events:none;
+  background:linear-gradient(var(--ai-s),var(--ai-s)) 0 0/18px 18px no-repeat,linear-gradient(#e2dcf5,#e2dcf5) 22px 0/18px 18px no-repeat,linear-gradient(var(--ai-s),var(--ai-s)) 44px 0/18px 18px no-repeat,linear-gradient(#d6cef0,#d6cef0) 66px 0/18px 18px no-repeat,linear-gradient(var(--ai-s),var(--ai-s)) 44px 22px/18px 18px no-repeat,linear-gradient(#e2dcf5,#e2dcf5) 66px 22px/18px 18px no-repeat,linear-gradient(var(--ai-s),var(--ai-s)) 66px 44px/18px 18px no-repeat;
+  -webkit-mask:linear-gradient(225deg,#000 30%,transparent 75%);mask:linear-gradient(225deg,#000 30%,transparent 75%)}
+[data-ai-style="tiles"] .ai--block>*,[data-ai-style="tiles"] .ai--note>*{position:relative;z-index:1}
+[data-ai-style="tiles"] .ai--block[data-state="kept"]{border-color:var(--line,#e3ded4)}
+[data-ai-style="tiles"] .ai--block[data-state="kept"]::after{opacity:.35}
+
+/* Style switcher (gallery / exploration pages) */
+.ai-switch{display:inline-flex;gap:4px;padding:4px;border-radius:10px;background:#ebe6dd;flex-wrap:wrap}
+.ai-switch button{font:500 13px 'IBM Plex Sans',system-ui,sans-serif;min-height:32px;padding:0 12px;border:0;border-radius:7px;background:none;color:#5f5b54;cursor:pointer}
+.ai-switch button[aria-pressed="true"]{background:#fff;color:#1c1b19;font-weight:600}
+
+/* Editable AI drafts (e.g. instructor feedback): let the text area fill the card in every style */
+[data-ai-style="marginalia"] .ai--block:has(textarea){grid-template-rows:auto 1fr auto;align-content:stretch}
+.ai--block:has(textarea) .ai-body{display:flex}
+.ai--block textarea{font:inherit;line-height:inherit}

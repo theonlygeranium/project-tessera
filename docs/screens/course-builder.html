@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <title>Prompt-to-course canvas</title>
+<link rel="stylesheet" href="../assets/ai-voice.css">
+<script src="../assets/ai-voice.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
 <style>
@@ -153,34 +155,32 @@ body.tessera-embed .tessera-bar{display:none}
           </div>
 
           <!-- Block: AI draft with diff view -->
-          <div style="border-radius: 12px; background: #fff; border: 1px solid #d0c8ea; border-left: 4px solid #5b4baf; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px">
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px">
-              <span style="font-weight: 600; color: #5f5b54; text-transform: uppercase; letter-spacing: 0.05em">Callout</span>
-              <span style="padding: 2px 8px; border-radius: 999px; background: #eeebf8; color: #3f3380; font-weight: 600">AI draft · from Week3_slides.pdf p. 4–7</span>
-              <a href="#why" style="font-weight: 600; font-size: 12px">Why this block?</a>
-              <span style="margin-left: auto; color: #5f5b54">Showing your edits as a diff</span>
+          <div class="ai ai--block" data-state="draft">
+            <div class="ai-who">AI draft <span class="ai-src">· from Week3_slides.pdf p. 4–7 · v3</span></div>
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #5f5b54; flex-wrap: wrap">
+              <span style="font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em">Callout</span>
+              <a href="#why" style="font-weight: 600">Why this block?</a>
+              <span style="margin-left: auto">Your edits shown as a diff</span>
             </div>
-            <div style="font-size: 14px; line-height: 1.55; color: #2a2825">
-              Remember: a single headline metric is a claim about the <span style="background: #fbe7e4; color: #7a2a20; text-decoration: line-through">typical user</span><span style="background: #e4f2e8; color: #1f5a37; font-weight: 600"> average person</span>. Fairness questions are about who the average <span style="background: #fbe7e4; color: #7a2a20; text-decoration: line-through">ignores</span><span style="background: #e4f2e8; color: #1f5a37; font-weight: 600"> hides</span>.
-            </div>
-            <div style="display: flex; gap: 8px; align-items: center">
+            <div class="ai-body">Remember: a single headline metric is a claim about the <span style="background: #fbe7e4; color: #7a2a20; text-decoration: line-through">typical user</span><span style="background: #e4f2e8; color: #1f5a37; font-weight: 600"> average person</span>. Fairness questions are about who the average <span style="background: #fbe7e4; color: #7a2a20; text-decoration: line-through">ignores</span><span style="background: #e4f2e8; color: #1f5a37; font-weight: 600"> hides</span>.</div>
+            <div class="ai-actions">
               <button type="button" style="height: 30px; padding: 0 12px; border-radius: 7px; border: none; background: #0e6b63; color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer">Accept edits</button>
               <button type="button" style="height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid #d5cfc4; background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer">Revert to AI draft</button>
               <button type="button" style="height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid #d5cfc4; background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer">Regenerate</button>
-              <span style="margin-left: auto; font-size: 12px; color: #5f5b54">v3 · history</span>
+              <span style="margin-left: auto; font-size: 12px; color: #5f5b54">history</span>
             </div>
           </div>
 
           <!-- Block: knowledge check, AI, needs review, with linter flag -->
-          <div style="border-radius: 12px; background: #fff; border: 1px solid #d0c8ea; border-left: 4px solid #5b4baf; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px">
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px">
-              <span style="font-weight: 600; color: #5f5b54; text-transform: uppercase; letter-spacing: 0.05em">Knowledge check</span>
-              <span style="padding: 2px 8px; border-radius: 999px; background: #eeebf8; color: #3f3380; font-weight: 600">AI draft · not yet reviewed</span>
+          <div class="ai ai--block" data-state="draft">
+            <div class="ai-who">AI draft <span class="ai-src">· not yet reviewed</span></div>
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #5f5b54; flex-wrap: wrap">
+              <span style="font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em">Knowledge check</span>
               <span style="padding: 2px 8px; border-radius: 999px; background: #fbf1dc; color: #7a5310; font-weight: 600">Reading level grade 14 · target 11</span>
-              <span style="margin-left: auto; color: #5f5b54">Outcome 3.2 · 2 min</span>
+              <span style="margin-left: auto">Outcome 3.2 · 2 min</span>
             </div>
-            <div style="font-size: 14px; line-height: 1.5; color: #2a2825">Which change would you make first before trusting the 94% figure? <span style="color: #5f5b54">(3 options · 1 correct · feedback drafted)</span></div>
-            <div style="display: flex; gap: 8px; align-items: center">
+            <div class="ai-body">Which change would you make first before trusting the 94% figure? <span style="color: #5f5b54">(3 options · 1 correct · feedback drafted)</span></div>
+            <div class="ai-actions">
               <button type="button" style="height: 30px; padding: 0 12px; border-radius: 7px; border: none; background: #0e6b63; color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer">Mark reviewed</button>
               <button type="button" style="height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid #d5cfc4; background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer">Simplify wording</button>
               <button type="button" style="height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid #d5cfc4; background: #fff; font-family: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer">Edit</button>
@@ -207,7 +207,11 @@ body.tessera-embed .tessera-bar{display:none}
       <div style="flex-grow: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; overflow: hidden">
         <div style="align-self: flex-end; max-width: 250px; padding: 9px 12px; border-radius: 12px 12px 4px 12px; background: #f0ede6; font-size: 13.5px; line-height: 1.45">Add a scenario block after the callout where learners play the auditor.</div>
         <div style="display: flex; flex-direction: column; gap: 8px">
-          <div style="padding: 11px 13px; border-radius: 12px 12px 12px 4px; background: #f7f5fc; border-left: 3px solid #5b4baf; font-size: 13.5px; line-height: 1.5">Drafted a 6-turn role-play: the learner is the auditor, the AI plays a product manager defending the 94% number. It cites Fairness_audit_guide.docx §3 and ends with a rubric on two criteria. <strong>One gap:</strong> your sources do not define "disparate impact ratio," so I left that line as a placeholder for you.</div>
+          <div class="ai ai--chat" style="max-width: 100%">
+            <div class="ai-who">Co-author <span class="ai-src">· from your 6 sources</span></div>
+            <div class="ai-body">Drafted a 6-turn role-play: the learner is the auditor, the AI plays a product manager defending the 94% number. It ends with a rubric on two criteria.<sup class="ai-ref">1</sup> <strong>One gap:</strong> your sources do not define "disparate impact ratio," so I left that line as a placeholder for you.</div>
+            <div class="ai-cites"><span class="ai-cite" data-n="1">Fairness_audit_guide.docx, §3</span></div>
+          </div>
           <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; border: 1px solid #e3ded4">
             <span style="font-size: 12px; font-weight: 600">Proposed change · 1 block</span>
             <span style="font-size: 12.5px; color: #3a3833">Insert "Scenario: Defend the metric" after block 2 · 6 min · Outcome 3.2 · tutor mode: open</span>

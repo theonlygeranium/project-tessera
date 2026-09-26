@@ -28,7 +28,7 @@ The build needs Python 3.10+ and `pip install markdown`.
 These come straight from the research. Break one only with a linked issue that argues why.
 
 - **Modules are the spine.** New screens use the same course → module → lesson → block hierarchy. AI features edit that structure; they never create a parallel one.
-- **AI output is labeled twice.** Every AI-produced element has the `ai` tint (`#5B4BAF`) *and* a text label that says what it is and what it is grounded in ("AI draft · from Week3_slides.pdf p. 4–7"). Never a sparkle icon on its own.
+- **AI speaks in the margin.** Mark AI output with the markup contract in `design/DESIGN-NOTES.md` (`.ai`, `.ai-who`, `.ai-body`, `.ai-cites`) and never with hand-rolled styling. The attribution says what the AI is and what it is grounded in ("AI draft · from Week3_slides.pdf p. 4–7"). No colored left stripes, sparkle icons, or gradients to signal AI.
 - **Drafts, not publishes.** Anything the AI writes for learners lands as a draft with accept, revert, and regenerate. Show who can see it.
 - **Tutors hint first.** Tutor UI offers hints and worked examples before answers, cites course sources, and respects the tutor mode set by the instructor.
 - **Explain and undo.** Anything the system reorders or adapts on the learner's behalf says why in one line and offers Undo.

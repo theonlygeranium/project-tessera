@@ -113,6 +113,8 @@ def convert(name: str, html: str, index: dict) -> str:
     html = re.sub(r"<script type=\"text/x-dc\".*?</script>\n", "", html, flags=re.S)
     html = html.replace("<x-dc>\n", "").replace("</x-dc>\n", "")
     html = html.replace("{{accent}}", ACCENT)
+    # shared AI visual language (docs/assets/ai-voice.css + .js); see design/DESIGN-NOTES.md
+    html = html.replace("../../docs/assets/", "../assets/")
 
     # links between artboards
     for src_name, (target_slug, _, _) in SCREENS.items():
