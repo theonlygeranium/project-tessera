@@ -20,7 +20,7 @@ The build needs Python 3.10+ and `pip install markdown`.
 
 1. Open an issue with the matching form: **Design change**, **Research finding**, **Mockup or site bug**, or **Design principle**. Blank issues are turned off so every issue carries its evidence and acceptance criteria.
 2. Branch from `main`: `design/<short-name>`, `research/<short-name>`, or `fix/<short-name>`.
-3. Make the change, rebuild, and open the affected pages locally (`python3 -m http.server --directory docs`).
+3. Make the change, rebuild, and open the affected pages locally (`python3 -m http.server --directory docs`). Run `npm run a11y`; it must report zero violations.
 4. Open a pull request. The template's checklist is the review standard.
 
 ## Design rules that reviews enforce

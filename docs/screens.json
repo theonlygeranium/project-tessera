@@ -27,6 +27,15 @@
     "h": 844
   },
   {
+    "file": "screens/learning-profile.html",
+    "slug": "learning-profile",
+    "group": "Learner",
+    "title": "C \u00b7 Learning profile setup (learner onboarding)",
+    "description": "Learning profile setup: goals and role, weekly time and study windows, an optional pre-check to skip known material, language, accessibility, device and reminders, with an AI-suggested preset and a plain statement of who sees what.",
+    "w": 1440,
+    "h": 1100
+  },
+  {
     "file": "screens/course-builder.html",
     "slug": "course-builder",
     "group": "Author",
@@ -41,6 +50,15 @@
     "group": "Instructor",
     "title": "D \u00b7 Instructor command center",
     "description": "Instructor command center: keyboard triage, submission + rubric side by side, labeled AI-drafted feedback, class misconceptions from tutor chats, and a \u2318K change-set preview.",
+    "w": 1440,
+    "h": 900
+  },
+  {
+    "file": "screens/tutor-settings.html",
+    "slug": "tutor-settings",
+    "group": "Instructor",
+    "title": "D \u00b7 Tutor settings by activity (instructor)",
+    "description": "Tutor settings by activity: Off / Hints / Explain / Open per activity inside program limits (locked options say why), hint count, answer-request handling, allowed sources, and a live learner preview.",
     "w": 1440,
     "h": 900
   },

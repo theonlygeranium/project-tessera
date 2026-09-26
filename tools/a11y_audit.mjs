@@ -1,0 +1,110 @@
+#!/usr/bin/env node
+// Accessibility audit for the Project Tessera site (docs/).
+//
+// Runs axe-core (WCAG 2.0 / 2.1 / 2.2, levels A and AA) against every page,
+// every screen in each AI style, and each state of the clickable prototype.
+// Writes reports/a11y.md and exits non-zero if any WCAG violation is found.
+//
+//   npm install              # once (set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 if Chromium is preinstalled)
+//   npm run a11y             # serves docs/ on a free port and audits it
+//   CHROMIUM=/path/to/chrome npm run a11y
+import { createServer } from 'node:http';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { extname, join, normalize, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { chromium } from 'playwright';
+
+const require = createRequire(import.meta.url);
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const DOCS = join(ROOT, 'docs');
+const AXE = await readFile(require.resolve('axe-core/axe.min.js'), 'utf8');
+const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+const STYLES = ['marginalia', 'tabs', 'perforated', 'tiles'];
+const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml' };
+
+// ---- static server for docs/ ------------------------------------------------
+const server = createServer(async (req, res) => {
+  let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  if (path.endsWith('/')) path += 'index.html';
+  const file = normalize(join(DOCS, path));
+  if (!file.startsWith(DOCS) || !existsSync(file)) { res.writeHead(404); return res.end(); }
+  res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
+  res.end(await readFile(file));
+});
+await new Promise((r) => server.listen(0, r));
+const BASE = `http://localhost:${server.address().port}/`;
+
+// ---- targets -----------------------------------------------------------------
+const screens = JSON.parse(await readFile(join(DOCS, 'screens.json'), 'utf8'));
+const AI_SCREENS = new Set(['lesson-player', 'course-builder', 'instructor-command', 'tutor-settings', 'learning-profile']);
+const targets = [
+  { name: 'Gallery', url: 'index.html' },
+  { name: 'Research report', url: 'research.html' },
+  { name: 'AI style exploration', url: 'explorations/ai-voice.html' },
+];
+for (const s of screens) {
+  const styles = AI_SCREENS.has(s.slug) ? STYLES : ['marginalia'];
+  for (const st of styles) targets.push({ name: `Screen · ${s.title}${styles.length > 1 ? ` · ${st}` : ''}`, url: `${s.file}?ai=${st}` });
+}
+const proto = (st) => [
+  { name: `Prototype · Today · ${st}`, url: `prototype/?ai=${st}#today` },
+  { name: `Prototype · Lesson + tutor · ${st}`, url: `prototype/?ai=${st}#today`, steps: async (p) => {
+      await p.click('#task-resume'); await p.check('input[name=kc][value=c]'); await p.click('#kc-form button[type=submit]');
+      await p.click('[data-act=toggle-tutor]'); await p.waitForTimeout(700); await p.click('[data-act=hint]'); await p.click('[data-act=answer]'); await p.waitForTimeout(1500); } },
+  { name: `Prototype · Result · ${st}`, url: `prototype/?ai=${st}#today`, steps: async (p) => {
+      await p.click('#task-resume'); await p.check('input[name=kc][value=b]'); await p.click('#kc-form button[type=submit]');
+      await p.click('[data-act=next-chunk]'); await p.click('[data-act=to-check]');
+      for (const v of ['b', 'b', 'b']) { await p.check(`input[name=quiz][value=${v}]`); await p.click('#quiz-form button[type=submit]'); await p.click('[data-act=next-q]'); }
+      await p.waitForTimeout(300); } },
+];
+targets.push(...proto('marginalia'));
+for (const st of STYLES.slice(1)) targets.push(...proto(st).slice(1));
+targets.push({ name: 'Prototype · Reflect step', url: 'prototype/#today', steps: async (p) => {
+  await p.click('#task-resume'); await p.check('input[name=kc][value=b]'); await p.click('#kc-form button[type=submit]'); await p.click('[data-act=next-chunk]'); } });
+targets.push({ name: 'Prototype · Phone width + tutor', url: 'prototype/#today', viewport: { width: 390, height: 844 }, steps: async (p) => {
+  await p.click('#task-resume'); await p.click('[data-act=toggle-tutor]'); await p.waitForTimeout(700); } });
+
+// ---- run -------------------------------------------------------------------
+const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
+const results = [];
+for (const t of targets) {
+  const page = await browser.newPage({ viewport: t.viewport || { width: 1600, height: 1000 } });
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  await page.goto(BASE + t.url);
+  await page.waitForTimeout(400);
+  if (t.steps) await t.steps(page);
+  await page.addScriptTag({ content: AXE });
+  const r = await page.evaluate(async (tags) => {
+    const out = await window.axe.run(document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] });
+    return out.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.map((n) => ({ target: n.target.join(' '), summary: n.failureSummary })) }));
+  }, TAGS);
+  results.push({ ...t, violations: r });
+  process.stdout.write(`${r.length ? '✗' : '✓'} ${t.name}${r.length ? `  (${r.map((v) => `${v.id}×${v.nodes.length}`).join(', ')})` : ''}\n`);
+  await page.close();
+}
+await browser.close();
+server.close();
+
+// ---- report ------------------------------------------------------------------
+const failing = results.filter((r) => r.violations.length);
+const lines = [
+  '# Accessibility audit', '',
+  `Run: ${new Date().toISOString().slice(0, 10)} · axe-core ${JSON.parse(await readFile(require.resolve('axe-core/package.json'), 'utf8')).version} · rules tagged ${TAGS.join(', ')}`, '',
+  `**${results.length - failing.length} of ${results.length} targets pass with zero violations.**`, '',
+  'Automated checks catch roughly a third to half of WCAG issues. Keyboard walkthroughs and screen-reader testing are still required (tracked in issue #10).', '',
+  '| Target | Result |', '|---|---|',
+  ...results.map((r) => `| ${r.name} | ${r.violations.length ? r.violations.map((v) => `${v.id} (${v.nodes.length})`).join(', ') : 'Pass'} |`),
+];
+for (const r of failing) {
+  lines.push('', `## ${r.name}`, '', `\`${r.url}\``, '');
+  for (const v of r.violations) {
+    lines.push(`- **${v.id}** (${v.impact}): ${v.help}`);
+    for (const n of v.nodes.slice(0, 5)) lines.push(`  - \`${n.target}\``);
+  }
+}
+await mkdir(join(ROOT, 'reports'), { recursive: true });
+await writeFile(join(ROOT, 'reports', 'a11y.md'), lines.join('\n') + '\n');
+console.log(`\n${results.length - failing.length}/${results.length} pass · report: reports/a11y.md`);
+process.exit(failing.length ? 1 : 0);

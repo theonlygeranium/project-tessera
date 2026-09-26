@@ -42,6 +42,12 @@ SCREENS = {
         "Learner",
         "Today on a phone: 15-minute session launcher, offline and low-bandwidth mode, review card.",
     ),
+    "LearningProfile.dc.html": (
+        "learning-profile",
+        "Learner",
+        "Learning profile setup: goals and role, weekly time and study windows, an optional pre-check to skip known material, "
+        "language, accessibility, device and reminders, with an AI-suggested preset and a plain statement of who sees what.",
+    ),
     "CourseBuilder.dc.html": (
         "course-builder",
         "Author",
@@ -53,6 +59,12 @@ SCREENS = {
         "Instructor",
         "Instructor command center: keyboard triage, submission + rubric side by side, labeled AI-drafted "
         "feedback, class misconceptions from tutor chats, and a ⌘K change-set preview.",
+    ),
+    "TutorSettings.dc.html": (
+        "tutor-settings",
+        "Instructor",
+        "Tutor settings by activity: Off / Hints / Explain / Open per activity inside program limits (locked options say why), "
+        "hint count, answer-request handling, allowed sources, and a live learner preview.",
     ),
     "AdminConsole.dc.html": (
         "admin-console",
@@ -151,7 +163,7 @@ def main() -> None:
         {"file": f"screens/{SCREENS[n][0]}.html", "slug": SCREENS[n][0], "group": SCREENS[n][1],
          "title": index["boards"][n].get("title", n), "description": SCREENS[n][2],
          "w": index["boards"][n]["w"], "h": index["boards"][n]["h"]}
-        for n in index["order"]
+        for n in SCREENS if n in index["boards"]  # gallery order follows SCREENS (grouped by role)
     ]
     (ROOT / "docs" / "screens.json").write_text(json.dumps(manifest, indent=2))
     print("wrote docs/screens.json")

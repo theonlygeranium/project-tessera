@@ -15,17 +15,20 @@ An AI-native learning management system prototype for higher-education and indus
 | `design/canvas/` | Source artboards (`*.dc.html`) and `canvas.json` from the design canvas. These are the editable originals. |
 | `design/DESIGN-NOTES.md` | Design system tokens, the decisions the screens encode, and their research grounding. |
 | `research/report.md` | The research report the design is based on: LXD evidence, LMS UX benchmarks, why Canvas wins, AI-authoring patterns, persona research, and the five layout briefs. |
+| `tools/a11y_audit.mjs` | Accessibility audit (axe-core, WCAG 2.0–2.2 A/AA) over every page, screen, AI style, and prototype state. `npm install && npm run a11y`; writes `reports/a11y.md`. |
 | `tools/build_docs.py` | Regenerates `docs/screens/`, `docs/screens.json`, and `docs/research.html` from `design/canvas/` and `research/report.md`. Requires `pip install markdown`. |
 
-## The six screens
+## The eight screens
 
 | Screen | Role | What it demonstrates |
 |---|---|---|
 | Today dashboard | Learner | One cross-course "Do next" list, weekly time budget, spaced-review queue, persona preset, "why this moved · Undo" |
 | Focus lesson player | Learner | Single reading column, chunk rail, format switcher, inline knowledge check, hint-mode tutor with source citations |
 | Today on phone | Learner | 15-minute session launcher, offline and low-bandwidth mode |
+| Learning profile setup | Learner | Onboarding on goals, role, time, prior knowledge, language, accessibility, device, and reminders; AI-suggested preset; who sees what. No learning styles. |
 | Prompt-to-course canvas | Author | Brief → Outline → Draft → Review → Publish, sources panel, provenance chips, tracked-changes diff, persona variants, publish-readiness bar |
 | Instructor command center | Instructor | Keyboard triage, submission + rubric, labeled AI-drafted feedback, misconceptions from tutor chats, ⌘K change-set preview |
+| Tutor settings by activity | Instructor | Off / Hints / Explain / Open per activity inside program limits, hint count, answer-request handling, allowed sources, live learner preview |
 | Governance console | Admin | KPI strip, AI policy matrix, integration health, accessibility audit, simulate-before-apply |
 
 ## Design thesis (short form)

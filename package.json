@@ -1,0 +1,12 @@
+{
+  "name": "project-tessera",
+  "private": true,
+  "description": "Tooling for the Project Tessera prototype site",
+  "scripts": {
+    "a11y": "node tools/a11y_audit.mjs"
+  },
+  "devDependencies": {
+    "axe-core": "^4.10.0",
+    "playwright": "^1.47.0"
+  }
+}

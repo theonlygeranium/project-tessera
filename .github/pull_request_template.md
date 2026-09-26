@@ -13,6 +13,7 @@
 ## Checklist
 
 - [ ] Ran `python3 tools/build_docs.py` and committed the regenerated `docs/`
+- [ ] Ran `npm run a11y`: zero violations (paste the summary line)
 - [ ] Opened every changed page locally; links between screens still resolve
 - [ ] AI-produced elements use the `.ai` markup contract (attribution + sources), with no left stripes, sparkles, or gradients
 - [ ] Text contrast ≥ 4.5:1; controls are real `<button>` / `<a>` / `<input>` with labels

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Learning profile setup</title>
+<link rel="stylesheet" href="../assets/ai-voice.css">
+<script src="../assets/ai-voice.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e6b63%22/%3E%3Cpath d=%22M9 11h14M9 16h9M9 21h14%22 stroke=%22white%22 stroke-width=%222.4%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<style>
+html,body{margin:0;background:#e9e5dd}
+.tessera-stage{display:flex;justify-content:center;padding:24px 16px 48px;box-sizing:border-box;min-height:100vh}
+.tessera-frame{transform-origin:top left;box-shadow:0 18px 50px rgba(28,27,25,.18);border-radius:16px;overflow:hidden;background:#f4f1eb}
+.tessera-bar{position:fixed;left:0;right:0;bottom:0;height:40px;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:rgba(28,27,25,.92);color:#f4f1eb;font:500 13px/1 'IBM Plex Sans',system-ui,sans-serif;z-index:10}
+.tessera-bar a{color:#9fd8cf;text-decoration:none}.tessera-bar a:hover{text-decoration:underline}
+.tessera-bar span{opacity:.75}
+body.tessera-embed{background:transparent}
+body.tessera-embed .tessera-stage{padding:0;min-height:0;display:block}
+body.tessera-embed .tessera-frame{box-shadow:none;border-radius:0}
+body.tessera-embed .tessera-bar{display:none}
+</style>
+</head>
+<body>
+<div class="tessera-stage"><div><div class="tessera-frame" data-w="1440" data-h="1100">
+<div style="width: 1440px; height: 1100px; box-sizing: border-box; display: flex; background: #f4f1eb; color: #1c1b19; font-size: 14px; line-height: 1.45; overflow: hidden">
+
+  <!-- Global rail -->
+  <nav aria-label="Global" style="width: 76px; flex-shrink: 0; box-sizing: border-box; padding: 20px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; border-right: 1px solid #e3ded4; background: #faf8f4">
+    <div style="width: 36px; height: 36px; border-radius: 10px; background: #0e6b63; display: flex; align-items: center; justify-content: center; margin-bottom: 14px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
+    </div>
+    <div style="flex-grow: 1"></div>
+    <div style="width: 36px; height: 36px; border-radius: 50%; background: #d9cdb8; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #4a3f2c" aria-hidden="true">PR</div>
+  </nav>
+
+  <main style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 28px 36px; display: flex; flex-direction: column; gap: 18px">
+    <header style="display: flex; align-items: flex-end; gap: 24px">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Welcome · about 2 minutes · every answer can be changed later</div>
+        <h1 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 34px; line-height: 1.1; letter-spacing: -0.01em">Set up how you'll learn here, Priya.</h1>
+        <p style="margin: 0; font-size: 15px; color: #5f5b54; max-width: 760px">We use these answers to plan your week, pace reminders, and pick defaults. Every format stays available to everyone; we don't sort people into "learning styles," because the research doesn't support it.</p>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <a href="today-dashboard.html" style="display: inline-flex; align-items: center; height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #d5cfc4; background: #fff; color: #1c1b19; font-weight: 500; text-decoration: none">Skip for now</a>
+        <a href="today-dashboard.html" style="display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border-radius: 10px; background: #0e6b63; color: #fff; font-weight: 600; text-decoration: none">Save and go to Today</a>
+      </div>
+    </header>
+
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 340px; gap: 20px; flex-grow: 1; min-height: 0">
+
+      <!-- Column 1 -->
+      <form aria-label="Goals, time, and prior knowledge" style="display: flex; flex-direction: column; gap: 14px; min-width: 0">
+        <fieldset style="margin: 0; border: 1px solid #e3ded4; border-radius: 14px; background: #fff; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px">
+          <legend style="font-size: 15px; font-weight: 600; padding: 0 6px">What are you here for?</legend>
+          <span style="font-size: 12.5px; color: #5f5b54">Pick any that apply.</span>
+          <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #0e6b63; background: #e3f0ee"><input type="checkbox" checked style="margin: 3px 0 0; accent-color: #0e6b63"><span><strong>Earn a certificate</strong><br><span style="font-size: 12.5px; color: #3a3833">Responsible AI in Practice · by <input type="text" value="November 2026" aria-label="Target date" style="width: 118px; height: 26px; box-sizing: border-box; padding: 0 6px; border-radius: 6px; border: 1px solid #b9d6d1; font: inherit; font-size: 12.5px; background: #fff"></span></span></label>
+          <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #0e6b63; background: #e3f0ee"><input type="checkbox" checked style="margin: 3px 0 0; accent-color: #0e6b63"><span><strong>Build skills for my role</strong><br><span style="font-size: 12.5px; color: #3a3833">Cloud Ops Upskilling Path · toward SRE II</span></span></label>
+          <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; border: 1px solid #e3ded4"><input type="checkbox" style="margin: 3px 0 0; accent-color: #0e6b63"><span><strong>Complete required training</strong><br><span style="font-size: 12.5px; color: #5f5b54">We'll show deadlines and test-out options first</span></span></label>
+          <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; border: 1px solid #e3ded4"><input type="checkbox" style="margin: 3px 0 0; accent-color: #0e6b63"><span><strong>Explore a topic</strong><br><span style="font-size: 12.5px; color: #5f5b54">No deadlines, fewer reminders</span></span></label>
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 2px">
+            <label for="role" style="font-size: 13px; font-weight: 600">Your role</label>
+            <select id="role" style="height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid #d5cfc4; font: inherit; background: #fff"><option>Working professional (part-time learner)</option><option>Full-time student</option><option>Graduate student</option><option>Employee completing required training</option></select>
+          </div>
+        </fieldset>
+
+        <fieldset style="margin: 0; border: 1px solid #e3ded4; border-radius: 14px; background: #fff; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px">
+          <legend style="font-size: 15px; font-weight: 600; padding: 0 6px">How much time do you have most weeks?</legend>
+          <div role="radiogroup" aria-label="Hours per week" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px">
+            <label style="display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 9px; border: 1px solid #d5cfc4; font-weight: 500"><input type="radio" name="hrs" style="margin: 0 6px 0 0; accent-color: #0e6b63">1 h</label>
+            <label style="display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 9px; border: 1px solid #d5cfc4; font-weight: 500"><input type="radio" name="hrs" style="margin: 0 6px 0 0; accent-color: #0e6b63">2 h</label>
+            <label style="display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 9px; border: 1.5px solid #0e6b63; background: #e3f0ee; color: #0a4f49; font-weight: 600"><input type="radio" name="hrs" checked style="margin: 0 6px 0 0; accent-color: #0e6b63">4 h</label>
+            <label style="display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 9px; border: 1px solid #d5cfc4; font-weight: 500"><input type="radio" name="hrs" style="margin: 0 6px 0 0; accent-color: #0e6b63">6 h</label>
+            <label style="display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 9px; border: 1px solid #d5cfc4; font-weight: 500"><input type="radio" name="hrs" style="margin: 0 6px 0 0; accent-color: #0e6b63">8 h+</label>
+          </div>
+          <span style="font-size: 13px; font-weight: 600; margin-top: 2px">When do you usually study?</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap">
+            <label style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #d5cfc4"><input type="checkbox" style="margin: 0; accent-color: #0e6b63">Early morning</label>
+            <label style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1.5px solid #0e6b63; background: #e3f0ee"><input type="checkbox" checked style="margin: 0; accent-color: #0e6b63">Lunch break</label>
+            <label style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1.5px solid #0e6b63; background: #e3f0ee"><input type="checkbox" checked style="margin: 0; accent-color: #0e6b63">Evenings</label>
+            <label style="display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #d5cfc4"><input type="checkbox" style="margin: 0; accent-color: #0e6b63">Weekends</label>
+          </div>
+        </fieldset>
+
+        <fieldset style="margin: 0; border: 1px solid #e3ded4; border-radius: 14px; background: #fff; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px">
+          <legend style="font-size: 15px; font-weight: 600; padding: 0 6px">Already know some of this?</legend>
+          <p style="margin: 0; font-size: 13.5px; color: #3a3833">Take a short check for each course. Anything you already know is marked done, and you can always open it again.</p>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+            <button type="button" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid #d5cfc4; background: #fff; font: inherit; font-weight: 600; cursor: pointer">Responsible AI · 6-minute check</button>
+            <button type="button" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid #d5cfc4; background: #fff; font: inherit; font-weight: 600; cursor: pointer">Cloud Ops · 8-minute check</button>
+            <span style="font-size: 12.5px; color: #5f5b54">or skip, and start at the beginning</span>
+          </div>
+        </fieldset>
+      </form>
+
+      <!-- Column 2 -->
+      <form aria-label="Language, accessibility, device, and notifications" style="display: flex; flex-direction: column; gap: 14px; min-width: 0">
+        <fieldset style="margin: 0; border: 1px solid #e3ded4; border-radius: 14px; background: #fff; padding: 14px 16px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px">
+          <legend style="font-size: 15px; font-weight: 600; padding: 0 6px">Language and reading</legend>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <label for="lang" style="font-size: 13px; font-weight: 600">Interface language</label>
+            <select id="lang" style="height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid #d5cfc4; font: inherit; background: #fff"><option>English</option><option>Español</option><option>Français</option><option>Tiếng Việt</option></select>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <label for="lang2" style="font-size: 13px; font-weight: 600">Also show course text in</label>
+            <select id="lang2" style="height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid #d5cfc4; font: inherit; background: #fff"><option>Español (side by side)</option><option>None</option></select>
+          </div>
+          <label style="grid-column: span 2; display: flex; gap: 10px; align-items: center; font-size: 13.5px"><input type="checkbox" checked style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">Offer plain-language versions of readings when they exist</label>
+        </fieldset>
+
+        <fieldset style="margin: 0; border: 1px solid #e3ded4; border-radius: 14px; background: #fff; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px">
+          <legend style="font-size: 15px; font-weight: 600; padding: 0 6px">Accessibility</legend>
+          <span style="font-size: 12.5px; color: #5f5b54; margin-bottom: 4px">Applies everywhere, including AI-generated content. Accommodations from disability services are added automatically.</span>
+          <label style="display: flex; gap: 10px; align-items: center; min-height: 34px; font-size: 13.5px"><input type="checkbox" checked style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">Captions on for all video and audio</label>
+          <label style="display: flex; gap: 10px; align-items: center; min-height: 34px; font-size: 13.5px"><input type="checkbox" style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">Larger text (125%)</label>
+          <label style="display: flex; gap: 10px; align-items: center; min-height: 34px; font-size: 13.5px"><input type="checkbox" style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">Reading-friendly spacing and font</label>
+          <label style="display: flex; gap: 10px; align-items: center; min-height: 34px; font-size: 13.5px"><input type="checkbox" checked style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">Reduce motion</label>
+          <label style="display: flex; gap: 10px; align-items: center; min-height: 34px; font-size: 13.5px"><input type="checkbox" style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">Focus mode by default (hide sidebars while studying)</label>
+          <label style="display: flex; gap: 10px; align-items: center; min-height: 34px; font-size: 13.5px"><input type="checkbox" style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">Extra time on timed checks (share with instructors)</label>
+        </fieldset>
+
+        <fieldset style="margin: 0; border: 1px solid #e3ded4; border-radius: 14px; background: #fff; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px">
+          <legend style="font-size: 15px; font-weight: 600; padding: 0 6px">Device and connection</legend>
+          <label style="display: flex; gap: 10px; align-items: center; min-height: 34px; font-size: 13.5px"><input type="checkbox" checked style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">I mostly learn on my phone</label>
+          <label style="display: flex; gap: 10px; align-items: center; min-height: 34px; font-size: 13.5px"><input type="checkbox" checked style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">Download next week's lessons for offline use</label>
+          <label style="display: flex; gap: 10px; align-items: center; min-height: 34px; font-size: 13.5px"><input type="checkbox" style="margin: 0; width: 18px; height: 18px; accent-color: #0e6b63">Low-bandwidth mode (text first, video as audio)</label>
+        </fieldset>
+
+        <fieldset style="margin: 0; border: 1px solid #e3ded4; border-radius: 14px; background: #fff; padding: 14px 16px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px">
+          <legend style="font-size: 15px; font-weight: 600; padding: 0 6px">Reminders</legend>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <label for="digest" style="font-size: 13px; font-weight: 600">Digest</label>
+            <select id="digest" style="height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid #d5cfc4; font: inherit; background: #fff"><option>Weekly, on Monday</option><option>Daily</option><option>Deadlines only</option></select>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <label for="quiet" style="font-size: 13px; font-weight: 600">Quiet hours</label>
+            <select id="quiet" style="height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid #d5cfc4; font: inherit; background: #fff"><option>9 pm – 7 am (Pacific)</option><option>None</option></select>
+          </div>
+        </fieldset>
+      </form>
+
+      <!-- Column 3: preview -->
+      <aside aria-label="What this changes" style="display: flex; flex-direction: column; gap: 14px; min-width: 0">
+        <div class="ai ai--note" style="background: #fff; border: 1px solid #e3ded4; border-radius: 14px; padding: 16px 16px 16px 12px">
+          <div class="ai-who">Suggested preset <span class="ai-src">· from your answers, not from a quiz</span></div>
+          <div class="ai-body">"Busy professional." Two 15-minute sessions on weekdays (lunch and evening), one longer block on Saturday, a Monday plan, and no pings after 9 pm. Certificate work comes first until November.<sup class="ai-ref">1</sup></div>
+          <div class="ai-cites"><span class="ai-cite" data-n="1">Your goals and 4-hour weekly budget</span></div>
+          <div class="ai-actions">
+            <button type="button" style="height: 34px; padding: 0 12px; border-radius: 8px; border: none; background: #0e6b63; color: #fff; font: inherit; font-weight: 600; cursor: pointer">Use this preset</button>
+            <button type="button" style="height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #d5cfc4; background: #fff; font: inherit; cursor: pointer">Show other presets</button>
+          </div>
+        </div>
+
+        <div style="border-radius: 14px; background: #fff; border: 1px solid #e3ded4; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Your week, previewed</span>
+          <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; text-align: center; font-size: 11.5px; color: #5f5b54">
+            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+            <span style="height: 34px; border-radius: 6px; background: #0e6b63"></span><span style="height: 34px; border-radius: 6px; background: #0e6b63"></span><span style="height: 34px; border-radius: 6px; background: #0e6b63"></span><span style="height: 34px; border-radius: 6px; background: #0e6b63"></span><span style="height: 18px; align-self: end; border-radius: 6px; background: #9fcbc4"></span><span style="height: 58px; border-radius: 6px; background: #0e6b63"></span><span style="height: 34px; border-radius: 6px; background: #ece8e0"></span>
+          </div>
+          <span style="font-size: 12.5px; color: #3a3833">4 h planned · 30 min on weekdays, 1 h 30 m on Saturday, Sunday off</span>
+        </div>
+
+        <div style="border-radius: 14px; background: #fff; border: 1px solid #e3ded4; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; font-size: 13px">
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Who sees this</span>
+          <span><strong>Only you</strong> see your goals, schedule, and reading settings.</span>
+          <span><strong>Instructors</strong> see accommodations you choose to share, like extra time.</span>
+          <span><strong>Your employer</strong> sees completion of required training only.</span>
+          <a href="#privacy" style="font-weight: 600">How we use your data</a>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</div></div></div>
+<nav class="tessera-bar" aria-label="Site"><a href="../index.html">← All screens</a><span>C · Learning profile setup (learner onboarding)</span><span>1440×1100</span></nav>
+<script>
+(function(){
+  var frame=document.querySelector('.tessera-frame');
+  var w=parseInt(frame.dataset.w,10), h=parseInt(frame.dataset.h,10);
+  var stage=document.querySelector('.tessera-stage');
+  var embed=/[?&]embed=1/.test(location.search);
+  if(embed){document.body.classList.add('tessera-embed');}
+  function fit(){
+    if(embed){frame.style.transform='none';frame.style.width=w+'px';frame.style.height=h+'px';return;}
+    var avail=stage.clientWidth-32;
+    var s=Math.min(1,avail/w);
+    frame.style.transform='scale('+s+')';
+    frame.style.width=w+'px';
+    frame.style.height=h+'px';
+    frame.parentElement.style.width=(w*s)+'px';
+    frame.parentElement.style.height=(h*s)+'px';
+  }
+  window.addEventListener('resize',fit);fit();
+})();
+</script>
+</body>
+</html>

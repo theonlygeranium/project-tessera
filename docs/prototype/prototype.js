@@ -415,7 +415,7 @@
     if (!el) return;
     const act = el.dataset.act;
     switch (act) {
-      case 'toggle-tutor': S.tutorOpen = !S.tutorOpen; renderTutor(); if (S.tutorOpen) $('#ask').focus(); return;
+      case 'toggle-tutor': S.tutorOpen = !S.tutorOpen; renderTutor(); if (S.tutorOpen) $('#ask').focus(); else $('.tutor-toggle').focus(); return;
       case 'open-tutor': S.tutorOpen = true; renderTutor(); if (S.chunk === 3 && S.kc) { hintLabel = 'worked example'; aiReply(TUTOR.kc.worked, TUTOR.kc.cites); } $('#ask').focus(); return;
       case 'hint': nextHint(); return;
       case 'worked': { const k = tutorKey(); S.hintsUsed++; hintLabel = 'worked example'; if (typeof k === 'number' && !S.answers[k]) aiReply('Here is a parallel case, not this question:\n' + TUTOR[k].worked, TUTOR[k].cites); else aiReply(TUTOR[k].worked, TUTOR[k].cites); return; }
@@ -471,7 +471,7 @@
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && S.tutorOpen) { S.tutorOpen = false; renderTutor(); }
+    if (e.key === 'Escape' && S.tutorOpen) { S.tutorOpen = false; renderTutor(); const t = $('.tutor-toggle'); if (t) t.focus(); }
   });
 
   if (!location.hash) history.replaceState(null, '', '#today');

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tutor settings by activity</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="../../docs/assets/ai-voice.css">
+<script src="../../docs/assets/ai-voice.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column; background: #f4f1eb; color: #1c1b19; font-size: 13.5px; line-height: 1.4; overflow: hidden">
+
+  <header style="height: 52px; flex-shrink: 0; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e3ded4; background: #faf8f4">
+    <div style="width: 30px; height: 30px; border-radius: 8px; background: {{accent}}; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h16"/></svg></div>
+    <nav aria-label="Instructor" style="display: flex; gap: 4px; font-size: 13px; font-weight: 500">
+      <a href="Main.dc.html" style="padding: 6px 10px; border-radius: 7px; text-decoration: none; color: #5f5b54">Today</a>
+      <a href="CourseBuilder.dc.html" style="padding: 6px 10px; border-radius: 7px; text-decoration: none; color: #5f5b54">Create</a>
+      <a href="InstructorCommand.dc.html" style="padding: 6px 10px; border-radius: 7px; text-decoration: none; color: #5f5b54">Grade</a>
+      <a href="#insights" style="padding: 6px 10px; border-radius: 7px; text-decoration: none; color: #5f5b54">Insights</a>
+      <a href="#settings" aria-current="page" style="padding: 6px 10px; border-radius: 7px; text-decoration: none; color: #0a4f49; background: #e3f0ee; font-weight: 600">Course settings</a>
+    </nav>
+    <div style="flex-grow: 1"></div>
+    <div style="width: 32px; height: 32px; border-radius: 50%; background: #c7d7d3; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #2f4d48" aria-hidden="true">AO</div>
+  </header>
+
+  <div style="flex-grow: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 420px 360px; gap: 0">
+
+    <!-- Activity table -->
+    <main style="box-sizing: border-box; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; min-width: 0; overflow: hidden">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <div style="font-size: 12.5px; color: #5f5b54">Responsible AI in Practice · Section B · 46 learners</div>
+        <h1 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 26px">Tutor settings by activity</h1>
+      </div>
+
+      <div style="display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: #fff; border: 1px solid #e3ded4">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5f5b54" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <span><strong>Program policy: Graduate certificates.</strong> Open mode isn't allowed on graded work. Transcripts are kept for 1 year. You can choose anything inside those limits.</span>
+          <a href="#policy" style="font-weight: 600; font-size: 12.5px">View policy · set by Academic Technology</a>
+        </div>
+      </div>
+
+      <div role="table" aria-label="Tutor mode for Module 3 activities" style="border-radius: 12px; background: #fff; border: 1px solid #e3ded4; overflow: hidden">
+        <div role="row" style="display: grid; grid-template-columns: minmax(0, 1fr) 312px; padding: 9px 14px; background: #faf8f4; font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #5f5b54">
+          <span role="columnheader">Module 3 activity</span><span role="columnheader">Tutor mode</span>
+        </div>
+
+        <div role="row" style="display: grid; grid-template-columns: minmax(0, 1fr) 312px; align-items: center; padding: 10px 14px; border-top: 1px solid #f0ede6">
+          <span role="cell" style="display: flex; flex-direction: column"><strong>3.1 Why evaluation misleads</strong><span style="font-size: 12px; color: #5f5b54">Lesson · practice</span></span>
+          <span role="cell"><span role="radiogroup" aria-label="Tutor mode for 3.1" style="display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; background: #ebe6dd; font-size: 12.5px">
+            <label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="m31" style="margin: 0 4px 0 0; accent-color: {{accent}}">Off</label><label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="m31" style="margin: 0 4px 0 0; accent-color: {{accent}}">Hints</label><label style="padding: 5px 10px; border-radius: 7px; background: #fff; font-weight: 600"><input type="radio" name="m31" checked style="margin: 0 4px 0 0; accent-color: {{accent}}">Explain</label><label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="m31" style="margin: 0 4px 0 0; accent-color: {{accent}}">Open</label>
+          </span></span>
+        </div>
+        <div role="row" style="display: grid; grid-template-columns: minmax(0, 1fr) 312px; align-items: center; padding: 10px 14px; border-top: 1px solid #f0ede6">
+          <span role="cell" style="display: flex; flex-direction: column"><strong>3.2 Bias in model evaluation</strong><span style="font-size: 12px; color: #5f5b54">Lesson · practice · includes a quick check</span></span>
+          <span role="cell"><span role="radiogroup" aria-label="Tutor mode for 3.2" style="display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; background: #ebe6dd; font-size: 12.5px">
+            <label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="m32" style="margin: 0 4px 0 0; accent-color: {{accent}}">Off</label><label style="padding: 5px 10px; border-radius: 7px; background: #fff; font-weight: 600"><input type="radio" name="m32" checked style="margin: 0 4px 0 0; accent-color: {{accent}}">Hints</label><label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="m32" style="margin: 0 4px 0 0; accent-color: {{accent}}">Explain</label><label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="m32" style="margin: 0 4px 0 0; accent-color: {{accent}}">Open</label>
+          </span></span>
+        </div>
+        <div role="row" style="display: grid; grid-template-columns: minmax(0, 1fr) 312px; align-items: center; padding: 10px 14px; border-top: 1px solid #f0ede6">
+          <span role="cell" style="display: flex; flex-direction: column"><strong>Scenario: Defend the metric</strong><span style="font-size: 12px; color: #5f5b54">AI role-play · practice · ungraded</span></span>
+          <span role="cell"><span role="radiogroup" aria-label="Tutor mode for scenario" style="display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; background: #ebe6dd; font-size: 12.5px">
+            <label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="msc" style="margin: 0 4px 0 0; accent-color: {{accent}}">Off</label><label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="msc" style="margin: 0 4px 0 0; accent-color: {{accent}}">Hints</label><label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="msc" style="margin: 0 4px 0 0; accent-color: {{accent}}">Explain</label><label style="padding: 5px 10px; border-radius: 7px; background: #fff; font-weight: 600"><input type="radio" name="msc" checked style="margin: 0 4px 0 0; accent-color: {{accent}}">Open</label>
+          </span></span>
+        </div>
+        <div role="row" aria-selected="true" style="display: grid; grid-template-columns: minmax(0, 1fr) 312px; align-items: center; padding: 10px 14px; border-top: 1px solid #f0ede6; background: #e3f0ee; box-shadow: inset 0 0 0 1.5px {{accent}}">
+          <span role="cell" style="display: flex; flex-direction: column"><strong>Module 3 check</strong><span style="font-size: 12px; color: #3a3833">Graded quiz · 3 questions · <span style="font-weight: 600; color: #0a4f49">editing, changed from Explain</span></span></span>
+          <span role="cell"><span role="radiogroup" aria-label="Tutor mode for Module 3 check" style="display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; background: #d5e7e4; font-size: 12.5px">
+            <label style="padding: 5px 10px; border-radius: 7px; color: #3a3833"><input type="radio" name="mck" style="margin: 0 4px 0 0; accent-color: {{accent}}">Off</label><label style="padding: 5px 10px; border-radius: 7px; background: #fff; font-weight: 600"><input type="radio" name="mck" checked style="margin: 0 4px 0 0; accent-color: {{accent}}">Hints</label><label style="padding: 5px 10px; border-radius: 7px; color: #3a3833"><input type="radio" name="mck" style="margin: 0 4px 0 0; accent-color: {{accent}}">Explain</label><label title="Not allowed on graded work by program policy" style="padding: 5px 10px; border-radius: 7px; color: #6f6a62; display: inline-flex; align-items: center; gap: 4px"><input type="radio" name="mck" disabled style="margin: 0; accent-color: {{accent}}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Open</label>
+          </span></span>
+        </div>
+        <div role="row" style="display: grid; grid-template-columns: minmax(0, 1fr) 312px; align-items: center; padding: 10px 14px; border-top: 1px solid #f0ede6">
+          <span role="cell" style="display: flex; flex-direction: column"><strong>Essay 2: Fairness audit memo</strong><span style="font-size: 12px; color: #5f5b54">Graded assignment · AI use must be declared</span></span>
+          <span role="cell"><span role="radiogroup" aria-label="Tutor mode for Essay 2" style="display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; background: #ebe6dd; font-size: 12.5px">
+            <label style="padding: 5px 10px; border-radius: 7px; background: #fff; font-weight: 600"><input type="radio" name="mes" checked style="margin: 0 4px 0 0; accent-color: {{accent}}">Off</label><label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="mes" style="margin: 0 4px 0 0; accent-color: {{accent}}">Hints</label><label style="padding: 5px 10px; border-radius: 7px; color: #5f5b54"><input type="radio" name="mes" style="margin: 0 4px 0 0; accent-color: {{accent}}">Explain</label><label title="Not allowed on graded work by program policy" style="padding: 5px 10px; border-radius: 7px; color: #6f6a62; display: inline-flex; align-items: center; gap: 4px"><input type="radio" name="mes" disabled style="margin: 0; accent-color: {{accent}}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Open</label>
+          </span></span>
+        </div>
+      </div>
+
+      <dl style="margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; font-size: 12.5px">
+        <div style="padding: 10px 12px; border-radius: 10px; background: #fff; border: 1px solid #e3ded4"><dt style="font-weight: 600">Off</dt><dd style="margin: 2px 0 0; color: #5f5b54">No tutor on this activity.</dd></div>
+        <div style="padding: 10px 12px; border-radius: 10px; background: #fff; border: 1px solid #e3ded4"><dt style="font-weight: 600">Hints</dt><dd style="margin: 2px 0 0; color: #5f5b54">Questions and hints only. Never gives answers.</dd></div>
+        <div style="padding: 10px 12px; border-radius: 10px; background: #fff; border: 1px solid #e3ded4"><dt style="font-weight: 600">Explain</dt><dd style="margin: 2px 0 0; color: #5f5b54">Explains concepts and examples, not item answers.</dd></div>
+        <div style="padding: 10px 12px; border-radius: 10px; background: #fff; border: 1px solid #e3ded4"><dt style="font-weight: 600">Open</dt><dd style="margin: 2px 0 0; color: #5f5b54">Answers directly. Practice only.</dd></div>
+      </dl>
+    </main>
+
+    <!-- Detail pane -->
+    <section aria-label="Module 3 check tutor settings" style="box-sizing: border-box; border-left: 1px solid #e3ded4; background: #fff; padding: 22px 22px; display: flex; flex-direction: column; gap: 16px; overflow: hidden">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">Module 3 check · Hints</span>
+        <h2 style="margin: 0; font-size: 18px">How the tutor behaves here</h2>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+        <label for="hints" style="font-weight: 600">Hints per question</label>
+        <span style="display: inline-flex; align-items: center; border: 1px solid #d5cfc4; border-radius: 9px; overflow: hidden">
+          <button type="button" aria-label="Fewer hints" style="width: 34px; height: 34px; border: 0; background: #fff; font-size: 18px; cursor: pointer">−</button>
+          <input id="hints" type="text" inputmode="numeric" value="2" style="width: 38px; height: 34px; border: 0; border-left: 1px solid #e3ded4; border-right: 1px solid #e3ded4; text-align: center; font: inherit; font-weight: 600">
+          <button type="button" aria-label="More hints" style="width: 34px; height: 34px; border: 0; background: #fff; font-size: 18px; cursor: pointer">+</button>
+        </span>
+      </div>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 6px">
+        <legend style="font-weight: 600; margin-bottom: 6px">Worked examples</legend>
+        <label style="display: flex; gap: 8px; align-items: flex-start"><input type="radio" name="we" checked style="margin: 2px 0 0; accent-color: {{accent}}"><span>Parallel cases only <span style="color: #5f5b54">(same idea, different numbers; recommended for graded work)</span></span></label>
+        <label style="display: flex; gap: 8px; align-items: flex-start"><input type="radio" name="we" style="margin: 2px 0 0; accent-color: {{accent}}"><span>No worked examples</span></label>
+      </fieldset>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 6px">
+        <legend style="font-weight: 600; margin-bottom: 6px">When a learner asks for the answer</legend>
+        <label style="display: flex; gap: 8px; align-items: flex-start"><input type="radio" name="ask" checked style="margin: 2px 0 0; accent-color: {{accent}}"><span>Decline, give the next hint, and count it in the summary you see</span></label>
+        <label style="display: flex; gap: 8px; align-items: flex-start"><input type="radio" name="ask" style="margin: 2px 0 0; accent-color: {{accent}}"><span>Decline and suggest office hours</span></label>
+      </fieldset>
+
+      <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 6px">
+        <legend style="font-weight: 600; margin-bottom: 6px">Sources the tutor may use</legend>
+        <label style="display: flex; gap: 8px; align-items: center"><input type="checkbox" checked style="margin: 0; accent-color: {{accent}}">Week 3 slides</label>
+        <label style="display: flex; gap: 8px; align-items: center"><input type="checkbox" checked style="margin: 0; accent-color: {{accent}}">Reading 3.2 and 3.3</label>
+        <label style="display: flex; gap: 8px; align-items: center"><input type="checkbox" checked style="margin: 0; accent-color: {{accent}}">Fairness audit guide</label>
+        <label style="display: flex; gap: 8px; align-items: center"><input type="checkbox" style="margin: 0; accent-color: {{accent}}">Lecture 3 recording (transcript)</label>
+        <label style="display: flex; gap: 8px; align-items: center; color: #6f6a62"><input type="checkbox" disabled style="margin: 0">Answer key <span style="font-size: 12px">· never available to the tutor</span></label>
+      </fieldset>
+
+      <div style="margin-top: auto; padding: 12px; border-radius: 10px; background: #faf8f4; border: 1px solid #ede8df; font-size: 12.5px; color: #3a3833; display: flex; flex-direction: column; gap: 4px">
+        <span><strong>What you'll see:</strong> a per-learner summary (hints used, answer requests, topics), plus class patterns in Insights.</span>
+        <span><strong>Full transcripts</strong> open only from a submission, and learners are told that.</span>
+      </div>
+    </section>
+
+    <!-- Learner preview -->
+    <aside aria-label="Learner preview" style="box-sizing: border-box; border-left: 1px solid #e3ded4; background: #faf8f4; padding: 22px 20px; display: flex; flex-direction: column; gap: 14px; overflow: hidden">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px">Preview as a learner</h2>
+        <span style="font-size: 12px; color: #5f5b54">Not saved yet</span>
+      </div>
+      <div style="padding: 10px 12px; border-radius: 10px; background: #fff; border: 1px solid #e3ded4; font-size: 12.5px; color: #3a3833">
+        <strong>Notice learners see:</strong> "Hint mode, set by Dr. Okafor for this check. The tutor answers only from course materials, and your instructor sees a summary of this chat."
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px; flex-grow: 1">
+        <div style="align-self: flex-end; max-width: 250px; padding: 9px 12px; border-radius: 12px 12px 4px 12px; background: #ebe6dd; font-size: 13.5px">Which option is right for question 2?</div>
+        <div class="ai ai--chat" style="max-width: 100%">
+          <div class="ai-who">Course tutor <span class="ai-src">· hint 1 of 2</span></div>
+          <div class="ai-body">I can't give answers on this check, but here's a way in: if you delete the ID column, can the model still recognize the same patient from their other features?<sup class="ai-ref">1</sup></div>
+          <div class="ai-cites"><span class="ai-cite" data-n="1">Week 3 slides, p. 6</span></div>
+        </div>
+        <div style="align-self: flex-end; max-width: 250px; padding: 9px 12px; border-radius: 12px 12px 4px 12px; background: #ebe6dd; font-size: 13.5px">Just tell me.</div>
+        <div class="ai ai--chat" style="max-width: 100%">
+          <div class="ai-who">Course tutor <span class="ai-src">· hint 2 of 2</span></div>
+          <div class="ai-body">The fix has to change which rows land in each set, not which columns the model sees. That's the last hint for this question.</div>
+        </div>
+      </div>
+      <button type="button" style="height: 36px; border-radius: 9px; border: 1px solid #d5cfc4; background: #fff; font: inherit; font-weight: 500; cursor: pointer">Try your own question</button>
+    </aside>
+  </div>
+
+  <footer style="height: 60px; flex-shrink: 0; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 16px; border-top: 1px solid #e3ded4; background: #fff">
+    <span style="font-size: 13px"><strong>1 change</strong> · Module 3 check: Explain → Hints · affects 46 learners in Section B · applies to new conversations · recorded in course history</span>
+    <div style="flex-grow: 1"></div>
+    <button type="button" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid #d5cfc4; background: #fff; font: inherit; font-weight: 500; cursor: pointer">Discard</button>
+    <button type="button" style="height: 38px; padding: 0 16px; border-radius: 9px; border: none; background: {{accent}}; color: #fff; font: inherit; font-weight: 600; cursor: pointer">Save tutor settings</button>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#0e6b63","options":["#0e6b63","#1f4f9c","#7a3e8f","#a24f1f"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#0e6b63' };
+  }
+}
+</script>
+</body>
+</html>

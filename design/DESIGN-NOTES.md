@@ -17,7 +17,7 @@ Tokens, conventions, and the reasoning behind the six prototype screens. The res
 | `ai` | `#5B4BAF` | AI-produced content: gutter glyph, attribution, footnote numbers (never a stripe or a fill that carries meaning alone) |
 | `ai-soft` | `#EEEBF8` / `#F7F5FC` | AI chip and bubble fills |
 | `success` | `#2E7D4F` / `#E4F2E8` | Correct, reviewed, healthy |
-| `warning` | `#9A6A12` / `#FBF1DC` | Due soon, needs review, delayed |
+| `warning` | `#9A6A12` / `#FBF1DC`; text `#7A5310` | Due soon, needs review, delayed. `#9A6A12` is for dots, bars and icons only; warning **text** uses `#7A5310` (4.2:1 vs 6.4:1 on the tint) |
 | `error` | `#B3382C` / `#FBE7E4` | Overdue, blocking, compliance risk |
 
 Semantic states differ in lightness as well as hue. Text contrast is at least 4.5:1; muted grey on white and white on accent both pass.
