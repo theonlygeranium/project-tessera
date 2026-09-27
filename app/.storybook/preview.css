@@ -1,0 +1,3 @@
+/* Story canvas defaults. Colors and fonts come from the generated tokens (D-011). */
+html,body{background:var(--paper);color:var(--ink);font:15px/1.5 var(--font-sans)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}

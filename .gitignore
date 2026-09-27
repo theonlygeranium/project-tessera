@@ -11,3 +11,4 @@ node_modules/
 # Phase 2 app build output (built by Cloudflare on every push, D-011)
 docs/app/
 docs/assets/tokens.css
+docs/storybook/
