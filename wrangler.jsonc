@@ -5,6 +5,10 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "project-tessera",
   "compatibility_date": "2026-09-26",
+  // D-011: build the Phase 2 React app into docs/app/ before every deploy and
+  // preview (Workers Builds, wrangler deploy, wrangler dev). The build output
+  // is not committed.
+  "build": { "command": "npm run build" },
   "assets": {
     "directory": "./docs",
     "html_handling": "auto-trailing-slash",

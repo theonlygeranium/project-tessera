@@ -49,6 +49,8 @@ Cursor, the self-hosted Schubert models, and Palmyra-X6 are benched; don't route
 | `.github/workflows/a11y.yml` | Runs `npm run a11y` on every push and PR (informational; doesn't block deploys). |
 | `docs/screens/*.html`, `docs/screens.json`, `docs/research.html` | **Generated** by `tools/build_docs.py`. Don't hand-edit. |
 | `docs/prototype/` | Clickable learner flow, hand-written (`index.html`, `prototype.css`, `prototype.js`). |
+| `app/` | **Phase 2 component app** (D-011): Vite + React + TypeScript. `app/src/tokens.ts` reads `design/tokens.json` into CSS custom properties; app code never hard-codes colors. |
+| `docs/app/` | **Generated** by `npm run build` and **not committed** (gitignored). Cloudflare builds it on every push via `wrangler.jsonc` → `build.command`; served at `/app/`. |
 | `docs/assets/ai-voice.css` + `.js` | The AI visual language: 4 styles, one markup contract. `DEFAULT` in the JS sets the site-wide style. |
 | `docs/explorations/ai-voice.html` | Comparison page for the 4 AI styles (a record of D-006). |
 | `research/report.md` | The research report (72 sources). |
@@ -63,6 +65,8 @@ Cursor, the self-hosted Schubert models, and Palmyra-X6 are benched; don't route
 ```bash
 pip install -r requirements.txt                        # once (Python 3.10+)
 python3 tools/build_docs.py                            # after ANY change to design/canvas or research/report.md
+npm run dev                                            # Phase 2 app with instant reload at http://localhost:5173/app/
+npm run build                                          # type-check + build the app into docs/app/ (Cloudflare runs this on every push)
 python3 -m http.server 8765 --directory docs           # quick local preview at http://localhost:8765/
 npx wrangler dev                                       # exact Cloudflare behavior (redirects, 404) at http://localhost:8787/
 npm install                                            # once (Node 18+) (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 if Chromium is preinstalled)
@@ -78,7 +82,7 @@ The owner is the sole developer and tests changes live. Pick the lane before sta
 
 ## Definition of done (full lane)
 1. Edit the source (`design/canvas/…`, `docs/prototype/…`, `research/report.md`).
-2. Run `python3 tools/build_docs.py`.
+2. Run `python3 tools/build_docs.py` (artboards or report changed) and/or `npm run build` (app changed; `npm run a11y` builds the app itself before auditing).
 3. Run `npm run a11y` and get **zero violations**. If you add a new page, screen state, or prototype step, add it to `tools/a11y_audit.mjs`.
 4. Open the changed pages locally and walk every affected flow, including the prototype's **Reset**. Take Playwright screenshots and look at them.
 5. Commit the source **and** the regenerated `docs/`, then push. Pushing a branch gives a live preview URL in about 30 seconds; pushing to `main` deploys production. For risky work, push a branch, check its preview, then merge.
@@ -136,7 +140,8 @@ If you can't reach the canvas, say in your handoff that it's behind the repo.
 - Permissions, sandbox allowances, and an `autoMode.allow` rule for delegated runs are in `.claude/settings.local.json` (machine-specific, not committed). The Codex project profile is `~/.codex/tessera.config.toml`.
 - Create worktrees with `git worktree add ../tessera-<task> -b agent/<task>`, and remove them when done. A new worktree has no `node_modules`; run `npm install` there (or symlink it) before `npm run a11y`.
 - The Mac's default `python3` is 3.9 (the build needs 3.10+), and Homebrew's `python3.12` refuses global installs (PEP 668). Build with: `uv run --no-project --python 3.12 --with 'markdown>=3.5' python tools/build_docs.py`. Verified 2026-09-26: the output is identical to the committed `docs/`.
-- `npm run a11y` works locally with the Playwright-managed Chromium (45/45 pass on 2026-09-26). No `CHROMIUM=` override is needed on the Mac.
+- `npm run a11y` works locally with the Playwright-managed Chromium (47/47 pass on 2026-09-26, including the app). No `CHROMIUM=` override is needed on the Mac.
+- **Live preview in the Claude desktop browser pane:** `.claude/launch.json` defines `tessera-app` (Vite dev server, reloads on every save; open `http://localhost:5173/app/`) and `tessera-site` (`wrangler dev` on port 8787, the whole site exactly as Cloudflare serves it, including the app build). Start one with `preview_start`.
 
 ## Working with the owner
 - Be direct. Lead with the result, then the reasoning. No praise or filler.

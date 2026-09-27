@@ -7,3 +7,6 @@ node_modules/
 
 # Local Cloudflare dev-server state (npx wrangler dev)
 .wrangler/
+
+# Phase 2 app build output (built by Cloudflare on every push, D-011)
+docs/app/

@@ -44,6 +44,7 @@ const targets = [
   { name: 'Research report', url: 'research.html' },
   { name: 'AI style exploration', url: 'explorations/ai-voice.html' },
   { name: 'Not found page', url: '404.html' },
+  { name: 'Component app', url: 'app/' }, // built by `npm run build` (D-011)
 ];
 for (const s of screens) {
   const styles = AI_SCREENS.has(s.slug) ? STYLES : ['marginalia'];
@@ -87,7 +88,7 @@ for (const t of targets) {
 }
 // ---- reflow: WCAG 1.4.10 (content usable at 320 CSS px without horizontal scrolling) ----
 // Screens under docs/screens/ are fixed-size design artboards and are exempt; site pages and the prototype are not.
-const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
+const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/', 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
 for (const u of REFLOW) {
   const page = await browser.newPage({ viewport: { width: 320, height: 256 } });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());

@@ -1,0 +1,25 @@
+/* Every color and font comes from design/tokens.json via applyTokens() (D-011). No hex values here. */
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--font-sans)}
+a{color:var(--accent);font-weight:600}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:4px}
+code{font-family:var(--font-mono);font-size:13px;background:var(--surface-sunk);padding:1px 6px;border-radius:5px}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+.hero{padding:40px 0 32px;border-bottom:1px solid var(--line);background:var(--surface-alt)}
+.hero a{text-decoration:none}
+.eyebrow{margin:18px 0 0;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--font-serif);font-weight:500;font-size:clamp(30px,4.6vw,44px);line-height:1.1;margin:8px 0 14px;text-wrap:balance}
+h2{font-family:var(--font-serif);font-weight:500;font-size:26px;margin:40px 0 8px}
+.lede{font-size:18px;max-width:70ch;color:var(--ink-2);margin:0}
+.muted{color:var(--muted)}
+.swatches{list-style:none;padding:0;margin:16px 0 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));gap:12px}
+.swatch{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:12px;row-gap:2px;align-items:start;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg)}
+.swatch .chip{grid-row:span 2;width:44px;height:44px;border-radius:var(--radius-md);border:1px solid var(--control-line)}
+.swatch .name{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.swatch .value{font-family:var(--font-mono);font-size:12.5px;color:var(--muted)}
+.swatch .desc{font-size:13.5px;color:var(--ink-3)}
+.sample{margin:8px 0;font-size:19px}
+.serif{font-family:var(--font-serif)}
+.sans{font-family:var(--font-sans)}
+.mono{font-family:var(--font-mono);font-size:16px}
+main{padding-bottom:64px}
