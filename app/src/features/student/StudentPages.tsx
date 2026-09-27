@@ -10,26 +10,44 @@ import { useSession } from '../../shell/session';
 import { usePageTitle } from '../../shell/usePageTitle';
 import styles from './Student.module.css';
 
-export function courseStatus(course: CourseSummary) {
-  return course.progress === 1 ? 'completed' : course.progress && course.progress > 0 ? 'active' : 'not-started';
+export function courseStatus(course: CourseSummary, hasStartedLesson = false) {
+  return course.publishedLessonCount > 0 && course.progress === 1 ? 'completed' :
+    (course.progress !== null && course.progress > 0) || hasStartedLesson ? 'active' : 'not-started';
+}
+function StudentCourseCard({ course }: { course: CourseSummary }) {
+  // A started lesson leaves the completed percentage at zero, so check lesson states in that case.
+  const outline = useApiQuery('getCourseOutline', { courseId: course.id }, { enabled: course.progress === 0 && course.publishedLessonCount > 0 });
+  const hasStartedLesson = outline.data?.modules.some(module => module.lessons.some(lesson => lesson.progress === 'in-progress')) ?? false;
+  const status = courseStatus(course, hasStartedLesson);
+  return <CourseCard title={course.title} code={course.code} term={course.term} instructor={course.instructorNames.join(', ')} progress={course.progress ?? undefined} status={status} meta={status === 'active' ? 'In progress' : undefined} href={paths.student.course(course.id)} renderLink={renderRouterLink} />;
 }
 export function CourseCards({ courses }: { courses: CourseSummary[] }) {
   if (!courses.length) return <p className={styles.empty}>No courses yet.</p>;
-  return <div className={styles.cards}>{courses.map(course => <CourseCard key={course.id} title={course.title} code={course.code} term={course.term} instructor={course.instructorNames.join(', ')} progress={course.progress ?? undefined} status={courseStatus(course)} href={paths.student.course(course.id)} renderLink={renderRouterLink} />)}</div>;
+  return <div className={styles.cards}>{courses.map(course => <StudentCourseCard key={course.id} course={course} />)}</div>;
 }
 
-function AnnouncementCard({ announcement, showCourse = false }: { announcement: Announcement; showCourse?: boolean }) {
+function previewBody(body: string) {
+  const text = body.replace(/\s+/g, ' ').trim();
+  if (text.length <= 160) return text;
+  const previousSpace = text.lastIndexOf(' ', 160);
+  const nextSpace = text.indexOf(' ', 160);
+  const boundary = previousSpace > 0 ? previousSpace : nextSpace >= 0 ? nextSpace : text.length;
+  return `${text.slice(0, boundary)}…`;
+}
+
+function AnnouncementCard({ announcement, showCourse = false, preview = false }: { announcement: Announcement; showCourse?: boolean; preview?: boolean }) {
   const mark = useApiMutation('markAnnouncementRead');
+  const body = preview ? previewBody(announcement.body) : announcement.body;
   return <div>
-    <PresenceCard name={announcement.authorName} initials={announcement.authorInitials} role={showCourse ? announcement.courseTitle : 'Instructor'} time={announcement.publishedAt ? new Date(announcement.publishedAt).toLocaleDateString() : ''} dateTime={announcement.publishedAt ?? undefined} title={announcement.title} pinned={announcement.pinned} unread={!announcement.read} actions={!announcement.read ? <Button density="compact" disabled={mark.isPending} onClick={() => mark.mutate({ announcementId: announcement.id })}>Mark as read</Button> : undefined}>
-      {announcement.origin === 'ai' && announcement.provenance ? <AiContent kind="block" state="kept" who="AI-assisted announcement" source={[announcement.provenance.summary, ...announcement.provenance.sources.map(source => source.name)].join(' · ')}>{announcement.body.split(/\n\s*\n/).map((text, index) => <p key={index}>{text}</p>)}</AiContent> : announcement.body.split(/\n\s*\n/).map((text, index) => <p key={index}>{text}</p>)}
+    <PresenceCard name={announcement.authorName} initials={announcement.authorInitials} role={showCourse ? announcement.courseTitle : 'Instructor'} time={announcement.publishedAt ? new Date(announcement.publishedAt).toLocaleDateString() : ''} dateTime={announcement.publishedAt ?? undefined} title={announcement.title} pinned={announcement.pinned} unread={!announcement.read} actions={preview || !announcement.read ? <div className={styles.announcementActions}>{preview && <Link className={styles.readLink} to={paths.student.announcements}>Read</Link>}{!announcement.read && <Button density="compact" disabled={mark.isPending} onClick={() => mark.mutate({ announcementId: announcement.id })}>Mark as read</Button>}</div> : undefined}>
+      {announcement.origin === 'ai' ? <AiContent kind="note" who="Drafted with AI" source={`edited by ${announcement.authorName}`}>{body.split(/\n\s*\n/).map((text, index) => <p key={index}>{text}</p>)}</AiContent> : body.split(/\n\s*\n/).map((text, index) => <p key={index}>{text}</p>)}
     </PresenceCard>
     <ErrorNotice error={mark.error} />
   </div>;
 }
-export function AnnouncementCards({ announcements, showCourse = false }: { announcements: Announcement[]; showCourse?: boolean }) {
+export function AnnouncementCards({ announcements, showCourse = false, preview = false }: { announcements: Announcement[]; showCourse?: boolean; preview?: boolean }) {
   if (!announcements.length) return <p className={styles.empty}>No announcements yet.</p>;
-  return <div className={styles.stack}>{announcements.map(announcement => <AnnouncementCard key={announcement.id} announcement={announcement} showCourse={showCourse} />)}</div>;
+  return <div className={styles.stack}>{announcements.map(announcement => <AnnouncementCard key={announcement.id} announcement={announcement} showCourse={showCourse} preview={preview} />)}</div>;
 }
 
 export function TodayPage() {
@@ -40,7 +58,7 @@ export function TodayPage() {
     {today.isPending ? <Loading label="Loading Today" /> : today.error ? <ErrorNotice error={today.error} onRetry={() => today.refetch()} /> : <>
       <section><h2>Do next</h2>{today.data.doNext.length ? <div className={styles.cards}>{today.data.doNext.map(task => <TaskCard key={task.id} title={task.title} context={task.context} minutes={task.minutes} state={task.state === 'completed' ? 'done' : task.state === 'in-progress' ? 'in-progress' : 'todo'} href={paths.student.lesson(task.courseId, task.lessonId)} actionLabel={task.kind === 'resume' ? 'Resume' : task.kind === 'start' ? 'Start' : 'Continue'} renderLink={renderRouterLink} />)}</div> : <p className={styles.empty}>You're all caught up.</p>}</section>
       <section><h2>This week</h2><div className={styles.meter}><ProgressMeter label="Study time" variant="ring" value={today.data.week.minutesDone} max={today.data.week.minutesGoal} valueText={`${today.data.week.minutesDone} of ${today.data.week.minutesGoal} minutes`} /></div></section>
-      <section><div className={styles.sectionHead}><h2>Announcements</h2><Link to={paths.student.announcements}>All announcements</Link></div><AnnouncementCards announcements={[...today.data.announcements].sort((a,b) => Number(a.read) - Number(b.read))} showCourse /></section>
+      <section><div className={styles.sectionHead}><h2>Announcements</h2><Link to={paths.student.announcements}>All announcements</Link></div><AnnouncementCards announcements={[...today.data.announcements].sort((a,b) => Number(a.read) - Number(b.read))} showCourse preview /></section>
       <section><div className={styles.sectionHead}><h2>Your courses</h2><Link to={paths.student.courses}>All courses</Link></div><CourseCards courses={today.data.courses} /></section>
     </>}
   </div>;
