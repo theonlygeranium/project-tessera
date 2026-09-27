@@ -45,6 +45,9 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
+// Durable Object classes must be exported from the main module.
+export { OcrContainer } from './ocr';
+
 /** Strips the version prefix (or the unversioned alias) from an API path. */
 export function apiRelativePath(pathname: string): string {
   const rel = pathname.startsWith(API_PREFIX) ? pathname.slice(API_PREFIX.length) : pathname.replace(/^\/api/, '');

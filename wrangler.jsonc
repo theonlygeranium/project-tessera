@@ -35,6 +35,17 @@
     }
   ],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "tessera-files" }],
+  // OCR for scanned PDFs (D-022, option B): OCRmyPDF + Tesseract in a Cloudflare Container.
+  "containers": [
+    {
+      "class_name": "OcrContainer",
+      "image": "./containers/ocr/Dockerfile",
+      "instance_type": { "vcpu": 2, "memory_mib": 4096, "disk_mb": 8000 },
+      "max_instances": 3
+    }
+  ],
+  "durable_objects": { "bindings": [{ "name": "OCR", "class_name": "OcrContainer" }] },
+  "migrations": [{ "tag": "v1-ocr", "new_sqlite_classes": ["OcrContainer"] }],
   "vars": {
     "ENVIRONMENT": "production",
     "ACCESS_TEAM_DOMAIN": "little-brook-5f84.cloudflareaccess.com",
@@ -46,6 +57,16 @@
   "previews": {
     "ai": { "binding": "AI" },
     "r2_buckets": [{ "binding": "FILES", "bucket_name": "tessera-files-preview" }],
+    // Preview container configuration isn't inherited from the top level.
+    "containers": [
+      {
+        "class_name": "OcrContainer",
+        "image": "./containers/ocr/Dockerfile",
+        "instance_type": { "vcpu": 2, "memory_mib": 4096, "disk_mb": 8000 },
+        "max_instances": 1
+      }
+    ],
+    "durable_objects": { "bindings": [{ "name": "OCR", "class_name": "OcrContainer" }] },
     "d1_databases": [
       {
         "binding": "DB",

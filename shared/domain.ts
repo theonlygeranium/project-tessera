@@ -439,7 +439,7 @@ export interface AccessIssue {
   location: { blockId?: Id; page?: number; element?: number; label?: string };
   count: number;
   /** Fixes the product can apply or draft (alt text, rewrite, header row, metadata). */
-  fix: 'alt-text' | 'rewrite' | 'link-text' | 'table-header' | 'metadata' | 'captions' | 'manual';
+  fix: 'alt-text' | 'rewrite' | 'link-text' | 'table-header' | 'metadata' | 'captions' | 'ocr' | 'manual';
 }
 
 export interface AccessSummary {
