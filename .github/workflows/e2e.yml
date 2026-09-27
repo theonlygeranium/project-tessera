@@ -1,0 +1,28 @@
+# Night 1 acceptance journeys on every push to main and night branches, and on every PR
+# (handoff/NIGHT-1-PLAN.md §4). Informational, like a11y.yml: it does not gate Cloudflare
+# deploys, which Workers Builds runs independently.
+name: e2e
+on:
+  push:
+    branches:
+      - main
+      - 'night*'
+  pull_request:
+  workflow_dispatch:
+jobs:
+  journeys:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: reports/e2e/
