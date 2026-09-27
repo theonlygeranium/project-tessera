@@ -1,0 +1,12 @@
+.group { min-width: 0; margin: 0; padding: 0; border: 0; color: var(--ink); font: 400 var(--size-text-learner)/1.35 var(--font-sans); }
+.legend { margin-bottom: 8px; font-weight: 600; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.segments { display: flex; flex-wrap: wrap; gap: 4px; width: fit-content; max-width: 100%; padding: 4px; border-radius: var(--radius-md); background: var(--surface-sunk); }
+.segment { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-direction: column; box-sizing: border-box; min-height: var(--size-target-learner); padding: 6px 12px; border-radius: var(--radius-sm); cursor: pointer; text-align: center; }
+.segment:has(input:checked) { background: var(--surface); color: var(--accent); font-weight: 600; }
+.segment:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.segment input { position: absolute; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+.locked { color: var(--disabled-text); cursor: not-allowed; }
+.reason { display: block; max-width: 180px; font-size: var(--size-text-label); font-weight: 400; }
+.compact { font-size: var(--size-text-compact); }
+.compact .segment { min-height: var(--size-target-compact); padding: 4px 10px; }

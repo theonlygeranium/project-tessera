@@ -1,0 +1,11 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { DataTable } from './DataTable';
+type Person = { id: string; name: string; email: string; role: string; status: string };
+const columns = [{ key: 'name', header: 'Name' }, { key: 'email', header: 'Email' }, { key: 'role', header: 'Role' }, { key: 'status', header: 'Status', render: (row: Person) => <span>{row.status}</span> }];
+const rows: Person[] = [{ id: 'okafor', name: 'Dr. Okafor', email: 'okafor@meridian.example', role: 'Instructor', status: 'Active' }, { id: 'priya', name: 'Priya Shah', email: 'priya@meridian.example', role: 'Learner', status: 'Invited' }];
+const meta = { title: 'Components/DataTable', component: DataTable<Person>, args: { caption: 'Data Literacy 101 people', columns, rows, rowKey: (row: Person) => row.id } } satisfies Meta<typeof DataTable<Person>>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const People: Story = {};
+export const Empty: Story = { args: { rows: [], empty: 'No people have joined Data Literacy 101 yet.' } };
+export const Compact: Story = { args: { density: 'compact' } };

@@ -1,0 +1,11 @@
+.region { box-sizing: border-box; max-width: 100%; min-width: 0; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink); font: 400 var(--size-text-learner)/1.4 var(--font-sans); }
+.region:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.table { width: 100%; min-width: 520px; border-collapse: collapse; background: var(--surface); }
+.caption { padding: 12px 14px; text-align: start; font-weight: 600; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.table th, .table td { padding: 12px 14px; border-top: 1px solid var(--line-soft); text-align: start; vertical-align: top; }
+.table th { background: var(--surface-alt); font-weight: 600; }
+.table .end { text-align: end; }
+.table tr:hover td { background: var(--surface-alt); }
+.compact { font-size: var(--size-text-compact); }
+.compact .table th, .compact .table td { padding: 8px 10px; }

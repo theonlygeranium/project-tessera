@@ -1,0 +1,11 @@
+.bar { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px; min-width: 0; padding: 20px 24px; border-bottom: 1px solid var(--line); background: var(--surface-alt); color: var(--ink); font-family: var(--font-sans); }
+.main { min-width: 0; flex: 1 1 220px; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0; margin: 0 0 8px; list-style: none; color: var(--ink-3); font-size: var(--size-text-compact); }
+.crumbs li { min-width: 0; overflow-wrap: anywhere; }
+.crumbs li + li::before { content: '›'; margin-right: 4px; color: var(--ink-3); }
+.crumbLink { color: var(--accent); text-decoration: underline; }
+.eyebrow { margin: 0 0 4px; color: var(--ink-3); font-size: var(--size-text-label); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.title { margin: 0; font: 600 var(--size-text-reading)/1.2 var(--font-serif); overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.crumbLink:focus-visible, .actions :is(a, button):focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 767px) { .bar { padding: 16px; } }

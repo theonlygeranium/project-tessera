@@ -1,0 +1,10 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { ProgressMeter } from './ProgressMeter';
+const meta = { title: 'Components/ProgressMeter', component: ProgressMeter, args: { label: 'Data Literacy 101 lessons', value: 40 } } satisfies Meta<typeof ProgressMeter>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Bar: Story = {};
+export const Thin: Story = { args: { variant: 'thin', value: 80 } };
+export const Ring: Story = { args: { variant: 'ring', label: 'Study time this week', value: 2.5, max: 4, valueText: '2.5 of 4 hours this week' } };
+export const Empty: Story = { args: { value: 0 } };
+export const Complete: Story = { args: { value: 100 } };

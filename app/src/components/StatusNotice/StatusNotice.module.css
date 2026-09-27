@@ -1,0 +1,12 @@
+.notice { display: flex; align-items: flex-start; gap: 10px; box-sizing: border-box; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink); font: 400 var(--size-text-learner)/1.45 var(--font-sans); }
+.info { background: var(--accent-soft); }
+.success { background: var(--success-soft); color: var(--success-text); }
+.warning { background: var(--warning-soft); color: var(--warning-text); }
+.error { background: var(--error-soft); color: var(--error-text); }
+.policy { background: var(--surface-alt); }
+.icon { flex: none; font-weight: 700; }
+.content { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.heading { display: block; font-weight: 600; }
+.action { margin-top: 8px; }
+.dismiss { display: inline-grid; place-items: center; flex: none; width: var(--size-target-learner); height: var(--size-target-learner); margin: -8px -10px -8px 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: inherit; font: inherit; font-size: var(--size-text-reading); cursor: pointer; }
+.dismiss:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

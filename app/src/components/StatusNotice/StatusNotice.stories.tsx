@@ -1,0 +1,13 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { StatusNotice } from './StatusNotice';
+import { Button } from '../Button/Button';
+const meta = { title: 'Components/StatusNotice', component: StatusNotice, args: { tone: 'info', children: 'Your Data Literacy 101 schedule has been updated.' } } satisfies Meta<typeof StatusNotice>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Info: Story = {};
+export const Success: Story = { args: { tone: 'success', children: 'Your answer was saved.' } };
+export const Warning: Story = { args: { tone: 'warning', children: 'This lesson closes tomorrow.' } };
+export const Error: Story = { args: { tone: 'error', children: 'Your answer could not be saved. Try again.' } };
+export const Policy: Story = { args: { tone: 'policy', children: 'Open tutor mode is unavailable on graded work.' } };
+export const WithUndo: Story = { args: { children: 'Why this moved: your weekly time changed.', action: <Button variant="text" onClick={() => {}}>Undo</Button> } };
+export const Dismissible: Story = { args: { onDismiss: () => {} } };

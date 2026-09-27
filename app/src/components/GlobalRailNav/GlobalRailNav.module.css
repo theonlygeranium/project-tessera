@@ -1,0 +1,12 @@
+.rail { box-sizing: border-box; width: var(--size-rail-width); min-width: 0; min-height: 100%; display: flex; flex-direction: column; gap: 16px; padding: 16px 10px; border-right: 1px solid var(--line); background: var(--surface-alt); color: var(--ink); font: 500 var(--size-text-compact)/1.4 var(--font-sans); }
+.header, .footer { padding: 8px; overflow-wrap: anywhere; }
+.footer { margin-top: auto; }
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.link { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-height: var(--size-target-learner); min-width: 0; padding: 8px 2px; border-radius: var(--radius-md); color: var(--ink-2); text-align: center; text-decoration: none; overflow-wrap: anywhere; }
+.link:hover { background: var(--surface); }
+.current { background: var(--accent-soft); color: var(--accent); font-weight: 700; box-shadow: inset 4px 0 var(--accent); }
+.icon { display: inline-flex; flex: none; align-items: center; justify-content: center; min-width: 20px; }
+.badge { padding: 2px 6px; border-radius: var(--radius-pill); background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.link:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 767px) { .rail { width: 100%; min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; gap: 4px; overflow-x: auto; } .header, .footer { padding: 4px 8px; } .footer { margin-top: 0; } .list { display: flex; width: max-content; min-width: 100%; } .link { flex-direction: row; padding: 8px; text-align: left; white-space: nowrap; } .current { box-shadow: inset 0 -3px var(--accent); } }

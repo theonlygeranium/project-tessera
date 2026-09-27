@@ -1,0 +1,15 @@
+.group { min-width: 0; margin: 0; padding: 0; border: 0; color: var(--ink); font: 400 var(--size-text-learner)/1.4 var(--font-sans); }
+.legend { margin-bottom: 10px; font-weight: 600; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.options { display: grid; gap: 8px; }
+.option { display: flex; align-items: center; gap: 10px; box-sizing: border-box; min-height: var(--size-target-learner); min-width: 0; cursor: pointer; }
+.option input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.option input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.optionLabel { display: block; font-weight: 500; }
+.description { display: block; color: var(--ink-2); font-size: var(--size-text-label); }
+.card .option { align-items: flex-start; padding: 12px; border: 1px solid var(--control-line); border-radius: var(--radius-md); background: var(--surface); }
+.card .option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.card .option:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.disabled { color: var(--disabled-text); cursor: not-allowed; }
+.disabled .description { color: var(--disabled-text); }
+.error { margin: 8px 0 0; color: var(--error-text); font-size: var(--size-text-label); font-weight: 600; }

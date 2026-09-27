@@ -1,0 +1,13 @@
+.stepper { min-width: 0; color: var(--ink); font: 500 var(--size-text-compact)/1.4 var(--font-sans); }
+.list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
+.step { min-width: 0; }
+.content, .link { display: inline-flex; align-items: center; gap: 6px; min-height: var(--size-target-learner); box-sizing: border-box; padding: 4px; border-radius: var(--radius-md); color: inherit; text-decoration: none; }
+.link:hover { background: var(--surface-alt); }
+.mark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid var(--line-strong); border-radius: var(--radius-pill); }
+.complete { color: var(--success-text); }
+.complete .mark { border-color: var(--success); background: var(--success-soft); }
+.current { color: var(--accent); font-weight: 700; }
+.current .mark { border-color: var(--accent); background: var(--accent-soft); }
+.upcoming { color: var(--ink-3); }
+.link:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

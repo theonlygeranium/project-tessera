@@ -1,0 +1,10 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { KnowledgeCheck } from './KnowledgeCheck';
+const options = [{ id: 'more-data', text: 'Increase the training set' }, { id: 'split-person', text: 'Split by person so no one appears in both sets' }, { id: 'f1', text: 'Switch from accuracy to F1' }];
+const meta = { title: 'Components/KnowledgeCheck', component: KnowledgeCheck, args: { question: 'How can Priya avoid evaluation leakage?', options, onSubmit: () => {} } } satisfies Meta<typeof KnowledgeCheck>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Unanswered: Story = {};
+export const Selected: Story = { play: async ({ canvasElement }) => { (canvasElement.querySelector('input[value="split-person"]') as HTMLInputElement).click(); } };
+export const Correct: Story = { args: { feedback: { correct: true, text: 'Each person belongs in only one split.' } }, play: async ({ canvasElement }) => { (canvasElement.querySelector('input[value="split-person"]') as HTMLInputElement).click(); (canvasElement.querySelector('button') as HTMLButtonElement).click(); } };
+export const IncorrectWithRetry: Story = { args: { feedback: { correct: false, text: 'Think about who appears in each split.' }, onRetry: () => {} }, play: async ({ canvasElement }) => { (canvasElement.querySelector('input[value="more-data"]') as HTMLInputElement).click(); (canvasElement.querySelector('button') as HTMLButtonElement).click(); } };

@@ -1,0 +1,11 @@
+.card { display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); color: var(--ink); font: 400 var(--size-text-learner)/1.5 var(--font-sans); text-decoration: none; overflow-wrap: anywhere; }
+.card:hover { border-color: var(--accent); }
+.card:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.code { color: var(--ink-3); font: 600 var(--size-text-compact)/1.3 var(--font-mono); }
+.status { padding: 3px 8px; border-radius: var(--radius-pill); background: var(--accent-soft); color: var(--accent); font-size: var(--size-text-compact); font-weight: 700; }
+.title { font: 600 var(--size-text-reading)/1.25 var(--font-serif); }
+.details { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--ink-3); font-size: var(--size-text-compact); }
+.progress { display: grid; gap: 4px; color: var(--ink-2); font-size: var(--size-text-compact); }
+.track { height: 6px; background: var(--track); border-radius: var(--radius-pill); overflow: hidden; }
+.fill { display: block; height: 100%; background: var(--accent); }
