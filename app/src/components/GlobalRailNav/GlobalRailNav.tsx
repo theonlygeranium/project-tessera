@@ -9,10 +9,12 @@ export type GlobalRailNavProps = Omit<HTMLAttributes<HTMLElement>, 'children'> &
   header?: ReactNode;
   footer?: ReactNode;
   renderLink?: (props: LinkRenderProps) => ReactNode;
+  /** `icon` (default): the narrow Phase 1 rail with labels under icons. `wide`: labels beside icons. */
+  layout?: 'icon' | 'wide';
 };
 
-export function GlobalRailNav({ label, items, currentId, header, footer, renderLink, className, ...navProps }: GlobalRailNavProps) {
-  return <nav {...navProps} aria-label={label} className={[styles.rail, className].filter(Boolean).join(' ')}>
+export function GlobalRailNav({ label, items, currentId, header, footer, renderLink, layout = 'icon', className, ...navProps }: GlobalRailNavProps) {
+  return <nav {...navProps} aria-label={label} className={[styles.rail, layout === 'wide' && styles.wide, className].filter(Boolean).join(' ')}>
     {header && <div className={styles.header}>{header}</div>}
     <ul className={styles.list}>{items.map((item) => {
       const current = item.id === currentId;

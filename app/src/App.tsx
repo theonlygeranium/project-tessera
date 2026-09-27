@@ -1,49 +1,16 @@
-import { colors } from './tokens';
+// The Tessera app (Night 1): React Query for server state, React Router for pages.
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { RouterProvider } from 'react-router';
+import { router } from './routes';
 
-// Phase 2 skeleton (D-011): proves the Cloudflare build pipeline and the
-// tokens.json → CSS custom properties path. Shared components start in #17.
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 10_000 } },
+});
+
 export function App() {
   return (
-    <>
-      <header className="hero">
-        <div className="wrap">
-          <a href="../">← Project Tessera</a>
-          <p className="eyebrow">Phase 2 · component app</p>
-          <h1>The component app starts here.</h1>
-          <p className="lede">
-            Phase 2 builds Tessera's screens from shared React components instead of one-off mockups. This page is
-            the first step: every color and typeface below is read live from the design tokens, so a token change
-            shows up everywhere at once.
-          </p>
-        </div>
-      </header>
-      <main className="wrap">
-        <section aria-labelledby="colors-h">
-          <h2 id="colors-h">Color tokens</h2>
-          <p className="muted">
-            {colors.length} colors from <code>design/tokens.json</code>. Warning text uses <code>warning-text</code>;
-            violet is reserved for AI.
-          </p>
-          <ul className="swatches">
-            {colors.map((c) => (
-              <li key={c.name} className="swatch">
-                <span className="chip" style={{ background: `var(--${c.name})` }} aria-hidden="true" />
-                <span className="name">
-                  <code>{c.name}</code>
-                  <span className="value">{c.value.toUpperCase()}</span>
-                </span>
-                {c.description && <span className="desc">{c.description}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section aria-labelledby="type-h">
-          <h2 id="type-h">Typefaces</h2>
-          <p className="sample serif">Fraunces · titles, lesson reading, and all AI text</p>
-          <p className="sample sans">IBM Plex Sans · all human interface text</p>
-          <p className="sample mono">IBM Plex Mono · shortcuts and footnote numerals</p>
-        </section>
-      </main>
-    </>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
   );
 }

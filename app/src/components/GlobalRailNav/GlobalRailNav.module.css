@@ -9,4 +9,8 @@
 .badge { padding: 2px 6px; border-radius: var(--radius-pill); background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 .link:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Wide layout: icon and label side by side, room for a persona footer (the Night 1 app shell). */
+.wide { width: 232px; padding: 20px 12px; }
+.wide .link { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 8px 12px; text-align: left; }
+.wide .header, .wide .footer { padding: 4px 12px; }
 @media (max-width: 767px) { .rail { width: 100%; min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; gap: 4px; overflow-x: auto; } .header, .footer { padding: 4px 8px; } .footer { margin-top: 0; } .list { display: flex; width: max-content; min-width: 100%; } .link { flex-direction: row; padding: 8px; text-align: left; white-space: nowrap; } .current { box-shadow: inset 0 -3px var(--accent); } }

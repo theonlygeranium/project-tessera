@@ -20,5 +20,7 @@ export default defineConfig({
     port: 5173,
     // The app imports design/tokens.json from outside app/.
     fs: { allow: [here('..')] },
+    // The Worker API from `npm run dev:api` (wrangler dev). Use ?data=mock to work without it.
+    proxy: { '/api': 'http://localhost:8787' },
   },
 });

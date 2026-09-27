@@ -28,7 +28,9 @@ const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascrip
 const server = createServer(async (req, res) => {
   let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (path.endsWith('/')) path += 'index.html';
-  const file = normalize(join(DOCS, path));
+  let file = normalize(join(DOCS, path));
+  // Single-page app fallback, as the Worker does in production (D-014): /app/<route> → /app/index.html.
+  if (!existsSync(file) && path.startsWith('/app/') && !extname(path)) file = join(DOCS, 'app', 'index.html');
   if (!file.startsWith(DOCS) || !existsSync(file)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
   res.end(await readFile(file));
@@ -44,8 +46,17 @@ const targets = [
   { name: 'Research report', url: 'research.html' },
   { name: 'AI style exploration', url: 'explorations/ai-voice.html' },
   { name: 'Not found page', url: '404.html' },
-  { name: 'Component app', url: 'app/' }, // built by `npm run build` (D-011)
 ];
+// The Night 1 app (D-014), on the in-memory mock (?data=mock) since there's no API here.
+// `as` signs in as a seed persona. Lane H adds every route.
+const APP = [
+  { name: 'App · Choose a persona', url: 'app/sign-in?data=mock' },
+  { name: 'App · Design tokens', url: 'app/tokens?data=mock' },
+  { name: 'App · Administrator home', url: 'app/?data=mock&as=u-admin' },
+  { name: 'App · Instructor home', url: 'app/?data=mock&as=u-okafor' },
+  { name: 'App · Student home', url: 'app/?data=mock&as=u-priya' },
+];
+for (const a of APP) targets.push({ ...a, settle: 900 });
 for (const s of screens) {
   const styles = AI_SCREENS.has(s.slug) ? STYLES : ['marginalia'];
   for (const st of styles) targets.push({ name: `Screen · ${s.title}${styles.length > 1 ? ` · ${st}` : ''}`, url: `${s.file}?ai=${st}` });
@@ -96,7 +107,7 @@ for (const t of targets) {
 }
 // ---- reflow: WCAG 1.4.10 (content usable at 320 CSS px without horizontal scrolling) ----
 // Screens under docs/screens/ are fixed-size design artboards and are exempt; site pages and the prototype are not.
-const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/', 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
+const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/sign-in?data=mock', 'app/?data=mock&as=u-okafor', 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
 for (const u of REFLOW) {
   const page = await browser.newPage({ viewport: { width: 320, height: 256 } });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
