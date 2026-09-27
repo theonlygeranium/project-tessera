@@ -43,11 +43,11 @@ function CheckBlock({ block, lessonId }: { block: Extract<StudentBlock, { type: 
   return <div className={styles.check}><KnowledgeCheck question={block.question} options={block.options} feedback={feedback} onSubmit={optionId => answer.mutate({ lessonId, blockId: block.id, optionId })} onRetry={() => setFeedback(undefined)} />{answer.isPending && <p role="status">Checking answer…</p>}<ErrorNotice error={answer.error} /></div>;
 }
 
-/** Kept AI blocks say what they are and where they came from (D-003, D-006). */
+/** Published AI blocks tell learners who reviewed them. */
 function ContentBlock({ block, lessonId }: { block: StudentBlock; lessonId: string }) {
   if (block.origin === 'ai') {
     return (
-      <AiContent kind="block" state="kept" who="Drafted with AI" source={`reviewed by your instructor${block.provenance ? ` · ${block.provenance.model}` : ''}`}>
+      <AiContent kind="note" who="Drafted with AI" source="reviewed by your instructor">
         <PlainBlock block={block} lessonId={lessonId} />
       </AiContent>
     );

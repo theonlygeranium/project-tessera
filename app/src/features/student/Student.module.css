@@ -16,11 +16,15 @@
 .sectionHead { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 14px; }
 .sectionHead h2 { margin: 0; }
 .sectionHead a, .lessonNav a { color: var(--accent); font-weight: 600; }
+.announcementActions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.readLink { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600; }
+.readLink:visited, .readLink:hover { color: var(--accent); }
+.readLink:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .meter { box-sizing: border-box; width: min(100%, 320px); padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
 .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
 .filters > :first-child { flex: 1 1 240px; }
-.primaryLink { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: var(--radius-lg); color: var(--surface); background: var(--accent); font-weight: 600; text-decoration: none; }
-.primaryLink:hover { background: var(--accent-hover); }
+.page a.primaryLink, .page a.primaryLink:visited { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: var(--radius-lg); color: var(--surface); background: var(--accent); font-weight: 600; text-decoration: none; }
+.page a.primaryLink:hover { color: var(--surface); background: var(--accent-hover); }
 .primaryLink:focus-visible, .lessonNav a:focus-visible, .sectionHead a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .reading { max-width: 760px; }
 .lessonBody { display: grid; gap: 12px; font: 400 var(--size-text-reading)/1.7 var(--font-serif); }
