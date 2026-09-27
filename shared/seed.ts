@@ -49,7 +49,9 @@ export function seedData(): SeedData {
     { id: 'u-okafor', name: 'Dr. Amara Okafor', email: 'a.okafor@meridian.example.edu', role: 'instructor', initials: 'AO', profile: null },
     { id: 'u-chen', name: 'Prof. Daniel Chen', email: 'd.chen@meridian.example.edu', role: 'instructor', initials: 'DC', profile: null },
     { id: 'u-priya', name: 'Priya Natarajan', email: 'priya.n@meridian.example.edu', role: 'student', initials: 'PN', profile: null },
-    { id: 'u-marcus', name: 'Marcus Bell', email: 'marcus.bell@meridian.example.edu', role: 'student', initials: 'MB', profile: null },
+    { id: 'u-marcus', name: 'Marcus Bell', email: 'marcus.bell@meridian.example.edu', role: 'student', initials: 'MB', profile: {
+      goals: ['finish-degree'], goalNote: '', weeklyMinutes: 120, language: 'en', readingLevel: 'standard',
+      accessibility: { captions: true, reducedMotion: false, largerText: false, screenReader: false }, reminders: 'weekly', completedAt: t(19, 20) } },
     { id: 'u-sofia', name: 'Sofia Alvarez', email: 'sofia.alvarez@meridian.example.edu', role: 'student', initials: 'SA', profile: null },
     { id: 'u-jordan', name: 'Jordan Lee', email: 'jordan.lee@meridian.example.edu', role: 'student', initials: 'JL', profile: null },
   ];
@@ -121,8 +123,8 @@ export function seedData(): SeedData {
         { id: 'c', text: 'What is the capital of the state?' },
       ],
       correctOptionId: 'b',
-      feedbackCorrect: 'Right: study hours vary from student to student, so answering it means describing that variability.',
-      feedbackIncorrect: 'Not quite. That question has one fixed answer. Look for the one whose answer changes from person to person.' },
+      feedbackCorrect: 'Study hours vary from student to student, so answering it means describing that variability.',
+      feedbackIncorrect: 'That question has one fixed answer. Look for the one whose answer changes from person to person.' },
     { ...human('b-s1-5', 'l-stat-1', 4, t(19)), type: 'text', text: 'Next, we\'ll name the things we measure (variables) and who or what we measure them on (cases).' },
 
     // STAT 110 · Lesson 2
@@ -136,12 +138,16 @@ export function seedData(): SeedData {
         { id: 'c', text: 'The survey questions' },
       ],
       correctOptionId: 'a',
-      feedbackCorrect: 'Yes: each student is one row, one case.',
-      feedbackIncorrect: 'Not quite. Major and hours are what was recorded (the variables). Who were they recorded about?' },
+      feedbackCorrect: 'Each student is one row, one case.',
+      feedbackIncorrect: 'Major and hours are what was recorded (the variables). Who were they recorded about?' },
 
     // STAT 110 · Lesson 3 (draft)
     { ...human('b-s3-1', 'l-stat-3', 0, t(24)), type: 'heading', level: 2, text: 'Two ways to describe the middle' },
     { ...human('b-s3-2', 'l-stat-3', 1, t(24)), type: 'text', text: 'The mean adds every value and divides by how many there are. The median is the middle value once the data are sorted.' },
+    { id: 'b-s3-3', lessonId: 'l-stat-3', position: 2, origin: 'ai', aiState: 'draft', updatedAt: t(25),
+      provenance: { model: 'palmyra-x6', task: 'block-regenerate', generatedAt: t(25), sources: [], summary: 'Add a worked example with study hours' },
+      previous: null, type: 'text', text:
+      'Suppose five students study 2, 3, 3, 4, and 13 hours a week. The mean is 25 ÷ 5 = 5 hours, but four of the five study less than that. The median, 3 hours, sits in the middle of the sorted list and isn\'t pulled up by the one long week.\n\nWhen a few values are far from the rest, the median usually describes a typical case better.' },
 
     // COMM 120 · Lesson 1
     { ...human('b-c1-1', 'l-comm-1', 0, t(20)), type: 'heading', level: 2, text: 'Write to one person' },
@@ -154,7 +160,7 @@ export function seedData(): SeedData {
         { id: 'c', text: 'Which fonts to use' },
       ],
       correctOptionId: 'b',
-      feedbackCorrect: 'Exactly. The reader shapes everything else.',
+      feedbackCorrect: 'The reader shapes everything else.',
       feedbackIncorrect: 'That comes later. Start with the person you\'re writing for.' },
   ];
 

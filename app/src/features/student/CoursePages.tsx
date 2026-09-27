@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { StudentBlock } from '../../../../shared/domain';
-import { Button, KnowledgeCheck, LessonOutline, PresenceCard, StatusNotice, TopBar } from '../../components';
+import { Button, KnowledgeCheck, LessonOutline, PresenceCard, StatusNotice, TopBar, AiContent } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
@@ -43,7 +43,19 @@ function CheckBlock({ block, lessonId }: { block: Extract<StudentBlock, { type: 
   return <div className={styles.check}><KnowledgeCheck question={block.question} options={block.options} feedback={feedback} onSubmit={optionId => answer.mutate({ lessonId, blockId: block.id, optionId })} onRetry={() => setFeedback(undefined)} />{answer.isPending && <p role="status">Checking answer…</p>}<ErrorNotice error={answer.error} /></div>;
 }
 
+/** Kept AI blocks say what they are and where they came from (D-003, D-006). */
 function ContentBlock({ block, lessonId }: { block: StudentBlock; lessonId: string }) {
+  if (block.origin === 'ai') {
+    return (
+      <AiContent kind="block" state="kept" who="Drafted with AI" source={`reviewed by your instructor${block.provenance ? ` · ${block.provenance.model}` : ''}`}>
+        <PlainBlock block={block} lessonId={lessonId} />
+      </AiContent>
+    );
+  }
+  return <PlainBlock block={block} lessonId={lessonId} />;
+}
+
+function PlainBlock({ block, lessonId }: { block: StudentBlock; lessonId: string }) {
   if (block.type === 'heading') return block.level === 2 ? <h2>{block.text}</h2> : <h3>{block.text}</h3>;
   if (block.type === 'text') return <div>{block.text.split(/\n\s*\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>;
   if (block.type === 'callout') return <aside className={styles.callout}><p className={styles.tone}>{block.tone}</p><h3>{block.title}</h3><p>{block.text}</p></aside>;

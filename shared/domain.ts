@@ -196,9 +196,11 @@ export type Block = BlockMeta & BlockContent;
 
 /** What a student receives for a check block: no answer key. */
 export type StudentCheckContent = Omit<Extract<BlockContent, { type: 'check' }>, 'correctOptionId' | 'feedbackCorrect' | 'feedbackIncorrect'>;
+/** `origin` and `provenance` let the player label AI-written (kept) blocks (D-003, D-006). */
+type StudentBlockMeta = Pick<BlockMeta, 'id' | 'position' | 'origin' | 'provenance'>;
 export type StudentBlock =
-  | (Pick<BlockMeta, 'id' | 'position'> & Exclude<BlockContent, { type: 'check' }>)
-  | (Pick<BlockMeta, 'id' | 'position'> & StudentCheckContent);
+  | (StudentBlockMeta & Exclude<BlockContent, { type: 'check' }>)
+  | (StudentBlockMeta & StudentCheckContent);
 
 /** A lesson with its blocks, as staff see it. */
 export interface LessonDetail {

@@ -45,11 +45,11 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
   getStudentLesson: async (ctx, { lessonId }) => {
     const l = await studentLesson(ctx, lessonId), c = await canReachCourse(ctx, l.courseId), m = await moduleFor(ctx, l.moduleId);
     const blocks: StudentBlock[] = (await ctx.repo.listBlocks(lessonId)).filter(visible).map(b => {
-      if (b.type === 'check') return { id: b.id, position: b.position, type: 'check', question: b.question, options: b.options };
-      if (b.type === 'heading') return { id: b.id, position: b.position, type: 'heading', level: b.level, text: b.text };
-      if (b.type === 'text') return { id: b.id, position: b.position, type: 'text', text: b.text };
-      if (b.type === 'callout') return { id: b.id, position: b.position, type: 'callout', tone: b.tone, title: b.title, text: b.text };
-      return { id: b.id, position: b.position, type: 'image', src: b.src, alt: b.alt, decorative: b.decorative, caption: b.caption };
+      if (b.type === 'check') return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'check', question: b.question, options: b.options };
+      if (b.type === 'heading') return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'heading', level: b.level, text: b.text };
+      if (b.type === 'text') return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'text', text: b.text };
+      if (b.type === 'callout') return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'callout', tone: b.tone, title: b.title, text: b.text };
+      return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'image', src: b.src, alt: b.alt, decorative: b.decorative, caption: b.caption };
     });
     const siblings = (await ctx.repo.listLessons({ courseId: l.courseId })).filter(x => x.status === 'published');
     const index = siblings.findIndex(x => x.id === lessonId);

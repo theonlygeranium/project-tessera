@@ -15,3 +15,4 @@
 .media { max-width: 100%; height: auto; }
 .preview { white-space: pre-wrap; overflow-wrap: anywhere; }
 .muted { color: var(--ink-2); }
+.list > .row > :first-child { flex: 1 1 260px; min-width: 0; }

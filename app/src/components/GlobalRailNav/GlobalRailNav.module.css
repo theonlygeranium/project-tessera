@@ -2,7 +2,7 @@
 .header, .footer { padding: 8px; overflow-wrap: anywhere; }
 .footer { margin-top: auto; }
 .list { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
-.link { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-height: var(--size-target-learner); min-width: 0; padding: 8px 2px; border-radius: var(--radius-md); color: var(--ink-2); text-align: center; text-decoration: none; overflow-wrap: anywhere; }
+.link { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-height: var(--size-target-learner); min-width: 0; padding: 8px 2px; border-radius: var(--radius-md); color: var(--ink-2); text-align: center; text-decoration: none; overflow-wrap: anywhere; }
 .link:hover { background: var(--surface); }
 .current { background: var(--accent-soft); color: var(--accent); font-weight: 700; box-shadow: inset 4px 0 var(--accent); }
 .icon { display: inline-flex; flex: none; align-items: center; justify-content: center; min-width: 20px; }
