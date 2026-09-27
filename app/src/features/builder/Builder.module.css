@@ -1,0 +1,26 @@
+.page { display: grid; gap: var(--space-5, 24px); min-width: 0; padding-bottom: var(--space-7, 40px); }
+.intro { max-width: 72ch; margin: 0; line-height: 1.55; }
+.stack { display: grid; gap: 16px; min-width: 0; }
+.stack h2, .stack h3, .sidePanel h2 { margin: 0; }
+.muted { color: var(--ink-3); margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 250px); gap: 24px; align-items: start; min-width: 0; }
+.mainColumn { min-width: 0; }
+.sidePanel { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+.sidePanel ul { padding-left: 24px; overflow-wrap: anywhere; }
+.sidePanel summary { cursor: pointer; }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-width: 0; }
+.full { grid-column: 1 / -1; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; min-width: 0; }
+.row > :first-child { flex: 1 1 230px; min-width: 0; }
+.sourceList, .sessionList, .reviewList { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.sourceList li, .sessionList li, .reviewItem { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); overflow-wrap: anywhere; }
+.sessionList li span { color: var(--ink-3); text-transform: capitalize; }
+.module { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); min-width: 0; }
+.lessonList { display: grid; gap: 12px; padding-left: 24px; margin: 0; }
+.lessonList li { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.error { color: var(--error-text); }
+.reviewItem { align-items: center; }
+.reviewItem > div { display: grid; gap: 8px; }
+@media (max-width: 760px) { .columns { grid-template-columns: minmax(0, 1fr); } .sidePanel { order: -1; } }
+@media (max-width: 520px) { .formGrid { grid-template-columns: minmax(0, 1fr); } .full { grid-column: auto; } }

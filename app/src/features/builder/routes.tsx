@@ -1,9 +1,9 @@
 // Lane F (AI course builder). Owns app/src/features/builder/. Paths: paths.teach.build*.
 import type { RouteObject } from 'react-router';
-import { Placeholder } from '../../shell/Placeholder';
+import { BuilderStart } from './Start';
+import { BuilderSessionPage } from './Session';
 
-const lane = 'lane F (AI course builder)';
 export const builderRoutes: RouteObject[] = [
-  { path: 'teach/courses/:courseId/build', element: <Placeholder title="Build with AI" lane={lane} /> },
-  { path: 'teach/courses/:courseId/build/:sessionId', element: <Placeholder title="Build with AI" lane={lane} /> },
+  { path: 'teach/courses/:courseId/build', element: <BuilderStart /> },
+  { path: 'teach/courses/:courseId/build/:sessionId', element: <BuilderSessionPage /> },
 ];
