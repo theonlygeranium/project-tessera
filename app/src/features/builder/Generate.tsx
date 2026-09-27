@@ -33,7 +33,8 @@ export function GeneratePage() {
   const freshParams = new URLSearchParams(search); freshParams.delete('job');
   const freshUrl = `${paths.teach.generate(courseId)}${freshParams.size ? `?${freshParams}` : ''}`;
   const course = useApiQuery('getCourseOutline', { courseId }, { enabled: !!courseId });
-  const jobQuery = useApiQuery('getGenerationJob', { jobId }, { enabled: !!jobId, refetchInterval: query => query.state.data?.state === 'running' ? 1500 : false });
+  const jobQuery = useApiQuery('getGenerationJob', { jobId }, { enabled: !!jobId, refetchInterval: query => query.state.data?.state === 'running' ? 1500 : false, // Jobs advance only while polled, so keep going in a background tab.
+    refetchIntervalInBackground: true });
   const start = useApiMutation('generateAtScope', { onSuccess: result => {
     const params = new URLSearchParams(search);
     params.set('job', result.jobId);
@@ -49,17 +50,16 @@ export function GeneratePage() {
   const modules = course.data?.modules ?? [];
   const lessons = modules.flatMap(module => module.lessons);
   const chosen = whole ? lessons : lessons.filter(lesson => selectedLessons.includes(lesson.id));
-  const count = chosen.length * new Set(selectedTypes.map(label => CHOICES.find(choice => choice.label === label)!.type)).size;
-  const job = jobQuery.data as Job | undefined;
-  const choiceTypes = [...new Set(selectedTypes.map(label => CHOICES.find(choice => choice.label === label)!.type))];
   const script = selectedTypes.includes('Video script');
-  const effectiveInstruction = [script ? `For document blocks only: ${CHOICES.at(-1)!.prefix}` : '', instruction.trim()].filter(Boolean).join(' ');
+  const choiceTypes = [...new Set(selectedTypes.filter(label => label !== 'Video script').map(label => CHOICES.find(choice => choice.label === label)!.type))];
+  const count = chosen.length * (choiceTypes.length + (script ? 1 : 0));
+  const job = jobQuery.data as Job | undefined;
   const toggleLesson = (id: string) => setSelectedLessons(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id]);
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!chosen.length || !selectedTypes.length || count > 60) { setFormError(count > 60 ? `${count} elements exceed the limit of 60.` : 'Choose at least one lesson and element type.'); return; }
     setFormError('');
-    start.mutate({ courseId, scope: { wholeCourse: whole, lessonIds: whole ? undefined : selectedLessons, elementTypes: choiceTypes }, instruction: effectiveInstruction });
+    start.mutate({ courseId, scope: { wholeCourse: whole, lessonIds: whole ? undefined : selectedLessons, elementTypes: choiceTypes, videoScript: script }, instruction: instruction.trim() });
   };
   const retryFailures = async () => {
     if (!job?.failures?.length) return;

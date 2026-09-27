@@ -8,7 +8,8 @@ import type {
 } from './domain';
 import type { SeedData } from './seed';
 
-export interface GenerationItem { lessonId: Id; type: Block['type'] }
+/** One element to draft; `variant: 'video-script'` is a document written as scenes with narration. */
+export interface GenerationItem { lessonId: Id; type: Block['type']; variant?: 'video-script' }
 export interface GenerationFailure extends GenerationItem { message: string }
 export interface GenerationJob {
   id: Id; courseId: Id; requestedBy: Id; state: 'running' | 'done' | 'failed';

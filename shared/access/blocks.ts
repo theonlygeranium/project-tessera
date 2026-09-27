@@ -42,9 +42,8 @@ export function checkBlocks(blocks: Block[]): AccessIssue[] {
   let lastLevel = 1; // the page title is the h1
   for (const b of blocks) {
     const id = b.id;
-    if (b.origin === 'ai' && b.aiState !== 'kept') {
-      issues.push(issue('block_ai_draft', 'serious', 'AI draft not yet reviewed', 'An AI-written block hasn\'t been kept by a person, so it can\'t be published.', 'Read it, then keep, edit, or revert it.', 'manual', id));
-    }
+    // Unreviewed AI drafts are a publishing-readiness rule (D-003, shared/policy.ts), not an
+    // accessibility barrier, so they don't count against the accessibility score.
     switch (b.type) {
       case 'heading': {
         if (!b.text.trim()) issues.push(issue('block_empty_heading', 'moderate', 'Empty heading', 'An empty heading is a confusing stop for screen-reader users.', 'Give the heading text, or remove it.', 'manual', id));

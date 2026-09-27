@@ -39,7 +39,7 @@ describe('checkBlocks', () => {
     const issues = checkBlocks(blocks);
     expect(issues.map((i) => i.code)).toEqual([
       'block_empty_heading', 'block_heading_skip', 'block_image_no_alt', 'block_image_no_alt', 'block_vague_link',
-      'block_table_no_header', 'block_video_no_captions', 'block_check_incomplete', 'block_color_only', 'block_ai_draft',
+      'block_table_no_header', 'block_video_no_captions', 'block_check_incomplete', 'block_color_only',
     ]);
     for (const i of issues) {
       expect(WCAG[i.code]).toBeDefined();

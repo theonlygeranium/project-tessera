@@ -110,3 +110,20 @@ it('fixture elements validate for every generatable type', async () => {
     expect(validateBlockContent(output.block).type).toBe(type);
   }
 });
+
+describe('video scripts', () => {
+  it('drafts a video script as its own item without leaking the script instruction into other elements', async () => {
+    const seen: { type: string; instruction: string }[] = [];
+    const spy: AiClient = { run: async (task, input) => { if (task === 'element') seen.push({ type: (input as { type: string }).type, instruction: (input as { instruction: string }).instruction }); return fixtureAi.run(task, input); } };
+    const { repo, ctx } = setup('u-okafor', spy);
+    const { jobId } = await start(ctx, { lessonIds: ['l-stat-1'], elementTypes: ['text', 'document'], videoScript: true });
+    expect((await repo.getGenerationJob(jobId))?.total).toBe(3);
+    let job = await dispatch(service, ctx, 'getGenerationJob', { jobId });
+    while (job.state === 'running') job = await dispatch(service, ctx, 'getGenerationJob', { jobId });
+    expect(seen.filter(s => /video script/i.test(s.instruction)).map(s => s.type)).toEqual(['document']);
+    const blocks = await repo.listBlocks('l-stat-1');
+    const drafted = blocks.filter(b => b.provenance?.task === 'element');
+    expect(drafted.map(b => b.provenance?.summary.split(' drafted')[0])).toEqual(['Text', 'Document', 'Video script']);
+    expect(drafted.find(b => b.provenance?.summary.startsWith('Video script'))).toMatchObject({ type: 'document', title: expect.stringMatching(/^Video script/) });
+  });
+});

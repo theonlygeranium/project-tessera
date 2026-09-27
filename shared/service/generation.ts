@@ -7,6 +7,7 @@ import { validateBlockContent } from './validate';
 import { courses } from './courses';
 
 const GENERATABLE: readonly BlockType[] = ['text', 'callout', 'check', 'document', 'table', 'scenario'];
+const VIDEO_SCRIPT = 'Write a video script. Title it "Video script: …" and make each section a scene with narration.';
 const labels: Record<string, string> = { text: 'Text', callout: 'Callout', check: 'Check', document: 'Document', table: 'Table', scenario: 'Scenario' };
 /** Checks the stricter shape promised by the element task after general block validation. */
 export function validateGeneratedElement(value: unknown, type: BlockType): BlockContent {
@@ -50,7 +51,8 @@ async function draft(ctx: ServiceContext, item: GenerationItem, instruction: str
       default: return [];
     }
   }).join('\n\n').slice(0, 6000);
-  const result = await ctx.ai.run('element', { courseTitle: course.title, moduleTitle: module.title, lessonTitle: lesson.title, lessonText, type: item.type, instruction });
+  const itemInstruction = item.variant === 'video-script' ? [VIDEO_SCRIPT, instruction].filter(Boolean).join(' ') : instruction;
+  const result = await ctx.ai.run('element', { courseTitle: course.title, moduleTitle: module.title, lessonTitle: lesson.title, lessonText, type: item.type, instruction: itemInstruction });
   const block = validateGeneratedElement(result.output.block, item.type);
   return { block, model: result.model, lessonTitle: lesson.title };
 }
@@ -60,7 +62,7 @@ async function insert(ctx: ServiceContext, item: GenerationItem, generated: Awai
   const at = position ?? old.length;
   const block: Block = { ...generated.block, id: blockId ?? ctx.newId('b'), lessonId: item.lessonId, position: at,
     origin: 'ai', aiState: 'draft', previous: null,
-    provenance: provenance(ctx, generated.model, 'element', `${labels[item.type]} drafted for ${generated.lessonTitle}`, []), updatedAt: ctx.now() } as Block;
+    provenance: provenance(ctx, generated.model, 'element', `${item.variant === 'video-script' ? 'Video script' : labels[item.type]} drafted for ${generated.lessonTitle}`, []), updatedAt: ctx.now() } as Block;
   if (at === old.length) await ctx.repo.putBlock(block);
   else await ctx.repo.replaceBlocks(item.lessonId, [...old.slice(0, at), block, ...old.slice(at)].map((value, index) => ({ ...value, position: index })));
 }
@@ -71,8 +73,8 @@ export const generation: Pick<Service, 'generateAtScope' | 'getGenerationJob' | 
   generateAtScope: async (ctx, { courseId, scope, instruction }) => {
     await canTeach(ctx, courseId); await aiEnabled(ctx);
     if (!scope || typeof scope !== 'object' || (scope.moduleIds !== undefined && !Array.isArray(scope.moduleIds)) || (scope.lessonIds !== undefined && !Array.isArray(scope.lessonIds)) || (scope.elementTypes !== undefined && !Array.isArray(scope.elementTypes))) fail('invalid', 'Choose a valid scope.');
-    const types = scope.elementTypes === undefined ? ['text', 'check'] as BlockType[] : scope.elementTypes.map(typeFor);
-    if (!types.length) fail('invalid', 'Choose at least one element type.');
+    const types = scope.elementTypes === undefined ? (scope.videoScript ? [] : ['text', 'check'] as BlockType[]) : scope.elementTypes.map(typeFor);
+    if (!types.length && !scope.videoScript) fail('invalid', 'Choose at least one element type.');
     const uniqueTypes = [...new Set(types)];
     const modules = await ctx.repo.listModules(courseId);
     const moduleIds = new Set(modules.map(module => module.id));
@@ -83,7 +85,7 @@ export const generation: Pick<Service, 'generateAtScope' | 'getGenerationJob' | 
     const selectedModules = new Set(scope.moduleIds ?? []), selectedLessons = new Set(scope.lessonIds ?? []);
     const chosen = lessons.filter(lesson => scope.wholeCourse === true || selectedModules.has(lesson.moduleId) || selectedLessons.has(lesson.id));
     if (!chosen.length) fail('invalid', 'Choose at least one lesson.');
-    const work = chosen.flatMap(lesson => uniqueTypes.map(type => ({ lessonId: lesson.id, type })));
+    const work: GenerationItem[] = chosen.flatMap(lesson => [...uniqueTypes.map(type => ({ lessonId: lesson.id, type })), ...(scope.videoScript ? [{ lessonId: lesson.id, type: 'document' as BlockType, variant: 'video-script' as const }] : [])]);
     if (work.length > 60) fail('invalid', `${work.length} elements exceed the limit of 60.`);
     const now = ctx.now();
     const job: GenerationJob = { id: ctx.newId('gj'), courseId, requestedBy: user(ctx).id, state: 'running', done: 0, total: work.length,

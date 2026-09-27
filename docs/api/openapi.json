@@ -11131,6 +11131,9 @@
                       },
                       "wholeCourse": {
                         "type": "boolean"
+                      },
+                      "videoScript": {
+                        "type": "boolean"
                       }
                     }
                   },

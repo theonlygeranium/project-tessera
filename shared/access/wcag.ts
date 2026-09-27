@@ -19,7 +19,6 @@ export const WCAG: Record<string, WcagRef> = {
   block_reading_level: { sc: '3.1.5', level: 'AAA', title: 'Reading level' },
   block_long_paragraph: { sc: '1.4.8', level: 'AAA', title: 'Visual presentation' },
   block_empty_lesson: { sc: '2.4.2', level: 'A', title: 'Page titled' },
-  block_ai_draft: { sc: '4.1.2', level: 'A', title: 'Name, role, value' }, // not a WCAG failure; a Tessera rule (D-003) carried in the same report
 
   // PDF
   pdf_no_text: { sc: '1.1.1', level: 'A', title: 'Non-text content' },

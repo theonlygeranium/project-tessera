@@ -68,6 +68,7 @@ const APP = [
   { name: 'App · Instructor · Course accessibility', url: 'app/teach/courses/c-stat110/access?data=mock&as=u-okafor' },
   { name: 'App · Instructor · File library', url: 'app/teach/courses/c-stat110/files?data=mock&as=u-okafor' },
   { name: 'App · Instructor · Assignment editor', url: 'app/teach/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-okafor' },
+  { name: 'App · Builder · Generate at scope', url: 'app/teach/courses/c-stat110/generate?data=mock&as=u-okafor' },
   { name: 'App · Builder · Start', url: 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor' },
   // Student (lane G): Priya has no profile yet (onboarding); Marcus has one
   { name: 'App · Student · Onboarding', url: 'app/onboarding?data=mock&as=u-priya' },
