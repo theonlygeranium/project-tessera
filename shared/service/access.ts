@@ -152,6 +152,7 @@ export const access: Pick<Service, 'getLessonAccess' | 'getCourseAccess' | 'getI
     if (!latest.issues[issueIndex]) throw new ApiError('invalid', 'No such issue.');
     const updated = await engine.fix(f, fix, user(ctx).id);
     await ctx.repo.putFile(updated);
+    await ctx.repo.putFileVersion({ fileId: f.id, version: updated.version, key: updated.key, note: `Fixed: ${fix.kind}`, createdBy: user(ctx).id, createdAt: ctx.now() });
     return access.scanFile(ctx, { fileId });
   },
   suggestFix: async (ctx, { target, kind }) => {

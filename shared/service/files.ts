@@ -2,16 +2,30 @@
 // by the Worker (`POST …/files/upload`, `GET /files/:id/content`); these handlers
 // manage the records. Format generation needs the document engine (`ctx.documents`).
 import { ApiError } from '../api';
-import type { AccessibleFormat, FormatStatus } from '../domain';
+import type { AccessibleFormat, FileRecord, FormatStatus } from '../domain';
 import type { Service, ServiceContext } from './context';
 import { canReachCourse, canTeach, fail, user } from './helpers';
 
 const FORMATS: AccessibleFormat[] = ['reading', 'audio', 'epub', 'ocr'];
 
-async function readableFile(ctx: ServiceContext, fileId: string) {
+/**
+ * Who can read a file: staff who reach the course, and enrolled students for files
+ * staff uploaded (course materials) or that they uploaded themselves. A student never
+ * reads another student's upload (a submission). Answers not-found rather than
+ * forbidden so ids can't be probed.
+ */
+export async function canReadFile(ctx: ServiceContext, f: FileRecord): Promise<void> {
+  await canReachCourse(ctx, f.courseId);
+  const u = user(ctx);
+  if (u.role !== 'student' || f.uploadedBy === u.id) return;
+  const uploader = await ctx.repo.getUser(f.uploadedBy);
+  if (!uploader || uploader.role === 'student') throw new ApiError('not-found', 'File not found.');
+}
+
+export async function readableFile(ctx: ServiceContext, fileId: string) {
   const f = await ctx.repo.getFile(fileId);
   if (!f) throw new ApiError('not-found', 'File not found.');
-  await canReachCourse(ctx, f.courseId);
+  await canReadFile(ctx, f);
   return f;
 }
 
@@ -22,7 +36,9 @@ function status(f: { format: AccessibleFormat; state: FormatStatus['state']; out
 export const files: Pick<Service, 'listFiles' | 'getFile' | 'deleteFile' | 'getFormats' | 'requestFormat'> = {
   listFiles: async (ctx, { courseId, limit, cursor }) => {
     await canReachCourse(ctx, courseId);
-    const all = await ctx.repo.listFiles(courseId);
+    const listed = await ctx.repo.listFiles(courseId);
+    const all: FileRecord[] = [];
+    for (const f of listed) { try { await canReadFile(ctx, f); all.push(f); } catch { /* not visible to this person */ } }
     const size = Math.min(Math.max(limit ?? 50, 1), 200);
     const start = cursor ? Math.max(0, all.findIndex((f) => f.id === cursor)) : 0;
     const items = all.slice(start, start + size);

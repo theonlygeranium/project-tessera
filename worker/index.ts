@@ -1,7 +1,9 @@
 // Tessera Worker (D-014, D-020): /api/v1/* is the JSON API (/api/* is an alias during
 // Night 2), /app/* is the React app, and every other path is a static asset.
 import { createAiClient } from './ai';
+import { createDocumentEngine } from './access/engine';
 import { RateLimiter, bearerToken, hasAccessCredential, readCookie, resolvePrincipal } from './api/auth';
+import { findFileRoute } from './api/files';
 import { D1Repo } from './d1-repo';
 import type { Env } from './env';
 import { API_PREFIX, ApiError, ROUTES, matchPath, type Operation, type SessionInfo } from '../shared/api';
@@ -61,17 +63,35 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     await ensureSeeded(env.DB, repo);
 
     const url = new URL(request.url);
-    const found = findRoute(request.method, apiRelativePath(url.pathname));
-    if (!found) return withId(fail(404, 'not-found', `No route matches ${request.method} ${url.pathname}.`));
+    const rel = apiRelativePath(url.pathname);
+    const fileRoute = findFileRoute(request.method, rel);
+    const found = fileRoute ? null : findRoute(request.method, rel);
+    if (!found && !fileRoute) return withId(fail(404, 'not-found', `No route matches ${request.method} ${url.pathname}.`));
     const now = new Date().toISOString();
 
-    const principal = await resolvePrincipal(request, env, repo, ROUTES[found.op], now);
+    const principal = await resolvePrincipal(request, env, repo, fileRoute ? fileRoute.route : ROUTES[found!.op], now);
     const wait = rateLimiter.check(principal.rateKey);
     if (wait > 0) {
       const res = fail(429, 'rate-limited', `Too many requests. Try again in ${wait} seconds.`);
       res.headers.set('retry-after', String(wait));
       return withId(res);
     }
+    const ctx: ServiceContext = {
+      repo,
+      ai: createAiClient(env),
+      user: principal.user,
+      token: principal.token,
+      now: () => new Date().toISOString(),
+      newId: (prefix) => prefix + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12),
+      documents: createDocumentEngine(env),
+    };
+
+    // Binary file routes (upload, content) answer directly.
+    if (fileRoute) {
+      if (!principal.user) throw new ApiError('unauthenticated', 'Sign in first.');
+      return withId(await fileRoute.handle(request, ctx, env.FILES, fileRoute.params));
+    }
+    if (!found) throw new ApiError('not-found', 'No route matches.');
 
     // Idempotent creates (D-020): the same key from the same principal replays the first response.
     const idempotencyKey = request.method === 'POST' ? request.headers.get('idempotency-key') : null;
@@ -84,14 +104,6 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     }
 
     const input = validateInput(found.op, coerceQuery(found.op, await readInput(request, found.params)));
-    const ctx: ServiceContext = {
-      repo,
-      ai: createAiClient(env),
-      user: principal.user,
-      token: principal.token,
-      now: () => new Date().toISOString(),
-      newId: (prefix) => prefix + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12),
-    };
     let output: unknown;
     if (found.op === 'whoAmI') {
       output = { email: principal.email, user: principal.user, viewingAs: principal.actingAs ? principal.user : null };

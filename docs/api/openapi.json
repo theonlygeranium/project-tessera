@@ -12193,7 +12193,10 @@
               "lesson-draft",
               "block-regenerate",
               "announcement",
-              "feedback"
+              "feedback",
+              "alt-text",
+              "rewrite",
+              "link-text"
             ]
           },
           "generatedAt": {

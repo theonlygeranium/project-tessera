@@ -35,6 +35,16 @@ export interface AiTasks {
     input: { courseTitle: string; instructorName: string; prompt: string };
     output: { title: string; body: string };
   };
+  /** Tessera Access (D-022): a plain-language rewrite of one passage. */
+  rewrite: {
+    input: { courseTitle: string; text: string };
+    output: { text: string };
+  };
+  /** Tessera Access: link text that says where a link goes. */
+  'link-text': {
+    input: { courseTitle: string; href: string; currentText: string; context: string };
+    output: { text: string };
+  };
   feedback: {
     input: { courseTitle: string; assignmentTitle: string; rubric: RubricCriterion[]; criteria: { criterionId: string; levelId: string; points: number; comment: string }[]; submissionText: string };
     output: { feedback: string };
@@ -67,6 +77,14 @@ export const fixtureAi: AiClient = {
 };
 
 const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  rewrite: ({ text }) => ({
+    text: text.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean).slice(0, 6).join('\n\n'),
+  }),
+  'link-text': ({ href, context }) => {
+    let host = href;
+    try { host = new URL(href).hostname.replace(/^www\./, ''); } catch { /* keep the raw href */ }
+    return { text: context.trim() ? `${firstSentence(context).replace(/[.!?]$/, '').slice(0, 60)} (${host})` : `Page on ${host}` };
+  },
   feedback: ({ criteria }) => ({ feedback: `You met ${criteria.length} rubric ${criteria.length === 1 ? 'criterion' : 'criteria'}. Review the rubric comments and revise one specific part of your work.` }),
   brief: ({ courseTitle, prompt }) => ({
     audience: /graduate|master/i.test(prompt) ? 'Graduate students new to the topic' : 'First-year undergraduates with no prior background',

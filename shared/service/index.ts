@@ -21,6 +21,7 @@ const pending = Object.fromEntries(
 );
 export const service = { ...pending, ...implemented } as Service;
 export { dispatch } from './context';
-export type { ServiceContext, Service } from './context';
+export type { ServiceContext, Service, DocumentEngine } from './context';
+export { canReadFile } from './files';
 export { MemoryRepo } from './memory-repo';
 export { validateBlockContent } from './validate';

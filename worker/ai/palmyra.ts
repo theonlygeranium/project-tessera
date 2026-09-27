@@ -39,6 +39,14 @@ function sourcesBlock(sources: SourceDoc[]): string {
 type Messages = { role: 'system' | 'user'; content: string }[];
 
 const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } = {
+  rewrite: ({ courseTitle, text }) => [
+    { role: 'system', content: `${SYSTEM}\nYou rewrite course text in plain language for accessibility (WCAG 3.1.5). Keep every fact, term, and number. Use short sentences, common words, and the same order. Don't add content.` },
+    { role: 'user', content: `Course: ${courseTitle}\nRewrite this passage at about a grade 8 reading level:\n\n${text.slice(0, 8000)}` },
+  ],
+  'link-text': ({ courseTitle, href, currentText, context }) => [
+    { role: 'system', content: `${SYSTEM}\nYou write link text that makes sense out of context (WCAG 2.4.4): name the page or document, under 8 words, no "click here".` },
+    { role: 'user', content: `Course: ${courseTitle}\nLink target: ${href}\nCurrent text: ${currentText}\nSurrounding text: ${context.slice(0, 1500)}` },
+  ],
   feedback: ({ courseTitle, assignmentTitle, rubric, criteria, submissionText }) => [
     { role: 'system', content: `${SYSTEM}\nFeedback is a draft for the instructor to edit. Ground it in the selected rubric levels and submission. Do not invent facts.` },
     { role: 'user', content: `Course: ${courseTitle}\nAssignment: ${assignmentTitle}\nRubric: ${JSON.stringify(rubric)}\nSelected results: ${JSON.stringify(criteria)}\nSubmission: ${submissionText.slice(0, 12000)}\nWrite concise, specific, constructive feedback.` },
@@ -84,6 +92,8 @@ const BLOCK = obj({
 
 const SCHEMAS: Record<AiTaskName, unknown> = {
   feedback: obj({ feedback: str }),
+  rewrite: obj({ text: str }),
+  'link-text': obj({ text: str }),
   brief: obj({
     audience: str,
     outcomes: { type: 'array', items: str },
@@ -124,6 +134,8 @@ export function toBlock(b: FlatBlock, fallback?: BlockContent): BlockContent {
 
 const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
   feedback: (raw) => ({ feedback: String(raw.feedback ?? '') }),
+  rewrite: (raw) => ({ text: String(raw.text ?? '') }),
+  'link-text': (raw) => ({ text: String(raw.text ?? '').trim() }),
   brief: (raw) => raw,
   outline: (raw) => raw,
   'lesson-draft': (raw) => ({ blocks: (raw.blocks as FlatBlock[]).map((b) => toBlock(b)) }),
@@ -137,7 +149,7 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 const MAX_TOKENS: Record<AiTaskName, number> = {
   // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the
   // occasional runaway generation within seconds instead of a minute.
-  brief: 6000, outline: 8000, 'lesson-draft': 7000, 'block-regenerate': 5000, announcement: 4000, feedback: 2000,
+  brief: 6000, outline: 8000, 'lesson-draft': 7000, 'block-regenerate': 5000, announcement: 4000, feedback: 2000, rewrite: 4000, 'link-text': 1500,
 };
 
 // ---- Client ---------------------------------------------------------------------------------

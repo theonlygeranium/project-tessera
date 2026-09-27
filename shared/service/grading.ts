@@ -115,6 +115,10 @@ export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAss
     const text = input.text?.trim() ?? '', fileId = input.fileId?.trim() || null, link = input.link?.trim() ?? '';
     if (a.submissionType === 'text' && !text) fail('invalid','Text is required.');
     if (a.submissionType === 'file' && !fileId) fail('invalid','A file is required.');
+    if (a.submissionType === 'file' && fileId) {
+      const f = await ctx.repo.getFile(fileId);
+      if (!f || f.courseId !== a.courseId || f.uploadedBy !== user(ctx).id) fail('invalid','Upload your file to this course, then submit it.');
+    }
     if (a.submissionType === 'link' && !/^https?:\/\/[^\s]+$/i.test(link)) fail('invalid','Enter an http or https link.');
     const previous = current(await ctx.repo.listSubmissions({ assignmentId:a.id,studentId:user(ctx).id }));
     if (previous && (previous.attempt >= 2 || previous.state !== 'submitted')) fail('conflict','This submission cannot be replaced.');

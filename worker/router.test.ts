@@ -342,3 +342,70 @@ describe('API tokens and browser-only routes', () => {
     expect((await call(env, '/api/v1/courses', { headers: auth })).status).toBe(200);
   });
 });
+
+describe('file routes', () => {
+  async function fileEnv() {
+    const { createTestBucket } = await import('./test/r2-shim');
+    const FILES = createTestBucket();
+    return { env: { ...testEnv(createTestDb(), assetsFor().fetcher), FILES }, FILES };
+  }
+  function upload(env: object, as: string, name: string, bytes: Uint8Array | string, courseId = 'c-stat110') {
+    const form = new FormData();
+    form.append('file', new File([bytes], name));
+    return call(env as never, `/api/v1/courses/${courseId}/files/upload`, { method: 'POST', headers: { cookie: `tessera_user=${as}` }, body: form });
+  }
+
+  it('uploads to R2, records version 1, and serves the bytes back with safe headers', async () => {
+    const { env, FILES } = await fileEnv();
+    const res = await upload(env, 'u-okafor', 'Syllabus.pdf', '%PDF-1.7 test');
+    expect(res.status).toBe(201);
+    const record = await res.json() as { id: string; key: string; kind: string; version: number; mime: string };
+    expect(record).toMatchObject({ kind: 'pdf', version: 1, mime: 'application/pdf' });
+    expect(FILES.store.has(record.key)).toBe(true);
+    const got = await call(env as never, `/api/v1/files/${record.id}/content`, { headers: { cookie: 'tessera_user=u-priya' } });
+    expect(got.status).toBe(200);
+    expect(await got.text()).toBe('%PDF-1.7 test');
+    expect(got.headers.get('content-security-policy')).toContain('sandbox');
+    expect(got.headers.get('x-content-type-options')).toBe('nosniff');
+    const part = await call(env as never, `/api/v1/files/${record.id}/content`, { headers: { cookie: 'tessera_user=u-okafor', range: 'bytes=0-3' } });
+    expect(part.status).toBe(206);
+    expect(await part.text()).toBe('%PDF');
+    expect(part.headers.get('content-range')).toBe('bytes 0-3/13');
+  });
+
+  it("never lets one student read another student's upload", async () => {
+    const { env } = await fileEnv();
+    const mine = await (await upload(env, 'u-priya', 'essay.docx', 'essay')).json() as { id: string };
+    expect((await call(env as never, `/api/v1/files/${mine.id}/content`, { headers: { cookie: 'tessera_user=u-priya' } })).status).toBe(200);
+    expect((await call(env as never, `/api/v1/files/${mine.id}/content`, { headers: { cookie: 'tessera_user=u-marcus' } })).status).toBe(404);
+    expect((await call(env as never, `/api/v1/files/${mine.id}/content`, { headers: { cookie: 'tessera_user=u-okafor' } })).status).toBe(200);
+  });
+
+  it('refuses uploads to a course the person cannot reach, and files over 25 MB', async () => {
+    const { env } = await fileEnv();
+    expect((await upload(env, 'u-okafor', 'x.pdf', 'x', 'c-comm120')).status).toBe(403);
+    const big = await upload(env, 'u-okafor', 'big.pdf', new Uint8Array(25 * 1024 * 1024 + 1));
+    expect(big.status).toBe(413);
+  });
+});
+
+describe('format downloads', () => {
+  it('serves a generated reading version with ?format=', async () => {
+    const { createTestBucket } = await import('./test/r2-shim');
+    const JSZip = (await import('jszip')).default;
+    const FILES = createTestBucket();
+    const env = { ...testEnv(createTestDb(), assetsFor().fetcher), FILES };
+    const z = new JSZip();
+    z.file('word/document.xml', '<w:document xmlns:w="x"><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Week one</w:t></w:r></w:p><w:p><w:r><w:t>Hello.</w:t></w:r></w:p></w:body></w:document>');
+    const form = new FormData();
+    form.append('file', new File([await z.generateAsync({ type: 'uint8array' })], 'notes.docx'));
+    const cookie = { cookie: 'tessera_user=u-okafor' };
+    const record = await (await call(env as never, '/api/v1/courses/c-stat110/files/upload', { method: 'POST', headers: cookie, body: form })).json() as { id: string };
+    const status = await (await call(env as never, `/api/v1/files/${record.id}/formats`, { method: 'POST', headers: { ...cookie, 'content-type': 'application/json' }, body: JSON.stringify({ format: 'reading' }) })).json() as { state: string };
+    expect(status.state).toBe('ready');
+    const page = await call(env as never, `/api/v1/files/${record.id}/content?format=reading`, { headers: cookie });
+    expect(page.status).toBe(200);
+    expect(page.headers.get('content-type')).toContain('text/html');
+    expect(await page.text()).toContain('<h2>Week one</h2>');
+  });
+});

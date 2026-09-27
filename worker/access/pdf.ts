@@ -10,7 +10,7 @@ const mul=(a:number[],b:number[])=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]
 const clamp=(n:number)=>Math.max(0,Math.min(1,n));
 function walk(node:Struct, result:Struct[]=[]):Struct[] { result.push(node); for(const child of node.children??[]) walk(child,result); return result; }
 export async function checkPdf(bytes:ArrayBuffer):Promise<DocumentCheck>{
-  const loading=getDocument({data:new Uint8Array(bytes.slice(0)),useWorkerFetch:false,disableFontFace:true,disableAutoFetch:true});
+  const loading=getDocument({data:new Uint8Array(bytes.slice(0)),verbosity:0,useWorkerFetch:false,disableFontFace:true,disableAutoFetch:true});
   const pdf=await loading.promise;
   try {
     const metadata=await pdf.getMetadata();

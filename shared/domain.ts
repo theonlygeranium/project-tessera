@@ -149,7 +149,7 @@ export interface CourseOutline {
 
 // ---- Blocks and AI provenance (D-003, D-006) --------------------------------------------
 
-export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback';
+export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback' | 'alt-text' | 'rewrite' | 'link-text';
 
 /** Where AI output came from. Shown next to every AI block ("names what it is and its source"). */
 export interface Provenance {
@@ -417,6 +417,7 @@ export interface FormatStatus {
   format: AccessibleFormat;
   state: 'none' | 'generating' | 'ready' | 'failed';
   /** Set when ready: the file id of the generated artifact, served through the files API. */
+  /** Set when ready. Download with `GET /api/v1/files/{fileId}/content?format={format}`. */
   outputFileId: Id | null;
   generatedAt: Timestamp | null;
 }
