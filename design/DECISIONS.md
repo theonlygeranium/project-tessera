@@ -14,7 +14,7 @@ Settled decisions for Project Tessera, with the reason for each. Agents should t
 | D-008 | Hosting: private repo, public Pages from `main:/docs`, build output committed | Superseded by D-012 | 2026-09-26 |
 | D-009 | The repo is the source of truth; the design canvas is a mirror | Accepted | 2026-09-26 |
 | D-010 | Accessibility bar: WCAG 2.2 AA, zero automated violations, 320px reflow | Accepted; audit timing superseded by D-013 | 2026-09-26 |
-| D-011 | Phase-2 build approach | **Open** (#16) | — |
+| D-011 | Phase-2 build approach: B, a Vite + React component app built by Cloudflare | Accepted | 2026-09-26 |
 | D-012 | Hosting: Cloudflare Workers static assets, deploy on push, per-branch previews | Accepted | 2026-09-26 |
 | D-013 | Deploy lanes: minor changes go straight to production; big features get the full check and a preview | Accepted | 2026-09-26 |
 
@@ -90,8 +90,17 @@ The owner's private Claude design canvas ("AI-Native LMS UI Concepts") holds the
 - Keyboard paths must work with visible focus, and focus returns to the control that opened a panel.
 - Screen-reader testing is a human task (#29).
 
-### D-011 · Phase-2 build approach · OPEN
-See #16. Record the owner's choice here, as Accepted, with the date.
+### D-011 · Phase-2 build approach · ACCEPTED (option B, React)
+Chosen by the owner on 2026-09-26 in #16.
+**Decision:**
+- **Option B:** a component prototype app in `app/`, built with Vite + React + TypeScript, with Storybook added alongside the first shared components (#17). The build output goes to `docs/app/` and is served at `/app/`.
+- **Cloudflare builds it on every push.** Build output is not committed (`docs/app/` is gitignored). The build command lives in the repo, in `wrangler.jsonc` → `build.command` (`npm run build`), which `wrangler deploy` and preview builds run before uploading `docs/`. Nothing needs changing in the Cloudflare dashboard.
+- Deploy speed matters less than cleanliness: the owner accepts a longer build as long as a push is previewable within a few minutes.
+- The `design/canvas/` artboards and the existing `docs/` site stay as they are. The artboards remain the visual spec; components become the source of truth for UI as they're built.
+- Design tokens come from `design/tokens.json` only; app code doesn't hard-code colors.
+- Revisit option C (backend, real AI) after the #28 usability tests.
+
+The options as they were weighed:
 
 | | A. Stay static | B. Component prototype app (recommended) | C. Full-stack app |
 |---|---|---|---|
@@ -111,7 +120,7 @@ Supersedes D-008. The owner is the sole developer and wants every push testable 
 **Decision:**
 - The site is served by the Worker **`project-tessera`** on the owner's personal Cloudflare account, configured by `wrangler.jsonc` (assets directory `./docs`, no Worker script, `404.html` for not-found, and the empty `previews` block that `wrangler preview` requires). Production: https://tessera.edstratumlabs.ai/ (custom domain on the `edstratumlabs.ai` zone, declared in `wrangler.jsonc` `routes`; the `workers.dev` URL also works).
 - Workers Builds is connected to the GitHub repo. A push to `main` deploys production (`npx wrangler deploy`). A push to any other branch runs `npx wrangler preview`, which creates a Preview with its own stable URL (`<branch>-project-tessera.jeff-f69.workers.dev`, sent with `X-Robots-Tag: noindex`). Cloudflare posts build status back to the commit.
-- For now there is no build command: `docs/` build output stays committed, because Cloudflare serves `docs/` as-is. GitHub Pages was unpublished on 2026-09-26. When D-011 lands, set the build command in the Worker's build settings (and record it in `CLAUDE.md`).
+- For now there is no build command: `docs/` build output stays committed, because Cloudflare serves `docs/` as-is. GitHub Pages was unpublished on 2026-09-26. When D-011 lands, set the build command in the Worker's build settings (and record it in `CLAUDE.md`). *(D-011 landed: the build command is set in `wrangler.jsonc` rather than the dashboard.)*
 - `.github/workflows/a11y.yml` runs the accessibility audit on every push and PR. It is informational and does not block deploys; the Definition of Done still requires a clean audit.
 - Unchanged from D-008: the repository is private, the site and every preview URL are public, nothing under `docs/` may link into the repository or be confidential. If something must be private, put Cloudflare Access in front of it.
 
