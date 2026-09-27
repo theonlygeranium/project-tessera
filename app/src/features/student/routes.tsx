@@ -1,14 +1,14 @@
 // Lane G (student). Owns app/src/features/student/. Paths: paths.student in app/src/paths.ts.
 import type { RouteObject } from 'react-router';
-import { Placeholder } from '../../shell/Placeholder';
-
-const lane = 'lane G (student)';
+import { ProfilePage } from './ProfilePage';
+import { TodayPage, CoursesPage, AnnouncementsPage } from './StudentPages';
+import { CoursePage, LessonPage } from './CoursePages';
 export const studentRoutes: RouteObject[] = [
-  { path: 'today', element: <Placeholder title="Today" lane={lane} /> },
-  { path: 'onboarding', element: <Placeholder title="Your learning profile" lane={lane} /> },
-  { path: 'profile', element: <Placeholder title="Profile" lane={lane} /> },
-  { path: 'courses', element: <Placeholder title="Courses" lane={lane} /> },
-  { path: 'courses/:courseId', element: <Placeholder title="Course" lane={lane} /> },
-  { path: 'courses/:courseId/lessons/:lessonId', element: <Placeholder title="Lesson" lane={lane} /> },
-  { path: 'announcements', element: <Placeholder title="Announcements" lane={lane} /> },
+  { path: 'today', element: <TodayPage /> },
+  { path: 'onboarding', element: <ProfilePage onboarding /> },
+  { path: 'profile', element: <ProfilePage /> },
+  { path: 'courses', element: <CoursesPage /> },
+  { path: 'courses/:courseId', element: <CoursePage /> },
+  { path: 'courses/:courseId/lessons/:lessonId', element: <LessonPage /> },
+  { path: 'announcements', element: <AnnouncementsPage /> },
 ];
