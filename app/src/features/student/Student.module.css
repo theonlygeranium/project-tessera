@@ -43,3 +43,7 @@
 .lessonFinish { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding-block: 20px; border-top: 1px solid var(--line); }
 .lessonNav { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 20px; }
 @media (max-width: 700px) { .form { grid-template-columns: minmax(0, 1fr); } .panel { padding: 16px; } }
+
+.assignments { display: grid; gap: var(--space-3, .75rem); padding: 0; list-style: none; }
+.assignments li { display: flex; flex-wrap: wrap; gap: var(--space-2, .5rem); align-items: baseline; }
+.meta { color: var(--ink-2); }

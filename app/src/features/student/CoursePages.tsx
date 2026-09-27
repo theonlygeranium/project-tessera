@@ -17,6 +17,7 @@ export function CoursePage() {
   const { courseId = '' } = useParams();
   const outline = useApiQuery('getCourseOutline', { courseId }, { enabled: !!courseId });
   const announcements = useApiQuery('listAnnouncements', { courseId }, { enabled: !!courseId });
+  const assignments = useApiQuery('listAssignments', { courseId }, { enabled: !!courseId });
   usePageTitle(outline.data?.course.title ?? 'Course');
   const course = outline.data?.course;
   const modules = outline.data?.modules ?? [];
@@ -32,6 +33,7 @@ export function CoursePage() {
         {modules.length ? <LessonOutline mode="student" currentLessonId={current} renderLink={renderRouterLink} modules={modules.map(module => ({ id: module.id, title: module.title, lessons: module.lessons.map(lesson => ({ id: lesson.id, title: lesson.title, minutes: lesson.minutes, state: lesson.progress === 'completed' ? 'done' : lesson.id === next?.id ? 'current' : 'todo', href: paths.student.lesson(courseId, lesson.id) })) }))} /> : <p className={styles.empty}>No lessons have been published yet.</p>}
         {!next && lessons.length > 0 && <p className={styles.empty}>You've completed every published lesson.</p>}
       </section>
+      <section><h2>Assignments</h2>{assignments.isPending ? <Loading label="Loading assignments" /> : assignments.error ? <ErrorNotice error={assignments.error} onRetry={() => assignments.refetch()} /> : assignments.data?.length ? <ul className={styles.assignments}>{assignments.data.map(a => <li key={a.id}><Link to={paths.student.assignment(courseId, a.id)}>{a.title}</Link> <span className={styles.meta}>{a.points} points · {a.dueAt ? `Due ${new Date(a.dueAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'No due date'}</span></li>)}</ul> : <p className={styles.empty}>No assignments yet.</p>}</section>
       <section><h2>Announcements</h2><AnnouncementCards announcements={[...announcements.data].sort((a,b) => Number(b.pinned) - Number(a.pinned) || Number(a.read) - Number(b.read))} /></section>
     </>}
   </div>;

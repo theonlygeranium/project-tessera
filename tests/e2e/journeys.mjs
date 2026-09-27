@@ -413,7 +413,9 @@ await journey('Journey 8 · Instructor drafts at scope; a student plays the scen
     await switchTo(page, 'Marcus Bell');
     await page.getByRole('heading', { level: 1, name: 'Today' }).waitFor();
     await page.getByRole('navigation', { name: 'Student navigation' }).getByRole('link', { name: 'Courses' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Courses' }).waitFor();
     await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.waitForURL(/\/courses\/c-stat110$/);
     await page.getByRole('link', { name: /Center: mean and median/ }).first().click();
     await page.getByRole('heading', { level: 1, name: 'Center: mean and median' }).waitFor();
     await page.getByRole('button', { name: 'State the question.' }).click();
@@ -436,9 +438,13 @@ await journey('Journey 9 · Student submits; instructor grades with an AI feedba
   });
   await step('As Dr. Okafor, grade with the rubric and an AI feedback draft', async () => {
     await switchTo(page, 'Dr. Amara Okafor');
+    await page.getByRole('heading', { level: 1, name: 'My courses' }).waitFor();
     await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.waitForURL(/\/teach\/courses\/c-stat110$/);
     await page.getByRole('navigation').getByRole('link', { name: 'Grades' }).click();
+    await page.waitForURL(/\/grades$/);
     await page.getByRole('link', { name: 'Find the statistical question' }).click();
+    await page.waitForURL(/\/assignments\/asg-stat-1$/);
     await page.getByRole('button', { name: /Marcus Bell · attempt 1/ }).click();
     for (const legend of ['Question', 'Reasoning']) {
       await page.getByRole('group', { name: legend }).getByRole('radio', { name: /Clear/ }).check();
@@ -454,8 +460,11 @@ await journey('Journey 9 · Student submits; instructor grades with an AI feedba
   await runAxe(page, 'Journey 9 · Grading');
   await step('As Marcus, see the grade, the rubric result, and the labeled AI feedback', async () => {
     await switchTo(page, 'Marcus Bell');
+    await page.getByRole('heading', { level: 1, name: 'Today' }).waitFor();
     await page.getByRole('navigation', { name: 'Student navigation' }).getByRole('link', { name: 'Courses' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Courses' }).waitFor();
     await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.waitForURL(/\/courses\/c-stat110$/);
     await page.getByRole('link', { name: /Find the statistical question/ }).click();
     await waitForIncludes(page.locator('main'), '10 / 10');
     await waitForIncludes(page.locator('main'), 'Drafted with AI');
