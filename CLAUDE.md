@@ -2,10 +2,9 @@
 
 An **AI-native learning management system** prototype for higher-education and industry audiences. It hosts courses and has a simplified native authoring tool that drafts modular content from natural language, files, and existing material, customizable for many learner personas. The owner is an instructional-design and learning-experience practitioner. Phase 1 (research, design system, 8 screens, a clickable learner prototype) is done. **Phase 2 (more design and building) starts from the GitHub issues in milestone "Phase 2: design and build".**
 
-- Live site (public): https://project-tessera.jeff-f69.workers.dev/
-- Clickable prototype: https://project-tessera.jeff-f69.workers.dev/prototype/
+- Live site (public): https://tessera.edstratumlabs.ai/ (also at https://project-tessera.jeff-f69.workers.dev/)
+- Clickable prototype: https://tessera.edstratumlabs.ai/prototype/
 - Branch previews: `https://<branch>-project-tessera.jeff-f69.workers.dev/` (branch names are lowercased; `/` and other symbols become `-`)
-- Legacy mirror (GitHub Pages, retiring): https://theonlygeranium.github.io/project-tessera/
 - Repo: `theonlygeranium/project-tessera` (**private**)
 
 ## Read these first, in order
@@ -92,14 +91,14 @@ The owner has a private Claude **Design canvas artifact**, "AI-Native LMS UI Con
 If you can't reach the canvas, say in your handoff that it's behind the repo.
 
 ## Environment notes (Claude cloud sessions)
-- GitHub REST works through the session proxy for issues, labels, milestones, and comments (`$GH_TOKEN`). **GraphQL is blocked, so Projects boards can't be created by agents**; the owner creates them in the UI. The Pages API is blocked too.
-- The sandbox shell can't reach `*.workers.dev`, `*.github.io`, or Google Fonts. Verify the live site with a browser pane if one is attached; otherwise verify locally and say so.
+- GitHub REST works through the session proxy for issues, labels, milestones, and comments (`$GH_TOKEN`). **GraphQL is blocked, so Projects boards can't be created by agents**; the owner creates them in the UI. Branch deletion through the API is refused too; the owner deletes branches in the GitHub UI.
+- The sandbox shell can't reach `*.workers.dev`, `tessera.edstratumlabs.ai`, or Google Fonts. Verify the live site with a browser pane if one is attached; otherwise verify locally and say so.
 - Agents can't deploy with `wrangler deploy` from the sandbox (no Cloudflare token). Deploys happen by pushing to GitHub; Workers Builds does the rest.
 - Chromium for Playwright is at `/opt/pw-browsers/chromium`. Don't run `playwright install`.
-- Hosting (D-012): Cloudflare Workers Builds on the owner's personal account deploys `main` to production and every other branch to a preview URL. No build command runs yet; `docs/` is committed. GitHub Pages (`main` → `/docs`) still mirrors the site until the owner retires it.
+- Hosting (D-012): Cloudflare Workers Builds on the owner's personal account deploys `main` to production and every other branch to a preview URL. No build command runs yet; `docs/` is committed. The production custom domain `tessera.edstratumlabs.ai` is set in `wrangler.jsonc` (`routes`). GitHub Pages was retired on 2026-09-26.
 
 ## Working with the owner
 - Be direct. Lead with the result, then the reasoning. No praise or filler.
 - End development responses with a **Next steps** block: a one-line status, then 2–4 numbered options, recommended first, each saying whether you'll do it or it needs the owner's decision.
-- Act on safe, reversible steps (reading, branches, draft PRs, building, auditing). **Confirm first** before anything destructive or irreversible: force-pushes, deleting branches or data, changing Cloudflare or Pages settings.
+- Act on safe, reversible steps (reading, branches, draft PRs, building, auditing). **Confirm first** before anything destructive or irreversible: force-pushes, deleting branches or data, changing Cloudflare settings or DNS.
 - The owner reviews visually. Show screenshots or the live link for design work, and offer options side by side when a direction is subjective (as with D-006).

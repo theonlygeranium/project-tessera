@@ -30,12 +30,12 @@ Labels: phase:2, priority:P0, decision
 Phase 1 produced static HTML artboards (`design/canvas/*.dc.html`, built to `docs/screens/`) and one vanilla-JS clickable prototype (`docs/prototype/`). Styles are mostly inline hex values; only the AI visual language is shared CSS (`docs/assets/ai-voice.css`). Phase 2 involves more design and building, so the stack decision comes first.
 
 #### Options
-- **A. Stay static.** Keep hand-built HTML/CSS/JS on GitHub Pages. This is the fastest way to more mockups, but the prototypes stay one-off and components get duplicated.
-- **B. Component prototype app (recommended).** Use Vite + a component framework (React or Svelte) + Storybook, with tokens from `design/tokens.json`, still deployed as static files to Pages under `docs/`. Components can be reused across screens, states are testable, and it moves toward production.
+- **A. Stay static.** Keep hand-built HTML/CSS/JS, served by Cloudflare (D-012). This is the fastest way to more mockups, but the prototypes stay one-off and components get duplicated.
+- **B. Component prototype app (recommended).** Use Vite + a component framework (React or Svelte) + Storybook, with tokens from `design/tokens.json`, still deployed as static files by Cloudflare (D-012). Components can be reused across screens, states are testable, and it moves toward production.
 - **C. Full-stack app.** Add a backend, auth, and real AI calls. This is premature until the flows are validated with users.
 
 #### Needs from the owner
-Pick A, B, or C. If B, pick React or Svelte and confirm that `docs/` stays the Pages root (the build output would go there).
+Pick A, B, or C. If B, pick React or Svelte and confirm whether the build output goes to `docs/` (committed) or Cloudflare runs the build (D-012).
 
 #### Done when
 The decision is recorded in `design/DECISIONS.md` (D-011) and this issue is closed with the choice.
@@ -63,7 +63,7 @@ Colors, type, and spacing live in `design/DESIGN-NOTES.md` and `design/tokens.js
 
 Labels: area:learner, phase:2, priority:P1, type:build
 
-Follow-up to #9. The static screen exists: [learning-profile](https://theonlygeranium.github.io/project-tessera/screens/learning-profile.html).
+Follow-up to #9. The static screen exists: [learning-profile](https://tessera.edstratumlabs.ai/screens/learning-profile.html).
 
 #### Scope
 - Add an onboarding view to `docs/prototype/`, shown before Today on first run and reachable later from the avatar menu.
@@ -80,7 +80,7 @@ Follow-up to #9. The static screen exists: [learning-profile](https://theonlyger
 
 Labels: area:learner, area:instructor, phase:2, priority:P1, type:build
 
-Follow-up to #5. The static screen exists: [tutor settings](https://theonlygeranium.github.io/project-tessera/screens/tutor-settings.html).
+Follow-up to #5. The static screen exists: [tutor settings](https://tessera.edstratumlabs.ai/screens/tutor-settings.html).
 
 #### Scope
 - Add a small instructor-view toggle, or a second prototype page, where the mode for the lesson check and the Module 3 check can be set (Off / Hints / Explain / Open, with Open locked on graded items).
@@ -100,7 +100,7 @@ Each mode is demonstrable end to end and the notice text learners see matches th
 
 Labels: area:author, phase:2, priority:P1, type:build
 
-The static screen is [course builder](https://theonlygeranium.github.io/project-tessera/screens/course-builder.html). Covers principles #6 and #12.
+The static screen is [course builder](https://tessera.edstratumlabs.ai/screens/course-builder.html). Covers principles #6 and #12.
 
 #### Scope
 A clickable prototype for authors:

@@ -19,7 +19,7 @@ import urllib.request
 
 REPO = "theonlygeranium/project-tessera"
 API = f"https://api.github.com/repos/{REPO}"
-SITE = "https://theonlygeranium.github.io/project-tessera"
+SITE = "https://tessera.edstratumlabs.ai"
 
 LABELS = [
     ("type:design", "0e6b63", "Change to a screen, flow, or the design system"),

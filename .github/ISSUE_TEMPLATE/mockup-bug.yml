@@ -7,7 +7,7 @@ body:
     id: url
     attributes:
       label: Page URL
-      placeholder: https://theonlygeranium.github.io/project-tessera/prototype/#lesson
+      placeholder: https://tessera.edstratumlabs.ai/prototype/#lesson
     validations:
       required: true
   - type: textarea

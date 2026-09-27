@@ -10,6 +10,9 @@
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
   },
+  // Production custom domain. Wrangler creates the DNS record and certificate
+  // on the edstratumlabs.ai zone (same Cloudflare account) on deploy.
+  "routes": [{ "pattern": "tessera.edstratumlabs.ai", "custom_domain": true }],
   "preview_urls": true,
   "workers_dev": true,
   // Required by `wrangler preview` (Workers Builds preview builds). Empty because

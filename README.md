@@ -2,7 +2,7 @@
 
 An AI-native learning management system prototype for higher-education and industry audiences: course hosting plus a native, simplified authoring tool that drafts modular content from natural language, files, and existing material, customizable for a wide range of learner personas.
 
-**Live site:** https://project-tessera.jeff-f69.workers.dev/ · **Clickable prototype:** https://project-tessera.jeff-f69.workers.dev/prototype/
+**Live site:** https://tessera.edstratumlabs.ai/ · **Clickable prototype:** https://tessera.edstratumlabs.ai/prototype/
 
 *Tessera* is a working codename. It refers to the tiles of a mosaic: modular blocks that compose into a course.
 
