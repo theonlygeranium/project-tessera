@@ -170,6 +170,7 @@ These were set up and tested but aren't part of the active ecosystem. Claude doe
 | 2026-09-26 | Codex loads the repo's `AGENTS.md` | "Claude is the orchestrator; I'm not allowed to commit." |
 | 2026-09-26 | Grok signed in (grok.com), headless `-p` with `--sandbox workspace` | Works; refuses to start if the requested sandbox profile doesn't exist |
 | 2026-09-26 | Trial 2 (`top_words`, 4 planted bugs plus a Unicode "letters" requirement), same brief to four models | See the next table |
+| 2026-09-26 | **First real task:** #17 slice 1 (tokens.css generator, app switched to it, `design/COMPONENTS.md`) by Codex `gpt-6-sol`, profile `tessera`, worktree `../tessera-17` | 209 s, 67,128 tokens. Code correct and minimal; honestly flagged that it couldn't run the audit (its sandbox blocks local servers) and that `npm run dev` would fail on a fresh checkout. Claude fixed: one factual error in the inventory (said the change-set table wasn't on any artboard; it's in the instructor ⌘K dialog), three missing components, a `predev` step. Verified: clean build, a11y 47/47, computed-style parity with production. Commit `dd28f5e`. |
 
 Trial 2 results (every result verified by Claude with the tests plus edge-case probes):
 
