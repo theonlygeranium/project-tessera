@@ -28,6 +28,19 @@ Project Tessera is an AI-native LMS prototype. Before editing, read the **Hard r
 
 If your brief asks for a review, you are read-only: don't modify any file. Report findings ranked by severity. Give each finding a concrete failing input or scenario where one applies, cite the decision (`D-0xx`) or hard rule it violates when relevant, and say plainly if you found no real defects.
 
+### Review guidelines (GitHub pull request reviews)
+
+Codex code review on GitHub reads this section. Flag as P1:
+
+- A route, handler, or repo method that lets one role reach another's data: students seeing unreleased grades, other students' submissions, answer keys (`correctOptionId`), or a course they aren't enrolled in; an API token acting outside its scopes.
+- AI output stored or shown as anything but a draft, or published without a person keeping it (D-003); AI content without the markup contract or without naming its source; the tutor giving an answer where the mode allows only hints (D-005).
+- A colored edge stripe, sparkle icon, or gradient used to mark AI or state (D-006, D-017).
+- Hard-coded colors in app code instead of tokens; text contrast under 4.5:1; icon-only buttons without `aria-label`; lost focus return after a panel closes (D-010).
+- Anything under `docs/` that links into this private repository or contains confidential material, credentials, or real student data (D-012).
+- `MemoryRepo` and `D1Repo` behaving differently, or a migration that breaks existing rows.
+
+Treat as P2: missing tests for a new service rule, input the zod schemas in `shared/schema/` accept but the service rejects (or the reverse), and generated files (`docs/screens/`, `docs/api/openapi.json`, `mintlify/design-system/tokens.mdx`) edited by hand or left stale. Ignore formatting and naming preferences.
+
 ## Your final report
 
 End with a short plain-text report:
