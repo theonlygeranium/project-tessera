@@ -1,0 +1,37 @@
+---
+title: "AI drafting"
+description: "How instructors generate course content with AI, and how every draft stays reviewable."
+---
+
+Tessera's course builder, from Night 1, takes a prompt and any sources an instructor pastes in, drafts a brief, then an outline, then the lessons themselves, all as labeled drafts an instructor reviews, edits, keeps, or regenerates before anything publishes.
+
+## Drafting at any scope
+
+Night 2 adds a **scope picker**, so drafting isn't limited to a whole new course. An instructor can generate:
+
+- The **whole course** at once.
+- One or more selected **modules**.
+- One or more selected **lessons**.
+- Specific **element types** across a selection — for example, documents and scenarios for one module, or knowledge checks for every lesson in the course.
+- A **video script**, drafted as a document of scenes, alongside a video block.
+
+Generation runs per element and reports progress as drafts come in, so an instructor can watch a large generation job proceed rather than waiting on one long request.
+
+## "Add with AI" in the lesson editor
+
+Inside a single lesson, "Add with AI" generates one new block at a chosen position — a heading, a paragraph, a callout, an image description, a document, a table, a scenario, a link, or a video script — optionally guided by a short instruction ("focus on the 1918 outbreak" or "make this a branching scenario about triage decisions").
+
+## Everything lands as a draft
+
+Whatever the scope, the result is the same: every AI-generated block is inserted as a labeled draft. Nothing an AI produces is published automatically. An instructor:
+
+- **Keeps** a draft, which marks it reviewed.
+- **Edits** it, which keeps it a draft until it's explicitly kept.
+- **Reverts** it to its previous content, when there is one.
+- **Regenerates** it with a new instruction.
+
+A lesson can't be published while it still has unreviewed AI drafts — the server enforces this at the publish gate, not only the editor screen.
+
+## Provenance
+
+Every AI draft carries where it came from: the model that generated it, what kind of task it was (an outline, a lesson draft, an element, a rewrite, alt text, feedback, and so on), when it was generated, what sources it drew on, and a one-line summary of what was asked. This line is shown next to the draft itself, using Tessera's Marginalia marks rather than a color or an icon, so a reader always knows what they're looking at and where it came from.

@@ -1,0 +1,114 @@
+---
+title: "Tessera Access"
+description: "How accessibility scores, checks, fixes, and accessible formats work."
+---
+
+Tessera Access is accessibility built into authoring and learning, not a separate audit run afterward. It checks lessons as they're written, checks uploaded documents when they're scanned (automatically the first time someone opens a file's report), and blocks a lesson from publishing when it doesn't meet the institution's policy.
+
+## Scores and grades
+
+Every accessibility report — a lesson, a file, a course, or an institution — carries a score from 0 to 100:
+
+```
+score = max(0, 100 − Σ penalty(severity) × min(count, 3))
+```
+
+Penalties by severity: **critical 30**, **serious 15**, **moderate 8**, **minor 3**. Three or more of the same issue count as three, so one severe, recurring problem doesn't sink the score past the point of being useful feedback.
+
+The score maps to a grade:
+
+| Grade | Score |
+|---|---|
+| Perfect | 90 and above |
+| Good | 75 and above |
+| Moderate | 50 and above |
+| Low | 25 and above |
+| Very low | below 25 |
+
+A course's or institution's score is the average of its parts' scores.
+
+## What's checked
+
+### Lessons and assignment instructions
+
+Tessera's lesson content is a list of typed blocks, so these checks run directly against the block model — instantly in the editor, and again at the publish gate:
+
+| Check | WCAG 2.2 |
+|---|---|
+| Image without alt text (or a placeholder like "image1.png") | 1.1.1 Non-text content (A) |
+| Heading level skips one or more levels | 1.3.1 Info and relationships (A) |
+| Empty heading | 2.4.6 Headings and labels (AA) |
+| Link text that doesn't say where it goes ("click here," a bare URL) | 2.4.4 Link purpose in context (A) |
+| Table without a marked header row | 1.3.1 Info and relationships (A) |
+| Video without captions or a transcript | 1.2.2 Captions, prerecorded (A) |
+| Information given by color alone ("the items shown in red") | 1.4.1 Use of color (A) |
+| Knowledge check missing a question, two answers, or a marked correct answer | 3.3.2 Labels or instructions (A) |
+| Dense reading level (an approximate grade level over 14) | 3.1.5 Reading level (AAA) |
+| Very long paragraph (over 200 words) | 1.4.8 Visual presentation (AAA) |
+| Empty lesson (no blocks at all) | 2.4.2 Page titled (A) |
+
+### PDF files
+
+Checked in the Worker against the document's real structure, not just its visible text:
+
+| Check | WCAG 2.2 |
+|---|---|
+| No extractable text (the PDF appears scanned) | 1.1.1 Non-text content (A) |
+| No usable tag structure | 1.3.1 Info and relationships (A) |
+| No document title set | 2.4.2 Page titled (A) |
+| No document language set | 3.1.1 Language of page (A) |
+| Images without matching alt text in the tag structure | 1.1.1 Non-text content (A) |
+| No headings detected | 1.3.1 Info and relationships (A) |
+| Structure order differs from the visual reading order | 1.3.2 Meaningful sequence (A) |
+
+### Word documents
+
+| Check | WCAG 2.2 |
+|---|---|
+| No document language set | 3.1.1 Language of page (A) |
+| A long document with no heading styles | 1.3.1 Info and relationships (A) |
+| No document title set | 2.4.2 Page titled (A) |
+| Images without a meaningful description | 1.1.1 Non-text content (A) |
+| Tables without a marked header row | 1.3.1 Info and relationships (A) |
+| Text under 9 pt | 1.4.4 Resize text (AA) |
+| Text and background contrast below the required ratio | 1.4.3 Contrast, minimum (AA) |
+
+### PowerPoint files
+
+| Check | WCAG 2.2 |
+|---|---|
+| Slides with no title placeholder text | 2.4.2 Page titled (A) |
+| Images without a meaningful description | 1.1.1 Non-text content (A) |
+| Most slides have no speaker notes | 1.2.1 Audio-only and video-only, prerecorded (A) |
+| Slide text under 18 pt | 1.4.4 Resize text (AA) |
+| Text and background contrast below the required ratio | 1.4.3 Contrast, minimum (AA) |
+
+## Fixes
+
+Every fix — alt text, a marked table header row, corrected title or language metadata, or OCR — saves a **new version** of the document. The original is never overwritten; every version is kept.
+
+AI-suggested fixes (an alt text description, a plain-language rewrite, a clearer link name) are drafts, the same rule that applies to every other AI output in Tessera: a person reviews and keeps a suggestion before it takes effect. An unreviewed AI draft blocks publishing, but it does not itself count against the accessibility score — the score reflects the content's actual state, not whether a draft is pending review.
+
+Alt text can be written into Word and PowerPoint files. For PDFs, Tessera doesn't yet write alt text into the file or extract its images for AI suggestions; the fixes it applies to PDFs are title, language, and OCR. The reading version and e-book carry a document's text and headings, not its images.
+
+## Accessible formats
+
+Every PDF, Word, and PowerPoint file gets a menu of accessible formats, generated on first request and cached per version:
+
+- **Reading version** — the extracted content rendered as a plain, accessible page.
+- **E-book** (ePub 3).
+- **Audio** — a synthesized read-through.
+- **Searchable version** — for a scanned PDF with no extractable text, OCR produces a searchable copy so screen readers and search both work. See [OCR for scanned PDFs](#ocr-for-scanned-pdfs) below.
+
+## OCR for scanned PDFs
+
+A scanned PDF has no text layer for a screen reader to read or for search to index. Running OCR on it is both a **fix** — it saves a new, searchable version of the file — and an **accessible format** in its own right, since the reading version, e-book, and audio of a scan are built from the OCR text.
+
+## Publishing policy
+
+Administrators set two things that the server enforces, not just the editor screen:
+
+- A **minimum accessibility score** a lesson must meet to publish.
+- A list of **blocking severities** — for example, treating any critical or serious issue as a publishing block regardless of the overall score.
+
+An instructor sees exactly why a lesson can't publish: the score, the policy's threshold, and which issues are blocking.
