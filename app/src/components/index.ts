@@ -4,3 +4,5 @@ export { StatusChip } from './StatusChip/StatusChip';
 export type { StatusChipProps } from './StatusChip/StatusChip';
 export { Card } from './Card/Card';
 export type { CardProps } from './Card/Card';
+export { AiContent, AiRef } from './AiContent/AiContent';
+export type { AiContentProps } from './AiContent/AiContent';

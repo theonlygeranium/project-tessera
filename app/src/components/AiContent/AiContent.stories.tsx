@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { AiContent, AiRef } from './AiContent';
+import { Button } from '../Button/Button';
 
 // Content is fictional and taken from the prototype and artboards.
 const meta = {
@@ -76,9 +77,9 @@ export const DraftBlock: Story = {
       'Remember: a single headline metric is a claim about the average person. Fairness questions are about who the average hides.',
     actions: (
       <>
-        <button type="button">Accept</button>
-        <button type="button">Revert</button>
-        <button type="button">Regenerate</button>
+        <Button variant="primary" density="compact">Accept</Button>
+        <Button density="compact">Revert</Button>
+        <Button variant="text" density="compact">Regenerate</Button>
       </>
     ),
   },
