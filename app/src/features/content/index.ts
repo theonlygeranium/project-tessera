@@ -6,23 +6,20 @@ import { LinkEditor } from './editors/LinkEditor';
 import { ScenarioEditor } from './editors/ScenarioEditor';
 import { TableEditor } from './editors/TableEditor';
 import { VideoEditor } from './editors/VideoEditor';
+import { FileEditor } from './editors/FileEditor';
 import { LegacyBlockFields, LegacyBlockPlayer } from './legacy';
 import { DocumentPlayer } from './players/DocumentPlayer';
 import { LinkPlayer } from './players/LinkPlayer';
 import { ScenarioPlayer } from './players/ScenarioPlayer';
 import { TablePlayer } from './players/TablePlayer';
 import { VideoPlayer } from './players/VideoPlayer';
-import styles from './content.module.css';
+import { FilePlayer } from './players/FilePlayer';
 
 export { DocumentEditor, LinkEditor, ScenarioEditor, TableEditor, VideoEditor };
 export { DocumentPlayer, LinkPlayer, ScenarioPlayer, TablePlayer, VideoPlayer };
 export { LegacyBlockFields, LegacyBlockPlayer };
 
-function fileNote(): ReactNode {
-  return createElement('p', { className: styles.note }, 'File blocks can be added after a file is uploaded.');
-}
-
-export function BlockEditor({ value, onChange }: { value: BlockInput; onChange: (value: BlockInput) => void }): ReactNode {
+export function BlockEditor({ value, onChange, courseId }: { value: BlockInput; onChange: (value: BlockInput) => void; courseId?: string }): ReactNode {
   switch (value.type) {
     case 'document': return createElement(DocumentEditor, { value, onChange });
     case 'table': return createElement(TableEditor, { value, onChange });
@@ -36,7 +33,7 @@ export function BlockEditor({ value, onChange }: { value: BlockInput; onChange: 
     case 'check':
       return createElement(LegacyBlockFields, { block: value, onChange });
     case 'file':
-      return fileNote();
+      return createElement(FileEditor, { value, onChange, courseId: courseId ?? '' });
     default: {
       const unreachable: never = value;
       return unreachable;
@@ -58,7 +55,7 @@ export function BlockPlayer({ block, lessonId }: { block: StudentBlock; lessonId
     case 'check':
       return createElement(LegacyBlockPlayer, { block, lessonId });
     case 'file':
-      return fileNote();
+      return createElement(FilePlayer, { value: block });
     default: {
       const unreachable: never = block;
       return unreachable;
