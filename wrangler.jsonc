@@ -1,0 +1,15 @@
+// Cloudflare Workers static-assets config for the Tessera site (D-012).
+// No Worker script: Cloudflare serves ./docs as-is. Workers Builds deploys
+// `main` to production and uploads every other branch as a preview version.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "project-tessera",
+  "compatibility_date": "2026-09-26",
+  "assets": {
+    "directory": "./docs",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "preview_urls": true,
+  "workers_dev": true
+}
