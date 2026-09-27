@@ -1,0 +1,12 @@
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.preview { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.media { max-width: 100%; height: auto; }
+.callout { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.tone { margin: 0; color: var(--ink-2); font: 700 var(--size-text-compact)/1.2 var(--font-sans); text-transform: capitalize; }
+.callout h3 { margin: 8px 0; }
+.figure { margin: 0; }
+.figure figcaption { color: var(--ink-2); font: 400 var(--size-text-compact)/1.5 var(--font-sans); }
+.check { margin-block: 16px; }
+.note { margin: 0; color: var(--ink-2); }
+.paragraphs p { margin: 0 0 12px; }
+.paragraphs p:last-child { margin-bottom: 0; }
