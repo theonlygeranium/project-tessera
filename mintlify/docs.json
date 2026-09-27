@@ -15,8 +15,13 @@
     }
   },
   "fonts": {
-    "heading": { "family": "Fraunces", "weight": 500 },
-    "body": { "family": "IBM Plex Sans" }
+    "heading": {
+      "family": "Fraunces",
+      "weight": 500
+    },
+    "body": {
+      "family": "IBM Plex Sans"
+    }
   },
   "favicon": "/images/favicon.svg",
   "logo": {
@@ -26,7 +31,10 @@
   },
   "navbar": {
     "links": [
-      { "label": "Live site", "href": "https://tessera.edstratumlabs.ai/" }
+      {
+        "label": "Live site",
+        "href": "https://tessera.edstratumlabs.ai/"
+      }
     ],
     "primary": {
       "type": "button",
@@ -38,7 +46,18 @@
     "groups": [
       {
         "group": "Start here",
-        "pages": ["index", "principles", "roadmap"]
+        "pages": [
+          "index",
+          "principles",
+          "roadmap"
+        ]
+      },
+      {
+        "group": "Product",
+        "pages": [
+          "screens",
+          "components"
+        ]
       },
       {
         "group": "Design system",
@@ -50,7 +69,10 @@
       },
       {
         "group": "Building Tessera",
-        "pages": ["build/architecture", "build/decisions"]
+        "pages": [
+          "build/architecture",
+          "build/decisions"
+        ]
       }
     ]
   },
