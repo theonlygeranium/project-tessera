@@ -10,7 +10,11 @@
     "a11y": "npm run build && node tools/a11y_audit.mjs",
     "docs:sync": "npm run build && node tools/docs_sync.mjs && node tools/build_mintlify_tokens.mjs",
     "test": "vitest run",
-    "typecheck": "tsc -p shared && tsc -p app"
+    "typecheck": "tsc -p shared && tsc -p app && tsc -p worker",
+    "dev:api": "wrangler dev --port 8787",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:prod": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:preview": "wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-migrations.jsonc"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260927.1",

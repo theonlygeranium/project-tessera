@@ -1,0 +1,17 @@
+// Migrations for the preview D1 database only. `wrangler d1 migrations apply`
+// reads the top-level binding, and preview bindings are not inherited, so
+// this file exists to target tessera-preview:
+//   npx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-migrations.jsonc
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "project-tessera",
+  "compatibility_date": "2026-09-26",
+  "d1_databases": [
+    {
+      "binding": "PREVIEW_DB",
+      "database_name": "tessera-preview",
+      "database_id": "36fc5739-9c50-43ec-b136-1934bf15fe2c",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
