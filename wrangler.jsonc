@@ -35,8 +35,20 @@
     }
   ],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "tessera-files" }],
+  // OCR for scanned PDFs (D-022, option B): OCRmyPDF + Tesseract in a Cloudflare Container.
+  "containers": [
+    {
+      "class_name": "OcrContainer",
+      "image": "./containers/ocr/Dockerfile",
+      "instance_type": { "vcpu": 1, "memory_mib": 3072, "disk_mb": 6000 },
+      "max_instances": 3
+    }
+  ],
+  "durable_objects": { "bindings": [{ "name": "OCR", "class_name": "OcrContainer" }] },
+  "migrations": [{ "tag": "v1-ocr", "new_sqlite_classes": ["OcrContainer"] }],
   "vars": {
     "ENVIRONMENT": "production",
+    "OCR_INSTANCES": "3",
     "ACCESS_TEAM_DOMAIN": "little-brook-5f84.cloudflareaccess.com",
     "ACCESS_AUD": "97c83cba8bf51d22c61e77f174b69318dc2cf542178fd0201443eaebf0f59a4d",
     "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/f69a6a0cad6e417b182bac1559292bf6/tessera/custom-writer/v1/chat/completions"
@@ -46,6 +58,16 @@
   "previews": {
     "ai": { "binding": "AI" },
     "r2_buckets": [{ "binding": "FILES", "bucket_name": "tessera-files-preview" }],
+    // Preview container configuration isn't inherited from the top level.
+    "containers": [
+      {
+        "class_name": "OcrContainer",
+        "image": "./containers/ocr/Dockerfile",
+        "instance_type": { "vcpu": 1, "memory_mib": 3072, "disk_mb": 6000 },
+        "max_instances": 1
+      }
+    ],
+    "durable_objects": { "bindings": [{ "name": "OCR", "class_name": "OcrContainer" }] },
     "d1_databases": [
       {
         "binding": "DB",
@@ -56,6 +78,7 @@
     ],
     "vars": {
       "ENVIRONMENT": "preview",
+      "OCR_INSTANCES": "1",
       "ACCESS_TEAM_DOMAIN": "little-brook-5f84.cloudflareaccess.com",
       "ACCESS_AUD": "97c83cba8bf51d22c61e77f174b69318dc2cf542178fd0201443eaebf0f59a4d",
       "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/f69a6a0cad6e417b182bac1559292bf6/tessera/custom-writer/v1/chat/completions"

@@ -71,7 +71,7 @@ export async function checkPdf(bytes:ArrayBuffer):Promise<DocumentCheck>{
       else missingAlt+=Math.max(missingFigures,Math.max(0,elements.filter(e=>e.page===pageNum).length-figures.length));
     }
     const tagged=taggedPages>0&&mark?.Marked!==false;
-    if(!hasText) issues.push(issue('pdf_no_text','critical','No extractable text','This PDF appears scanned or image-only.','Use OCR to create a text version.','manual'));
+    if(!hasText) issues.push(issue('pdf_no_text','critical','No extractable text','This PDF appears scanned or image-only.','Run OCR to add searchable text.','ocr'));
     if(!tagged) issues.push(issue('pdf_untagged','serious','PDF is untagged','No usable structure tree was found.','Add document tags in an authoring tool.','manual'));
     if(!title) issues.push(issue('pdf_no_title','moderate','PDF title missing','No document title is set.','Set the title metadata.','metadata'));
     if(!language) issues.push(issue('pdf_no_language','serious','PDF language missing','No document language is set.','Set the language metadata.','metadata'));
@@ -82,7 +82,7 @@ export async function checkPdf(bytes:ArrayBuffer):Promise<DocumentCheck>{
   } finally { await loading.destroy(); }
 }
 export async function fixPdf(bytes:ArrayBuffer,fix:ApiSpec['fixFileIssue']['input']['fix']):Promise<ArrayBuffer>{
-  if(fix.kind!=='metadata') throw new Error('PDF supports metadata fixes only');
+  if(fix.kind!=='metadata') throw new Error('PDF supports metadata fixes here; OCR runs in the OCR container');
   const pdf=await PDFDocument.load(bytes.slice(0));
   if(fix.title!==undefined) pdf.setTitle(fix.title);
   if(fix.language!==undefined) pdf.setLanguage(fix.language);

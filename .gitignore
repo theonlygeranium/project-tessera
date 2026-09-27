@@ -18,3 +18,4 @@ docs/storybook/
 
 # Screenshots from failing e2e journeys (tests/e2e/journeys.mjs); regenerated per run
 reports/e2e/
+.vitest/

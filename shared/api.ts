@@ -155,7 +155,7 @@ export interface ApiSpec {
   scanFile: { input: { fileId: Id }; output: AccessReport };
   getFileAccess: { input: { fileId: Id }; output: AccessReport };
   /** Applies a fix to a document as a new version (alt text, table header, metadata). */
-  fixFileIssue: { input: { fileId: Id; issueIndex: number; fix: { kind: 'alt-text'; element: number; alt: string; decorative: boolean } | { kind: 'table-header'; element: number } | { kind: 'metadata'; title?: string; language?: string } }; output: AccessReport };
+  fixFileIssue: { input: { fileId: Id; issueIndex: number; fix: { kind: 'alt-text'; element: number; alt: string; decorative: boolean } | { kind: 'table-header'; element: number } | { kind: 'metadata'; title?: string; language?: string } | { kind: 'ocr'; language?: string } }; output: AccessReport };
   /** AI suggestion for an issue (alt text from the image, rewrite, link text): a draft the person applies. */
   suggestFix: { input: { target: { lessonId: Id; blockId: Id } | { fileId: Id; element: number }; kind: 'alt-text' | 'rewrite' | 'link-text' }; output: { suggestion: string; provenance: Provenance } };
   getCourseAccess: { input: { courseId: Id }; output: CourseAccessReport };

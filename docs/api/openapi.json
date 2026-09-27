@@ -7458,6 +7458,22 @@
                         "required": [
                           "kind"
                         ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "ocr"
+                          },
+                          "language": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ]
                       }
                     ]
                   }
@@ -11793,6 +11809,7 @@
               "table-header",
               "metadata",
               "captions",
+              "ocr",
               "manual"
             ]
           }

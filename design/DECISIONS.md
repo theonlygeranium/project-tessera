@@ -229,3 +229,11 @@ Approved 2026-09-27. Accessibility is a native capability adapted from the owner
 - Students get accessible formats (reading view, audio, ePub, OCR text) on every document.
 - Administrators set a minimum accessibility score and blocking severities for publishing; the server enforces them.
 
+
+### D-023 · OCR for scanned PDFs
+Approved 2026-09-27 (the owner chose option B of four: Browser Rendering + a vision model, a Cloudflare Container with OCRmyPDF, a managed OCR service, or author guidance only).
+**Decision:**
+- **OCRmyPDF + Tesseract in a Cloudflare Container** (`containers/ocr/`, Worker class `OcrContainer`, binding `OCR`). Workers can't render PDF pages, so OCR runs in a container; it stays on Cloudflare, sends course files to no other vendor, and gives the same output every time.
+- OCR is both a **fix** (`fixFileIssue { kind: 'ocr' }` saves a searchable PDF as a new version; the original stays, like every other fix) and an **accessible format** (`?format=ocr`). The reading version, e-book, and audio of a scan use its OCR text.
+- Languages installed: English, Spanish, French. Up to 3 instances in production and 1 per preview, each 1 vCPU / 3 GiB (Cloudflare requires at least 3 GiB per vCPU), OCR one page at a time, sleeping after 3 idle minutes; the Workers Paid allowance (25 GiB-hours of memory a month) covers about 8 running hours at this size.
+- Limits: Tesseract is weak on handwriting and complex layouts; a vision-model second pass (option A) can be added later for pages it reads poorly.

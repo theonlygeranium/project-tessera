@@ -10,8 +10,11 @@ import type { AccessReport, AccessibleFormat, Block, FileRecord, Provenance } fr
 import { canReadFile, type DocumentEngine, type ServiceContext } from '../../shared/service';
 import { describeImage, type VisionEnv } from '../ai/vision';
 import { applyFix, checkDocument, extractImage, type DocumentCheck } from './index';
+import { runOcr, type OcrContainer } from '../ocr';
 
-export interface EngineEnv extends VisionEnv { FILES: R2Bucket }
+export interface EngineEnv extends VisionEnv { FILES: R2Bucket; OCR?: DurableObjectNamespace<OcrContainer>; OCR_INSTANCES?: string }
+
+const ocrInstances = (env: EngineEnv) => Number(env.OCR_INSTANCES ?? 1) || 1;
 
 // The reading version uses Tessera's tokens (D-007): ink on paper.
 const INK = tokens.color.ink.$value, PAPER = tokens.color.surface.$value;
@@ -22,8 +25,9 @@ const TTS_MODEL = '@cf/deepgram/aura-2-en';
 const AUDIO_MAX_CHARS = 27_000;
 const TTS_CHUNK = 1_800;
 
-export const FORMAT_FILES: Record<Exclude<AccessibleFormat, 'ocr'>, { ext: string; mime: string }> = {
+export const FORMAT_FILES: Record<AccessibleFormat, { ext: string; mime: string }> = {
   reading: { ext: 'html', mime: 'text/html; charset=utf-8' },
+  ocr: { ext: 'pdf', mime: 'application/pdf' },
   epub: { ext: 'epub', mime: 'application/epub+zip' },
   audio: { ext: 'mp3', mime: 'audio/mpeg' },
 };
@@ -190,7 +194,10 @@ export function createDocumentEngine(env: EngineEnv): DocumentEngine {
     async fix(file, fix) {
       if (!SCANNABLE.has(file.kind)) throw new ApiError('unsupported', 'Only PDF, Word, and PowerPoint files can be fixed.');
       let fixed: ArrayBuffer;
-      try {
+      if (fix.kind === 'ocr') {
+        if (file.kind !== 'pdf') throw new ApiError('invalid', 'OCR is for scanned PDFs.');
+        fixed = (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), fix.language, ocrInstances(env))).pdf;
+      } else try {
         fixed = await applyFix(file.kind, await bytesOf(env, file.key), fix);
       } catch (error) {
         if (error instanceof ApiError) throw error;
@@ -231,13 +238,24 @@ export function createDocumentEngine(env: EngineEnv): DocumentEngine {
     },
 
     async generateFormat(file, format) {
-      if (format === 'ocr') throw new ApiError('unsupported', 'OCR for scanned PDFs isn\'t available yet. Ask for a text version from the author, or use a desktop OCR tool.');
-      const doc = await check(env, file);
-      if (!doc.document?.hasText) throw new ApiError('unsupported', 'This file has no text to convert. It may be a scan; OCR isn\'t available yet.');
-      const language = 'en';
-      const { title, html, text } = documentBody(file, doc);
       const key = fileKeys.format(file, format);
       const meta = { httpMetadata: { contentType: FORMAT_FILES[format].mime } };
+      if (format === 'ocr') {
+        if (file.kind !== 'pdf') throw new ApiError('unsupported', 'OCR is for scanned PDFs.');
+        await env.FILES.put(key, (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), undefined, ocrInstances(env))).pdf, meta);
+        return key;
+      }
+      let doc = await check(env, file);
+      if (!doc.document?.hasText && file.kind === 'pdf') {
+        // A scan: use its OCR text, running OCR first if it hasn't been.
+        const ocrKey = fileKeys.format(file, 'ocr');
+        let ocr = await env.FILES.get(ocrKey);
+        if (!ocr) { await env.FILES.put(ocrKey, (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), undefined, ocrInstances(env))).pdf, { httpMetadata: { contentType: FORMAT_FILES.ocr.mime } }); ocr = await env.FILES.get(ocrKey); }
+        doc = await checkDocument('pdf', await ocr!.arrayBuffer());
+      }
+      if (!doc.document?.hasText) throw new ApiError('unsupported', 'This file has no text to convert, even after OCR.');
+      const language = 'en';
+      const { title, html, text } = documentBody(file, doc);
       if (format === 'reading') await env.FILES.put(key, readingHtml(title, html, language), meta);
       else if (format === 'epub') await env.FILES.put(key, await buildEpub(title, html, language, `${file.id}-v${file.version}`), meta);
       else await env.FILES.put(key, await speak(env, text), meta);
