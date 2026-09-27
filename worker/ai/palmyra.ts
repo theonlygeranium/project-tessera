@@ -39,6 +39,10 @@ function sourcesBlock(sources: SourceDoc[]): string {
 type Messages = { role: 'system' | 'user'; content: string }[];
 
 const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } = {
+  feedback: ({ courseTitle, assignmentTitle, rubric, criteria, submissionText }) => [
+    { role: 'system', content: `${SYSTEM}\nFeedback is a draft for the instructor to edit. Ground it in the selected rubric levels and submission. Do not invent facts.` },
+    { role: 'user', content: `Course: ${courseTitle}\nAssignment: ${assignmentTitle}\nRubric: ${JSON.stringify(rubric)}\nSelected results: ${JSON.stringify(criteria)}\nSubmission: ${submissionText.slice(0, 12000)}\nWrite concise, specific, constructive feedback.` },
+  ],
   brief: ({ courseTitle, prompt, sources }) => [
     { role: 'system', content: SYSTEM },
     { role: 'user', content: `Draft a course brief for "${courseTitle}".\nThe instructor asked: ${prompt}\n\n${sourcesBlock(sources)}\n\nChoose 1–3 modules, 2–3 lessons per module, and lesson length in minutes (10–30). Outcomes are 3–5 observable, measurable statements starting with a verb.` },
@@ -79,6 +83,7 @@ const BLOCK = obj({
 });
 
 const SCHEMAS: Record<AiTaskName, unknown> = {
+  feedback: obj({ feedback: str }),
   brief: obj({
     audience: str,
     outcomes: { type: 'array', items: str },
@@ -118,6 +123,7 @@ export function toBlock(b: FlatBlock, fallback?: BlockContent): BlockContent {
 }
 
 const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  feedback: (raw) => ({ feedback: String(raw.feedback ?? '') }),
   brief: (raw) => raw,
   outline: (raw) => raw,
   'lesson-draft': (raw) => ({ blocks: (raw.blocks as FlatBlock[]).map((b) => toBlock(b)) }),
@@ -131,7 +137,7 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 const MAX_TOKENS: Record<AiTaskName, number> = {
   // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the
   // occasional runaway generation within seconds instead of a minute.
-  brief: 6000, outline: 8000, 'lesson-draft': 7000, 'block-regenerate': 5000, announcement: 4000,
+  brief: 6000, outline: 8000, 'lesson-draft': 7000, 'block-regenerate': 5000, announcement: 4000, feedback: 2000,
 };
 
 // ---- Client ---------------------------------------------------------------------------------
@@ -236,4 +242,3 @@ export function hasUsableCheck(draft: { blocks: BlockContent[] }): boolean {
   return draft.blocks.some((b) => b.type === 'check' && b.question.trim() !== '' && b.options.filter((o) => o.text.trim()).length >= 2
     && b.options.some((o) => o.id === b.correctOptionId && o.text.trim() !== ''));
 }
-

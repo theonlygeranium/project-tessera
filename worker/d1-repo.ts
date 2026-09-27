@@ -2,7 +2,7 @@
 // `put*` upserts. replaceBlocks, setEnrollments, deleteLesson, and reset each run
 // in one batch so a failure leaves the previous rows in place.
 import type {
-  Block, BlockContent, BuilderSession, Course, Id, Institution, Lesson, Module, Role, User, ApiToken, FileRecord, AccessibleFormat,
+  AccessibleFormat, ApiToken, Assignment, Block, BlockContent, BuilderSession, Course, FileRecord, Id, Institution, Lesson, Module, Role, Submission, User,
 } from '../shared/domain';
 import type {
   AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat,
@@ -329,6 +329,29 @@ export class D1Repo implements Repo {
     return { id: r.id, courseId: r.course_id, name: r.name, kind: r.kind, mime: r.mime, size: r.size, key: r.key, version: r.version, uploadedBy: r.uploaded_by, uploadedAt: r.uploaded_at,
       scan: scan ? { score: scan.score, grade: scan.grade, issueCount: scan.issueCount, bySeverity: scan.bySeverity, scannedAt: scan.scannedAt } : null };
   }
+  async getAssignment(id: Id): Promise<Assignment | null> {
+    const row = await this.first<AssignmentRow>('SELECT * FROM assignments WHERE id = ?', [id]);
+    return row ? assignmentFromRow(row) : null;
+  }
+  async listAssignments(filter: { courseId?: Id; moduleId?: Id }): Promise<Assignment[]> {
+    const rows = await this.all<AssignmentRow>(`SELECT a.* FROM assignments a JOIN modules m ON m.id = a.module_id
+      WHERE (? IS NULL OR a.course_id = ?) AND (? IS NULL OR a.module_id = ?)
+      ORDER BY m.position, a.position, a.id`, [filter.courseId ?? null, filter.courseId ?? null, filter.moduleId ?? null, filter.moduleId ?? null]);
+    return rows.map(assignmentFromRow);
+  }
+  async putAssignment(a: Assignment): Promise<void> { await this.assignmentStmt(a).run(); }
+  async deleteAssignment(id: Id): Promise<void> { await this.db.prepare('DELETE FROM assignments WHERE id = ?').bind(id).run(); }
+  async getSubmission(id: Id): Promise<Submission | null> {
+    const row = await this.first<SubmissionRow>('SELECT * FROM submissions WHERE id = ?', [id]);
+    return row ? submissionFromRow(row) : null;
+  }
+  async listSubmissions(filter: { assignmentId?: Id; studentId?: Id }): Promise<Submission[]> {
+    const rows = await this.all<SubmissionRow>(`SELECT * FROM submissions WHERE (? IS NULL OR assignment_id = ?) AND (? IS NULL OR student_id = ?)
+      ORDER BY student_id, attempt DESC, submitted_at DESC`, [filter.assignmentId ?? null, filter.assignmentId ?? null, filter.studentId ?? null, filter.studentId ?? null]);
+    return rows.map(submissionFromRow);
+  }
+  async putSubmission(s: Submission): Promise<void> { await this.submissionStmt(s).run(); }
+
   async getApiTokenByHash(hash: string) {
     const row = await this.first<TokenRow>('SELECT * FROM api_tokens WHERE hash = ?', [hash]);
     return row ? tokenFromRow(row) : null;
@@ -367,6 +390,8 @@ export class D1Repo implements Repo {
       ...seed.modules.map((module) => this.moduleStmt(module)),
       ...seed.lessons.map((lesson) => this.lessonStmt(lesson)),
       ...seed.blocks.map((block) => this.blockStmt(block)),
+      ...seed.assignments.map((assignment) => this.assignmentStmt(assignment)),
+      ...seed.submissions.map((submission) => this.submissionStmt(submission)),
       ...seed.enrollments.map((row) => this.enrollmentStmt(row.courseId, row.userId)),
       ...seed.announcements.map((announcement) => this.announcementStmt(announcement)),
       ...seed.reads.map((read) => this.readStmt(read)),
@@ -510,6 +535,20 @@ export class D1Repo implements Repo {
       jsonOrNull(block.previous),
       block.updatedAt,
     );
+  }
+
+  private assignmentStmt(a: Assignment): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO assignments (id,module_id,course_id,title,position,status,published_at,due_at,points,submission_type,rubric,instructions)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET module_id=excluded.module_id,course_id=excluded.course_id,title=excluded.title,
+      position=excluded.position,status=excluded.status,published_at=excluded.published_at,due_at=excluded.due_at,points=excluded.points,
+      submission_type=excluded.submission_type,rubric=excluded.rubric,instructions=excluded.instructions`)
+      .bind(a.id,a.moduleId,a.courseId,a.title,a.position,a.status,a.publishedAt,a.dueAt,a.points,a.submissionType,JSON.stringify(a.rubric),JSON.stringify(a.instructions));
+  }
+  private submissionStmt(s: Submission): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO submissions (id,assignment_id,student_id,attempt,state,text,file_id,link,submitted_at,grade)
+      VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET assignment_id=excluded.assignment_id,student_id=excluded.student_id,
+      attempt=excluded.attempt,state=excluded.state,text=excluded.text,file_id=excluded.file_id,link=excluded.link,submitted_at=excluded.submitted_at,grade=excluded.grade`)
+      .bind(s.id,s.assignmentId,s.studentId,s.attempt,s.state,s.text,s.fileId,s.link,s.submittedAt,jsonOrNull(s.grade));
   }
 
   private announcementStmt(announcement: StoredAnnouncement): D1PreparedStatement {
@@ -818,4 +857,21 @@ function progressFromRow(row: ProgressRow): StoredProgress {
     checks: parseJson(row.checks),
     updatedAt: row.updated_at,
   };
+}
+
+interface AssignmentRow extends Record<string, unknown> {
+  id: string; module_id: string; course_id: string; title: string; position: number; status: Assignment['status'];
+  published_at: string | null; due_at: string | null; points: number; submission_type: Assignment['submissionType']; rubric: string; instructions: string;
+}
+function assignmentFromRow(r: AssignmentRow): Assignment {
+  return { id:r.id,moduleId:r.module_id,courseId:r.course_id,title:r.title,position:r.position,status:r.status,publishedAt:r.published_at,
+    dueAt:r.due_at,points:r.points,submissionType:r.submission_type,rubric:parseJson(r.rubric),instructions:parseJson(r.instructions) };
+}
+interface SubmissionRow extends Record<string, unknown> {
+  id: string; assignment_id: string; student_id: string; attempt: number; state: Submission['state']; text: string;
+  file_id: string | null; link: string; submitted_at: string; grade: string | null;
+}
+function submissionFromRow(r: SubmissionRow): Submission {
+  return { id:r.id,assignmentId:r.assignment_id,studentId:r.student_id,attempt:r.attempt,state:r.state,text:r.text,fileId:r.file_id,
+    link:r.link,submittedAt:r.submitted_at,grade:r.grade ? parseJson(r.grade) : null };
 }

@@ -15,6 +15,10 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       const module = (await repo.getModule('m-stat-1'))!; module.title = 'New'; await repo.putModule(module); expect((await repo.getModule(module.id))?.title).toBe('New');
       const lesson = (await repo.getLesson('l-stat-1'))!; lesson.title = 'New'; await repo.putLesson(lesson); expect((await repo.getLesson(lesson.id))?.title).toBe('New');
       const block = (await repo.getBlock('b-s1-1'))!; await repo.putBlock(block); expect(await repo.getBlock(block.id)).toEqual(block);
+      const assignment = (await repo.getAssignment('asg-stat-1'))!; assignment.title = 'Edited'; await repo.putAssignment(assignment); assignment.title = 'Changed locally';
+      expect((await repo.getAssignment(assignment.id))?.title).toBe('Edited');
+      const submission = { id:'sub-contract',assignmentId:assignment.id,studentId:'u-priya',attempt:1,state:'submitted' as const,text:'Answer',fileId:null,link:'',submittedAt:'2026-09-26T00:00:00Z',grade:null };
+      await repo.putSubmission(submission); expect(await repo.getSubmission(submission.id)).toEqual(submission);
       const announcement = (await repo.getAnnouncement('a-stat-welcome'))!; await repo.putAnnouncement(announcement); expect(await repo.getAnnouncement(announcement.id)).toEqual(announcement);
       const progress = (await repo.getProgress('u-priya','l-stat-1'))!; await repo.putProgress(progress); expect(await repo.getProgress('u-priya','l-stat-1')).toEqual(progress);
       const session = { id: 'bs-x', courseId: 'c-stat110', prompt: 'x', sources: [], stage: 'brief' as const, brief: null, outline: null, lessonIds: [], provenance: null, createdAt: '2026-09-26T00:00:00Z' };
@@ -28,6 +32,13 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect((await repo.listModules('c-stat110')).map(x => x.id)).toEqual(['m-stat-1','m-stat-2']);
       expect((await repo.listLessons({ courseId: 'c-stat110' })).map(x => x.id)).toEqual(['l-stat-1','l-stat-2','l-stat-3']);
       expect((await repo.listBlocks('l-stat-1')).map(x => x.position)).toEqual([0,1,2,3,4]);
+      const seedAssignment = (await repo.getAssignment('asg-stat-1'))!;
+      await repo.putAssignment({ ...seedAssignment,id:'asg-later',position:2 });
+      await repo.putAssignment({ ...seedAssignment,id:'asg-middle',position:1 });
+      expect((await repo.listAssignments({moduleId:'m-stat-1'})).map(x=>x.id)).toEqual(['asg-stat-1','asg-middle','asg-later']);
+      const baseSubmission = {id:'sub-one',assignmentId:'asg-stat-1',studentId:'u-priya',attempt:1,state:'submitted' as const,text:'One',fileId:null,link:'',submittedAt:'2026-09-26T00:00:00Z',grade:null};
+      await repo.putSubmission(baseSubmission); await repo.putSubmission({...baseSubmission,id:'sub-two',attempt:2,text:'Two'});
+      expect((await repo.listSubmissions({assignmentId:'asg-stat-1',studentId:'u-priya'})).map(x=>x.id)).toEqual(['sub-two','sub-one']);
       expect((await repo.listAnnouncements({})).map(x => x.id)).toEqual(['a-stat-draft','a-stat-office','a-comm-reading','a-stat-welcome']);
       const base = { courseId: 'c-stat110', prompt: '', sources: [], stage: 'brief' as const, brief: null, outline: null, lessonIds: [], provenance: null };
       await repo.putBuilderSession({ ...base, id: 'bs-old', createdAt: '2026-01-01T00:00:00Z' });
@@ -48,9 +59,10 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
     it('replaces enrollments and resets from an empty seed', async () => {
       const repo = await makeRepo(); await repo.setEnrollments('c-stat110',['u-priya']);
       expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-priya']);
-      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.builderSessions = [];
+      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.builderSessions = [];
       await repo.reset(empty); expect(await repo.isEmpty()).toBe(true);
       await repo.reset(seedData()); expect(await repo.isEmpty()).toBe(false); expect(await repo.getUser('u-priya')).not.toBeNull();
+      expect(await repo.getAssignment('asg-stat-1')).not.toBeNull();
     });
   });
 }
