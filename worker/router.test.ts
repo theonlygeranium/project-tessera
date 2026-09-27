@@ -409,3 +409,34 @@ describe('format downloads', () => {
     expect(await page.text()).toContain('<h2>Week one</h2>');
   });
 });
+
+describe('journey 6: API', () => {
+  it('an administrator creates a token, a script imports a course, the course appears, and a revoked token gets 401', async () => {
+    const env = testEnv(createTestDb(), assetsFor().fetcher);
+    const admin = { cookie: 'tessera_user=u-admin', 'content-type': 'application/json' };
+    // 1. The administrator creates a token in the app (browser session).
+    const created = await (await call(env, '/api/v1/tokens', { method: 'POST', headers: admin, body: JSON.stringify({ name: 'Catalog sync', scopes: ['courses:read', 'courses:write'], expiresInDays: 30 }) })).json() as { token: { id: string; scopes: string[] }; secret: string };
+    expect(created.secret).toMatch(/^tsk_/);
+    const script = { authorization: `Bearer ${created.secret}`, 'content-type': 'application/json' };
+    // 2. A script imports a course with two modules and a lesson with blocks.
+    const outline = await call(env, '/api/v1/courses/import', { method: 'POST', headers: { ...script, 'idempotency-key': 'import-1' }, body: JSON.stringify({
+      course: { code: 'BIO 105', title: 'Cells and systems', term: 'Spring' },
+      modules: [
+        { title: 'Cells', lessons: [{ title: 'What a cell does', minutes: 15, blocks: [{ type: 'heading', level: 2, text: 'Cells' }, { type: 'text', text: 'Every living thing is made of cells.' }] }] },
+        { title: 'Systems', lessons: [{ title: 'Organs working together', blocks: [] }] },
+      ],
+    }) });
+    expect(outline.status).toBe(200);
+    const body = await outline.json() as { course: { id: string; title: string }; modules: { lessons: unknown[] }[] };
+    expect(body.modules.map((m) => m.lessons.length)).toEqual([1, 1]);
+    // A retried request with the same key replays the first response instead of importing twice.
+    const replay = await call(env, '/api/v1/courses/import', { method: 'POST', headers: { ...script, 'idempotency-key': 'import-1' }, body: '{}' });
+    expect(replay.headers.get('idempotency-replayed')).toBe('true');
+    // 3. The course appears in the app for the administrator.
+    const courses = await (await call(env, '/api/v1/courses', { headers: admin })).json() as { id: string; title: string }[];
+    expect(courses.filter((c) => c.title === 'Cells and systems')).toHaveLength(1);
+    // 4. The token is revoked; the script now gets 401.
+    expect((await call(env, `/api/v1/tokens/${created.token.id}`, { method: 'DELETE', headers: admin })).status).toBe(200);
+    expect((await call(env, '/api/v1/courses', { headers: script })).status).toBe(401);
+  });
+});

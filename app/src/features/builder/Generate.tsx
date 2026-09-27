@@ -95,7 +95,7 @@ export function GeneratePage() {
           </fieldset>
         </section>
         <section aria-labelledby="types-heading" className={styles.stack}><h2 id="types-heading">Element types</h2><fieldset className={styles.fieldset}><legend>Choose what to draft</legend>
-          {CHOICES.map(choice => <label className={styles.choice} key={keyFor(choice)}><input type="checkbox" checked={selectedTypes.includes(choice.label)} onChange={() => setSelectedTypes(current => current.includes(choice.label) ? current.filter(x => x !== choice.label) : [...current.filter(x => !(choice.label === 'Document' && x === 'Video script' || choice.label === 'Video script' && x === 'Document')), choice.label])} /><span><strong>{choice.label}</strong> — {choice.description}</span></label>)}
+          {CHOICES.map(choice => <label className={styles.choice} key={keyFor(choice)}><input type="checkbox" checked={selectedTypes.includes(choice.label)} onChange={() => setSelectedTypes(current => current.includes(choice.label) ? current.filter(x => x !== choice.label) : [...current, choice.label])} /><span><strong>{choice.label}</strong> — {choice.description}</span></label>)}
         </fieldset></section>
         <FormField label="Instruction (optional)" hint="For example: Use examples from nursing.">{control => <TextArea {...control} rows={3} value={instruction} onChange={event => setInstruction(event.target.value)} />}</FormField>
         <p className={styles.summary}>{count} {count === 1 ? 'element' : 'elements'} across {chosen.length} {chosen.length === 1 ? 'lesson' : 'lessons'}</p>

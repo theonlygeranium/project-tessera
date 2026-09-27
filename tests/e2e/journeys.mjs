@@ -376,6 +376,92 @@ await journey("Journey 5c · An instructor can't reach admin pages", async (page
   });
 });
 
+// =======================================================================================
+// Night 2 journeys (plan §8). Persona switches keep the in-memory demo data, so a journey
+// can cross roles in one tab; navigation stays in-app because a reload resets the data.
+async function switchTo(page, name) {
+  await page.getByRole('button', { name: 'Switch persona' }).click();
+  await page.getByRole('button', { name: new RegExp(`^Sign in as ${name},`) }).click();
+}
+
+await journey('Journey 8 · Instructor drafts at scope; a student plays the scenario', async (page) => {
+  await step('Open Generate and choose Module 2 with documents and scenarios', async () => {
+    await page.goto(`${BASE}app/teach/courses/c-stat110/generate?data=mock&as=u-okafor`);
+    await page.getByRole('heading', { level: 1, name: 'Generate lesson drafts' }).waitFor();
+    await page.getByRole('radio', { name: 'Pick modules and lessons' }).check();
+    await page.getByRole('checkbox', { name: 'Describing distributions' }).check();
+    await page.getByRole('checkbox', { name: /^Text/ }).uncheck();
+    await page.getByRole('checkbox', { name: /^Knowledge check/ }).uncheck();
+    await page.getByRole('checkbox', { name: /^Document/ }).check();
+    await page.getByRole('checkbox', { name: /^Scenario/ }).check();
+    await waitForIncludes(page.locator('main'), '2 elements across 1 lesson');
+  });
+  await runAxe(page, 'Journey 8 · Generate');
+  await step('Generate; drafts land and nothing is published', async () => {
+    await page.getByRole('button', { name: 'Generate', exact: true }).click();
+    await waitForIncludes(page.locator('main'), 'Nothing was published.', 20000);
+  });
+  await step('Review the lesson: keep every AI draft and publish', async () => {
+    await page.getByRole('link', { name: 'Center: mean and median' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Center: mean and median' }).waitFor();
+    await keepAllAiBlocks(page);
+    await waitForEnabled(page, 'Publish', 10000);
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await waitForIncludes(page.locator('main'), 'Lesson published.');
+  });
+  await step('As Marcus, open the lesson and play the scenario to an outcome', async () => {
+    await switchTo(page, 'Marcus Bell');
+    await page.getByRole('heading', { level: 1, name: 'Today' }).waitFor();
+    await page.getByRole('navigation', { name: 'Student navigation' }).getByRole('link', { name: 'Courses' }).click();
+    await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.getByRole('link', { name: /Center: mean and median/ }).first().click();
+    await page.getByRole('heading', { level: 1, name: 'Center: mean and median' }).waitFor();
+    await page.getByRole('button', { name: 'State the question.' }).click();
+    await waitForIncludes(page.locator('main'), 'The class uses evidence to support its conclusion.');
+  });
+  await runAxe(page, 'Journey 8 · Scenario outcome');
+});
+
+await journey('Journey 9 · Student submits; instructor grades with an AI feedback draft; student sees the grade', async (page) => {
+  // Demo mode has no file storage, so this journey submits text; file submissions are
+  // covered by the Worker route tests and the preview smoke test.
+  await step('As Marcus, open the assignment from the course page and submit', async () => {
+    await page.goto(`${BASE}app/courses?data=mock&as=u-marcus`);
+    await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.getByRole('link', { name: /Find the statistical question/ }).click();
+    await page.getByRole('heading', { level: 1, name: 'Find the statistical question' }).waitFor();
+    await page.getByLabel('Your response').fill('How many hours of sleep do students in my dorm get on weeknights? Answers will vary from person to person and night to night.');
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await waitForIncludes(page.locator('main'), 'Attempt 1 submitted.');
+  });
+  await step('As Dr. Okafor, grade with the rubric and an AI feedback draft', async () => {
+    await switchTo(page, 'Dr. Amara Okafor');
+    await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Grades' }).click();
+    await page.getByRole('link', { name: 'Find the statistical question' }).click();
+    await page.getByRole('button', { name: /Marcus Bell · attempt 1/ }).click();
+    for (const legend of ['Question', 'Reasoning']) {
+      await page.getByRole('group', { name: legend }).getByRole('radio', { name: /Clear/ }).check();
+    }
+    await page.getByRole('button', { name: 'Draft feedback with AI' }).click();
+    await waitForIncludes(page.locator('main'), 'AI draft added.');
+    await page.getByRole('button', { name: 'Save grade' }).click();
+    await waitForIncludes(page.locator('main'), 'Grade saved.');
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: 'Release grades' }).click();
+    await waitForIncludes(page.locator('main'), 'Grades released.');
+  });
+  await runAxe(page, 'Journey 9 · Grading');
+  await step('As Marcus, see the grade, the rubric result, and the labeled AI feedback', async () => {
+    await switchTo(page, 'Marcus Bell');
+    await page.getByRole('navigation', { name: 'Student navigation' }).getByRole('link', { name: 'Courses' }).click();
+    await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.getByRole('link', { name: /Find the statistical question/ }).click();
+    await waitForIncludes(page.locator('main'), '10 / 10');
+    await waitForIncludes(page.locator('main'), 'Drafted with AI');
+  });
+});
+
 // ---- summary --------------------------------------------------------------------------
 await browser.close();
 server.close();
