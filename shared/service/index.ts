@@ -1,15 +1,14 @@
-// The service: one handler per API operation (shared/api.ts). Lane C1 replaces these
-// stubs with real handlers, split across modules in this folder.
-import { ApiError, ROUTES, type Operation } from '../api';
-import type { Handler, Service } from './context';
+import type { Service } from './context';
+import { session } from './session';
+import { admin } from './admin';
+import { courses } from './courses';
+import { contentHandlers } from './content';
+import { student } from './student';
+import { announcements } from './announcements';
+import { builder } from './builder';
 
-const notImplemented = (op: Operation): Handler<Operation> => async () => {
-  throw new ApiError('conflict', `${op} is not implemented yet`);
-};
-
-export const service = Object.fromEntries(
-  (Object.keys(ROUTES) as Operation[]).map((op) => [op, notImplemented(op)]),
-) as unknown as Service;
-
+export const service: Service = { ...session, ...admin, ...courses, ...contentHandlers, ...student, ...announcements, ...builder };
 export { dispatch } from './context';
 export type { ServiceContext, Service } from './context';
+export { MemoryRepo } from './memory-repo';
+export { validateBlockContent } from './validate';
