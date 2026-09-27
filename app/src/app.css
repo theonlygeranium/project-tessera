@@ -1,4 +1,4 @@
-/* Every color and font comes from design/tokens.json via applyTokens() (D-011). No hex values here. */
+/* Every color and font comes from generated design/tokens.json variables (D-011). No hex values here. */
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--font-sans)}
 a{color:var(--accent);font-weight:600}

@@ -3,8 +3,9 @@
   "private": true,
   "description": "Tooling for the Project Tessera prototype site",
   "scripts": {
+    "predev": "node tools/build_tokens.mjs",
     "dev": "vite --config app/vite.config.ts",
-    "build": "tsc -p app && vite build --config app/vite.config.ts",
+    "build": "node tools/build_tokens.mjs && tsc -p app && vite build --config app/vite.config.ts",
     "a11y": "npm run build && node tools/a11y_audit.mjs"
   },
   "devDependencies": {
