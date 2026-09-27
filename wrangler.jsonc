@@ -11,5 +11,8 @@
     "not_found_handling": "404-page"
   },
   "preview_urls": true,
-  "workers_dev": true
+  "workers_dev": true,
+  // Required by `wrangler preview` (Workers Builds preview builds). Empty because
+  // a static site has no bindings that need preview-specific values.
+  "previews": {}
 }
