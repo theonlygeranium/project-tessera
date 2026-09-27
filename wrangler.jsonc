@@ -7,6 +7,8 @@
   "name": "project-tessera",
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-26",
+  // Local dev runs without Docker; OCR is exercised through its fake binding in tests (D-023).
+  "dev": { "enable_containers": false },
   // D-011: build the Phase 2 React app into docs/app/ before every deploy and
   // preview (Workers Builds, wrangler deploy, wrangler dev). The build output
   // is not committed.
