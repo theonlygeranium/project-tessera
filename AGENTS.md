@@ -20,7 +20,7 @@ Project Tessera is an AI-native LMS prototype. Before editing, read the **Hard r
 - **Don't commit, push, merge, rebase, or delete branches.** Pushing to `main` deploys production immediately and pushing any branch publishes a public preview. Claude verifies your work and then pushes it, usually straight to `main` so the owner can test right away. Leave your changes uncommitted.
 - **Don't delete data or run destructive commands**, and don't change configuration outside this repository (including Cloudflare settings, DNS, and GitHub settings).
 - **Keep public interfaces and documented contracts stable** unless your brief explicitly says to change them. Read docstrings, comments, and `design/DECISIONS.md` for contracts.
-- **Run the verification commands from your brief** and make sure they pass before you finish. If none were given, run `python3 tools/build_docs.py` (if you touched sources) and `npm run a11y` (if you touched UI).
+- **Run the verification commands from your brief** and make sure they pass before you finish. If none were given, run `python3 tools/build_docs.py` if you touched `design/canvas/` or `research/report.md` (on the owner's Mac: `uv run --no-project --python 3.12 --with 'markdown>=3.5' python tools/build_docs.py`). Run `npm run a11y` only when the brief asks for it.
 - **Check the brief item by item before you report.** Go through every requirement in the brief and confirm each one is done. Workers in trials have skipped a requirement and reported the task complete.
 - **If you're blocked or the brief is ambiguous,** stop and explain what's unclear in your report. Don't guess at requirements.
 

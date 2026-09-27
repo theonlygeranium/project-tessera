@@ -16,10 +16,10 @@ Three agents are active. Everything else is on the [bench](#bench) and isn't use
 
 ## Project Tessera specifics
 
-- **Verification means the Definition of done in `CLAUDE.md`,** not just unit tests: `python3 tools/build_docs.py`, `npm run a11y` with zero violations, a local walkthrough of every affected flow (including the prototype's Reset), and screenshots. Claude runs these itself after every delegated task.
+- **Verification follows the deploy lanes in `CLAUDE.md`.** Fast lane (minor changes): Claude reads the worker's diff, rebuilds if sources changed, and pushes to `main`; the `a11y` workflow runs after the push. Full lane (big features, separate work): the whole Definition of done — build, `npm run a11y` with zero violations, a walkthrough of every affected flow including the prototype's Reset, screenshots — then a branch preview before merging.
 - **Owner decisions stay with the owner.** Issues labeled `decision` (starting with #16, the build approach) are never delegated; Claude prepares the options and the owner picks.
 - **Subjective design direction stays with Claude and the owner.** The owner reviews visually. Workers can implement a chosen direction, but alternatives go to the owner side by side (as with D-006).
-- **Rapid production deploys.** Pushing `main` deploys production, and the owner wants verified work live quickly for testing, so Claude pushes to `main` as soon as a change passes verification, without asking first. Branch previews (public URLs) are for risky or large changes. Workers never push; Claude's verification is the gate.
+- **Rapid production deploys.** The owner is the sole developer and tests live. Minor changes go straight to `main` (production) without extensive QA or asking first; branch previews (public URLs) are for big or separate features. Workers never push; Claude reads every diff before pushing.
 - **Nothing confidential under `docs/`** (D-012). This file lives in `handoff/` because it isn't meant for the public site.
 
 ## Principles
@@ -84,9 +84,9 @@ Pick the first row that matches the task.
 ### A. Delegate and verify (default)
 1. Claude writes a task brief (template below) and creates a worktree: `git worktree add ../tessera-<task> -b agent/<task>`.
 2. Claude runs the worker with explicit model and sandbox flags, pointed at the worktree.
-3. Claude reads the full diff, runs `python3 tools/build_docs.py` and `npm run a11y`, walks the affected flows, and probes the edge cases the spec implies (every requirement in the brief, Reset, keyboard paths, 320px reflow, empty or unusual inputs).
+3. Claude reads the full diff and checks every requirement in the brief. Fast lane: rebuild if sources changed, then go to step 5. Full lane: also run the build and `npm run a11y`, walk the affected flows, and probe the edge cases the spec implies (Reset, keyboard paths, 320px reflow, unusual inputs).
 4. If there are problems: send one round of specific feedback to the same worker, or move the task up a tier.
-5. Claude commits and pushes to `main` so the owner can test in production right away (for risky or large changes, push the branch first and check its preview). Then Claude removes the worktree and reports with evidence (checks run, results, tokens, production URL).
+5. Claude commits and pushes to `main` so the owner can test live (full lane: push the branch first and check its preview). Then Claude removes the worktree and reports what changed, the production URL, and the agent, model, time, and tokens.
 
 ### B. Second-opinion review
 1. After Claude or a worker produces a diff, run Codex `gpt-6-astra` in `read-only` mode with a review brief. For high-stakes changes, also run Grok with the same brief.

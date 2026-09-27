@@ -29,13 +29,13 @@ Cursor, the self-hosted Schubert models, and Palmyra-X6 are benched; don't route
 
 **Delegate or do it yourself.** Delegate to Codex `gpt-6-sol` when the spec can be written as a brief with concrete examples, a check (tests, `npm run a11y`, a scripted walkthrough) can verify the result, and writing the brief takes less effort than doing the work. Do it yourself when the task is small, ambiguous, subjective design direction the owner must see, cross-cutting, architectural, or dependent on context that exists only in the conversation. Owner decisions (#16 and anything labeled `decision`) are never delegated.
 
-**Default loop:** plan → Sol implements in a git worktree → you verify (Definition of done steps 2–4, plus edge-case checks) → Astra reviews anything non-trivial → you sort the findings, commit, and push to `main` so the owner can test in production right away.
+**Default loop:** plan → Sol implements in a git worktree → you check it (fast lane: read the diff and rebuild; full lane: Definition of done steps 2–4 plus edge-case checks) → Astra reviews big or risky changes → you commit and push to `main` so the owner can test live.
 
 **Rules when delegating:**
-- Always verify. A worker's summary is a claim, not evidence; in trials workers skipped requirements and reported "no uncertainties". Re-run `python3 tools/build_docs.py` and `npm run a11y` yourself.
+- Always read the worker's diff yourself before pushing. A worker's summary is a claim, not evidence; in trials workers skipped requirements and reported "no uncertainties". For full-lane work, also re-run `python3 tools/build_docs.py` and `npm run a11y` yourself.
 - Codex always runs with `-p tessera` (or `-m <model>` plus `-s read-only`/`-s workspace-write`), `--ephemeral`, and `-C <worktree>`. The owner's global Codex default is `danger-full-access` and must never apply to delegated runs.
 - Grok always runs with `--sandbox workspace` and `--cwd <worktree>`; `--always-approve` only together with `--sandbox`.
-- **Rapid production deploys.** The owner wants verified work live quickly for testing: once a change passes your verification, push it to `main` without asking first. Use a branch preview first only for risky or large changes. Workers never commit or push; your verification is the gate. Destructive actions (force pushes, deleting branches, Cloudflare or DNS changes) still need the owner's confirmation.
+- **Deploy by lane** (see "Deploy lanes" below). Minor delegated changes: read the diff, rebuild if needed, push to `main`. Big features: full Definition of done and a branch preview first. Workers never commit or push; you do.
 - Report agent, model, time, and tokens for each delegated run, and record what you learn in `handoff/AGENT-ECOSYSTEM.md`.
 
 ## Repo map
@@ -69,7 +69,14 @@ npm install                                            # once (Node 18+) (PLAYWR
 npm run a11y                                           # must print "N/N pass"; in Claude cloud sessions: CHROMIUM=/opt/pw-browsers/chromium npm run a11y
 ```
 
-## Definition of done for any change
+## Deploy lanes (owner's standing preference)
+The owner is the sole developer and tests changes live. Pick the lane before starting.
+
+- **Fast lane: any normal, minor change** (copy, styling tweaks, a fix in one screen or the prototype, small doc updates). Edit the source, run `python3 tools/build_docs.py` if you touched `design/canvas/` or `research/report.md` (the site serves the committed build output, so the change won't show otherwise), commit, and **push to `main` right away** without asking. Skip the local audit, walkthrough, and screenshots. The `a11y` workflow runs on every push; if it fails, tell the owner and fix it in a follow-up.
+- **Full lane: big features or separate, self-contained work** (a new flow, a new screen, the build-approach migration, anything touching many files). Follow the Definition of done below, push a branch, check its preview, then merge to `main`.
+- **Either lane:** destructive actions (force pushes, deleting branches or data, Cloudflare or DNS changes) still need the owner's confirmation, and nothing confidential goes under `docs/` (D-012).
+
+## Definition of done (full lane)
 1. Edit the source (`design/canvas/…`, `docs/prototype/…`, `research/report.md`).
 2. Run `python3 tools/build_docs.py`.
 3. Run `npm run a11y` and get **zero violations**. If you add a new page, screen state, or prototype step, add it to `tools/a11y_audit.mjs`.
@@ -127,7 +134,9 @@ If you can't reach the canvas, say in your handoff that it's behind the repo.
 - Codex CLI is bundled with ChatGPT.app at `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`; Grok CLI is at `~/.grok/bin/grok`. Both are signed in with the owner's subscriptions.
 - Run Codex and Grok with the Bash sandbox off (`dangerouslyDisableSandbox: true`) and their own sandbox on. Codex can't reach its API through the Claude Code sandbox proxy, and Grok's sandbox can't start nested inside Claude's. Git writes to `.git` also need the Bash sandbox off.
 - Permissions, sandbox allowances, and an `autoMode.allow` rule for delegated runs are in `.claude/settings.local.json` (machine-specific, not committed). The Codex project profile is `~/.codex/tessera.config.toml`.
-- Create worktrees with `git worktree add ../tessera-<task> -b agent/<task>`, and remove them when done.
+- Create worktrees with `git worktree add ../tessera-<task> -b agent/<task>`, and remove them when done. A new worktree has no `node_modules`; run `npm install` there (or symlink it) before `npm run a11y`.
+- The Mac's default `python3` is 3.9 (the build needs 3.10+), and Homebrew's `python3.12` refuses global installs (PEP 668). Build with: `uv run --no-project --python 3.12 --with 'markdown>=3.5' python tools/build_docs.py`. Verified 2026-09-26: the output is identical to the committed `docs/`.
+- `npm run a11y` works locally with the Playwright-managed Chromium (45/45 pass on 2026-09-26). No `CHROMIUM=` override is needed on the Mac.
 
 ## Working with the owner
 - Be direct. Lead with the result, then the reasoning. No praise or filler.
