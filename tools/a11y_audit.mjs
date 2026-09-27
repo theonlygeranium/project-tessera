@@ -50,6 +50,14 @@ for (const s of screens) {
   const styles = AI_SCREENS.has(s.slug) ? STYLES : ['marginalia'];
   for (const st of styles) targets.push({ name: `Screen · ${s.title}${styles.length > 1 ? ` · ${st}` : ''}`, url: `${s.file}?ai=${st}` });
 }
+// Storybook (D-011, #17): every story, in the default AI style, from the built index.
+const sbIndex = join(DOCS, 'storybook', 'index.json');
+if (existsSync(sbIndex)) {
+  const { entries } = JSON.parse(await readFile(sbIndex, 'utf8'));
+  for (const e of Object.values(entries)) {
+    if (e.type === 'story') targets.push({ name: `Story · ${e.title} · ${e.name}`, url: `storybook/iframe.html?id=${e.id}&viewMode=story`, settle: 900 });
+  }
+}
 const proto = (st) => [
   { name: `Prototype · Today · ${st}`, url: `prototype/?ai=${st}#today` },
   { name: `Prototype · Lesson + tutor · ${st}`, url: `prototype/?ai=${st}#today`, steps: async (p) => {
@@ -75,7 +83,7 @@ for (const t of targets) {
   const page = await browser.newPage({ viewport: t.viewport || { width: 1600, height: 1000 } });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
   await page.goto(BASE + t.url);
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(t.settle || 400);
   if (t.steps) await t.steps(page);
   await page.addScriptTag({ content: AXE });
   const r = await page.evaluate(async (tags) => {
