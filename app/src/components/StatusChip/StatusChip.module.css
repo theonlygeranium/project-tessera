@@ -1,0 +1,17 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font: 600 12px/1.4 var(--font-sans);
+  white-space: nowrap;
+}
+.icon { display: inline-flex; align-items: center; justify-content: center; }
+.neutral { color: var(--ink-3); background: var(--surface-sunk); }
+.accent { color: var(--accent); background: var(--accent-soft); }
+.ai { color: var(--ai-strong); background: var(--ai-soft); }
+.success { color: var(--success-text); background: var(--success-soft); }
+.warning { color: var(--warning-text); background: var(--warning-soft); }
+.error { color: var(--error-text); background: var(--error-soft); }

@@ -1,0 +1,24 @@
+.card {
+  box-sizing: border-box;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 var(--size-text-learner)/1.5 var(--font-sans);
+}
+.learner { padding: 16px; }
+.compact { padding: 12px; font-size: var(--size-text-compact); }
+.quiet { background: var(--surface-alt); }
+.interactive { padding: 0; }
+.interactive:hover, .interactive:focus-within { border-color: var(--accent); }
+.link {
+  display: block;
+  border-radius: inherit;
+  padding: 16px;
+  color: var(--ink);
+  font: inherit;
+  text-decoration: none;
+}
+.compact .link { padding: 12px; }
+.link:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
