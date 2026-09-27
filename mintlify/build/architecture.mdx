@@ -1,0 +1,42 @@
+---
+title: "Architecture"
+description: "How Tessera is built and deployed today, and how it grows into a full-stack app."
+---
+
+## Today
+
+Tessera is a static site served by a single Cloudflare Worker.
+
+| Part | What it is |
+|---|---|
+| **Screens** | Eight design artboards, converted to standalone pages. |
+| **Clickable prototype** | A hand-written learner flow in plain HTML, CSS, and JavaScript. No network calls, no storage. |
+| **Component app** | The Phase 2 app at [`/app/`](https://tessera.edstratumlabs.ai/app/): Vite, React, and TypeScript. Every color and typeface comes from the design tokens. |
+| **Hosting** | Cloudflare Workers static assets. Every push to the main branch deploys production; every other branch gets its own preview address. |
+
+## How changes ship
+
+Minor changes go straight to production and are live within about a minute. Big features are built on a branch, checked on that branch's preview address, and then merged. The accessibility audit runs on every push.
+
+Cloudflare builds the component app on every push, so build output is never committed.
+
+## Toward a full-stack app
+
+Tessera is meant to grow into a full-stack product with accounts, a database, and real AI calls, without a rewrite. The foundations that keep that path short:
+
+<AccordionGroup>
+  <Accordion title="One Cloudflare Worker" icon="server">
+    The Worker that serves the site today can also run application code. An `/api` layer, a database (D1), file storage for uploaded course material (R2), and AI calls (Workers AI or AI Gateway) are added to the same deployment, next to the static site and the app.
+  </Accordion>
+  <Accordion title="A data layer between screens and data" icon="layer-group">
+    Components get data through one small, typed interface, backed by sample data now and by API calls later. Components don't change when the data becomes real.
+  </Accordion>
+  <Accordion title="Shared types for the domain" icon="code">
+    The course → module → lesson → block structure, the tutor modes, and the AI draft states are TypeScript types that the future API reuses.
+  </Accordion>
+  <Accordion title="Policies modeled as data" icon="shield-halved">
+    AI drafts with provenance, tutor modes, and "who sees what" are data from the start, so the server can enforce them later instead of leaving them as interface-only behavior.
+  </Accordion>
+</AccordionGroup>
+
+When the API exists, its reference documentation will live here.

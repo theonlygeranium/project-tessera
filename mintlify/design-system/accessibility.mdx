@@ -1,0 +1,18 @@
+---
+title: "Accessibility"
+description: "WCAG 2.2 AA across the interface and generated content."
+---
+
+Tessera targets WCAG 2.2 AA, above the WCAG 2.1 AA floor that the U.S. ADA Title II rule sets for public institutions (compliance deadlines in April 2027 and April 2028). Accessibility applies to AI-generated content too: the generator must produce headings, alt text, captions, and sufficient contrast by default.
+
+## The bar
+
+- **Zero automated violations.** An axe-core audit (WCAG 2.0, 2.1, and 2.2, levels A and AA) runs against every page, every screen in every AI style, and every state of the clickable prototype. It also checks that pages reflow at 320 CSS pixels without horizontal scrolling.
+- **Real controls.** Real `<button>`, `<a href>`, and `<input>` with `<label>` elements, even in static mockups. Icon-only buttons have an accessible name.
+- **Contrast and size.** Text contrast of at least 4.5:1. Learner touch targets of at least 44 pixels; compact instructor surfaces at least 28 pixels (the WCAG 2.2 minimum is 24).
+- **Keyboard paths.** Visible focus everywhere, and focus returns to the control that opened a panel.
+- **Color is never the only signal.** Semantic states differ in lightness as well as hue, and AI review state is spelled out in words.
+
+## How it's checked
+
+The audit runs automatically on every push. Automated tools catch roughly a third to half of accessibility problems, so keyboard walkthroughs and a screen-reader pass (VoiceOver and NVDA) are part of Phase 2.

@@ -1,0 +1,47 @@
+---
+title: "Design principles"
+description: "The evidence behind Tessera's design, and the rules it turns into."
+---
+
+Tessera's design comes from a research report covering learning-experience design, LMS usability benchmarks, why Canvas leads the market, evidence on AI tutors and AI-assisted authoring, and learner personas. The full report, with all 72 sources, is on the live site: [research report](https://tessera.edstratumlabs.ai/research.html).
+
+## The thesis
+
+1. **Borrow Canvas's backbone, not its surface.** Canvas leads North American higher education on structure (modules, fast grading, reliability, integrations), not on measured usability: faculty rated it 68.9 on the System Usability Scale, about average. A calmer interface on the same backbone has room to win.
+2. **AI is a governed co-author and a hint-first tutor.** In a field experiment, unguarded GPT-4 raised practice scores but lowered exam scores; a tutor that gave hints instead of answers avoided that harm (Bastani et al., *PNAS*, 2025). A carefully scaffolded AI tutor doubled median learning gains over an active-learning class (Kestin et al., *Scientific Reports*, 2025).
+3. **Personalize on evidence, not "learning styles."** Style-matching lacks the evidence it needs (Pashler et al., 2008; a 2024 meta-analysis found the required pattern in only 26% of outcomes). Tessera personalizes on goals, time, prior knowledge, language, accessibility, device, and role.
+4. **Agents propose, people apply.** Bulk or agentic actions appear as previewable change sets.
+5. **Quality and accessibility are checked before publishing,** including AI-generated content.
+
+## The 15 principles
+
+| # | Principle |
+|---|---|
+| 1 | Modules are the single canonical course spine. AI edits it and never bypasses it. |
+| 2 | The next action is one click from login, and one Today list spans all courses and paths. |
+| 3 | Institution and program templates enforce consistency across courses. |
+| 4 | Lessons are chunked with time estimates and embedded retrieval checks. |
+| 5 | The tutor is hint-first, grounded in course sources, and bound by instructor policy. |
+| 6 | AI output is a labeled draft with provenance, a diff, and revert, and a person approves it. |
+| 7 | The system explains its adaptations and offers undo. |
+| 8 | AI capabilities and limits are disclosed, with no sparkle-only AI cues. |
+| 9 | Personalization uses evidence-based variables, never learning styles. |
+| 10 | WCAG 2.2 AA holds across the interface and generated content. |
+| 11 | Agentic actions are previewable change sets. |
+| 12 | A quality and alignment linter runs before publishing. |
+| 13 | Interoperability covers LTI 1.3, SIS/HRIS, SCORM, xAPI, cmi5, open APIs, and MCP. |
+| 14 | AI governance is visible: models, data residency, retention, logs, FERPA/GDPR. |
+| 15 | Features are measured against learning outcomes, not engagement alone. |
+
+## The tutor modes
+
+Instructors choose a tutor mode for each activity, within limits an administrator sets for each program.
+
+| Mode | What the tutor does |
+|---|---|
+| **Off** | No tutor on this activity. |
+| **Hints** | Questions and hints only. Never gives answers. |
+| **Explain** | Explains concepts and examples, not item answers. |
+| **Open** | Answers directly. Practice only. |
+
+The answer key is never a tutor source. Learners always see which mode is on, who set it, and what their instructor can see.

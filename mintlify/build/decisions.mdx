@@ -1,0 +1,42 @@
+---
+title: "Decisions"
+description: "Settled decisions that act as constraints on Tessera's design and build."
+---
+
+Tessera keeps a decision log. Accepted decisions are constraints: changing one takes a new decision that supersedes it, not an edit to the old one.
+
+| ID | Decision | Status |
+|---|---|---|
+| D-001 | "Tessera" is a working codename, not the product name | Accepted |
+| D-002 | Borrow Canvas's backbone: modules are the spine | Accepted |
+| D-003 | AI is a governed co-author and a hint-first tutor; drafts never auto-publish | Accepted |
+| D-004 | Personalize on evidence-based variables; no "learning styles" | Accepted |
+| D-005 | Tutor modes (Off, Hints, Explain, Open) and who controls them | Accepted |
+| D-006 | AI visual language: Marginalia; no stripes, sparkles, or gradients | Accepted |
+| D-007 | Visual system: paper, ink, one teal accent, violet for AI; Fraunces and IBM Plex | Accepted |
+| D-008 | Hosting on GitHub Pages | Superseded by D-012 |
+| D-009 | The repository is the source of truth; the design canvas mirrors it | Accepted |
+| D-010 | Accessibility bar: WCAG 2.2 AA, zero automated violations, 320px reflow | Accepted |
+| D-011 | Phase 2 build approach: a Vite + React component app built by Cloudflare, growing into a full-stack app | Accepted |
+| D-012 | Hosting: Cloudflare Workers static assets, deploy on push, a preview address per branch | Accepted |
+| D-013 | Deploy lanes: minor changes go straight to production; big features get a full check and a preview first | Accepted |
+
+## The ones that shape every screen
+
+<AccordionGroup>
+  <Accordion title="D-002 · Modules are the spine">
+    One course → module → lesson → block hierarchy everywhere. Grading shows the submission and rubric side by side, and a unified Today list is the entry point. AI features edit this structure and never create a parallel one.
+  </Accordion>
+  <Accordion title="D-003 · AI drafts, people publish">
+    Every AI output is a labeled draft with its source, a diff, and Accept, Revert, and Regenerate. A person must mark it kept before learners see it. Agentic bulk actions appear as previewable change sets. The tutor gives hints and worked parallel examples, not answers, unless policy allows.
+  </Accordion>
+  <Accordion title="D-004 · Personalize on evidence">
+    Personalize on goals, role, time, prior knowledge, language and reading level, accessibility, device, and bandwidth. Offer every format to everyone, and show every adaptation with a reason and an Undo.
+  </Accordion>
+  <Accordion title="D-005 · Tutor modes and control">
+    Administrators set limits per program; instructors choose a mode per activity within them, and locked options say why. The answer key is never a tutor source. Instructors see per-learner summaries; full transcripts open only from a submission.
+  </Accordion>
+  <Accordion title="D-011 · Component app, then full stack">
+    Phase 2 builds a React component app with shared design tokens and Storybook. It's designed to grow into a full-stack app on the same Cloudflare deployment. See [architecture](/build/architecture).
+  </Accordion>
+</AccordionGroup>

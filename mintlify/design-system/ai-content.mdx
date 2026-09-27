@@ -1,0 +1,50 @@
+---
+title: "Marking AI content"
+description: "One markup contract for everything the AI writes, and the Marginalia style that renders it."
+---
+
+Every piece of AI-produced content in Tessera, whether a tutor reply, a drafted course block, or a summary, uses the same markup. The markup says what the content is; a switchable stylesheet decides how it looks.
+
+## The markup contract
+
+```html
+<div class="ai ai--chat">                       <!-- tutor or co-author message -->
+<div class="ai ai--note">                       <!-- summary, AI feedback, insight card -->
+<div class="ai ai--block" data-state="draft">   <!-- authored content block; "kept" once reviewed -->
+  <div class="ai-who">Course tutor <span class="ai-src">· hint 1 of 2</span></div>
+  <div class="ai-body">Text…<sup class="ai-ref">1</sup></div>
+  <div class="ai-cites"><span class="ai-cite" data-n="1">Week 3 slides, p. 4</span></div>
+  <div class="ai-actions">…</div>
+</div>
+```
+
+Every style keeps these rules:
+
+- A text label (`.ai-who`) is always visible and says what the AI is and what it's working from, for example "AI draft · from Week3_slides.pdf p. 4–7".
+- Sources are always shown.
+- Review state (`data-state="draft"` or `"kept"`) is legible without relying on color.
+
+## Marginalia, the current style
+
+The AI writes the way a scholar annotates a book: in the margin, with no box and no stripe.
+
+- A **gutter glyph** in violet marks who is speaking: ※ for the tutor and co-author, ¶ for drafted content blocks, † for summaries and insights.
+- The **attribution** is set in small caps in Fraunces.
+- The **body** is set in the reading serif, so AI text reads differently from interface text (IBM Plex Sans) even in grayscale.
+- **Sources** are numbered footnotes, with superscript markers in the text.
+- **Review state** is spelled out in words ("not yet reviewed", "· kept").
+
+<Warning>
+  Never use a sparkle icon, a colored left stripe, or a gradient to signal AI. Research by Nielsen Norman Group found no participant associated the sparkle icon with AI, and the colored left-stripe card was rejected as generic.
+</Warning>
+
+## Alternative styles
+
+Three more styles are kept and can be switched in: **index tab**, **perforated slip**, and **Tessera tiles**. Add `?ai=tabs`, `?ai=perforated`, or `?ai=tiles` to any page on the live site to preview one, or compare them all on the [AI style exploration page](https://tessera.edstratumlabs.ai/explorations/ai-voice.html).
+
+## Draft-first behavior
+
+- AI output lands as a **draft** with Accept, Revert, and Regenerate. A person must mark it kept before learners see it.
+- A **review-coverage meter** shows what share of AI blocks a person has checked.
+- **Adaptive choices** show a one-line reason and an Undo, for example "Moved up because it is due in 26 hours".
+- **Bulk changes** from the command palette appear as a change set: what the values were, what they'll be, how many learners are affected, and any conflicts, before Apply.

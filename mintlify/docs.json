@@ -1,0 +1,63 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "Project Tessera",
+  "description": "Documentation for Project Tessera, a research-grounded prototype of an AI-native learning management system for higher education and industry.",
+  "colors": {
+    "primary": "#0E6B63",
+    "light": "#E3F0EE",
+    "dark": "#0A4F49"
+  },
+  "background": {
+    "color": {
+      "light": "#F4F1EB",
+      "dark": "#1C1B19"
+    }
+  },
+  "fonts": {
+    "heading": { "family": "Fraunces", "weight": 500 },
+    "body": { "family": "IBM Plex Sans" }
+  },
+  "favicon": "/images/favicon.svg",
+  "logo": {
+    "light": "/images/logo-light.svg",
+    "dark": "/images/logo-dark.svg",
+    "href": "https://tessera.edstratumlabs.ai/"
+  },
+  "navbar": {
+    "links": [
+      { "label": "Live site", "href": "https://tessera.edstratumlabs.ai/" }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Try the prototype",
+      "href": "https://tessera.edstratumlabs.ai/prototype/"
+    }
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start here",
+        "pages": ["index", "principles", "roadmap"]
+      },
+      {
+        "group": "Design system",
+        "pages": [
+          "design-system/tokens",
+          "design-system/ai-content",
+          "design-system/accessibility"
+        ]
+      },
+      {
+        "group": "Building Tessera",
+        "pages": ["build/architecture", "build/decisions"]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {}
+  },
+  "seo": {
+    "indexing": "navigable"
+  }
+}
