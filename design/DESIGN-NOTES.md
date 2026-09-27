@@ -50,7 +50,7 @@ AI content uses one markup contract and a switchable visual style. The current s
 ```
 
 **Marginalia rules.** The AI writes the way a scholar annotates a book. There's no box and no stripe.
-- A gutter glyph in `ai` violet marks who is speaking: ※ for the tutor and co-author, ¶ for drafted content blocks, † for summaries and insights.
+- A gutter mark in `ai` violet marks who is speaking (D-018), drawn as one family of proofreader's marks on a faint baseline: a **comment balloon** for the tutor and co-author, a **pilcrow** for drafted content blocks, and a **caret** ("text inserted here") for notes, summaries, and announcement drafts. Never a dagger or cross shape, a sparkle, or a gradient.
 - The attribution (`.ai-who`) is set in Fraunces small caps and says what the AI is and what it is working from ("course tutor · hint 1 of 2", "AI draft · from Week3_slides.pdf p. 4–7").
 - The body is set in the reading serif, so AI text reads differently from human UI text (Plex Sans) even in grayscale.
 - Sources are numbered footnotes, with superscript markers in the text and a dotted rule above the note list.

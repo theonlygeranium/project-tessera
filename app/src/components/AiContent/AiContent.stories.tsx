@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Everything the AI produces uses this one markup contract (D-006). The look follows the AI style in the toolbar: Marginalia is current; tabs, perforated, and tiles are kept as alternatives. Every instance names what the AI is and what it is working from, and drafted blocks say "not yet reviewed" until a person keeps them (D-003).',
+          'Everything the AI produces uses this one markup contract (D-006). The look follows the AI style in the toolbar: Marginalia is current, with a drawn gutter mark for each kind (D-018): a comment balloon for chat, a pilcrow for blocks, and a caret for notes. Tabs, perforated, and tiles are kept as alternatives. Every instance names what the AI is and what it is working from, and drafted blocks say "not yet reviewed" until a person keeps them (D-003).',
       },
     },
   },

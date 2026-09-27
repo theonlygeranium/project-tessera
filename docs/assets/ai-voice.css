@@ -36,9 +36,14 @@ sup.ai-ref{display:none}
    The AI writes in the margin: reading serif, a gutter glyph, small-caps
    attribution, and numbered footnotes. No box, no stripe. */
 [data-ai-style="marginalia"] .ai{display:grid;grid-template-columns:22px minmax(0,1fr);column-gap:10px;row-gap:4px;align-content:start}
-[data-ai-style="marginalia"] .ai::before{content:"\203B";grid-column:1;grid-row:1/span 6;font-family:var(--ai-serif);font-style:italic;font-size:21px;line-height:1.05;color:var(--ai);text-align:center}
-[data-ai-style="marginalia"] .ai--block::before{content:"\00B6"}
-[data-ai-style="marginalia"] .ai--note::before{content:"\2020"}
+/* Gutter marks (D-018): a family of proofreader's marks, drawn with one hand-inked stroke
+   and resting on a faint baseline. Balloon = tutor or co-author (chat), pilcrow = drafted
+   content block, caret = inserted note or summary. Masks take the AI violet. */
+[data-ai-style="marginalia"]{--mg-chat:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cpath d=%22M12.2 4.3c4.2 0 7.3 2.3 7.3 5.3s-3.1 5.3-7.3 5.3c-.9 0-1.8-.1-2.6-.3l-3.4 1.9.9-3.1c-1.4-1-2.3-2.3-2.3-3.8 0-3 3.2-5.3 7.4-5.3Z%22 fill=%22%23000%22 fill-opacity=%22.14%22 stroke=%22%23000%22 stroke-width=%221.8%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M8.5 20h7%22 stroke=%22%23000%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 opacity=%22.45%22/%3E%3C/svg%3E");--mg-block:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cpath d=%22M13.1 5H9.6a3.4 3.4 0 0 0 0 6.8h3.5%22 fill=%22%23000%22 fill-opacity=%22.14%22/%3E%3Cpath d=%22M18 5H9.6a3.4 3.4 0 0 0 0 6.8h3.5M13.1 5v11.4M16.2 5v11.4%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%221.8%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M8.5 20h7%22 stroke=%22%23000%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 opacity=%22.45%22/%3E%3C/svg%3E");--mg-note:url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Cpath d=%22M5 15.6C8 13.3 10 9.5 12 5.6c2 3.9 4 7.7 7 10%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%221.9%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/%3E%3Cpath d=%22M8.5 20h7%22 stroke=%22%23000%22 stroke-width=%221.4%22 stroke-linecap=%22round%22 opacity=%22.45%22/%3E%3C/svg%3E")}
+[data-ai-style="marginalia"] .ai::before{content:"";display:block;width:20px;height:20px;margin:1px auto 0;grid-column:1;grid-row:1/span 6;background:var(--ai);-webkit-mask:var(--mg-chat) no-repeat center/contain;mask:var(--mg-chat) no-repeat center/contain}
+[data-ai-style="marginalia"] .ai--block::before{-webkit-mask-image:var(--mg-block);mask-image:var(--mg-block)}
+[data-ai-style="marginalia"] .ai--note::before{-webkit-mask-image:var(--mg-note);mask-image:var(--mg-note)}
+@media (forced-colors:active){[data-ai-style="marginalia"] .ai::before{forced-color-adjust:none;background:CanvasText}}
 [data-ai-style="marginalia"] .ai>*{grid-column:2}
 [data-ai-style="marginalia"] .ai-who{font-family:var(--ai-serif);font-size:13px;font-weight:500;font-variant:small-caps;letter-spacing:.05em;color:var(--ai-d)}
 [data-ai-style="marginalia"] .ai-src{font-style:italic;font-variant:normal;letter-spacing:0;color:var(--ai-muted)}

@@ -98,7 +98,7 @@ The owner is the sole developer and tests changes live. Pick the lane before sta
 
 ## Hard rules (from DECISIONS.md)
 - **AI content** always uses the markup contract (`.ai.ai--chat|note|block`, `.ai-who`, `.ai-src`, `.ai-body`, `sup.ai-ref`, `.ai-cites > .ai-cite[data-n]`, `.ai-actions`; `data-state="draft|kept"` on blocks).
-  - Never use sparkle icons or gradients to signal AI (D-006).
+  - Never use sparkle icons or gradients to signal AI (D-006). Marginalia's gutter marks are the drawn balloon, pilcrow, and caret (D-018); never a dagger or cross shape.
 - **No colored edge stripes on anything** (D-017): no accent `border-left`, no `inset Npx 0` box-shadow bars, on any element, for any purpose (current items, callouts, cards, AI). Show state with fills, weight, text, or Tessera's markers. `npm test` fails on a stripe.
   - Every AI element names what it is and its source.
 - **AI drafts never auto-publish.** A person marks them kept. Agentic actions are previewable change sets (D-003).

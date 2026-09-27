@@ -21,6 +21,7 @@ Settled decisions for Project Tessera, with the reason for each. Agents should t
 | D-015 | Platform LLM: WRITER Palmyra-X6 through Cloudflare AI Gateway, with a deterministic fixture provider | Accepted | 2026-09-27 |
 | D-016 | Night 1 scope and milestone model: "Night N" coordinated releases for administrator, instructor, and student | Accepted | 2026-09-27 |
 | D-017 | No colored edge stripes on any element, for any purpose | Accepted | 2026-09-27 |
+| D-018 | Marginalia gutter marks become a drawn proofreader's family: balloon, pilcrow, caret | Accepted | 2026-09-27 |
 
 ---
 
@@ -60,7 +61,7 @@ Screens: `TutorSettings.dc.html`, `AdminConsole.dc.html`.
 
 ### D-006 · AI visual language: Marginalia
 The owner rejected the colored left-stripe card as "AI slop." Four alternatives were explored (`docs/explorations/ai-voice.html`) and the owner chose **Marginalia**:
-- a gutter glyph: ※ for the tutor and co-author, ¶ for drafted blocks, † for summaries
+- a gutter glyph: ※ for the tutor and co-author, ¶ for drafted blocks, † for summaries *(superseded by D-018: drawn balloon, pilcrow, and caret marks)*
 - a small-caps serif attribution naming the source
 - serif body text
 - numbered footnotes for sources
@@ -178,4 +179,15 @@ Extends D-006 from AI content to the whole product. The owner rejected the color
 - 1 px neutral borders (`--line` family) that separate panels or outline a whole box are layout, not stripes, and stay allowed.
 - State (current, selected, warning, pinned, AI) is shown with fills, type weight, text, and shape. The current item in navigation and outlines is a **lifted tile**: white surface, full 1px outline, bold text (owner's choice, option B in `design/explorations/current-marker.md`).
 - `npm test` enforces it: `tools/no-stripes.test.ts` scans every stylesheet and artboard and fails on an edge stripe.
+
+### D-018 · Marginalia marks: a proofreader's family
+Supersedes the gutter glyphs listed in D-006 (※, ¶, †); the rest of D-006 stands. The owner found that the footnote dagger (†) on AI notes reads as a religious cross. After two rounds of options (`design/explorations/current-marker.md` records the process for the current-item marker; the glyph rounds were shown as rendered images in the session), the owner chose the proofreader's caret for notes and asked for matching chat and block marks.
+**Decision:**
+- The Marginalia gutter marks are drawn SVG marks, one hand-inked stroke with round ends, each resting on a faint baseline, in the AI violet (`--ai`):
+  - **Balloon** (a marginal comment balloon): tutor and co-author messages, `.ai--chat`.
+  - **Pilcrow** (redrawn "new paragraph"): drafted content blocks, `.ai--block`.
+  - **Caret** (the proofreader's "text inserted here"): notes, summaries, and announcement drafts, `.ai--note`.
+- They're CSS masks in `docs/assets/ai-voice.css` (`--mg-chat`, `--mg-block`, `--mg-note`), so the app, Storybook, the Phase 1 screens, and the prototype all change together. In forced-colors mode they render in `CanvasText`.
+- Never use a cross- or dagger-like shape, a sparkle or star, or a gradient as an AI mark (D-006, D-017).
+- `docs/explorations/ai-voice.html` stays as the historical record of D-006 and still shows the old glyphs.
 
