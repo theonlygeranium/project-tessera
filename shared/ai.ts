@@ -4,7 +4,7 @@
 // the a11y audit, docs screenshots, and local development without a key.
 //
 // Whatever a client returns is stored as a *draft*; a person keeps it (D-003).
-import type { BlockContent, CourseBrief, OutlineDraft, SourceDoc } from './domain';
+import type { BlockContent, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc } from './domain';
 
 export interface AiTasks {
   brief: {
@@ -35,6 +35,10 @@ export interface AiTasks {
     input: { courseTitle: string; instructorName: string; prompt: string };
     output: { title: string; body: string };
   };
+  feedback: {
+    input: { courseTitle: string; assignmentTitle: string; rubric: RubricCriterion[]; criteria: { criterionId: string; levelId: string; points: number; comment: string }[]; submissionText: string };
+    output: { feedback: string };
+  };
 }
 
 export type AiTaskName = keyof AiTasks;
@@ -63,6 +67,7 @@ export const fixtureAi: AiClient = {
 };
 
 const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  feedback: ({ criteria }) => ({ feedback: `You met ${criteria.length} rubric ${criteria.length === 1 ? 'criterion' : 'criteria'}. Review the rubric comments and revise one specific part of your work.` }),
   brief: ({ courseTitle, prompt }) => ({
     audience: /graduate|master/i.test(prompt) ? 'Graduate students new to the topic' : 'First-year undergraduates with no prior background',
     outcomes: [

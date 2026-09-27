@@ -1,0 +1,9 @@
+.page { display: grid; gap: var(--space-6, 1.5rem); min-width: 0; }
+.stack { display: grid; gap: var(--space-4, 1rem); min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: var(--space-3, .75rem); align-items: center; }
+.columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5, 1.25rem); }
+.panel { min-width: 0; padding: var(--space-4, 1rem); border: 1px solid var(--line); border-radius: var(--radius-md, .5rem); }
+.list { display: grid; gap: var(--space-4, 1rem); padding: 0; list-style: none; }
+.block { white-space: pre-wrap; overflow-wrap: anywhere; }
+.muted { color: var(--ink-2); }
+@media (max-width: 899px) { .columns { grid-template-columns: 1fr; } }

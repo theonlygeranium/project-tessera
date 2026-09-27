@@ -1,4 +1,4 @@
-import type { Announcement, Block, BuilderSession, Course, Institution, Lesson, Module, User, ApiToken } from '../domain';
+import type { Announcement, Assignment, Block, BuilderSession, Course, Institution, Lesson, Module, Submission, User, ApiToken } from '../domain';
 import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress } from '../repo';
 import type { SeedData } from '../seed';
 
@@ -55,6 +55,20 @@ export class MemoryRepo implements Repo {
   }
   async putBlock(value: Block) { this.upsert(this.data.blocks, value); }
   async deleteBlock(id: string) { this.data.blocks = this.data.blocks.filter(x => x.id !== id); }
+  async getAssignment(id: string): Promise<Assignment | null> { return copy(this.data.assignments.find(x => x.id === id) ?? null); }
+  async listAssignments(filter: { courseId?: string; moduleId?: string }): Promise<Assignment[]> {
+    const positions = new Map(this.data.modules.map(x => [x.id, x.position]));
+    return copy(this.data.assignments.filter(x => (!filter.courseId || x.courseId === filter.courseId) && (!filter.moduleId || x.moduleId === filter.moduleId))
+      .sort((a,b) => (positions.get(a.moduleId) ?? 0) - (positions.get(b.moduleId) ?? 0) || a.position - b.position || a.id.localeCompare(b.id)));
+  }
+  async putAssignment(value: Assignment) { this.upsert(this.data.assignments, value); }
+  async deleteAssignment(id: string) { this.data.assignments = this.data.assignments.filter(x => x.id !== id); this.data.submissions = this.data.submissions.filter(x => x.assignmentId !== id); }
+  async getSubmission(id: string): Promise<Submission | null> { return copy(this.data.submissions.find(x => x.id === id) ?? null); }
+  async listSubmissions(filter: { assignmentId?: string; studentId?: string }): Promise<Submission[]> {
+    return copy(this.data.submissions.filter(x => (!filter.assignmentId || x.assignmentId === filter.assignmentId) && (!filter.studentId || x.studentId === filter.studentId))
+      .sort((a,b) => a.studentId.localeCompare(b.studentId) || b.attempt - a.attempt || b.submittedAt.localeCompare(a.submittedAt)));
+  }
+  async putSubmission(value: Submission) { this.upsert(this.data.submissions, value); }
   async getAnnouncement(id: string): Promise<StoredAnnouncement | null> { return copy(this.data.announcements.find(x => x.id === id) ?? null); }
   async listAnnouncements(filter: { courseIds?: string[] }): Promise<StoredAnnouncement[]> {
     return copy(this.data.announcements.filter(x => !filter.courseIds || filter.courseIds.includes(x.courseId)).sort(byNewest));

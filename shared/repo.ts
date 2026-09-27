@@ -4,7 +4,7 @@
 // Both must behave identically. `put*` is an upsert by id. Lists are returned in a
 // stable order: by `position` where the entity has one, otherwise as documented.
 import type {
-  Announcement, ApiToken, Block, BuilderSession, Course, Id, Institution, Lesson, LessonProgress, Module, Role, Timestamp, User,
+  Announcement, ApiToken, Assignment, Block, BuilderSession, Course, Id, Institution, Lesson, LessonProgress, Module, Role, Submission, Timestamp, User,
 } from './domain';
 import type { SeedData } from './seed';
 
@@ -50,6 +50,17 @@ export interface Repo {
   replaceBlocks(lessonId: Id, blocks: Block[]): Promise<void>;
   putBlock(block: Block): Promise<void>;
   deleteBlock(id: Id): Promise<void>;
+
+  getAssignment(id: Id): Promise<Assignment | null>;
+  /** Ordered by module position, then assignment position. */
+  listAssignments(filter: { courseId?: Id; moduleId?: Id }): Promise<Assignment[]>;
+  putAssignment(assignment: Assignment): Promise<void>;
+  /** Also deletes submissions for the assignment. */
+  deleteAssignment(id: Id): Promise<void>;
+  getSubmission(id: Id): Promise<Submission | null>;
+  /** Ordered by student id, then descending attempt. */
+  listSubmissions(filter: { assignmentId?: Id; studentId?: Id }): Promise<Submission[]>;
+  putSubmission(submission: Submission): Promise<void>;
 
   getAnnouncement(id: Id): Promise<StoredAnnouncement | null>;
   /** Newest first (publishedAt, else createdAt). */

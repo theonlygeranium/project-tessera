@@ -2,7 +2,7 @@
 // the D1 database (on first request, and on "Reset demo data"). Deterministic: no
 // random ids or clocks, so tests and screenshots are stable.
 import type {
-  Announcement, ApiToken, Block, BuilderSession, Course, Id, Institution, Invitation, Lesson, LessonProgress, Module, Timestamp, User,
+  Announcement, ApiToken, Assignment, Block, BuilderSession, Course, Id, Institution, Invitation, Lesson, LessonProgress, Module, Submission, Timestamp, User,
 } from './domain';
 
 export interface SeedData {
@@ -13,6 +13,8 @@ export interface SeedData {
   modules: Module[];
   lessons: Lesson[];
   blocks: Block[];
+  assignments: Assignment[];
+  submissions: Submission[];
   /** Stored announcement rows; names and read state are joined in at read time. */
   announcements: Omit<Announcement, 'courseTitle' | 'authorName' | 'authorInitials' | 'read'>[];
   reads: { announcementId: Id; userId: Id; readAt: Timestamp }[];
@@ -192,5 +194,14 @@ export function seedData(): SeedData {
     { userId: 'u-marcus', lessonId: 'l-stat-2', state: 'completed', checks: { 'b-s2-3': { correct: true, attempts: 2 } }, updatedAt: t(24, 20) },
   ];
 
-  return { institution, users, courses, enrollments, modules, lessons, blocks, announcements, reads, progress, builderSessions: [], apiTokens: [], invitations: [] };
+  const assignments: Assignment[] = [{
+    id: 'asg-stat-1', moduleId: 'm-stat-1', courseId: 'c-stat110', title: 'Find the statistical question', position: 0,
+    status: 'published', publishedAt: t(24), dueAt: '2026-10-02T23:59:00.000Z', points: 10, submissionType: 'text',
+    rubric: [
+      { id: 'criterion-question', title: 'Question', description: 'A question that expects variability.', levels: [{ id: 'clear', title: 'Clear', points: 5, description: 'Clearly statistical.' }, { id: 'developing', title: 'Developing', points: 3, description: 'Partly statistical.' }] },
+      { id: 'criterion-reason', title: 'Reasoning', description: 'Explain why answers vary.', levels: [{ id: 'clear', title: 'Clear', points: 5, description: 'Explains the variation.' }, { id: 'developing', title: 'Developing', points: 3, description: 'Partial explanation.' }] },
+    ], instructions: [{ ...human('b-asg-1', 'asg-stat-1', 0, t(24)), type: 'text', text: 'Write one statistical question about your community. Explain why you expect its answers to vary.' }],
+  }];
+  const submissions: Submission[] = [];
+  return { institution, users, courses, enrollments, modules, lessons, blocks, assignments, submissions, announcements, reads, progress, builderSessions: [], apiTokens: [], invitations: [] };
 }
