@@ -2,7 +2,7 @@
 // the D1 database (on first request, and on "Reset demo data"). Deterministic: no
 // random ids or clocks, so tests and screenshots are stable.
 import type {
-  Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, Id, Institution, Invitation, Lesson, LessonProgress, Module, Submission, Timestamp, User,
+  Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, Id, Institution, Invitation, Lesson, LessonProgress, Module, Submission, Timestamp, User,
 } from './domain';
 import type { FileVersion, GenerationJob, StoredFormat, StoredScan } from './repo';
 
@@ -20,6 +20,7 @@ export interface SeedData {
   announcements: Omit<Announcement, 'courseTitle' | 'authorName' | 'authorInitials' | 'read'>[];
   reads: { announcementId: Id; userId: Id; readAt: Timestamp }[];
   progress: (LessonProgress & { userId: Id })[];
+  adaptations: Adaptation[];
   builderSessions: BuilderSession[];
   generationJobs: GenerationJob[];
   apiTokens: (ApiToken & { hash: string })[];
@@ -210,5 +211,5 @@ export function seedData(): SeedData {
     ], instructions: [{ ...human('b-asg-1', 'asg-stat-1', 0, t(24)), type: 'text', text: 'Write one statistical question about your community. Explain why you expect its answers to vary.' }],
   }];
   const submissions: Submission[] = [];
-  return { institution, users, courses, enrollments, modules, lessons, blocks, assignments, submissions, announcements, reads, progress, builderSessions: [], generationJobs: [], apiTokens: [], invitations: [], files: [], fileVersions: [], scans: [], formats: [] };
+  return { institution, users, courses, enrollments, modules, lessons, blocks, assignments, submissions, announcements, reads, progress, adaptations: [], builderSessions: [], generationJobs: [], apiTokens: [], invitations: [], files: [], fileVersions: [], scans: [], formats: [] };
 }

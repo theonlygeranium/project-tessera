@@ -4,7 +4,7 @@
 // Both must behave identically. `put*` is an upsert by id. Lists are returned in a
 // stable order: by `position` where the entity has one, otherwise as documented.
 import type {
-  AccessibleFormat, AccessReport, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Lesson, LessonProgress, Module, Role, Submission, Timestamp, User,
+  AccessibleFormat, AccessReport, Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Lesson, LessonProgress, Module, Role, Submission, Timestamp, User,
 } from './domain';
 import type { SeedData } from './seed';
 
@@ -89,6 +89,13 @@ export interface Repo {
   getProgress(userId: Id, lessonId: Id): Promise<StoredProgress | null>;
   listProgress(filter: { userId?: Id; lessonIds?: Id[] }): Promise<StoredProgress[]>;
   putProgress(progress: StoredProgress): Promise<void>;
+
+  getAdaptation(id: Id): Promise<Adaptation | null>;
+  /** A student's changes, newest first (id breaks timestamp ties). */
+  listAdaptations(studentId: Id): Promise<Adaptation[]>;
+  putAdaptation(adaptation: Adaptation): Promise<void>;
+  /** Atomically stores a profile change with every adaptation describing it. */
+  putUserWithAdaptations(user: User, adaptations: Adaptation[]): Promise<void>;
 
   getBuilderSession(id: Id): Promise<BuilderSession | null>;
   /** Newest first. */

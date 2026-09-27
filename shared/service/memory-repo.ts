@@ -1,4 +1,4 @@
-import type { Announcement, Assignment, Block, BuilderSession, Course, Institution, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat } from '../domain';
+import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat } from '../domain';
 import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob } from '../repo';
 import type { SeedData } from '../seed';
 
@@ -91,6 +91,15 @@ export class MemoryRepo implements Repo {
   async putProgress(value: StoredProgress) {
     const i = this.data.progress.findIndex(x => x.userId === value.userId && x.lessonId === value.lessonId);
     if (i < 0) this.data.progress.push(copy(value)); else this.data.progress[i] = copy(value);
+  }
+  async getAdaptation(id: string): Promise<Adaptation | null> { return copy(this.data.adaptations.find(x => x.id === id) ?? null); }
+  async listAdaptations(studentId: string): Promise<Adaptation[]> {
+    return copy(this.data.adaptations.filter(x => x.studentId === studentId).sort((a, b) => b.appliedAt.localeCompare(a.appliedAt) || b.id.localeCompare(a.id)));
+  }
+  async putAdaptation(value: Adaptation): Promise<void> { this.upsert(this.data.adaptations, value); }
+  async putUserWithAdaptations(value: User, adaptations: Adaptation[]): Promise<void> {
+    this.upsert(this.data.users, value);
+    for (const adaptation of adaptations) this.upsert(this.data.adaptations, adaptation);
   }
   async getBuilderSession(id: string): Promise<BuilderSession | null> { return copy(this.data.builderSessions.find(x => x.id === id) ?? null); }
   async listBuilderSessions(courseId: string): Promise<BuilderSession[]> { return copy(this.data.builderSessions.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt))); }

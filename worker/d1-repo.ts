@@ -2,7 +2,7 @@
 // `put*` upserts. replaceBlocks, setEnrollments, deleteLesson, and reset each run
 // in one batch so a failure leaves the previous rows in place.
 import type {
-  AccessibleFormat, ApiToken, Assignment, Block, BlockContent, BuilderSession, Course, FileRecord, Id, Institution, Lesson, Module, Role, Submission, User,
+  AccessibleFormat, Adaptation, ApiToken, Assignment, Block, BlockContent, BuilderSession, Course, FileRecord, Id, Institution, Lesson, Module, Role, Submission, User,
 } from '../shared/domain';
 import type {
   AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob,
@@ -257,6 +257,22 @@ export class D1Repo implements Repo {
     await this.progressStmt(progress).run();
   }
 
+  async getAdaptation(id: Id): Promise<Adaptation | null> {
+    const row = await this.first<AdaptationRow>('SELECT * FROM adaptations WHERE id = ?', [id]);
+    return row ? adaptationFromRow(row) : null;
+  }
+
+  async listAdaptations(studentId: Id): Promise<Adaptation[]> {
+    const rows = await this.all<AdaptationRow>('SELECT * FROM adaptations WHERE student_id = ? ORDER BY applied_at DESC, id DESC', [studentId]);
+    return rows.map(adaptationFromRow);
+  }
+
+  async putAdaptation(value: Adaptation): Promise<void> { await this.adaptationStmt(value).run(); }
+
+  async putUserWithAdaptations(value: User, adaptations: Adaptation[]): Promise<void> {
+    await this.db.batch([this.userStmt(value), ...adaptations.map(adaptation => this.adaptationStmt(adaptation))]);
+  }
+
   async getBuilderSession(id: Id): Promise<BuilderSession | null> {
     const row = await this.first<BuilderRow>('SELECT * FROM builder_sessions WHERE id = ?', [id]);
     return row ? parseJson<BuilderSession>(row.data) : null;
@@ -405,6 +421,7 @@ export class D1Repo implements Repo {
       ...seed.announcements.map((announcement) => this.announcementStmt(announcement)),
       ...seed.reads.map((read) => this.readStmt(read)),
       ...seed.progress.map((progress) => this.progressStmt(progress)),
+      ...seed.adaptations.map((adaptation) => this.adaptationStmt(adaptation)),
       ...seed.builderSessions.map((session) => this.builderStmt(session)),
       ...seed.generationJobs.map((job) => this.generationStmt(job)),
     ]);
@@ -635,6 +652,25 @@ export class D1Repo implements Repo {
         JSON.stringify(job.lessonIds), job.error, job.createdAt, job.updatedAt,
         JSON.stringify(job.work), job.instruction, JSON.stringify(job.failures));
   }
+
+  private adaptationStmt(value: Adaptation): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO adaptations (id, student_id, kind, why, before_value, after_value, applied_at, undone_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, why = excluded.why,
+        before_value = excluded.before_value, after_value = excluded.after_value, undone_at = excluded.undone_at`)
+      .bind(value.id, value.studentId, value.kind, value.why, JSON.stringify({ value: value.before }), JSON.stringify({ value: value.after }), value.appliedAt, value.undoneAt);
+  }
+}
+
+interface AdaptationRow extends Record<string, unknown> {
+  id: string; student_id: string; kind: Adaptation['kind']; why: string;
+  before_value: string; after_value: string; applied_at: string; undone_at: string | null;
+}
+function adaptationFromRow(row: AdaptationRow): Adaptation {
+  return { id: row.id, studentId: row.student_id, kind: row.kind, why: row.why,
+    before: (JSON.parse(row.before_value) as { value?: unknown }).value,
+    after: (JSON.parse(row.after_value) as { value?: unknown }).value,
+    appliedAt: row.applied_at, undoneAt: row.undone_at };
 }
 
 interface GenerationRow extends Record<string, unknown> {
