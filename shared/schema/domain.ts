@@ -27,7 +27,7 @@ export const LessonSchema = z.object({ id, moduleId:id, courseId:id, title:requi
 export const LessonSummarySchema = LessonSchema.extend({ progress:z.enum(['not-started','in-progress','completed']).nullable(), draftBlockCount:nonnegative.nullable() });
 export const ModuleWithLessonsSchema = ModuleSchema.extend({ lessons:z.array(LessonSummarySchema) });
 export const CourseOutlineSchema = z.object({ course:CourseSummarySchema, modules:z.array(ModuleWithLessonsSchema) });
-export const ProvenanceSchema = z.object({ model:required, task:z.enum(['brief','outline','lesson-draft','block-regenerate','announcement']), generatedAt:timestamp, sources:z.array(z.object({ id, name:required })), summary:string });
+export const ProvenanceSchema = z.object({ model:required, task:z.enum(['brief','outline','lesson-draft','block-regenerate','announcement','feedback']), generatedAt:timestamp, sources:z.array(z.object({ id, name:required })), summary:string });
 const scenarioNode = z.object({ id, text:required, choices:z.array(z.object({ id, text:required, nextNodeId:id, feedback:string, quality:z.enum(['best','okay','poor']) })).max(6), outcome:string });
 const videoUrl = required.refine(v => /^https:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com)\//.test(v), 'Video src must be a YouTube or Vimeo URL.');
 const heading = z.object({ type:z.literal('heading'), level:z.union([z.literal(2),z.literal(3)]), text:required });

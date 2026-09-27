@@ -293,3 +293,36 @@ describe('worker fetch', () => {
     });
   });
 });
+
+describe('input validation (shared/schema)', () => {
+  it('rejects a body that fails the operation schema, with the field path', async () => {
+    const env = testEnv(createTestDb(), assetsFor().fetcher);
+    const response = await call(env, '/api/v1/users', {
+      method: 'POST',
+      headers: { cookie: 'tessera_user=u-admin', 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'New Person', email: 'not-an-email', role: 'student' }),
+    });
+    expect(response.status).toBe(400);
+    const body = await response.json() as { error: { code: string; details: { issues: { path: string }[] } } };
+    expect(body.error.code).toBe('invalid');
+    expect(body.error.details.issues[0].path).toBe('email');
+  });
+
+  it('coerces numeric query fields and rejects ones that do not parse', async () => {
+    const env = testEnv(createTestDb(), assetsFor().fetcher);
+    let seen: unknown;
+    await withHandlers({ listFiles: async (_ctx, input) => { seen = input; return { items: [], nextCursor: null }; } }, async () => {
+      const ok = await call(env, '/api/v1/courses/c-stat110/files?limit=5', { headers: { cookie: 'tessera_user=u-admin' } });
+      expect(ok.status).toBe(200);
+      expect(seen).toEqual({ courseId: 'c-stat110', limit: 5 });
+      const bad = await call(env, '/api/v1/courses/c-stat110/files?limit=lots', { headers: { cookie: 'tessera_user=u-admin' } });
+      expect(bad.status).toBe(400);
+    });
+  });
+
+  it('ignores stray query fields on an operation that takes no input', async () => {
+    const env = testEnv(createTestDb(), assetsFor().fetcher);
+    const response = await call(env, '/api/v1/session?data=mock');
+    expect(response.status).toBe(200);
+  });
+});

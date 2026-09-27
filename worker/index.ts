@@ -8,6 +8,7 @@ import { API_PREFIX, ApiError, ROUTES, matchPath, type Operation, type SessionIn
 import type { Repo } from '../shared/repo';
 import { seedData } from '../shared/seed';
 import { dispatch, service, type ServiceContext } from '../shared/service';
+import { coerceQuery, validateInput } from '../shared/schema';
 
 const SESSION_COOKIE = 'tessera_user';
 const VIEW_AS_COOKIE = 'tessera_view_as';
@@ -82,7 +83,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       }
     }
 
-    const input = await readInput(request, found.params);
+    const input = validateInput(found.op, coerceQuery(found.op, await readInput(request, found.params)));
     const ctx: ServiceContext = {
       repo,
       ai: createAiClient(env),

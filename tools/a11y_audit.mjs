@@ -64,6 +64,8 @@ const APP = [
   { name: 'App · Instructor · Published lesson', url: 'app/teach/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-okafor' },
   { name: 'App · Instructor · Announcements', url: 'app/teach/courses/c-stat110/announcements?data=mock&as=u-okafor' },
   { name: 'App · Instructor · Roster', url: 'app/teach/courses/c-stat110/roster?data=mock&as=u-okafor' },
+  { name: 'App · Instructor · Grades', url: 'app/teach/courses/c-stat110/grades?data=mock&as=u-okafor' },
+  { name: 'App · Instructor · Assignment editor', url: 'app/teach/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-okafor' },
   { name: 'App · Builder · Start', url: 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor' },
   // Student (lane G): Priya has no profile yet (onboarding); Marcus has one
   { name: 'App · Student · Onboarding', url: 'app/onboarding?data=mock&as=u-priya' },
@@ -71,6 +73,7 @@ const APP = [
   { name: 'App · Student · Courses', url: 'app/courses?data=mock&as=u-marcus' },
   { name: 'App · Student · Course home', url: 'app/courses/c-stat110?data=mock&as=u-marcus' },
   { name: 'App · Student · Lesson', url: 'app/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-marcus' },
+  { name: 'App · Student · Assignment', url: 'app/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-priya' },
   { name: 'App · Student · Announcements', url: 'app/announcements?data=mock&as=u-marcus' },
   { name: 'App · Student · Profile', url: 'app/profile?data=mock&as=u-marcus' },
 ];
@@ -125,7 +128,7 @@ for (const t of targets) {
 }
 // ---- reflow: WCAG 1.4.10 (content usable at 320 CSS px without horizontal scrolling) ----
 // Screens under docs/screens/ are fixed-size design artboards and are exempt; site pages and the prototype are not.
-const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/sign-in?data=mock', 'app/?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-3?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor', 'app/today?data=mock&as=u-marcus', 'app/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-marcus', 'app/onboarding?data=mock&as=u-priya', 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
+const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/sign-in?data=mock', 'app/?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-3?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor', 'app/today?data=mock&as=u-marcus', 'app/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-marcus', 'app/teach/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-okafor', 'app/onboarding?data=mock&as=u-priya', 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
 for (const u of REFLOW) {
   const page = await browser.newPage({ viewport: { width: 320, height: 256 } });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());

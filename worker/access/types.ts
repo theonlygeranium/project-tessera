@@ -1,5 +1,5 @@
 import type { AccessIssue, AccessReport, AccessSeverity } from '../../shared/domain';
-import { WCAG } from './wcag';
+import { wcagFor } from '../../shared/access/wcag';
 export interface Element { index: number; page: number; kind: 'image' | 'table'; bbox: { x: number; y: number; w: number; h: number }; label: string }
 export interface DocumentCheck {
   issues: AccessIssue[];
@@ -8,7 +8,7 @@ export interface DocumentCheck {
   elements: Element[];
 }
 export function issue(code: string, severity: AccessSeverity, title: string, description: string, fixHint: string, fix: AccessIssue['fix'], count = 1, page?: number, element?: number): AccessIssue {
-  return { code, severity, wcag: WCAG[code], title, description, fixHint, location: { ...(page ? { page } : {}), ...(element !== undefined ? { element } : {}) }, count, fix };
+  return { code, severity, wcag: wcagFor(code), title, description, fixHint, location: { ...(page ? { page } : {}), ...(element !== undefined ? { element } : {}) }, count, fix };
 }
 export const emptyBox = { x: 0, y: 0, w: 0, h: 0 };
 export function contrastRatio(hexA: string, hexB: string): number {

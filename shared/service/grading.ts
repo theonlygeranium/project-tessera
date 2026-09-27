@@ -132,7 +132,7 @@ export const grading: Pick<Service, 'createAssignment'|'getAssignment'|'updateAs
     const {s,a} = await submission(ctx,submissionId); await aiEnabled(ctx); checkedCriteria(a,criteria);
     const c = await ctx.repo.getCourse(a.courseId);
     const result = await ctx.ai.run('feedback',{ courseTitle:c?.title ?? '',assignmentTitle:a.title,rubric:a.rubric,criteria,submissionText:s.text || s.link || (s.fileId ? 'File submission' : '') });
-    return { feedback:result.output.feedback,provenance:{model:result.model,task:'feedback' as never,generatedAt:ctx.now(),sources:[],summary:`Feedback draft from rubric results for ${a.title}` } };
+    return { feedback:result.output.feedback,provenance:{model:result.model,task:'feedback',generatedAt:ctx.now(),sources:[],summary:`Feedback draft from rubric results for ${a.title}` } };
   },
   releaseGrades: async (ctx, { assignmentId }) => { await assignment(ctx,assignmentId,true); for (const s of await ctx.repo.listSubmissions({ assignmentId })) if (s.state === 'graded' && s.grade) { s.state='returned'; s.grade.releasedAt=ctx.now(); await ctx.repo.putSubmission(s); } return {ok:true}; },
   getGradebook: async (ctx, { courseId }) => book(ctx,courseId),

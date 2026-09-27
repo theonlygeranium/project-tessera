@@ -11643,7 +11643,8 @@
         "required": [
           "minimumScore",
           "blockingSeverities"
-        ]
+        ],
+        "additionalProperties": false
       },
       "AccessReport": {
         "type": "object",
@@ -12091,7 +12092,8 @@
               "outline",
               "lesson-draft",
               "block-regenerate",
-              "announcement"
+              "announcement",
+              "feedback"
             ]
           },
           "generatedAt": {
@@ -15677,6 +15679,9 @@
           },
           "policy": {
             "$ref": "#/components/schemas/AiPolicy"
+          },
+          "accessPolicy": {
+            "$ref": "#/components/schemas/AccessPolicy"
           }
         },
         "required": [
@@ -15685,7 +15690,8 @@
           "shortName",
           "accent",
           "setupComplete",
-          "policy"
+          "policy",
+          "accessPolicy"
         ],
         "additionalProperties": false
       },
