@@ -7,10 +7,6 @@ import { useSession } from '../../shell/session';
 import { AdaptationChanges } from './AdaptationChanges';
 import styles from './Presets.module.css';
 
-function PresetDetails({ preset }: { preset: Preset }) {
-  return <p>{preset.sessionMinutes}-minute sessions, {preset.reminders} reminders, {preset.readingLevel === 'plain' ? 'plain language' : 'standard'} reading.</p>;
-}
-
 export function PresetSetup({ onChange }: { onChange?: (changes: Adaptation[], undo: boolean) => void }) {
   const { user } = useSession();
   const dismissKey = `tessera-preset-dismissed-${user.id}`;
@@ -31,7 +27,6 @@ export function PresetSetup({ onChange }: { onChange?: (changes: Adaptation[], u
       <h2>Suggested setup</h2>
       <h3>{suggestion.data.preset.title}</h3>
       <p>{suggestion.data.preset.description}</p>
-      <PresetDetails preset={suggestion.data.preset} />
       <p>{suggestion.data.why}</p>
       <div className={styles.actions}>
         <Button variant="primary" disabled={apply.isPending} onClick={() => apply.mutate({ presetId: suggestion.data.preset.id })}>Use this setup</Button>
@@ -45,7 +40,7 @@ export function PresetSetup({ onChange }: { onChange?: (changes: Adaptation[], u
       <h2>Other setups</h2>
       {presets.isPending ? <Loading label="Loading setups" /> : presets.error ? <ErrorNotice error={presets.error} onRetry={() => presets.refetch()} /> : <ul className={styles.list}>
         {presets.data.map(preset => <li className={styles.item} key={preset.id}>
-          <h3>{preset.title}</h3><p>{preset.description}</p><PresetDetails preset={preset} />
+          <h3>{preset.title}</h3><p>{preset.description}</p>
           <Button disabled={apply.isPending} onClick={() => apply.mutate({ presetId: preset.id })}>Use this setup</Button>
         </li>)}
       </ul>}
