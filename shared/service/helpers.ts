@@ -25,14 +25,10 @@ export async function studentLesson(ctx: ServiceContext, id: string): Promise<Le
   if (l.status !== 'published') return fail('not-found', 'Lesson not found.');
   await canReachCourse(ctx, l.courseId); return l;
 }
+/** The block's content without its metadata; works for every block type. */
 export const content = (b: Block): BlockContent => {
-  switch (b.type) {
-    case 'heading': return { type: 'heading', level: b.level, text: b.text };
-    case 'text': return { type: 'text', text: b.text };
-    case 'callout': return { type: 'callout', tone: b.tone, title: b.title, text: b.text };
-    case 'image': return { type: 'image', src: b.src, alt: b.alt, decorative: b.decorative, caption: b.caption };
-    case 'check': return { type: 'check', question: b.question, options: b.options, correctOptionId: b.correctOptionId, feedbackCorrect: b.feedbackCorrect, feedbackIncorrect: b.feedbackIncorrect };
-  }
+  const { id: _id, lessonId: _l, position: _p, origin: _o, aiState: _a, provenance: _pr, previous: _pv, updatedAt: _u, ...rest } = b;
+  return rest as BlockContent;
 };
 export const provenance = (ctx: ServiceContext, model: string, task: Provenance['task'], summary: string, sources: Provenance['sources'] = []): Provenance =>
   ({ model, task, generatedAt: ctx.now(), sources, summary });

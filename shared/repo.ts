@@ -4,7 +4,7 @@
 // Both must behave identically. `put*` is an upsert by id. Lists are returned in a
 // stable order: by `position` where the entity has one, otherwise as documented.
 import type {
-  Announcement, Block, BuilderSession, Course, Id, Institution, Lesson, LessonProgress, Module, Role, Timestamp, User,
+  Announcement, ApiToken, Block, BuilderSession, Course, Id, Institution, Lesson, LessonProgress, Module, Role, Timestamp, User,
 } from './domain';
 import type { SeedData } from './seed';
 
@@ -69,6 +69,14 @@ export interface Repo {
   /** Newest first. */
   listBuilderSessions(courseId: Id): Promise<BuilderSession[]>;
   putBuilderSession(session: BuilderSession): Promise<void>;
+
+  /** API tokens (D-020). `hash` is the SHA-256 of the secret; never the secret. */
+  getApiTokenByHash(hash: string): Promise<(ApiToken & { hash: string }) | null>;
+  listApiTokens(ownerId: Id): Promise<(ApiToken & { hash: string })[]>;
+  putApiToken(token: ApiToken & { hash: string }): Promise<void>;
+  touchApiToken(id: Id, usedAt: Timestamp): Promise<void>;
+  /** Whether any invitation exists (D-021): once one does, the persona cookie no longer signs anyone in. */
+  hasInvitations(): Promise<boolean>;
 
   /** True when there's no institution or no users: a database the Worker must seed on first request. */
   isEmpty(): Promise<boolean>;

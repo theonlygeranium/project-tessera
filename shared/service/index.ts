@@ -6,8 +6,17 @@ import { contentHandlers } from './content';
 import { student } from './student';
 import { announcements } from './announcements';
 import { builder } from './builder';
+import { tokens } from './tokens';
 
-export const service: Service = { ...session, ...admin, ...courses, ...contentHandlers, ...student, ...announcements, ...builder };
+import { ApiError, ROUTES, type Operation } from '../api';
+import type { Handler } from './context';
+
+const implemented = { ...session, ...admin, ...courses, ...contentHandlers, ...student, ...announcements, ...builder, ...tokens };
+// Night 2 lanes replace these stubs as they land (a 501-style error until then).
+const pending = Object.fromEntries(
+  (Object.keys(ROUTES) as Operation[]).filter((op) => !(op in implemented)).map((op) => [op, (async () => { throw new ApiError('conflict', `${op} is not available yet`); }) as Handler<Operation>]),
+);
+export const service = { ...pending, ...implemented } as Service;
 export { dispatch } from './context';
 export type { ServiceContext, Service } from './context';
 export { MemoryRepo } from './memory-repo';

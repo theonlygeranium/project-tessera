@@ -26,6 +26,44 @@ export function validateBlockContent(value: unknown): BlockContent {
       const correctOptionId = str(v.correctOptionId, 'correctOptionId');
       return { type: 'check', question: str(v.question, 'question'), options, correctOptionId, feedbackCorrect: str(v.feedbackCorrect, 'feedbackCorrect'), feedbackIncorrect: str(v.feedbackIncorrect, 'feedbackIncorrect') };
     }
+    case 'document': {
+      if (!Array.isArray(v.sections) || v.sections.length < 1 || v.sections.length > 40) return invalid('A document needs 1–40 sections.');
+      return { type: 'document', title: str(v.title, 'title', true), sections: v.sections.map((raw: unknown) => { const sec = object(raw); return { heading: str(sec.heading, 'section heading', true), text: str(sec.text, 'section text', true) }; }) };
+    }
+    case 'file': return { type: 'file', fileId: str(v.fileId, 'fileId', true), title: str(v.title, 'title', true), description: str(v.description, 'description') };
+    case 'video': {
+      const provider = v.provider === 'youtube' || v.provider === 'vimeo' || v.provider === 'upload' ? v.provider : invalid('Invalid video provider.');
+      const src = str(v.src, 'src', true);
+      if (provider !== 'upload' && !/^https:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com)\//.test(src)) return invalid('Video src must be a YouTube or Vimeo URL.');
+      return { type: 'video', src, provider, title: str(v.title, 'title', true), captionsFileId: v.captionsFileId == null ? null : str(v.captionsFileId, 'captionsFileId', true), transcript: str(v.transcript, 'transcript'), minutes: intRange(v.minutes ?? 0, 'minutes', 0, 600) };
+    }
+    case 'table': {
+      if (!Array.isArray(v.rows) || v.rows.length < 1 || v.rows.length > 200) return invalid('A table needs 1–200 rows.');
+      const rows = v.rows.map((row: unknown) => { if (!Array.isArray(row) || row.length < 1 || row.length > 20) return invalid('A table row needs 1–20 cells.'); return row.map((cell: unknown) => str(cell, 'cell')); });
+      const width = rows[0].length;
+      if (rows.some((r: string[]) => r.length !== width)) return invalid('Every table row needs the same number of cells.');
+      return { type: 'table', caption: str(v.caption, 'caption'), headerRow: typeof v.headerRow === 'boolean' ? v.headerRow : invalid('headerRow must be boolean.'), rows };
+    }
+    case 'scenario': {
+      if (!Array.isArray(v.nodes) || v.nodes.length < 1 || v.nodes.length > 60) return invalid('A scenario needs 1–60 nodes.');
+      const nodes = v.nodes.map((raw: unknown) => {
+        const n = object(raw);
+        if (!Array.isArray(n.choices) || n.choices.length > 6) return invalid('A scenario node has 0–6 choices.');
+        return { id: str(n.id, 'node id', true), text: str(n.text, 'node text', true), outcome: str(n.outcome, 'outcome'),
+          choices: n.choices.map((c: unknown) => { const ch = object(c); return { id: str(ch.id, 'choice id', true), text: str(ch.text, 'choice text', true), nextNodeId: str(ch.nextNodeId, 'nextNodeId', true), feedback: str(ch.feedback, 'feedback'), quality: (ch.quality === 'best' || ch.quality === 'okay' || ch.quality === 'poor' ? ch.quality : invalid('Invalid choice quality.')) as 'best' | 'okay' | 'poor' }; }) };
+      });
+      const ids = new Set(nodes.map((n) => n.id));
+      if (ids.size !== nodes.length) return invalid('Scenario node ids must be unique.');
+      const startNodeId = str(v.startNodeId, 'startNodeId', true);
+      if (!ids.has(startNodeId)) return invalid('startNodeId must be a node.');
+      for (const n of nodes) for (const c of n.choices) if (!ids.has(c.nextNodeId)) return invalid(`Choice "${c.text}" points to a missing node.`);
+      return { type: 'scenario', title: str(v.title, 'title', true), setting: str(v.setting, 'setting'), nodes, startNodeId };
+    }
+    case 'link': {
+      const href = str(v.href, 'href', true);
+      if (!/^https?:\/\//.test(href)) return invalid('Link href must be http(s).');
+      return { type: 'link', href, text: str(v.text, 'text', true), description: str(v.description, 'description') };
+    }
     default: return invalid('Unknown block type.');
   }
 }

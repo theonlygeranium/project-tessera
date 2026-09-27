@@ -8,4 +8,11 @@ export interface Env {
   ACCESS_AUD: string;
   WRITER_API_KEY?: string;
   AI_GATEWAY_URL?: string;
+  /** Uploaded files, versions, and generated formats (D-019). */
+  FILES: R2Bucket;
+  /** Workers AI: audio, OCR and vision fallback, transcription (D-019). */
+  AI: Ai;
+  /** Lane G (D-021): a Cloudflare API token scoped to Access groups, and the group invitations add to. */
+  CF_ACCESS_API_TOKEN?: string;
+  ACCESS_GROUP_ID?: string;
 }

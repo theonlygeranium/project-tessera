@@ -3,7 +3,7 @@
 // `dispatch`, so they behave the same by construction.
 import type { AiClient } from '../ai';
 import { ApiError, ROUTES, type Input, type Operation, type Output } from '../api';
-import type { Id, Timestamp, User } from '../domain';
+import type { ApiToken, Id, Timestamp, User } from '../domain';
 import { allows } from '../policy';
 import type { Repo } from '../repo';
 
@@ -12,6 +12,8 @@ export interface ServiceContext {
   ai: AiClient;
   /** The signed-in persona, or null. */
   user: User | null;
+  /** The API token the request was made with, when it wasn't a browser session (D-020). */
+  token?: ApiToken | null;
   now(): Timestamp;
   /** A new unique id with a readable prefix, for example newId('l') → "l-3f9c…". */
   newId(prefix: string): Id;

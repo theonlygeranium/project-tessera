@@ -11,6 +11,9 @@
   // preview (Workers Builds, wrangler deploy, wrangler dev). The build output
   // is not committed.
   "build": { "command": "npm run build" },
+  // D-019: document parsing and format generation run inline (Workers Paid).
+  "limits": { "cpu_ms": 120000 },
+  "ai": { "binding": "AI" },
   "assets": {
     "directory": "./docs",
     "binding": "ASSETS",
@@ -31,6 +34,7 @@
       "migrations_dir": "migrations"
     }
   ],
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "tessera-files" }],
   "vars": {
     "ENVIRONMENT": "production",
     "ACCESS_TEAM_DOMAIN": "little-brook-5f84.cloudflareaccess.com",
@@ -40,6 +44,8 @@
   // Required by `wrangler preview` (Workers Builds preview builds). Preview
   // vars and bindings are not inherited from the top level (D-014).
   "previews": {
+    "ai": { "binding": "AI" },
+    "r2_buckets": [{ "binding": "FILES", "bucket_name": "tessera-files-preview" }],
     "d1_databases": [
       {
         "binding": "DB",

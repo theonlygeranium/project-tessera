@@ -74,10 +74,10 @@ async function withHandlers(patch: Partial<Service>, run: () => Promise<void>) {
 describe('worker fetch', () => {
   it('returns JSON 404 for an unknown API route', async () => {
     const env = testEnv(createTestDb(), assetsFor().fetcher);
-    const response = await call(env, '/api/nope');
+    const response = await call(env, '/api/v1/nope');
     expect(response.status).toBe(404);
     expect(response.headers.get('content-type')).toContain('application/json');
-    expect(await response.json()).toEqual({ error: { code: 'not-found', message: 'No route matches GET /api/nope.' } });
+    expect(await response.json()).toEqual({ error: { code: 'not-found', message: 'No route matches GET /api/v1/nope.' } });
   });
 
   it('GET /api/session with no cookie returns the seeded institution and no user', async () => {
@@ -85,7 +85,7 @@ describe('worker fetch', () => {
     await withHandlers({
       getSession: async (ctx) => ({ user: ctx.user, institution: await ctx.repo.getInstitution() }),
     }, async () => {
-      const response = await call(env, '/api/session');
+      const response = await call(env, '/api/v1/session');
       expect(response.status).toBe(200);
       expect(response.headers.get('cache-control')).toBe('no-store');
       expect(await response.json()).toEqual({ user: null, institution: seedData().institution });
@@ -101,7 +101,7 @@ describe('worker fetch', () => {
         return { user, institution: await ctx.repo.getInstitution() };
       },
     }, async () => {
-      const response = await call(env, '/api/session', {
+      const response = await call(env, '/api/v1/session', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ userId: 'u-admin' }),
@@ -115,25 +115,25 @@ describe('worker fetch', () => {
 
   it('returns a service ApiError as its status and JSON', async () => {
     const env = testEnv(createTestDb(), assetsFor().fetcher);
-    const response = await call(env, '/api/session', { method: 'POST', body: JSON.stringify({ userId: 'u-missing' }) });
+    const response = await call(env, '/api/v1/session', { method: 'POST', body: JSON.stringify({ userId: 'u-missing' }) });
     expect(response.status).toBe(404);
     expect(((await response.json()) as { error: { code: string } }).error.code).toBe('not-found');
   });
 
   it('reads the persona cookie before dispatch checks the role', async () => {
     const env = testEnv(createTestDb(), assetsFor().fetcher);
-    const student = await call(env, '/api/overview', { headers: { cookie: 'tessera_user=u-priya' } });
+    const student = await call(env, '/api/v1/overview', { headers: { cookie: 'tessera_user=u-priya' } });
     expect(student.status).toBe(403);
     expect(await student.json()).toEqual({ error: { code: 'forbidden', message: 'Your role can\'t do this.' } });
 
-    const stranger = await call(env, '/api/overview');
+    const stranger = await call(env, '/api/v1/overview');
     expect(stranger.status).toBe(401);
     expect(await stranger.json()).toEqual({ error: { code: 'unauthenticated', message: 'Sign in first.' } });
 
-    const unknown = await call(env, '/api/overview', { headers: { cookie: 'tessera_user=u-missing' } });
+    const unknown = await call(env, '/api/v1/overview', { headers: { cookie: 'tessera_user=u-missing' } });
     expect(unknown.status).toBe(401);
 
-    const admin = await call(env, '/api/overview', { headers: { cookie: 'theme=light; tessera_user=u-admin' } });
+    const admin = await call(env, '/api/v1/overview', { headers: { cookie: 'theme=light; tessera_user=u-admin' } });
     expect(admin.status).toBe(200);
     expect(((await admin.json()) as { people: Record<string, number> }).people.student).toBe(4);
   });
@@ -147,7 +147,7 @@ describe('worker fetch', () => {
         return [];
       },
     }, async () => {
-      const response = await call(env, '/api/users?role=student', { headers: { cookie: 'tessera_user=u-admin' } });
+      const response = await call(env, '/api/v1/users?role=student', { headers: { cookie: 'tessera_user=u-admin' } });
       expect(response.status).toBe(200);
       expect(seen).toEqual({ role: 'student' });
     });
@@ -157,7 +157,7 @@ describe('worker fetch', () => {
         throw new ApiError('invalid', 'Bad', { name: 'required' });
       },
     }, async () => {
-      const response = await call(env, '/api/users/u-priya', {
+      const response = await call(env, '/api/v1/users/u-priya', {
         method: 'PATCH',
         headers: { cookie: 'tessera_user=u-admin', 'content-type': 'application/json' },
         body: JSON.stringify({ name: 'Priya N.' }),
@@ -175,7 +175,7 @@ describe('worker fetch', () => {
     ['"hi"', 'Request body must be a JSON object.'],
   ])('rejects a non-object body %j', async (body, message) => {
     const env = testEnv(createTestDb(), assetsFor().fetcher);
-    const response = await call(env, '/api/session', { method: 'POST', body });
+    const response = await call(env, '/api/v1/session', { method: 'POST', body });
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: { code: 'invalid', message } });
   });
@@ -188,11 +188,11 @@ describe('worker fetch', () => {
         throw new Error('database exploded');
       },
     }, async () => {
-      const response = await call(env, '/api/session');
+      const response = await call(env, '/api/v1/session');
       expect(response.status).toBe(500);
       expect(await response.json()).toEqual({ error: { code: 'internal', message: 'Something went wrong.' } });
     });
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ message: 'database exploded' }));
+    expect(spy).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ message: 'database exploded' }));
     spy.mockRestore();
   });
 
@@ -201,10 +201,11 @@ describe('worker fetch', () => {
     await withHandlers({
       signOut: async () => ({ ok: true }),
     }, async () => {
-      const response = await call(env, '/api/session', { method: 'DELETE' });
+      const response = await call(env, '/api/v1/session', { method: 'DELETE' });
       expect(response.status).toBe(200);
       expect(response.headers.getSetCookie()).toEqual([
         'tessera_user=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
+        'tessera_view_as=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
       ]);
     });
   });
@@ -212,12 +213,12 @@ describe('worker fetch', () => {
   it('does not reset a database that already has data', async () => {
     const db = createTestDb();
     const env = testEnv(db, assetsFor().fetcher);
-    await call(env, '/api/demo/users');
+    await call(env, '/api/v1/demo/users');
     const repo = new D1Repo(db as never);
     const admin = await repo.getUser('u-admin');
     expect(admin).not.toBeNull();
     await repo.putUser({ ...admin!, name: 'Renamed' });
-    await call(env, '/api/demo/users');
+    await call(env, '/api/v1/demo/users');
     expect((await repo.getUser('u-admin'))?.name).toBe('Renamed');
   });
 
@@ -259,10 +260,10 @@ describe('worker fetch', () => {
       { fetch() { return Promise.reject(new Error('assets used')); } },
       'production',
     );
-    const response = await call(env, '/api/session');
+    const response = await call(env, '/api/v1/session');
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({
-      error: { code: 'unauthenticated', message: 'Missing or invalid Cloudflare Access token.' },
+      error: { code: 'unauthenticated', message: 'Sign in through Cloudflare Access, or send an API token.' },
     });
   });
 
@@ -280,7 +281,7 @@ describe('worker fetch', () => {
         institution: await ctx.repo.getInstitution(),
       }),
     }, async () => {
-      const response = await call(env, '/api/session', {
+      const response = await call(env, '/api/v1/session', {
         method: 'POST',
         headers: { 'cf-access-jwt-assertion': token, 'content-type': 'application/json' },
         body: JSON.stringify({ userId: 'u-admin' }),

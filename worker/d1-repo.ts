@@ -2,7 +2,7 @@
 // `put*` upserts. replaceBlocks, setEnrollments, deleteLesson, and reset each run
 // in one batch so a failure leaves the previous rows in place.
 import type {
-  Block, BlockContent, BuilderSession, Course, Id, Institution, Lesson, Module, Role, User,
+  Block, BlockContent, BuilderSession, Course, Id, Institution, Lesson, Module, Role, User, ApiToken,
 } from '../shared/domain';
 import type {
   AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress,
@@ -12,6 +12,9 @@ import type { SeedData } from '../shared/seed';
 type SqlBind = string | number | null;
 
 const DELETE_ORDER = [
+  // Night 2 tables first (they reference users, courses, modules, files).
+  'idempotency_keys', 'api_tokens', 'format_jobs', 'file_versions', 'access_scans', 'submissions', 'assignments',
+  'tutor_sessions', 'tutor_settings', 'adaptations', 'invitations', 'generation_jobs', 'files',
   'announcement_reads',
   'progress',
   'blocks',
@@ -271,6 +274,30 @@ export class D1Repo implements Repo {
     await this.builderStmt(session).run();
   }
 
+  async getApiTokenByHash(hash: string) {
+    const row = await this.first<TokenRow>('SELECT * FROM api_tokens WHERE hash = ?', [hash]);
+    return row ? tokenFromRow(row) : null;
+  }
+  async listApiTokens(ownerId: string) {
+    const rows = await this.all<TokenRow>('SELECT * FROM api_tokens WHERE owner_id = ? ORDER BY created_at DESC, id', [ownerId]);
+    return rows.map(tokenFromRow);
+  }
+  async putApiToken(t: ApiToken & { hash: string }) {
+    await this.db.prepare(
+      `INSERT INTO api_tokens (id, name, prefix, hash, scopes, owner_id, created_at, expires_at, last_used_at, revoked_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, scopes = excluded.scopes, expires_at = excluded.expires_at,
+         last_used_at = excluded.last_used_at, revoked_at = excluded.revoked_at`,
+    ).bind(t.id, t.name, t.prefix, t.hash, JSON.stringify(t.scopes), t.ownerId, t.createdAt, t.expiresAt, t.lastUsedAt, t.revokedAt).run();
+  }
+  async touchApiToken(id: string, usedAt: string) {
+    await this.db.prepare('UPDATE api_tokens SET last_used_at = ? WHERE id = ?').bind(usedAt, id).run();
+  }
+  async hasInvitations() {
+    const row = await this.first<{ n: number }>('SELECT count(*) AS n FROM invitations');
+    return !!row && row.n > 0;
+  }
+
   async isEmpty(): Promise<boolean> {
     const row = await this.first<{ i: number; u: number }>('SELECT (SELECT count(*) FROM institution) AS i, (SELECT count(*) FROM users) AS u');
     return !row || row.i === 0 || row.u === 0;
@@ -513,31 +540,17 @@ function parseJson<T>(value: unknown): T {
 }
 
 function contentJson(block: Block): string {
-  switch (block.type) {
-    case 'heading':
-      return JSON.stringify({ type: block.type, level: block.level, text: block.text });
-    case 'text':
-      return JSON.stringify({ type: block.type, text: block.text });
-    case 'callout':
-      return JSON.stringify({ type: block.type, tone: block.tone, title: block.title, text: block.text });
-    case 'image':
-      return JSON.stringify({
-        type: block.type, src: block.src, alt: block.alt, decorative: block.decorative, caption: block.caption,
-      });
-    case 'check':
-      return JSON.stringify({
-        type: block.type,
-        question: block.question,
-        options: block.options,
-        correctOptionId: block.correctOptionId,
-        feedbackCorrect: block.feedbackCorrect,
-        feedbackIncorrect: block.feedbackIncorrect,
-      });
-    default: {
-      const unreachable: never = block;
-      throw new Error(`Unknown block type on ${(unreachable as Block).id}`);
-    }
-  }
+  // Every block type: the content is the block minus its metadata columns.
+  const { id: _id, lessonId: _l, position: _p, origin: _o, aiState: _a, provenance: _pr, previous: _pv, updatedAt: _u, ...content } = block;
+  return JSON.stringify(content);
+}
+
+interface TokenRow extends Record<string, unknown> {
+  id: string; name: string; prefix: string; hash: string; scopes: string; owner_id: string;
+  created_at: string; expires_at: string | null; last_used_at: string | null; revoked_at: string | null;
+}
+function tokenFromRow(r: TokenRow): ApiToken & { hash: string } {
+  return { id: r.id, name: r.name, prefix: r.prefix, hash: r.hash, scopes: JSON.parse(r.scopes), ownerId: r.owner_id, createdAt: r.created_at, expiresAt: r.expires_at, lastUsedAt: r.last_used_at, revokedAt: r.revoked_at };
 }
 
 interface InstitutionRow extends Record<string, unknown> {

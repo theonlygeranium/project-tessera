@@ -1,10 +1,10 @@
 // The real API adapter: one fetch per operation, driven by ROUTES (shared/api.ts).
-import { ApiError, ROUTES, fillPath, type ApiErrorBody, type Operation, type TesseraApi } from '../../../shared/api';
+import { API_PREFIX, ApiError, ROUTES, fillPath, type ApiErrorBody, type Operation, type TesseraApi } from '../../../shared/api';
 
 async function call(op: Operation, input: Record<string, unknown> | undefined): Promise<unknown> {
   const route = ROUTES[op];
   const { path, rest } = fillPath(route.path, input ?? {});
-  let url = path;
+  let url = API_PREFIX + path;
   const init: RequestInit = { method: route.method, credentials: 'same-origin', headers: { accept: 'application/json' } };
   if (route.method === 'GET' || route.method === 'DELETE') {
     const query = new URLSearchParams();

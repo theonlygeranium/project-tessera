@@ -2,7 +2,7 @@
 // the D1 database (on first request, and on "Reset demo data"). Deterministic: no
 // random ids or clocks, so tests and screenshots are stable.
 import type {
-  Announcement, Block, BuilderSession, Course, Id, Institution, Lesson, LessonProgress, Module, Timestamp, User,
+  Announcement, ApiToken, Block, BuilderSession, Course, Id, Institution, Invitation, Lesson, LessonProgress, Module, Timestamp, User,
 } from './domain';
 
 export interface SeedData {
@@ -18,6 +18,8 @@ export interface SeedData {
   reads: { announcementId: Id; userId: Id; readAt: Timestamp }[];
   progress: (LessonProgress & { userId: Id })[];
   builderSessions: BuilderSession[];
+  apiTokens: (ApiToken & { hash: string })[];
+  invitations: Invitation[];
 }
 
 /** Demo "now". The seed's timestamps sit in the week before it. */
@@ -190,5 +192,5 @@ export function seedData(): SeedData {
     { userId: 'u-marcus', lessonId: 'l-stat-2', state: 'completed', checks: { 'b-s2-3': { correct: true, attempts: 2 } }, updatedAt: t(24, 20) },
   ];
 
-  return { institution, users, courses, enrollments, modules, lessons, blocks, announcements, reads, progress, builderSessions: [] };
+  return { institution, users, courses, enrollments, modules, lessons, blocks, announcements, reads, progress, builderSessions: [], apiTokens: [], invitations: [] };
 }

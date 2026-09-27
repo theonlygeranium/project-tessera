@@ -18,6 +18,13 @@ function fresh(type: BlockContent['type']): BlockInput {
     case 'callout': return { type, tone: 'info', title: '', text: '' };
     case 'image': return { type, src: '', alt: '', decorative: false, caption: '' };
     case 'check': return { type, question: '', options: [{ id: crypto.randomUUID(), text: '' }, { id: crypto.randomUUID(), text: '' }], correctOptionId: '', feedbackCorrect: '', feedbackIncorrect: '' };
+    // Night 2 block types get their editors in lane C; these are valid empty starts.
+    case 'document': return { type, title: '', sections: [{ heading: '', text: '' }] };
+    case 'file': return { type, fileId: '', title: '', description: '' };
+    case 'video': return { type, src: '', provider: 'youtube', title: '', captionsFileId: null, transcript: '', minutes: 0 };
+    case 'table': return { type, caption: '', headerRow: true, rows: [['', ''], ['', '']] };
+    case 'scenario': return { type, title: '', setting: '', nodes: [{ id: 'start', text: '', choices: [], outcome: '' }], startNodeId: 'start' };
+    case 'link': return { type, href: '', text: '', description: '' };
   }
 }
 function contentText(block: BlockContent): string {
@@ -26,6 +33,12 @@ function contentText(block: BlockContent): string {
     case 'callout': return `${block.title}\n${block.text}`;
     case 'image': return `${block.src}\n${block.alt}\n${block.caption}`;
     case 'check': return `${block.question}\n${block.options.map(o => o.text).join('\n')}`;
+    case 'document': return `${block.title}\n${block.sections.map(s => s.heading).join('\n')}`;
+    case 'file': return `${block.title}\n${block.description}`;
+    case 'video': return `${block.title}\n${block.src}`;
+    case 'table': return `${block.caption}\n${block.rows.map(r => r.join(' | ')).join('\n')}`;
+    case 'scenario': return `${block.title}\n${block.setting}`;
+    case 'link': return `${block.text}\n${block.href}`;
   }
 }
 function BlockFields({ block, onChange }: { block: BlockInput; onChange: (value: BlockInput) => void }) {
@@ -34,6 +47,7 @@ function BlockFields({ block, onChange }: { block: BlockInput; onChange: (value:
   if (block.type === 'text') return <Field label="Text" value={block.text} onChange={text => set({ text })} multiline required />;
   if (block.type === 'callout') return <><FormField label="Tone">{control => <Select {...control} value={block.tone} onChange={e => set({ tone: e.target.value as 'info' | 'tip' | 'warning' })}><option value="info">Info</option><option value="tip">Tip</option><option value="warning">Warning</option></Select>}</FormField><Field label="Callout title" value={block.title} onChange={title => set({ title })} /><Field label="Callout text" value={block.text} onChange={text => set({ text })} multiline /></>;
   if (block.type === 'image') return <><Field label="Image URL" type="url" value={block.src} onChange={src => set({ src })} required /><label className={styles.row}><input type="checkbox" checked={block.decorative} onChange={e => set({ decorative: e.target.checked, alt: e.target.checked ? '' : block.alt })} /> Decorative image</label><Field label="Alt text" value={block.alt} onChange={alt => set({ alt })} required={!block.decorative} hint="Describe the image, or mark it decorative." /><Field label="Caption" value={block.caption} onChange={caption => set({ caption })} /></>;
+  if (block.type !== 'check') return <p className="muted">This block type is edited in the content editor (Night 2, lane C).</p>;
   return <><Field label="Question" value={block.question} onChange={question => set({ question })} required />{block.options.map((option, i) => <div className={styles.row} key={option.id}><Field label={`Option ${i + 1}`} value={option.text} onChange={text => set({ options: block.options.map(o => o.id === option.id ? { ...o, text } : o) })} required /><label><input type="radio" name={`correct-${block.id ?? block.options[0].id}`} checked={block.correctOptionId === option.id} onChange={() => set({ correctOptionId: option.id })} /> Correct</label><Button density="compact" disabled={block.options.length <= 2} onClick={() => set({ options: block.options.filter(o => o.id !== option.id), correctOptionId: block.correctOptionId === option.id ? '' : block.correctOptionId })}>Remove option</Button></div>)}<Button density="compact" disabled={block.options.length >= 6} onClick={() => set({ options: [...block.options, { id: crypto.randomUUID(), text: '' }] })}>Add option</Button><Field label="Feedback for correct answer" value={block.feedbackCorrect} onChange={feedbackCorrect => set({ feedbackCorrect })} multiline /><Field label="Feedback for incorrect answer" value={block.feedbackIncorrect} onChange={feedbackIncorrect => set({ feedbackIncorrect })} multiline /></>;
 }
 function StudentBlock({ block }: { block: BlockInput }) {
@@ -43,6 +57,7 @@ function StudentBlock({ block }: { block: BlockInput }) {
     case 'callout': return <aside className={styles.panel}><strong>{block.title}</strong><p className={styles.preview}>{block.text}</p></aside>;
     case 'image': return <figure><img className={styles.media} src={block.src} alt={block.decorative ? '' : block.alt} /><figcaption>{block.caption}</figcaption></figure>;
     case 'check': return <fieldset><legend>{block.question}</legend>{block.options.map(o => <label key={o.id} className={styles.row}><input type="radio" disabled name={`preview-${block.id ?? block.options[0].id}`} />{o.text}</label>)}</fieldset>;
+    default: return <p className="muted">{contentText(block).split('\n')[0]}</p>;
   }
 }
 export function LessonEditor() {

@@ -60,7 +60,12 @@ function PlainBlock({ block, lessonId }: { block: StudentBlock; lessonId: string
   if (block.type === 'text') return <div>{block.text.split(/\n\s*\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>;
   if (block.type === 'callout') return <aside className={styles.callout}><p className={styles.tone}>{block.tone}</p><h3>{block.title}</h3><p>{block.text}</p></aside>;
   if (block.type === 'image') return <figure className={styles.figure}><img src={block.src} alt={block.decorative ? '' : block.alt} />{block.caption && <figcaption>{block.caption}</figcaption>}</figure>;
-  return <CheckBlock block={block} lessonId={lessonId} />;
+  if (block.type === 'check') return <CheckBlock block={block} lessonId={lessonId} />;
+  if (block.type === 'document') return <section>{block.sections.map((s, i) => <div key={i}><h3>{s.heading}</h3>{s.text.split(/\n\s*\n/).map((p, j) => <p key={j}>{p}</p>)}</div>)}</section>;
+  if (block.type === 'table') return <table><caption>{block.caption}</caption>{block.headerRow && <thead><tr>{block.rows[0].map((c, i) => <th scope="col" key={i}>{c}</th>)}</tr></thead>}<tbody>{block.rows.slice(block.headerRow ? 1 : 0).map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table>;
+  if (block.type === 'link') return <p><a href={block.href} rel="noopener">{block.text}</a>{block.description && <> · {block.description}</>}</p>;
+  // Players for file, video, and scenario blocks arrive with lane C.
+  return <p className="muted">{'title' in block ? block.title : 'Content'} (coming in this release)</p>;
 }
 
 export function LessonPage() {

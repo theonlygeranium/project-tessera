@@ -121,6 +121,12 @@ const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K][
       case 'callout': return { block: { ...block, text: `${block.text} Take a minute on this before moving on.` } };
       case 'image': return { block: { ...block, caption: block.caption || 'Illustration for this section.' } };
       case 'check': return { block: { ...block, question: `Rephrased${note}: ${block.question}` } };
+      case 'document': return { block: { ...block, sections: block.sections.map((s) => ({ ...s, text: `Put another way${note}: ${s.text}` })) } };
+      case 'scenario': return { block: { ...block, setting: `${block.setting}${note}` } };
+      case 'video': return { block: { ...block, transcript: block.transcript || 'Transcript to be added.' } };
+      case 'table': return { block: { ...block, caption: block.caption || 'Data table' } };
+      case 'link': return { block: { ...block, text: block.text || block.href } };
+      case 'file': return { block: { ...block, description: `${block.description}${note}`.trim() } };
     }
   },
 

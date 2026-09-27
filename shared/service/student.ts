@@ -1,7 +1,7 @@
 import { ApiError } from '../api';
 import type { Block, LessonProgress, StudentBlock, TaskItem } from '../domain';
 import type { Service, ServiceContext } from './context';
-import { canReachCourse, fail, moduleFor, studentLesson, user } from './helpers';
+import { canReachCourse, fail, moduleFor, studentLesson, user, content } from './helpers';
 import { courses } from './courses';
 import { announcements } from './announcements';
 
@@ -45,11 +45,11 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
   getStudentLesson: async (ctx, { lessonId }) => {
     const l = await studentLesson(ctx, lessonId), c = await canReachCourse(ctx, l.courseId), m = await moduleFor(ctx, l.moduleId);
     const blocks: StudentBlock[] = (await ctx.repo.listBlocks(lessonId)).filter(visible).map(b => {
-      if (b.type === 'check') return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'check', question: b.question, options: b.options };
-      if (b.type === 'heading') return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'heading', level: b.level, text: b.text };
-      if (b.type === 'text') return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'text', text: b.text };
-      if (b.type === 'callout') return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'callout', tone: b.tone, title: b.title, text: b.text };
-      return { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance, type: 'image', src: b.src, alt: b.alt, decorative: b.decorative, caption: b.caption };
+      const meta = { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance };
+      const c = content(b);
+      // Students never receive the answer key (D-005).
+      if (c.type === 'check') return { ...meta, type: 'check', question: c.question, options: c.options };
+      return { ...meta, ...c } as StudentBlock;
     });
     const siblings = (await ctx.repo.listLessons({ courseId: l.courseId })).filter(x => x.status === 'published');
     const index = siblings.findIndex(x => x.id === lessonId);

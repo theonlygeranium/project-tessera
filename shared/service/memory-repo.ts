@@ -1,4 +1,4 @@
-import type { Announcement, Block, BuilderSession, Course, Institution, Lesson, Module, User } from '../domain';
+import type { Announcement, Block, BuilderSession, Course, Institution, Lesson, Module, User, ApiToken } from '../domain';
 import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress } from '../repo';
 import type { SeedData } from '../seed';
 
@@ -81,6 +81,11 @@ export class MemoryRepo implements Repo {
   async getBuilderSession(id: string): Promise<BuilderSession | null> { return copy(this.data.builderSessions.find(x => x.id === id) ?? null); }
   async listBuilderSessions(courseId: string): Promise<BuilderSession[]> { return copy(this.data.builderSessions.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt))); }
   async putBuilderSession(value: BuilderSession) { this.upsert(this.data.builderSessions, value); }
+  async getApiTokenByHash(hash: string) { const t = this.data.apiTokens.find(x => x.hash === hash); return t ? copy(t) : null; }
+  async listApiTokens(ownerId: string) { return copy(this.data.apiTokens.filter(x => x.ownerId === ownerId)); }
+  async putApiToken(token: ApiToken & { hash: string }) { this.upsert(this.data.apiTokens, token); }
+  async touchApiToken(id: string, usedAt: string) { const t = this.data.apiTokens.find(x => x.id === id); if (t) t.lastUsedAt = usedAt; }
+  async hasInvitations() { return this.data.invitations.length > 0; }
   async isEmpty(): Promise<boolean> { return this.data.users.length === 0; }
   async reset(seed: SeedData) { this.data = copy(seed); }
   private upsert<T extends { id: string }>(items: T[], value: T) {

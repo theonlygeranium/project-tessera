@@ -1,4 +1,4 @@
-// The Tessera API contract (Night 1, lane A). One table drives three things:
+// The Tessera API contract (D-020). One table drives three things:
 //   1. the Worker router (worker/): method, path, and which roles may call it;
 //   2. the app's HTTP adapter (app/src/data/http.ts), generically;
 //   3. the app's mock adapter (app/src/data/mock.ts), which must behave the same.
@@ -7,12 +7,23 @@
 // Path parameters (":courseId") are read from the input object by name. For GET and
 // DELETE the remaining input fields become the query string; otherwise they're the
 // JSON body. Role rules here are the first check; handlers also check resource
-// access (an instructor must teach the course, a student must be enrolled).
+// access (an instructor must teach the course, a student must be enrolled). API
+// tokens must also carry the route's scope (D-020).
 import type {
-  AiPolicy, Announcement, Block, BlockContent, BuilderSession, CheckResult, Course, CourseBrief, CourseOutline,
-  CourseSummary, Id, Institution, LearningProfile, Lesson, LessonDetail, LessonProgress, LessonProgressState, Module,
-  OutlineDraft, Overview, Provenance, Role, RosterEntry, StudentLesson, Today, User,
+  AccessIssue, AccessPolicy, AccessReport, AccessibleFormat, Adaptation, AiPolicy, Announcement, ApiToken, Assignment,
+  Block, BlockContent, BlockType, BuilderSession, CheckResult, Course, CourseAccessReport, CourseBrief, CourseOutline,
+  CourseSummary, FileRecord, FormatStatus, Grade, GradebookRow, Id, Institution, InstitutionAccessReport, Invitation,
+  LearningProfile, Lesson, LessonDetail, LessonProgress, LessonProgressState, Module, OutlineDraft, Overview, Preset,
+  Provenance, Role, RosterEntry, RubricCriterion, ScenarioNode, Scope, StudentLesson, Submission, SubmissionType, Today,
+  Timestamp, TutorMessage, TutorSession, TutorSetting, TutorSummary, User,
 } from './domain';
+
+/** Every API route lives under this prefix (D-020). `/api` without a version is an alias during Night 2. */
+export const API_PREFIX = '/api/v1';
+
+/** A page of results: cursor pagination on every list (D-020). */
+export interface Page<T> { items: T[]; nextCursor: string | null }
+export interface PageInput { limit?: number; cursor?: string }
 
 export interface SessionInfo {
   user: User | null;
@@ -115,6 +126,82 @@ export interface ApiSpec {
   generateOutline: { input: { sessionId: Id }; output: BuilderSession };
   /** Creates modules, lessons, and AI draft blocks in the course from the outline. */
   generateDrafts: { input: { sessionId: Id }; output: BuilderSession };
+
+  // ---- Night 2 ----
+
+  // Identity (D-021)
+  /** Who the Access session is (email) and the Tessera user it maps to, if any. */
+  whoAmI: { input: void; output: { email: string | null; user: User | null; viewingAs: User | null } };
+  /** Administrators only: act as another user for support and QA. */
+  viewAs: { input: { userId: Id | null }; output: SessionInfo };
+  listInvitations: { input: PageInput; output: Page<Invitation> };
+  inviteUser: { input: { name: string; email: string; role: Role }; output: Invitation };
+
+  // API tokens (D-020)
+  listApiTokens: { input: void; output: ApiToken[] };
+  createApiToken: { input: { name: string; scopes: Scope[]; expiresInDays?: number }; output: { token: ApiToken; secret: string } };
+  revokeApiToken: { input: { tokenId: Id }; output: Ok };
+
+  // Files (D-019)
+  listFiles: { input: { courseId: Id } & PageInput; output: Page<FileRecord> };
+  /** Multipart upload is handled by the Worker; this records the file after the bytes are stored. */
+  getFile: { input: { fileId: Id }; output: FileRecord };
+  deleteFile: { input: { fileId: Id }; output: Ok };
+  getFormats: { input: { fileId: Id }; output: FormatStatus[] };
+  requestFormat: { input: { fileId: Id; format: AccessibleFormat }; output: FormatStatus };
+
+  // Tessera Access (D-022)
+  getLessonAccess: { input: { lessonId: Id }; output: AccessReport };
+  scanFile: { input: { fileId: Id }; output: AccessReport };
+  getFileAccess: { input: { fileId: Id }; output: AccessReport };
+  /** Applies a fix to a document as a new version (alt text, table header, metadata). */
+  fixFileIssue: { input: { fileId: Id; issueIndex: number; fix: { kind: 'alt-text'; element: number; alt: string; decorative: boolean } | { kind: 'table-header'; element: number } | { kind: 'metadata'; title?: string; language?: string } }; output: AccessReport };
+  /** AI suggestion for an issue (alt text from the image, rewrite, link text): a draft the person applies. */
+  suggestFix: { input: { target: { lessonId: Id; blockId: Id } | { fileId: Id; element: number }; kind: 'alt-text' | 'rewrite' | 'link-text' }; output: { suggestion: string; provenance: Provenance } };
+  getCourseAccess: { input: { courseId: Id }; output: CourseAccessReport };
+  getInstitutionAccess: { input: void; output: InstitutionAccessReport };
+  exportInstitutionAccess: { input: void; output: { csv: string } };
+  updateAccessPolicy: { input: AccessPolicy; output: Institution };
+
+  // Assignments, submissions, grading (plan §5.3)
+  createAssignment: { input: { moduleId: Id; title: string; submissionType: SubmissionType; points: number; dueAt?: Timestamp | null }; output: Assignment };
+  getAssignment: { input: { assignmentId: Id }; output: Assignment };
+  updateAssignment: { input: { assignmentId: Id } & Partial<Pick<Assignment, 'title' | 'dueAt' | 'points' | 'submissionType' | 'rubric' | 'position'>> & { instructions?: BlockInput[] }; output: Assignment };
+  deleteAssignment: { input: { assignmentId: Id }; output: Ok };
+  publishAssignment: { input: { assignmentId: Id }; output: Assignment };
+  listSubmissions: { input: { assignmentId: Id } & PageInput; output: Page<Submission & { student: Pick<User, 'id' | 'name' | 'email'> }> };
+  submit: { input: { assignmentId: Id; text?: string; fileId?: Id; link?: string }; output: Submission };
+  getMySubmission: { input: { assignmentId: Id }; output: Submission | null };
+  gradeSubmission: { input: { submissionId: Id; criteria: Grade['criteria']; score: number; feedback: string; feedbackOrigin: 'human' | 'ai'; feedbackProvenance?: Provenance | null }; output: Submission };
+  /** AI-drafted feedback from the rubric result and the submission (a draft, D-003). */
+  draftFeedback: { input: { submissionId: Id; criteria: Grade['criteria'] }; output: { feedback: string; provenance: Provenance } };
+  releaseGrades: { input: { assignmentId: Id }; output: Ok };
+  getGradebook: { input: { courseId: Id }; output: { assignments: Pick<Assignment, 'id' | 'title' | 'points' | 'dueAt'>[]; rows: GradebookRow[] } };
+  exportGradebook: { input: { courseId: Id }; output: { csv: string } };
+
+  // Tutor (D-005, plan §5.4)
+  getTutorSetting: { input: { activityKind: 'lesson' | 'assignment'; activityId: Id }; output: TutorSetting | null };
+  setTutorSetting: { input: Omit<TutorSetting, 'setBy' | 'setAt'>; output: TutorSetting };
+  startTutorSession: { input: { activityKind: 'lesson' | 'assignment'; activityId: Id }; output: TutorSession };
+  sendTutorMessage: { input: { sessionId: Id; text: string; intent: 'hint' | 'explain' | 'answer' | 'chat' }; output: { session: TutorSession; reply: TutorMessage } };
+  getTutorSummaries: { input: { courseId: Id }; output: TutorSummary[] };
+
+  // Adaptations (D-004, principle #7)
+  listPresets: { input: void; output: Preset[] };
+  suggestPreset: { input: void; output: { preset: Preset; why: string; provenance: Provenance | null } };
+  applyPreset: { input: { presetId: Preset['id'] }; output: Adaptation[] };
+  listAdaptations: { input: void; output: Adaptation[] };
+  undoAdaptation: { input: { adaptationId: Id }; output: Adaptation };
+
+  // AI authoring at any scope (plan §5.2)
+  /** Generates drafts for a scope: whole course, modules, lessons, or element types; returns a job. */
+  generateAtScope: { input: { courseId: Id; scope: { moduleIds?: Id[]; lessonIds?: Id[]; elementTypes?: BlockType[]; wholeCourse?: boolean }; instruction?: string }; output: { jobId: Id } };
+  getGenerationJob: { input: { jobId: Id }; output: { jobId: Id; state: 'running' | 'done' | 'failed'; done: number; total: number; lessonIds: Id[]; error: string | null } };
+  /** Generates one element as a draft block in a lesson. */
+  generateElement: { input: { lessonId: Id; type: BlockType; instruction?: string; position?: number }; output: LessonDetail };
+
+  // Import (D-020)
+  importCourse: { input: { course: { code: string; title: string; term: string; description?: string; welcome?: string; outcomes?: string[] }; modules: { title: string; lessons: { title: string; minutes?: number; blocks: BlockInput[] }[] }[] }; output: CourseOutline };
 }
 
 export type Operation = keyof ApiSpec;
@@ -132,8 +219,11 @@ export type Access = 'public' | 'signed-in' | Role[];
 
 export interface Route {
   method: HttpMethod;
+  /** Relative to API_PREFIX. */
   path: string;
   access: Access;
+  /** The scope an API token needs (browser sessions need none). */
+  scope: Scope | null;
 }
 
 const ADMIN: Role[] = ['administrator'];
@@ -143,63 +233,135 @@ const STUDENT: Role[] = ['student'];
 
 /** Permissions as data (D-011 foundations): the Worker and the mock adapter both enforce this table. */
 export const ROUTES: { [K in Operation]: Route } = {
-  getSession: { method: 'GET', path: '/api/session', access: 'public' },
-  signIn: { method: 'POST', path: '/api/session', access: 'public' },
-  signOut: { method: 'DELETE', path: '/api/session', access: 'public' },
-  listDemoUsers: { method: 'GET', path: '/api/demo/users', access: 'public' },
-  resetDemo: { method: 'POST', path: '/api/demo/reset', access: ADMIN },
+  getSession: { method: 'GET', path: '/session', access: 'public', scope: null },
+  signIn: { method: 'POST', path: '/session', access: 'public', scope: null },
+  signOut: { method: 'DELETE', path: '/session', access: 'public', scope: null },
+  listDemoUsers: { method: 'GET', path: '/demo/users', access: 'public', scope: null },
+  resetDemo: { method: 'POST', path: '/demo/reset', access: ADMIN, scope: 'people:write' },
 
-  updateInstitution: { method: 'PATCH', path: '/api/institution', access: ADMIN },
-  updatePolicy: { method: 'PUT', path: '/api/institution/policy', access: ADMIN },
-  getOverview: { method: 'GET', path: '/api/overview', access: ADMIN },
-  listUsers: { method: 'GET', path: '/api/users', access: ADMIN },
-  createUser: { method: 'POST', path: '/api/users', access: ADMIN },
-  importUsers: { method: 'POST', path: '/api/users/import', access: ADMIN },
-  updateUser: { method: 'PATCH', path: '/api/users/:userId', access: ADMIN },
+  updateInstitution: { method: 'PATCH', path: '/institution', access: ADMIN, scope: 'people:write' },
+  updatePolicy: { method: 'PUT', path: '/institution/policy', access: ADMIN, scope: 'people:write' },
+  getOverview: { method: 'GET', path: '/overview', access: ADMIN, scope: 'people:read' },
+  listUsers: { method: 'GET', path: '/users', access: ADMIN, scope: 'people:read' },
+  createUser: { method: 'POST', path: '/users', access: ADMIN, scope: 'people:write' },
+  importUsers: { method: 'POST', path: '/users/import', access: ADMIN, scope: 'people:write' },
+  updateUser: { method: 'PATCH', path: '/users/:userId', access: ADMIN, scope: 'people:write' },
 
-  listCourses: { method: 'GET', path: '/api/courses', access: 'signed-in' },
-  createCourse: { method: 'POST', path: '/api/courses', access: ADMIN },
-  getCourseOutline: { method: 'GET', path: '/api/courses/:courseId', access: 'signed-in' },
-  updateCourse: { method: 'PATCH', path: '/api/courses/:courseId', access: STAFF },
-  setCourseInstructors: { method: 'PUT', path: '/api/courses/:courseId/instructors', access: ADMIN },
-  getCourseEnrollments: { method: 'GET', path: '/api/courses/:courseId/enrollments', access: STAFF },
-  setCourseEnrollments: { method: 'PUT', path: '/api/courses/:courseId/enrollments', access: ADMIN },
-  getRoster: { method: 'GET', path: '/api/courses/:courseId/roster', access: STAFF },
+  listCourses: { method: 'GET', path: '/courses', access: 'signed-in', scope: 'courses:read' },
+  createCourse: { method: 'POST', path: '/courses', access: ADMIN, scope: 'courses:write' },
+  getCourseOutline: { method: 'GET', path: '/courses/:courseId', access: 'signed-in', scope: 'courses:read' },
+  updateCourse: { method: 'PATCH', path: '/courses/:courseId', access: STAFF, scope: 'courses:write' },
+  setCourseInstructors: { method: 'PUT', path: '/courses/:courseId/instructors', access: ADMIN, scope: 'courses:write' },
+  getCourseEnrollments: { method: 'GET', path: '/courses/:courseId/enrollments', access: STAFF, scope: 'courses:read' },
+  setCourseEnrollments: { method: 'PUT', path: '/courses/:courseId/enrollments', access: ADMIN, scope: 'courses:write' },
+  getRoster: { method: 'GET', path: '/courses/:courseId/roster', access: STAFF, scope: 'courses:read' },
 
-  createModule: { method: 'POST', path: '/api/courses/:courseId/modules', access: INSTRUCTOR },
-  updateModule: { method: 'PATCH', path: '/api/modules/:moduleId', access: INSTRUCTOR },
-  deleteModule: { method: 'DELETE', path: '/api/modules/:moduleId', access: INSTRUCTOR },
-  createLesson: { method: 'POST', path: '/api/modules/:moduleId/lessons', access: INSTRUCTOR },
-  updateLesson: { method: 'PATCH', path: '/api/lessons/:lessonId', access: INSTRUCTOR },
-  deleteLesson: { method: 'DELETE', path: '/api/lessons/:lessonId', access: INSTRUCTOR },
-  getLesson: { method: 'GET', path: '/api/lessons/:lessonId', access: STAFF },
-  saveBlocks: { method: 'PUT', path: '/api/lessons/:lessonId/blocks', access: INSTRUCTOR },
-  keepBlock: { method: 'POST', path: '/api/blocks/:blockId/keep', access: INSTRUCTOR },
-  revertBlock: { method: 'POST', path: '/api/blocks/:blockId/revert', access: INSTRUCTOR },
-  regenerateBlock: { method: 'POST', path: '/api/blocks/:blockId/regenerate', access: INSTRUCTOR },
-  publishLesson: { method: 'POST', path: '/api/lessons/:lessonId/publish', access: INSTRUCTOR },
-  unpublishLesson: { method: 'POST', path: '/api/lessons/:lessonId/unpublish', access: INSTRUCTOR },
+  createModule: { method: 'POST', path: '/courses/:courseId/modules', access: INSTRUCTOR, scope: 'content:write' },
+  updateModule: { method: 'PATCH', path: '/modules/:moduleId', access: INSTRUCTOR, scope: 'content:write' },
+  deleteModule: { method: 'DELETE', path: '/modules/:moduleId', access: INSTRUCTOR, scope: 'content:write' },
+  createLesson: { method: 'POST', path: '/modules/:moduleId/lessons', access: INSTRUCTOR, scope: 'content:write' },
+  updateLesson: { method: 'PATCH', path: '/lessons/:lessonId', access: INSTRUCTOR, scope: 'content:write' },
+  deleteLesson: { method: 'DELETE', path: '/lessons/:lessonId', access: INSTRUCTOR, scope: 'content:write' },
+  getLesson: { method: 'GET', path: '/lessons/:lessonId', access: STAFF, scope: 'content:read' },
+  saveBlocks: { method: 'PUT', path: '/lessons/:lessonId/blocks', access: INSTRUCTOR, scope: 'content:write' },
+  keepBlock: { method: 'POST', path: '/blocks/:blockId/keep', access: INSTRUCTOR, scope: 'content:write' },
+  revertBlock: { method: 'POST', path: '/blocks/:blockId/revert', access: INSTRUCTOR, scope: 'content:write' },
+  regenerateBlock: { method: 'POST', path: '/blocks/:blockId/regenerate', access: INSTRUCTOR, scope: 'ai:run' },
+  publishLesson: { method: 'POST', path: '/lessons/:lessonId/publish', access: INSTRUCTOR, scope: 'content:write' },
+  unpublishLesson: { method: 'POST', path: '/lessons/:lessonId/unpublish', access: INSTRUCTOR, scope: 'content:write' },
 
-  saveProfile: { method: 'PUT', path: '/api/me/profile', access: STUDENT },
-  getToday: { method: 'GET', path: '/api/me/today', access: STUDENT },
-  getStudentLesson: { method: 'GET', path: '/api/me/lessons/:lessonId', access: STUDENT },
-  answerCheck: { method: 'POST', path: '/api/me/lessons/:lessonId/checks/:blockId', access: STUDENT },
-  setLessonProgress: { method: 'POST', path: '/api/me/lessons/:lessonId/progress', access: STUDENT },
+  saveProfile: { method: 'PUT', path: '/me/profile', access: STUDENT, scope: null },
+  getToday: { method: 'GET', path: '/me/today', access: STUDENT, scope: null },
+  getStudentLesson: { method: 'GET', path: '/me/lessons/:lessonId', access: STUDENT, scope: null },
+  answerCheck: { method: 'POST', path: '/me/lessons/:lessonId/checks/:blockId', access: STUDENT, scope: null },
+  setLessonProgress: { method: 'POST', path: '/me/lessons/:lessonId/progress', access: STUDENT, scope: null },
 
-  listAnnouncements: { method: 'GET', path: '/api/announcements', access: 'signed-in' },
-  createAnnouncement: { method: 'POST', path: '/api/courses/:courseId/announcements', access: INSTRUCTOR },
-  updateAnnouncement: { method: 'PATCH', path: '/api/announcements/:announcementId', access: INSTRUCTOR },
-  deleteAnnouncement: { method: 'DELETE', path: '/api/announcements/:announcementId', access: INSTRUCTOR },
-  markAnnouncementRead: { method: 'POST', path: '/api/announcements/:announcementId/read', access: 'signed-in' },
-  draftAnnouncement: { method: 'POST', path: '/api/ai/announcement', access: INSTRUCTOR },
+  listAnnouncements: { method: 'GET', path: '/announcements', access: 'signed-in', scope: 'courses:read' },
+  createAnnouncement: { method: 'POST', path: '/courses/:courseId/announcements', access: INSTRUCTOR, scope: 'courses:write' },
+  updateAnnouncement: { method: 'PATCH', path: '/announcements/:announcementId', access: INSTRUCTOR, scope: 'courses:write' },
+  deleteAnnouncement: { method: 'DELETE', path: '/announcements/:announcementId', access: INSTRUCTOR, scope: 'courses:write' },
+  markAnnouncementRead: { method: 'POST', path: '/announcements/:announcementId/read', access: 'signed-in', scope: 'courses:write' },
+  draftAnnouncement: { method: 'POST', path: '/ai/announcement', access: INSTRUCTOR, scope: 'ai:run' },
 
-  listBuilderSessions: { method: 'GET', path: '/api/courses/:courseId/builder', access: INSTRUCTOR },
-  createBuilderSession: { method: 'POST', path: '/api/courses/:courseId/builder', access: INSTRUCTOR },
-  getBuilderSession: { method: 'GET', path: '/api/builder/:sessionId', access: INSTRUCTOR },
-  updateBuilderSession: { method: 'PATCH', path: '/api/builder/:sessionId', access: INSTRUCTOR },
-  generateOutline: { method: 'POST', path: '/api/builder/:sessionId/outline', access: INSTRUCTOR },
-  generateDrafts: { method: 'POST', path: '/api/builder/:sessionId/draft', access: INSTRUCTOR },
+  listBuilderSessions: { method: 'GET', path: '/courses/:courseId/builder', access: INSTRUCTOR, scope: 'content:read' },
+  createBuilderSession: { method: 'POST', path: '/courses/:courseId/builder', access: INSTRUCTOR, scope: 'ai:run' },
+  getBuilderSession: { method: 'GET', path: '/builder/:sessionId', access: INSTRUCTOR, scope: 'content:read' },
+  updateBuilderSession: { method: 'PATCH', path: '/builder/:sessionId', access: INSTRUCTOR, scope: 'content:write' },
+  generateOutline: { method: 'POST', path: '/builder/:sessionId/outline', access: INSTRUCTOR, scope: 'ai:run' },
+  generateDrafts: { method: 'POST', path: '/builder/:sessionId/draft', access: INSTRUCTOR, scope: 'ai:run' },
+
+  whoAmI: { method: 'GET', path: '/me', access: 'public', scope: null },
+  viewAs: { method: 'POST', path: '/session/view-as', access: ADMIN, scope: null },
+  listInvitations: { method: 'GET', path: '/invitations', access: ADMIN, scope: 'people:read' },
+  inviteUser: { method: 'POST', path: '/invitations', access: ADMIN, scope: 'people:write' },
+
+  listApiTokens: { method: 'GET', path: '/tokens', access: STAFF, scope: null },
+  createApiToken: { method: 'POST', path: '/tokens', access: STAFF, scope: null },
+  revokeApiToken: { method: 'DELETE', path: '/tokens/:tokenId', access: STAFF, scope: null },
+
+  listFiles: { method: 'GET', path: '/courses/:courseId/files', access: 'signed-in', scope: 'content:read' },
+  getFile: { method: 'GET', path: '/files/:fileId', access: 'signed-in', scope: 'content:read' },
+  deleteFile: { method: 'DELETE', path: '/files/:fileId', access: INSTRUCTOR, scope: 'content:write' },
+  getFormats: { method: 'GET', path: '/files/:fileId/formats', access: 'signed-in', scope: 'content:read' },
+  requestFormat: { method: 'POST', path: '/files/:fileId/formats', access: 'signed-in', scope: 'content:read' },
+
+  getLessonAccess: { method: 'GET', path: '/lessons/:lessonId/access', access: STAFF, scope: 'access:read' },
+  scanFile: { method: 'POST', path: '/files/:fileId/access/scan', access: STAFF, scope: 'access:write' },
+  getFileAccess: { method: 'GET', path: '/files/:fileId/access', access: STAFF, scope: 'access:read' },
+  fixFileIssue: { method: 'POST', path: '/files/:fileId/access/fix', access: INSTRUCTOR, scope: 'access:write' },
+  suggestFix: { method: 'POST', path: '/access/suggest', access: INSTRUCTOR, scope: 'ai:run' },
+  getCourseAccess: { method: 'GET', path: '/courses/:courseId/access', access: STAFF, scope: 'access:read' },
+  getInstitutionAccess: { method: 'GET', path: '/access/institution', access: ADMIN, scope: 'access:read' },
+  exportInstitutionAccess: { method: 'GET', path: '/access/institution/export', access: ADMIN, scope: 'access:read' },
+  updateAccessPolicy: { method: 'PUT', path: '/institution/access-policy', access: ADMIN, scope: 'people:write' },
+
+  createAssignment: { method: 'POST', path: '/modules/:moduleId/assignments', access: INSTRUCTOR, scope: 'content:write' },
+  getAssignment: { method: 'GET', path: '/assignments/:assignmentId', access: 'signed-in', scope: 'content:read' },
+  updateAssignment: { method: 'PATCH', path: '/assignments/:assignmentId', access: INSTRUCTOR, scope: 'content:write' },
+  deleteAssignment: { method: 'DELETE', path: '/assignments/:assignmentId', access: INSTRUCTOR, scope: 'content:write' },
+  publishAssignment: { method: 'POST', path: '/assignments/:assignmentId/publish', access: INSTRUCTOR, scope: 'content:write' },
+  listSubmissions: { method: 'GET', path: '/assignments/:assignmentId/submissions', access: STAFF, scope: 'grades:read' },
+  submit: { method: 'POST', path: '/assignments/:assignmentId/submissions', access: STUDENT, scope: null },
+  getMySubmission: { method: 'GET', path: '/assignments/:assignmentId/submissions/me', access: STUDENT, scope: null },
+  gradeSubmission: { method: 'POST', path: '/submissions/:submissionId/grade', access: INSTRUCTOR, scope: 'grades:write' },
+  draftFeedback: { method: 'POST', path: '/submissions/:submissionId/draft-feedback', access: INSTRUCTOR, scope: 'ai:run' },
+  releaseGrades: { method: 'POST', path: '/assignments/:assignmentId/release', access: INSTRUCTOR, scope: 'grades:write' },
+  getGradebook: { method: 'GET', path: '/courses/:courseId/gradebook', access: STAFF, scope: 'grades:read' },
+  exportGradebook: { method: 'GET', path: '/courses/:courseId/gradebook/export', access: STAFF, scope: 'grades:read' },
+
+  getTutorSetting: { method: 'GET', path: '/tutor/settings', access: 'signed-in', scope: 'content:read' },
+  setTutorSetting: { method: 'PUT', path: '/tutor/settings', access: INSTRUCTOR, scope: 'content:write' },
+  startTutorSession: { method: 'POST', path: '/tutor/sessions', access: STUDENT, scope: null },
+  sendTutorMessage: { method: 'POST', path: '/tutor/sessions/:sessionId/messages', access: STUDENT, scope: null },
+  getTutorSummaries: { method: 'GET', path: '/courses/:courseId/tutor/summaries', access: INSTRUCTOR, scope: 'courses:read' },
+
+  listPresets: { method: 'GET', path: '/presets', access: 'signed-in', scope: null },
+  suggestPreset: { method: 'POST', path: '/me/preset/suggest', access: STUDENT, scope: null },
+  applyPreset: { method: 'POST', path: '/me/preset', access: STUDENT, scope: null },
+  listAdaptations: { method: 'GET', path: '/me/adaptations', access: STUDENT, scope: null },
+  undoAdaptation: { method: 'POST', path: '/me/adaptations/:adaptationId/undo', access: STUDENT, scope: null },
+
+  generateAtScope: { method: 'POST', path: '/courses/:courseId/generate', access: INSTRUCTOR, scope: 'ai:run' },
+  getGenerationJob: { method: 'GET', path: '/generate/:jobId', access: INSTRUCTOR, scope: 'ai:run' },
+  generateElement: { method: 'POST', path: '/lessons/:lessonId/generate', access: INSTRUCTOR, scope: 'ai:run' },
+
+  importCourse: { method: 'POST', path: '/courses/import', access: ADMIN, scope: 'courses:write' },
 };
+
+/** All scopes, for the token form and the docs. */
+export const SCOPES: { id: Scope; description: string }[] = [
+  { id: 'courses:read', description: 'Read courses, outlines, rosters, announcements' },
+  { id: 'courses:write', description: 'Create and change courses, enrollments, announcements' },
+  { id: 'content:read', description: 'Read lessons, blocks, files, assignments' },
+  { id: 'content:write', description: 'Create and change modules, lessons, blocks, files, assignments; publish' },
+  { id: 'people:read', description: 'Read people and invitations' },
+  { id: 'people:write', description: 'Add and change people, institution settings, policies' },
+  { id: 'access:read', description: 'Read accessibility reports' },
+  { id: 'access:write', description: 'Run scans and apply document fixes' },
+  { id: 'grades:read', description: 'Read submissions and gradebooks' },
+  { id: 'grades:write', description: 'Grade and release' },
+  { id: 'ai:run', description: 'Run AI drafting and suggestions' },
+];
 
 // ---- Errors ------------------------------------------------------------------------------
 
@@ -211,7 +373,10 @@ export type ApiErrorCode =
   | 'conflict' //        409: for example deleting a non-empty module
   | 'not-ready' //       409: publish blocked; `details` is the ReadinessReport
   | 'ai-disabled' //     403: the administrator turned AI authoring off
-  | 'ai-failed'; //      502: the model call failed or returned unusable output
+  | 'ai-failed' //       502: the model call failed or returned unusable output
+  | 'rate-limited' //    429: too many requests for this token
+  | 'too-large' //       413: upload over the size limit
+  | 'unsupported'; //    415: file type not supported
 
 export const ERROR_STATUS: Record<ApiErrorCode, number> = {
   unauthenticated: 401,
@@ -222,6 +387,9 @@ export const ERROR_STATUS: Record<ApiErrorCode, number> = {
   'not-ready': 409,
   'ai-disabled': 403,
   'ai-failed': 502,
+  'rate-limited': 429,
+  'too-large': 413,
+  unsupported: 415,
 };
 
 /** Error body: `{ error: { code, message, details? } }` */
@@ -268,4 +436,4 @@ export function matchPath(pattern: string, path: string): Record<string, string>
 }
 
 // Re-exported so callers can import everything from one module.
-export type { Block };
+export type { Block, Timestamp };
