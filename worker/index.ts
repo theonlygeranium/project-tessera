@@ -84,7 +84,10 @@ async function handleApp(request: Request, env: Env): Promise<Response> {
   const asset = await env.ASSETS.fetch(request);
   const accept = request.headers.get('accept') ?? '';
   if (asset.status !== 404 || request.method !== 'GET' || !accept.toLowerCase().includes('text/html')) return asset;
-  const index = await env.ASSETS.fetch(new Request(new URL('/app/index.html', request.url), request));
+  // Fetch the app's entry as `/app/`: with html_handling "auto-trailing-slash" the
+  // assets binding answers `/app/index.html` with a redirect whose body is empty.
+  const index = await env.ASSETS.fetch(new Request(new URL('/app/', request.url), { headers: request.headers }));
+  if (!index.ok) return index;
   return new Response(index.body, { status: 200, headers: new Headers(index.headers) });
 }
 

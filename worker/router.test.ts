@@ -24,9 +24,12 @@ function assetsFor() {
       const request = input instanceof Request ? input : new Request(input);
       const url = new URL(request.url);
       calls.push(url.pathname);
-      if (url.pathname === '/app/index.html') {
+      // Like Cloudflare's assets with html_handling "auto-trailing-slash": the
+      // directory URL serves index.html, and /app/index.html redirects with no body.
+      if (url.pathname === '/app/') {
         return new Response('<html>app</html>', { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
       }
+      if (url.pathname === '/app/index.html') return new Response(null, { status: 307, headers: { location: '/app/' } });
       if (url.pathname === '/app/assets/app.js') {
         return new Response('js', { status: 200, headers: { 'content-type': 'text/javascript' } });
       }
@@ -218,14 +221,14 @@ describe('worker fetch', () => {
     expect((await repo.getUser('u-admin'))?.name).toBe('Renamed');
   });
 
-  it('falls back to /app/index.html for an HTML app route', async () => {
+  it('falls back to the app entry (/app/) for an HTML app route, with a body', async () => {
     const { fetcher, calls } = assetsFor();
     const env = testEnv(createTestDb(), fetcher);
     const response = await call(env, '/app/courses/x', { headers: { accept: 'text/html,application/xhtml+xml' } });
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('<html>app</html>');
     expect(response.headers.get('content-type')).toContain('text/html');
-    expect(calls).toEqual(['/app/courses/x', '/app/index.html']);
+    expect(calls).toEqual(['/app/courses/x', '/app/']);
   });
 
   it('does not rewrite an app asset that exists, or a non-HTML miss', async () => {
