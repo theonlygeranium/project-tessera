@@ -100,3 +100,14 @@ describe('document engine (Worker)', () => {
     expect(safeName('../Week 1: notes?.docx')).toBe('Week-1-notes.docx');
   });
 });
+
+describe('alt text for image blocks', () => {
+  it("refuses a file from another course", async () => {
+    const { engine, ctx, bucket } = await setup();
+    const other: FileRecord = { id: 'file-other', courseId: 'c-comm120', name: 'x.png', kind: 'image', mime: 'image/png', size: 4, key: 'files/c-comm120/file-other/v1/x.png', version: 1, uploadedBy: 'u-chen', uploadedAt: '2026-09-27T00:00:00.000Z', scan: null };
+    await bucket.put(other.key, new Uint8Array([137, 80, 78, 71]));
+    await ctx.repo.putFile(other);
+    const block = { id: 'b-img', lessonId: 'l-stat-1', position: 0, origin: 'human', aiState: null, provenance: null, previous: null, updatedAt: '', type: 'image', src: '/api/v1/files/file-other/content', alt: '', decorative: false, caption: '' } as Block;
+    await expect(engine.suggest({ kind: 'alt-text', courseTitle: 'Statistics', block }, ctx)).rejects.toMatchObject({ code: 'not-found' });
+  });
+});

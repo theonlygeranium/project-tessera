@@ -95,8 +95,13 @@ export class MemoryRepo implements Repo {
   async getBuilderSession(id: string): Promise<BuilderSession | null> { return copy(this.data.builderSessions.find(x => x.id === id) ?? null); }
   async listBuilderSessions(courseId: string): Promise<BuilderSession[]> { return copy(this.data.builderSessions.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt))); }
   async putBuilderSession(value: BuilderSession) { this.upsert(this.data.builderSessions, value); }
-  async getFile(id: string) { const f = this.data.files.find(x => x.id === id); return f ? copy(f) : null; }
-  async listFiles(courseId: string) { return copy(this.data.files.filter(x => x.courseId === courseId).sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt) || a.id.localeCompare(b.id))); }
+  // Like D1Repo, a file's `scan` is derived from its latest stored scan.
+  private withScan(f: FileRecord): FileRecord {
+    const s = this.data.scans.filter(x => x.target.kind === 'file' && x.target.fileId === f.id).sort((a, b) => b.scannedAt.localeCompare(a.scannedAt))[0];
+    return copy({ ...f, scan: s ? { score: s.score, grade: s.grade, issueCount: s.issueCount, bySeverity: s.bySeverity, scannedAt: s.scannedAt } : null });
+  }
+  async getFile(id: string) { const f = this.data.files.find(x => x.id === id); return f ? this.withScan(f) : null; }
+  async listFiles(courseId: string) { return this.data.files.filter(x => x.courseId === courseId).sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt) || a.id.localeCompare(b.id)).map(f => this.withScan(f)); }
   async putFile(file: FileRecord) { this.upsert(this.data.files, file); }
   async deleteFile(id: string) {
     this.data.files = this.data.files.filter(x => x.id !== id);

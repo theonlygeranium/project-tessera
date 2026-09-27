@@ -7,7 +7,7 @@ import tokens from '../../design/tokens.json';
 import { ApiError } from '../../shared/api';
 import { summarize } from '../../shared/access/score';
 import type { AccessReport, AccessibleFormat, Block, FileRecord, Provenance } from '../../shared/domain';
-import type { DocumentEngine, ServiceContext } from '../../shared/service';
+import { canReadFile, type DocumentEngine, type ServiceContext } from '../../shared/service';
 import { describeImage, type VisionEnv } from '../ai/vision';
 import { applyFix, checkDocument, extractImage, type DocumentCheck } from './index';
 
@@ -162,7 +162,10 @@ async function imageForBlock(env: EngineEnv, ctx: ServiceContext, block: Extract
   const fileId = /\/api(?:\/v1)?\/files\/([^/?#]+)\/content/.exec(block.src)?.[1];
   if (fileId) {
     const f = await ctx.repo.getFile(decodeURIComponent(fileId));
-    if (!f) throw new ApiError('not-found', 'The image file was not found.');
+    const lesson = await ctx.repo.getLesson(block.lessonId);
+    // The image must be a file of this lesson's course that the person can read.
+    if (!f || !lesson || f.courseId !== lesson.courseId) throw new ApiError('not-found', 'The image file was not found in this course.');
+    await canReadFile(ctx, f);
     return { mime: f.mime, bytes: await bytesOf(env, f.key) };
   }
   if (/^https:\/\//.test(block.src)) {

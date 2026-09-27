@@ -168,6 +168,7 @@ export interface ApiSpec {
   /** Staff see drafts and published assignments; students see published ones. */
   listAssignments: { input: { courseId: Id }; output: Assignment[] };
   getAssignment: { input: { assignmentId: Id }; output: Assignment };
+  /** `instructions` accepts heading, text, and callout blocks only. */
   updateAssignment: { input: { assignmentId: Id } & Partial<Pick<Assignment, 'title' | 'dueAt' | 'points' | 'submissionType' | 'rubric' | 'position'>> & { instructions?: BlockInput[] }; output: Assignment };
   deleteAssignment: { input: { assignmentId: Id }; output: Ok };
   publishAssignment: { input: { assignmentId: Id }; output: Assignment };
