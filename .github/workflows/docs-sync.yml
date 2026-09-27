@@ -1,0 +1,47 @@
+# Keeps the Mintlify docs site current (docs.tessera.edstratumlabs.ai).
+# On every push to main that can change what users see, rebuild the site and
+# Storybook, recapture screenshots, regenerate the Screens, Components, and
+# Tokens pages, and commit any changes to mintlify/. Mintlify redeploys from
+# that commit automatically. Images only change when their pixels change.
+name: docs-sync
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'design/**'
+      - 'docs/**'
+      - 'research/**'
+      - 'tools/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: docs-sync
+  cancel-in-progress: true
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run docs:sync
+      - name: Commit updated docs
+        run: |
+          if [ -z "$(git status --porcelain mintlify)" ]; then
+            echo "Docs already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mintlify
+          git commit -m "docs: sync screenshots and generated pages"
+          git pull --rebase origin main
+          git push origin HEAD:main
