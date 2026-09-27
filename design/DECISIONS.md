@@ -20,6 +20,7 @@ Settled decisions for Project Tessera, with the reason for each. Agents should t
 | D-014 | Night 1 backend and access: one Worker + D1, demo persona sign-in, `/app` and `/api` behind Cloudflare Access | Accepted | 2026-09-27 |
 | D-015 | Platform LLM: WRITER Palmyra-X6 through Cloudflare AI Gateway, with a deterministic fixture provider | Accepted | 2026-09-27 |
 | D-016 | Night 1 scope and milestone model: "Night N" coordinated releases for administrator, instructor, and student | Accepted | 2026-09-27 |
+| D-017 | No colored edge stripes on any element, for any purpose | Accepted | 2026-09-27 |
 
 ---
 
@@ -169,4 +170,12 @@ Approved by the owner on 2026-09-27.
 - Phase 2 and later work ships as coordinated **"Night N"** milestones: Claude plans the release, splits it into lanes that different agents build in parallel, integrates continuously on a `nightN` branch, and deploys to production once, at the end.
 - Planning uses three personas: **administrator** (IT and LMS administrators), **instructor** (instructors, teaching faculty, faculty), and **student**.
 - Night 1's scope, cut list, acceptance journeys, and lanes are in `handoff/NIGHT-1-PLAN.md`. The hint-first tutor is a stretch goal.
+
+### D-017 · No colored edge stripes, anywhere
+Extends D-006 from AI content to the whole product. The owner rejected the colored left stripe as the signature of generic AI-generated interfaces ("AI slop") in Phase 1, and restated on 2026-09-27 that it's forbidden everywhere after it appeared on the Night 1 navigation rail and module map as a "current" marker.
+**Decision:**
+- No element gets a colored bar along an edge: no `border-left`/`border-inline-start` accents, no `box-shadow: inset Npx 0 …` stripes, no pseudo-element bars. This covers cards, callouts, list rows, navigation, tables, notices, and AI content.
+- 1 px neutral borders (`--line` family) that separate panels or outline a whole box are layout, not stripes, and stay allowed.
+- State (current, selected, warning, pinned, AI) is shown with fills, type weight, text, and Tessera's own markers (the "current" marker is chosen in the stripe-replacement exploration, `design/explorations/current-marker.md`).
+- `npm test` enforces it: `tools/no-stripes.test.ts` scans every stylesheet and artboard and fails on an edge stripe.
 

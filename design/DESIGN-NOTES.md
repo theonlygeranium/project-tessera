@@ -56,6 +56,7 @@ AI content uses one markup contract and a switchable visual style. The current s
 - Sources are numbered footnotes, with superscript markers in the text and a dotted rule above the note list.
 - Review state is spelled out in words ("not yet reviewed", "· kept"). It never relies on color alone.
 - Never use a sparkle icon, a colored left stripe, or a gradient to signal AI.
+- More broadly (D-017): no element anywhere gets a colored edge stripe, including navigation and "current" rows.
 
 **Switching styles.** `docs/assets/ai-voice.css` holds four styles: `marginalia`, `tabs`, `perforated` and `tiles`.
 - To preview a style on any page, add `?ai=tabs` (or `perforated`, `tiles`) to its URL. The gallery also has a switcher.

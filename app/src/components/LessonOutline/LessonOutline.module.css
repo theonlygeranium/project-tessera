@@ -10,7 +10,7 @@
 .lesson:last-child { border-bottom: 0; }
 .lessonLink, .lessonStatic { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; min-width: 0; min-height: var(--size-target-learner); flex: 1; padding: 8px; box-sizing: border-box; color: var(--ink); text-decoration: none; border-radius: var(--radius-md); }
 .lessonLink:hover { background: var(--surface-alt); }
-.lessonLink[aria-current='page'], .lessonStatic[aria-current='page'] { background: var(--accent-soft); box-shadow: inset 4px 0 var(--accent); }
+.lessonLink[aria-current='page'], .lessonStatic[aria-current='page'] { background: var(--accent-soft); }
 .lessonTitle { min-width: 0; overflow-wrap: anywhere; }
 .current { font-weight: 700; }
 .meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--ink-3); font-size: var(--size-text-compact); }
