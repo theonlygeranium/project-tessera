@@ -156,18 +156,30 @@ export function PeoplePage() {
             className={styles.directory}
             density="compact"
             caption="People"
+            hideCaption
             rows={visible}
             rowKey={(person) => person.id}
             empty="No one has this role yet."
             columns={[
-              { key: 'name', header: 'Name' },
+              {
+                key: 'name',
+                header: 'Name',
+                render: (person) => {
+                  const self = person.id === current.id;
+                  return (
+                    <span className={styles.personName}>
+                      <span>{person.name}</span>
+                      {self && <span className={styles.why} id={`role-reason-${person.id}`}>You can't change your own role.</span>}
+                    </span>
+                  );
+                },
+              },
               { key: 'email', header: 'Email' },
               {
                 key: 'role',
                 header: 'Role',
                 render: (person) => {
                   const self = person.id === current.id;
-                  const reasonId = `role-reason-${person.id}`;
                   const errorId = `role-error-${person.id}`;
                   const rowError = rowErrors[person.id];
                   const pendingRole = optimisticRole[person.id];
@@ -176,7 +188,7 @@ export function PeoplePage() {
                     <div className={styles.roleCell}>
                       <Select
                         aria-label={`Role for ${person.name}`}
-                        aria-describedby={self ? reasonId : rowError ? errorId : undefined}
+                        aria-describedby={self ? `role-reason-${person.id}` : rowError ? errorId : undefined}
                         value={shownRole}
                         disabled={self || pendingId === person.id}
                         onChange={(event) => {
@@ -185,7 +197,6 @@ export function PeoplePage() {
                       >
                         {ROLES.map((item) => <option key={item} value={item}>{ROLE_LABELS[item]}</option>)}
                       </Select>
-                      {self && <p className={styles.why} id={reasonId}>You can't change your own role.</p>}
                       {rowError && <p className={styles.inlineError} id={errorId}>Error: {rowError}</p>}
                     </div>
                   );

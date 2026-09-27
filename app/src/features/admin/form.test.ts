@@ -48,7 +48,8 @@ describe('admin form helpers', () => {
     const off = TUTOR_MODES.find((mode) => mode.id === 'off');
     const open = TUTOR_MODES.find((mode) => mode.id === 'open');
     expect(off && tutorChoice(off, 'practice')).toMatchObject({ disabled: true, description: expect.stringContaining('Off is always allowed.') });
-    expect(open && tutorChoice(open, 'graded').description).toContain('Open is never allowed on graded work (D-005).');
+    expect(open && tutorChoice(open, 'graded').description).toContain('Open is never allowed on graded work.');
+    expect(open && tutorChoice(open, 'graded').description).not.toMatch(/D-\d+/);
     expect(open && tutorChoice(open, 'graded').disabled).toBe(true);
     expect(open && tutorChoice(open, 'practice').disabled).toBe(false);
   });
