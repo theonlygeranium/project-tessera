@@ -98,7 +98,15 @@ Chosen by the owner on 2026-09-26 in #16.
 - Deploy speed matters less than cleanliness: the owner accepts a longer build as long as a push is previewable within a few minutes.
 - The `design/canvas/` artboards and the existing `docs/` site stay as they are. The artboards remain the visual spec; components become the source of truth for UI as they're built.
 - Design tokens come from `design/tokens.json` only; app code doesn't hard-code colors.
-- Revisit option C (backend, real AI) after the #28 usability tests.
+- Verified 2026-09-26: Workers Builds ran `npm run build` for the `phase2/app-skeleton` preview (41 s from push to built preview) without any dashboard change.
+
+**Destination: a full-stack app (owner, 2026-09-26).** Option B is the starting point, not the end state. Tessera should grow into option C (backend, authentication, database, real AI calls) without a rewrite, so Phase 2 work must keep these foundations:
+- **One Cloudflare Worker.** The Worker that serves `docs/` today can gain a Worker script (`main` in `wrangler.jsonc`) for `/api/*` routes plus bindings: D1 (database), KV (sessions and cache), R2 (uploaded course files), and Workers AI or AI Gateway (tutor and co-author calls). The static site and the app keep being served as assets from the same deploy.
+- **A data layer between UI and data.** Components get data through a small typed interface (for example `app/src/data/`), backed by mock data now and by `fetch('/api/...')` later. Components never import fixtures directly.
+- **Shared TypeScript types** for the domain (course → module → lesson → block, D-002; tutor modes, D-005; AI draft states, D-003), reusable by the future API.
+- **Routing and state that survive real data:** client-side routing inside `/app/`, no assumptions that data is static or local.
+- **Policies built in from the start:** AI output as drafts with provenance, tutor modes, and "who sees what" modeled as data now, so they become server-enforced rules later rather than UI-only behavior.
+- Revisit *when* to add the backend after the #28 usability tests.
 
 The options as they were weighed:
 
