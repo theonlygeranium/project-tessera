@@ -16,3 +16,23 @@
 .preview { white-space: pre-wrap; overflow-wrap: anywhere; }
 .muted { color: var(--ink-2); }
 .list > .row > :first-child { flex: 1 1 260px; min-width: 0; }
+
+.fieldRow { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.fieldRow > :first-child { flex: 1 1 220px; min-width: 0; }
+.fieldRow > button, .fieldRow > :last-child { align-self: flex-end; }
+.outlineHeader { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; min-width: 0; }
+.outlineHeader h3 { margin: 0; }
+.outlineHeader > form { flex: 1 1 260px; }
+.lessonList { display: grid; gap: 0; list-style: none; padding: 0; margin: 0; }
+.lessonRow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 10px 0; border-top: 1px solid var(--line); min-width: 0; }
+.lessonRow > a { flex: 1 1 180px; min-width: 0; }
+.lessonRow > .row { margin-left: auto; }
+.startButton, .inlineForm > button, .stack > button, .panel > button { justify-self: start; align-self: flex-start; }
+.readiness { grid-row: 1; align-content: start; }
+.readiness > span, .readiness > button { justify-self: start; align-self: flex-start; }
+.editorLayout { display: grid; gap: 16px; min-width: 0; }
+.editorMain { display: grid; grid-row: 2; gap: 16px; min-width: 0; align-content: start; }
+@media (min-width: 1100px) { .editorLayout { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; } .readiness { grid-column: 2; grid-row: 1; position: sticky; top: 16px; } .editorMain { grid-column: 1; grid-row: 1; } }
+
+.rosterProgress { display: grid; gap: 5px; min-width: 120px; }
+.rosterProgress progress { width: 100%; height: 6px; accent-color: var(--accent); }
