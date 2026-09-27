@@ -344,3 +344,13 @@ describe('migration 0003', () => {
     expect(await repo.getBlock('b-table')).toEqual(table);
   });
 });
+
+describe('email lookup', () => {
+  it('matches Access emails case-insensitively, like MemoryRepo', async () => {
+    const repo = new D1Repo(createTestDb() as never);
+    await repo.reset(seedData());
+    const u = (await repo.getUser('u-priya'))!;
+    await repo.putUser({ ...u, email: 'Priya.Nair@Meridian.example.edu' });
+    expect((await repo.findUserByEmail('priya.nair@meridian.example.edu'))?.id).toBe('u-priya');
+  });
+});

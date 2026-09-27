@@ -34,3 +34,15 @@ describe('runtime API schemas', () => {
     }
   });
 });
+
+describe('schemas match service rules (review 3)', () => {
+  it('rejects empty-level and duplicate-id rubrics and out-of-range token requests', () => {
+    const level = { id: 'l1', title: 'Clear', points: 5, description: '' };
+    expect(() => validateInput('updateAssignment', { assignmentId: 'a', rubric: [{ id: 'c', title: 'C', description: '', levels: [] }] })).toThrow();
+    expect(() => validateInput('updateAssignment', { assignmentId: 'a', rubric: [{ id: 'c', title: 'C', description: '', levels: [level, level] }] })).toThrow();
+    expect(() => validateInput('updateAssignment', { assignmentId: 'a', rubric: [{ id: 'c', title: 'C', description: '', levels: [level] }, { id: 'c', title: 'D', description: '', levels: [level] }] })).toThrow();
+    expect(validateInput('updateAssignment', { assignmentId: 'a', rubric: [{ id: 'c', title: 'C', description: '', levels: [level] }] })).toBeTruthy();
+    expect(() => validateInput('createApiToken', { name: 'bot', scopes: [] })).toThrow();
+    expect(() => validateInput('createApiToken', { name: 'bot', scopes: ['content:read'], expiresInDays: 366 })).toThrow();
+  });
+});

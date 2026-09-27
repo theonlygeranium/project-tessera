@@ -60,7 +60,9 @@ async function book(ctx: ServiceContext, courseId: string) {
     const cells = assignments.map(a => {
       const s = current(submissions.filter(x => x.assignmentId === a.id && x.studentId === student.id));
       const released = !!s?.grade?.releasedAt;
-      if (released) { total += s!.grade!.score; possible += a.points; }
+      // Every published assignment counts toward what's possible; only released grades count as earned.
+      possible += a.points;
+      if (released) total += s!.grade!.score;
       return { assignmentId: a.id, score: released ? s!.grade!.score : null, state: s?.state ?? 'missing', released };
     });
     return { student: { id: student.id, name: student.name, email: student.email }, cells, total, possible };
@@ -111,7 +113,7 @@ export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAss
   submit: async (ctx, input) => {
     const a = await assignment(ctx, input.assignmentId); if (user(ctx).role !== 'student') fail('forbidden','Students only.');
     if (a.status !== 'published') fail('not-found','Assignment not found.');
-    if (a.dueAt && ctx.now() > a.dueAt) fail('conflict','The due date has passed.');
+    if (a.dueAt && Date.parse(ctx.now()) > Date.parse(a.dueAt)) fail('conflict','The due date has passed.');
     const text = input.text?.trim() ?? '', fileId = input.fileId?.trim() || null, link = input.link?.trim() ?? '';
     if (a.submissionType === 'text' && !text) fail('invalid','Text is required.');
     if (a.submissionType === 'file' && !fileId) fail('invalid','A file is required.');

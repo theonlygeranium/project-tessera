@@ -33,7 +33,7 @@ describe('grading service',()=>{
     await dispatch(service,teacher,'gradeSubmission',{submissionId:submitted.id,criteria:rubric,score:8,feedback:draft.feedback,feedbackOrigin:'ai',feedbackProvenance:draft.provenance});
     expect((await dispatch(service,student,'getMySubmission',{assignmentId:id}))?.grade).toBeNull();
     let book=await dispatch(service,teacher,'getGradebook',{courseId:'c-stat110'});
-    expect(book.rows.find(x=>x.student.id==='u-priya')).toMatchObject({total:0,possible:0});
+    expect(book.rows.find(x=>x.student.id==='u-priya')).toMatchObject({total:0,possible:10});
     await dispatch(service,teacher,'releaseGrades',{assignmentId:id});
     expect((await dispatch(service,student,'getMySubmission',{assignmentId:id}))?.grade?.score).toBe(8);
     book=await dispatch(service,teacher,'getGradebook',{courseId:'c-stat110'});
@@ -71,5 +71,14 @@ describe('file scans in demo mode', () => {
     await repo.putScan({ id: 's1', courseId: 'c-stat110', version: 1, target: { kind: 'file', fileId: 'f1', version: 1 }, score: 70, grade: 'Moderate', issueCount: 1, bySeverity: { critical: 1, serious: 0, moderate: 0, minor: 0 }, scannedAt: '2026-09-27T01:00:00.000Z', issues: [], document: null });
     expect((await repo.getFile('f1'))?.scan?.score).toBe(70);
     expect((await repo.listFiles('c-stat110'))[0].scan?.grade).toBe('Moderate');
+  });
+});
+
+describe('review 3 fixes', () => {
+  it('compares due dates as instants, not text', async () => {
+    const repo = new MemoryRepo(seedData());
+    const a = (await repo.getAssignment(id))!; a.dueAt = '2026-09-27T23:00:00-05:00'; await repo.putAssignment(a);
+    const student = await context(repo, 'u-priya', '2026-09-28T01:00:00.000Z'); // 8 p.m. in UTC-5, before the deadline
+    expect((await dispatch(service, student, 'submit', { assignmentId: id, text: 'On time' })).attempt).toBe(1);
   });
 });

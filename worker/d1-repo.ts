@@ -63,7 +63,7 @@ export class D1Repo implements Repo {
   }
 
   async findUserByEmail(email: string): Promise<User | null> {
-    const row = await this.first<UserRow>('SELECT * FROM users WHERE email = ?', [email]);
+    const row = await this.first<UserRow>('SELECT * FROM users WHERE lower(email) = lower(?)', [email]);
     return row ? userFromRow(row) : null;
   }
 
