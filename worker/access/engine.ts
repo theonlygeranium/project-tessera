@@ -12,7 +12,9 @@ import { describeImage, type VisionEnv } from '../ai/vision';
 import { applyFix, checkDocument, extractImage, type DocumentCheck } from './index';
 import { runOcr, type OcrContainer } from '../ocr';
 
-export interface EngineEnv extends VisionEnv { FILES: R2Bucket; OCR?: DurableObjectNamespace<OcrContainer> }
+export interface EngineEnv extends VisionEnv { FILES: R2Bucket; OCR?: DurableObjectNamespace<OcrContainer>; OCR_INSTANCES?: string }
+
+const ocrInstances = (env: EngineEnv) => Number(env.OCR_INSTANCES ?? 1) || 1;
 
 // The reading version uses Tessera's tokens (D-007): ink on paper.
 const INK = tokens.color.ink.$value, PAPER = tokens.color.surface.$value;
@@ -194,7 +196,7 @@ export function createDocumentEngine(env: EngineEnv): DocumentEngine {
       let fixed: ArrayBuffer;
       if (fix.kind === 'ocr') {
         if (file.kind !== 'pdf') throw new ApiError('invalid', 'OCR is for scanned PDFs.');
-        fixed = (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), fix.language)).pdf;
+        fixed = (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), fix.language, ocrInstances(env))).pdf;
       } else try {
         fixed = await applyFix(file.kind, await bytesOf(env, file.key), fix);
       } catch (error) {
@@ -240,7 +242,7 @@ export function createDocumentEngine(env: EngineEnv): DocumentEngine {
       const meta = { httpMetadata: { contentType: FORMAT_FILES[format].mime } };
       if (format === 'ocr') {
         if (file.kind !== 'pdf') throw new ApiError('unsupported', 'OCR is for scanned PDFs.');
-        await env.FILES.put(key, (await runOcr(env.OCR, file.id, await bytesOf(env, file.key))).pdf, meta);
+        await env.FILES.put(key, (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), undefined, ocrInstances(env))).pdf, meta);
         return key;
       }
       let doc = await check(env, file);
@@ -248,7 +250,7 @@ export function createDocumentEngine(env: EngineEnv): DocumentEngine {
         // A scan: use its OCR text, running OCR first if it hasn't been.
         const ocrKey = fileKeys.format(file, 'ocr');
         let ocr = await env.FILES.get(ocrKey);
-        if (!ocr) { await env.FILES.put(ocrKey, (await runOcr(env.OCR, file.id, await bytesOf(env, file.key))).pdf, { httpMetadata: { contentType: FORMAT_FILES.ocr.mime } }); ocr = await env.FILES.get(ocrKey); }
+        if (!ocr) { await env.FILES.put(ocrKey, (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), undefined, ocrInstances(env))).pdf, { httpMetadata: { contentType: FORMAT_FILES.ocr.mime } }); ocr = await env.FILES.get(ocrKey); }
         doc = await checkDocument('pdf', await ocr!.arrayBuffer());
       }
       if (!doc.document?.hasText) throw new ApiError('unsupported', 'This file has no text to convert, even after OCR.');

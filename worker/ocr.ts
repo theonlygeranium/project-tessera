@@ -11,7 +11,6 @@ export class OcrContainer extends Container {
   pingEndpoint = 'localhost/health';
 }
 
-const INSTANCES = 3;
 const LANGS: Record<string, string> = { en: 'eng', es: 'spa', fr: 'fra' };
 
 /** Tesseract language codes for a BCP 47 tag; English when unknown. */
@@ -19,16 +18,20 @@ export function tesseractLang(language: string | null | undefined): string {
   return LANGS[(language ?? 'en').toLowerCase().split('-')[0]] ?? 'eng';
 }
 
-/** Spreads files across instances by id, so one large scan doesn't queue every other request. */
-export function instanceFor(fileId: string): string {
+/**
+ * Spreads files across instances by id, so one large scan doesn't queue every other
+ * request. `instances` must not exceed the environment's `max_instances` (OCR_INSTANCES:
+ * 3 in production, 1 in previews), or the extra instances fail to start.
+ */
+export function instanceFor(fileId: string, instances = 1): string {
   let h = 0;
   for (const c of fileId) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return `ocr-${h % INSTANCES}`;
+  return `ocr-${h % Math.max(1, Math.floor(instances))}`;
 }
 
-export async function runOcr(binding: DurableObjectNamespace<OcrContainer> | undefined, fileId: string, pdf: ArrayBuffer, language?: string): Promise<{ pdf: ArrayBuffer; pages: number; seconds: number }> {
+export async function runOcr(binding: DurableObjectNamespace<OcrContainer> | undefined, fileId: string, pdf: ArrayBuffer, language?: string, instances = 1): Promise<{ pdf: ArrayBuffer; pages: number; seconds: number }> {
   if (!binding) throw new ApiError('unsupported', 'OCR isn\'t available in this environment.');
-  const res = await getContainer(binding, instanceFor(fileId)).fetch(new Request(`http://ocr/ocr?lang=${tesseractLang(language)}`, {
+  const res = await getContainer(binding, instanceFor(fileId, instances)).fetch(new Request(`http://ocr/ocr?lang=${tesseractLang(language)}`, {
     method: 'POST', body: pdf, headers: { 'content-type': 'application/pdf' },
   }));
   if (!res.ok) {

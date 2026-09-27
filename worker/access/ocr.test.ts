@@ -72,7 +72,8 @@ describe('OCR (container)', () => {
 
   it('maps languages and spreads files across instances', () => {
     expect([tesseractLang('en-US'), tesseractLang('fr'), tesseractLang('de'), tesseractLang(undefined)]).toEqual(['eng', 'fra', 'eng', 'eng']);
-    expect(new Set(['a', 'b', 'c', 'd', 'e', 'f'].map(instanceFor)).size).toBeGreaterThan(1);
-    expect(instanceFor('file-1')).toBe(instanceFor('file-1'));
+    expect(new Set(['a', 'b', 'c', 'd', 'e', 'f'].map((id) => instanceFor(id, 3))).size).toBeGreaterThan(1);
+    expect(new Set(['a', 'b', 'c', 'd', 'e', 'f'].map((id) => instanceFor(id)))).toEqual(new Set(['ocr-0']));
+    expect(instanceFor('file-1', 3)).toBe(instanceFor('file-1', 3));
   });
 });
