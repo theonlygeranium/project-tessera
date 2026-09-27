@@ -16,7 +16,7 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
     await ctx.repo.putUser(u); return u;
   },
   getToday: async ctx => {
-    const u = user(ctx), summaries = await courses.listCourses(ctx, undefined);
+    const u = await ctx.repo.getUser(user(ctx).id) ?? user(ctx), summaries = await courses.listCourses(ctx, undefined);
     const tasks: TaskItem[] = [];
     for (const c of summaries) {
       const lessons = (await ctx.repo.listLessons({ courseId: c.id })).filter(l => l.status === 'published');
@@ -28,6 +28,10 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
       tasks.push({ id: `task-${lesson.id}`, kind: state === 'in-progress' ? 'resume' : progress.length ? 'next' : 'start', title: lesson.title, context: `${c.code} · ${m.title}`, minutes: lesson.minutes, courseId: c.id, lessonId: lesson.id, state });
     }
     tasks.sort((a,b) => (a.kind === 'resume' ? -1 : 0) - (b.kind === 'resume' ? -1 : 0));
+    if (u.profile?.sessionMinutes !== undefined) {
+      const limit = u.profile.sessionMinutes;
+      tasks.sort((a, b) => Number(b.minutes <= limit) - Number(a.minutes <= limit));
+    }
     const feed = await announcements.listAnnouncements(ctx, {});
     const unreadCount = feed.filter(x => !x.read).length;
     const recent = feed.slice().sort((a,b) => Number(a.read) - Number(b.read) || (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt)).slice(0,5);

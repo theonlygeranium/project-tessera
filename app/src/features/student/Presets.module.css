@@ -1,0 +1,11 @@
+.setup { display: grid; gap: 24px; min-width: 0; }
+.section { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.section h2 { margin: 0 0 14px; }
+.section h2:focus { outline: 3px solid var(--focus); outline-offset: 4px; }
+.section h3 { margin: 0 0 8px; }
+.section p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.item { border-top: 1px solid var(--line); padding-top: 14px; min-width: 0; }
+.item:first-child { border-top: 0; padding-top: 0; }
+@media (max-width: 700px) { .section { padding: 16px; } }

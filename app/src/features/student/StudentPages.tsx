@@ -9,6 +9,7 @@ import { ErrorNotice, Loading } from '../../shell/Status';
 import { useSession } from '../../shell/session';
 import { usePageTitle } from '../../shell/usePageTitle';
 import styles from './Student.module.css';
+import { AdaptationChanges } from './AdaptationChanges';
 
 export function courseStatus(course: CourseSummary) {
   return course.publishedLessonCount > 0 && course.progress === 1 ? 'completed' :
@@ -51,9 +52,13 @@ export function TodayPage() {
   usePageTitle('Today');
   const { user } = useSession();
   const today = useApiQuery('getToday', undefined);
+  const adaptations = useApiQuery('listAdaptations', undefined);
+  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const recent = (adaptations.data ?? []).filter(change => !change.undoneAt && Date.parse(change.appliedAt) >= cutoff && Date.parse(change.appliedAt) <= Date.now());
   return <div className={styles.page}><TopBar title="Today" eyebrow={`Hello, ${user.name.split(' ')[0]}`} />
     {today.isPending ? <Loading label="Loading Today" /> : today.error ? <ErrorNotice error={today.error} onRetry={() => today.refetch()} /> : <>
       <section><h2>Do next</h2>{today.data.doNext.length ? <div className={styles.cards}>{today.data.doNext.map(task => <TaskCard key={task.id} title={task.title} context={task.context} minutes={task.minutes} state={task.state === 'completed' ? 'done' : task.state === 'in-progress' ? 'in-progress' : 'todo'} href={paths.student.lesson(task.courseId, task.lessonId)} actionLabel={task.kind === 'resume' ? 'Resume' : task.kind === 'start' ? 'Start' : 'Continue'} renderLink={renderRouterLink} />)}</div> : <p className={styles.empty}>You're all caught up.</p>}</section>
+      {adaptations.isPending ? <Loading label="Loading changes" /> : adaptations.error ? <ErrorNotice error={adaptations.error} onRetry={() => adaptations.refetch()} /> : <AdaptationChanges changes={recent} title="Changes Tessera made for you" />}
       <section><h2>This week</h2><div className={styles.meter}><ProgressMeter label="Study time" variant="ring" value={today.data.week.minutesDone} max={today.data.week.minutesGoal} valueText={`${today.data.week.minutesDone} of ${today.data.week.minutesGoal} minutes`} /></div></section>
       <section><div className={styles.sectionHead}><h2>Announcements</h2><Link to={paths.student.announcements}>All announcements</Link></div><AnnouncementCards announcements={[...today.data.announcements].sort((a,b) => Number(a.read) - Number(b.read))} showCourse preview /></section>
       <section><div className={styles.sectionHead}><h2>Your courses</h2><Link to={paths.student.courses}>All courses</Link></div><CourseCards courses={today.data.courses} /></section>

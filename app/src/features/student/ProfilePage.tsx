@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import type { LearningGoal, LearningProfile } from '../../../../shared/domain';
 import { Button, ChoiceGroup, FormField, SegmentedControl, Select, StatusNotice, TextArea, TopBar } from '../../components';
 import { useApiMutation } from '../../data/hooks';
@@ -8,6 +8,8 @@ import { ErrorNotice } from '../../shell/Status';
 import { useSession } from '../../shell/session';
 import { usePageTitle } from '../../shell/usePageTitle';
 import styles from './Student.module.css';
+import { PresetSetup } from './PresetSetup';
+import type { Adaptation } from '../../../../shared/domain';
 
 type ProfileInput = Omit<LearningProfile, 'completedAt'>;
 const emptyProfile: ProfileInput = { goals: [], goalNote: '', weeklyMinutes: 120, language: 'en', readingLevel: 'standard', accessibility: { captions: false, reducedMotion: false, largerText: false, screenReader: false }, reminders: 'off' };
@@ -24,17 +26,29 @@ const access = [
 export function ProfilePage({ onboarding = false }: { onboarding?: boolean }) {
   usePageTitle(onboarding ? 'Set up your learning profile' : 'Profile');
   const { user } = useSession();
-  const navigate = useNavigate();
-  const [form, setForm] = useState<ProfileInput>(() => user.profile ? { goals: user.profile.goals, goalNote: user.profile.goalNote, weeklyMinutes: user.profile.weeklyMinutes, language: user.profile.language, readingLevel: user.profile.readingLevel, accessibility: { ...user.profile.accessibility }, reminders: user.profile.reminders } : emptyProfile);
+  const [form, setForm] = useState<ProfileInput>(() => user.profile ? { goals: user.profile.goals, goalNote: user.profile.goalNote, weeklyMinutes: user.profile.weeklyMinutes, language: user.profile.language, readingLevel: user.profile.readingLevel, accessibility: { ...user.profile.accessibility }, reminders: user.profile.reminders, sessionMinutes: user.profile.sessionMinutes } : emptyProfile);
   const [saved, setSaved] = useState(false);
-  const save = useApiMutation('saveProfile', { onSuccess: () => { setSaved(true); if (onboarding) navigate(paths.student.today); } });
+  const [hasProfile, setHasProfile] = useState(!!user.profile);
+  const save = useApiMutation('saveProfile', { onSuccess: () => { setSaved(true); setHasProfile(true); } });
+  const onPresetChange = (changes: Adaptation[], undo: boolean) => {
+    setForm(current => {
+      const next = { ...current };
+      for (const change of changes) {
+        const value = undo ? change.before : change.after;
+        if (change.kind === 'session-length') next.sessionMinutes = value as number | undefined;
+        if (change.kind === 'reminders') next.reminders = value as ProfileInput['reminders'];
+        if (change.kind === 'reading-level') next.readingLevel = value as ProfileInput['readingLevel'];
+      }
+      return next;
+    });
+  };
   const update = (patch: Partial<ProfileInput>) => { setSaved(false); setForm(current => ({ ...current, ...patch })); };
   const onSubmit = (event: FormEvent) => { event.preventDefault(); save.mutate(form); };
   const selectedAccess = access.filter(item => form.accessibility[item.value]).map(item => item.value);
   return <div className={styles.page}>
     <TopBar title={onboarding ? 'Set up your learning profile' : 'Profile'} eyebrow={onboarding ? 'Welcome · about 2 minutes' : undefined} />
     <p className={styles.intro}>Tell us your goals and preferences. You can change these answers later. Every course format stays available to everyone.</p>
-    {saved && !onboarding && <StatusNotice tone="success" live="polite">Your learning profile was saved.</StatusNotice>}
+    {saved && <StatusNotice tone="success" live="polite">Your learning profile was saved.</StatusNotice>}
     <ErrorNotice error={save.error} />
     <form onSubmit={onSubmit} className={styles.form}>
       <section className={styles.panel}><h2>Goals</h2>
@@ -51,7 +65,9 @@ export function ProfilePage({ onboarding = false }: { onboarding?: boolean }) {
         <SegmentedControl legend="Reminders" name="reminders" options={[{ value: 'off', label: 'Off' }, { value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }]} value={form.reminders} onChange={value => update({ reminders: value as ProfileInput['reminders'] })} />
       </section>
       <aside className={styles.panel}><h2>Who sees this</h2><p>Instructors see your progress, not your profile answers.</p></aside>
-      <div className={styles.actions}><Button type="submit" variant="primary" disabled={save.isPending}>{save.isPending ? 'Saving…' : onboarding ? 'Save and go to Today' : 'Save profile'}</Button></div>
+      <div className={styles.actions}><Button type="submit" variant="primary" disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save profile'}</Button></div>
     </form>
+    {hasProfile && <PresetSetup onChange={onPresetChange} />}
+    {onboarding && saved && <Link className={styles.primaryLink} to={paths.student.today}>Continue to Today</Link>}
   </div>;
 }

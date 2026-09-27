@@ -25,6 +25,20 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       await repo.putBuilderSession(session); expect(await repo.getBuilderSession(session.id)).toEqual(session);
       const job = { id: 'gj-contract', courseId: 'c-stat110', requestedBy: 'u-okafor', state: 'running' as const, done: 0, total: 1, lessonIds: [], error: null, work: [{ lessonId: 'l-stat-1', type: 'text' as const }], instruction: 'Keep it short', failures: [], createdAt: '2026-09-26T00:00:00Z', updatedAt: '2026-09-26T00:00:00Z' };
       await repo.putGenerationJob(job); job.work[0].lessonId = 'changed'; expect((await repo.getGenerationJob(job.id))?.work[0].lessonId).toBe('l-stat-1');
+      const adaptation = { id: 'ad-contract', studentId: 'u-priya', kind: 'session-length' as const, why: 'Shorter sessions fit.', before: undefined, after: 15, appliedAt: '2026-09-26T00:00:00Z', undoneAt: null };
+      await repo.putAdaptation(adaptation);
+      expect(await repo.getAdaptation(adaptation.id)).toEqual(adaptation);
+      const storedAdaptation = (await repo.getAdaptation(adaptation.id))!;
+      storedAdaptation.why = 'Changed locally';
+      expect((await repo.getAdaptation(adaptation.id))?.why).toBe(adaptation.why);
+      await repo.putAdaptation({ ...adaptation, undoneAt: '2026-09-26T01:00:00Z' });
+      expect((await repo.getAdaptation(adaptation.id))?.undoneAt).toBe('2026-09-26T01:00:00Z');
+      const updatedUser = (await repo.getUser('u-priya'))!;
+      updatedUser.profile = { ...seedData().users.find(u => u.id === 'u-marcus')!.profile!, sessionMinutes: 15 };
+      const bundled = { ...adaptation, id: 'ad-bundled' };
+      await repo.putUserWithAdaptations(updatedUser, [bundled]);
+      expect((await repo.getUser('u-priya'))?.profile?.sessionMinutes).toBe(15);
+      expect(await repo.getAdaptation(bundled.id)).toEqual(bundled);
       const storedJob = (await repo.getGenerationJob(job.id))!; storedJob.failures.push({ lessonId: 'l-stat-1', type: 'text', message: 'Failed' }); expect((await repo.getGenerationJob(job.id))?.failures).toEqual([]);
     });
     it('orders users, courses, modules, lessons, blocks, announcements, and sessions', async () => {
@@ -42,6 +56,11 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       const baseSubmission = {id:'sub-one',assignmentId:'asg-stat-1',studentId:'u-priya',attempt:1,state:'submitted' as const,text:'One',fileId:null,link:'',submittedAt:'2026-09-26T00:00:00Z',grade:null};
       await repo.putSubmission(baseSubmission); await repo.putSubmission({...baseSubmission,id:'sub-two',attempt:2,text:'Two'});
       expect((await repo.listSubmissions({assignmentId:'asg-stat-1',studentId:'u-priya'})).map(x=>x.id)).toEqual(['sub-two','sub-one']);
+      const a = { id: 'ad-old', studentId: 'u-priya', kind: 'reminders' as const, why: 'Old change.', before: 'off', after: 'daily', appliedAt: '2026-01-01T00:00:00Z', undoneAt: null };
+      await repo.putAdaptation(a);
+      await repo.putAdaptation({ ...a, id: 'ad-new', appliedAt: '2026-02-01T00:00:00Z' });
+      await repo.putAdaptation({ ...a, id: 'ad-other', studentId: 'u-marcus' });
+      expect((await repo.listAdaptations('u-priya')).map(x => x.id)).toEqual(['ad-new', 'ad-old']);
       expect((await repo.listAnnouncements({})).map(x => x.id)).toEqual(['a-stat-draft','a-stat-office','a-comm-reading','a-stat-welcome']);
       const base = { courseId: 'c-stat110', prompt: '', sources: [], stage: 'brief' as const, brief: null, outline: null, lessonIds: [], provenance: null };
       await repo.putBuilderSession({ ...base, id: 'bs-old', createdAt: '2026-01-01T00:00:00Z' });
@@ -62,7 +81,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
     it('replaces enrollments and resets from an empty seed', async () => {
       const repo = await makeRepo(); await repo.setEnrollments('c-stat110',['u-priya']);
       expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-priya']);
-      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.builderSessions = []; empty.generationJobs = [];
+      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.adaptations = []; empty.builderSessions = []; empty.generationJobs = [];
       await repo.reset(empty); expect(await repo.isEmpty()).toBe(true);
       await repo.reset(seedData()); expect(await repo.isEmpty()).toBe(false); expect(await repo.getUser('u-priya')).not.toBeNull();
       expect(await repo.getAssignment('asg-stat-1')).not.toBeNull();
