@@ -1,6 +1,6 @@
 # Night 2: accessibility, the API, AI authoring at any scope, grading, tutor, accounts
 
-**Status: proposed, waiting on the owner's decisions in §7.** Written 2026-09-27 by Claude after reviewing `theonlygeranium/canvas-luma-ops` (Luma Access), the Night 1 codebase, and Cloudflare's current platform docs. Night 1 shipped on 2026-09-27 (tag `night-1`); this plan builds on it (D-011, D-014 to D-018).
+**Status: approved 2026-09-27 (all of §7); Part 1 in progress.** Decisions recorded as D-019 to D-022. Written 2026-09-27 by Claude after reviewing `theonlygeranium/canvas-luma-ops` (Luma Access), the Night 1 codebase, and Cloudflare's current platform docs. Night 1 shipped on 2026-09-27 (tag `night-1`); this plan builds on it (D-011, D-014 to D-018).
 
 Night 2 is deliberately large: about three times Night 1. It runs as three working sessions ("Night 2, parts 1–3"), one integration branch `night2`, continuous merges, and one production deployment at the end of each part, so the owner can test live between parts.
 
@@ -221,4 +221,4 @@ Rules from Night 1 stand: one owner per directory, contract first, small merges,
 
 ## 10. Status
 
-Waiting on §7. Then: create the milestone and lane issues, `night2` branch, Wave 0.
+Part 1, Wave 0 in progress on branch `night2`. Workers Paid verified 2026-09-27.

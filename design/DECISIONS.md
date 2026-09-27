@@ -22,6 +22,10 @@ Settled decisions for Project Tessera, with the reason for each. Agents should t
 | D-016 | Night 1 scope and milestone model: "Night N" coordinated releases for administrator, instructor, and student | Accepted | 2026-09-27 |
 | D-017 | No colored edge stripes on any element, for any purpose | Accepted | 2026-09-27 |
 | D-018 | Marginalia gutter marks become a drawn proofreader's family: balloon, pilcrow, caret | Accepted | 2026-09-27 |
+| D-019 | Night 2 platform: Workers Paid, R2 for files, Workers AI for audio/OCR/vision fallback, Palmyra-X5 for alt text | Accepted | 2026-09-27 |
+| D-020 | The API: `/api/v1`, runtime schemas that generate OpenAPI, scoped tokens, `/api` outside Cloudflare Access | Accepted | 2026-09-27 |
+| D-021 | Identity: Cloudflare Access is the identity provider; Tessera invites by managing an Access group | Accepted | 2026-09-27 |
+| D-022 | Tessera Access: accessibility is native, adapted from Luma Access; "Access" in the product | Accepted | 2026-09-27 |
 
 ---
 
@@ -190,4 +194,38 @@ Supersedes the gutter glyphs listed in D-006 (※, ¶, †); the rest of D-006 s
 - They're CSS masks in `docs/assets/ai-voice.css` (`--mg-chat`, `--mg-block`, `--mg-note`), so the app, Storybook, the Phase 1 screens, and the prototype all change together. In forced-colors mode they render in `CanvasText`.
 - Never use a cross- or dagger-like shape, a sparkle or star, or a gradient as an AI mark (D-006, D-017).
 - `docs/explorations/ai-voice.html` stays as the historical record of D-006 and still shows the old glyphs.
+
+### D-019 · Night 2 platform
+Approved by the owner on 2026-09-27 (`handoff/NIGHT-2-PLAN.md` §7).
+**Decision:**
+- The account is on **Workers Paid** (verified 2026-09-27): CPU per request is raised in `wrangler.jsonc` (`limits.cpu_ms`) so document parsing and format generation run inline.
+- Uploaded files, their remediated versions, and generated formats live in **R2** (`tessera-files`; previews use `tessera-files-preview`). Originals are never overwritten; fixes create versions.
+- **Workers AI** (binding `AI`, through AI Gateway) provides audio (Deepgram Aura-2), OCR and vision fallback (moondream), and transcription (Nova-3, stretch).
+- **Alt text** uses **Palmyra-X5** (vision) through the gateway, because Palmyra-X6 rejects image input (tested 2026-09-27); moondream is the fallback. Text tasks stay on Palmyra-X6 (D-015).
+- Background queues aren't used in Night 2 because branch previews can't consume them; large-file work is a Night 3 Workflow candidate.
+
+### D-020 · The API
+Extends D-011 and D-014. Administrators and designers must be able to create courses and perform actions from outside the app. Approved 2026-09-27.
+**Decision:**
+- Versioned routes under **`/api/v1/`**; `/api/` stays as an alias for the app during Night 2 and is removed in Night 3.
+- Every operation's input and output is a **Zod schema** next to its type; the Worker validates requests against it, and the build generates **OpenAPI 3.1** (`docs/api/openapi.json`) that the docs site renders as the API reference.
+- **Scoped API tokens** (`tsk_…`), created by administrators (and by instructors for their own courses), stored hashed with scopes, owner, expiry, and last use. The Worker accepts an Access JWT (browser) or a token; role rules and resource checks apply to the token's owner and scopes.
+- **`/api/*` is not behind Cloudflare Access**; `/app/*` stays behind it. Cursor pagination on lists, `Idempotency-Key` on creates, per-token rate limits, `X-Request-Id` on every response.
+- A generated TypeScript SDK (`sdk/`) and a **Tessera MCP server** (`mcp/`) expose the same operations.
+
+### D-021 · Identity
+Supersedes D-014's demo persona sign-in for real use. Approved 2026-09-27.
+**Decision:**
+- **Cloudflare Access is the identity provider.** The Worker maps the Access JWT's email to a Tessera user. Tessera stores no passwords.
+- **Invitations:** adding a person adds their email to an Access group that the app policy allows, through the Cloudflare API with a scoped token stored as a Worker secret. Sign-in is a one-time PIN or the institution's single sign-on once configured in Access.
+- The persona picker remains in mock mode and as **"View as"** for administrators.
+
+### D-022 · Tessera Access
+Approved 2026-09-27. Accessibility is a native capability adapted from the owner's Luma Access (a Canvas add-on) and upgraded per the audit in `handoff/NIGHT-2-PLAN.md` §3.2.
+**Decision:**
+- Product name **"Access"** ("Tessera Access" in docs). Public docs never mention Luma or Canvas (D-012).
+- Checks run on Tessera's block model in the editor and in the server-side publish gate; documents (PDF, DOCX, PPTX) are checked in the Worker; every issue carries its WCAG 2.2 success criterion, level, and severity; scores are 0–100 with a published formula.
+- Every AI-assisted fix is a draft a person keeps (D-003). PDF alt text is not patched into the PDF; the accessible version is offered instead.
+- Students get accessible formats (reading view, audio, ePub, OCR text) on every document.
+- Administrators set a minimum accessibility score and blocking severities for publishing; the server enforces them.
 
