@@ -19,6 +19,14 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect((await repo.getAssignment(assignment.id))?.title).toBe('Edited');
       const submission = { id:'sub-contract',assignmentId:assignment.id,studentId:'u-priya',attempt:1,state:'submitted' as const,text:'Answer',fileId:null,link:'',submittedAt:'2026-09-26T00:00:00Z',grade:null };
       await repo.putSubmission(submission); expect(await repo.getSubmission(submission.id)).toEqual(submission);
+      const tutorSetting = { activityKind:'lesson' as const, activityId:'l-stat-1', mode:'hints' as const, maxHints:2, allowedSourceIds:['b-s1-1'], setBy:'u-okafor', setAt:'2026-09-26T00:00:00Z' };
+      await repo.putTutorSetting(tutorSetting);
+      tutorSetting.allowedSourceIds.push('local-change');
+      expect((await repo.getTutorSetting('lesson','l-stat-1'))?.allowedSourceIds).toEqual(['b-s1-1']);
+      const tutorSession = { id:'ts-contract', studentId:'u-priya', activityKind:'lesson' as const, activityId:'l-stat-1', courseId:'c-stat110', mode:'hints' as const, hintsUsed:0, maxHints:2, answerRequests:0, messages:[], startedAt:'2026-09-26T00:00:00Z', updatedAt:'2026-09-26T00:00:00Z' };
+      await repo.putTutorSession(tutorSession);
+      expect(await repo.getTutorSession(tutorSession.id)).toEqual(tutorSession);
+      expect((await repo.listTutorSessions({ courseId:'c-stat110', studentId:'u-priya', activityKind:'lesson', activityId:'l-stat-1' })).map(s => s.id)).toContain(tutorSession.id);
       const announcement = (await repo.getAnnouncement('a-stat-welcome'))!; await repo.putAnnouncement(announcement); expect(await repo.getAnnouncement(announcement.id)).toEqual(announcement);
       const progress = (await repo.getProgress('u-priya','l-stat-1'))!; await repo.putProgress(progress); expect(await repo.getProgress('u-priya','l-stat-1')).toEqual(progress);
       const session = { id: 'bs-x', courseId: 'c-stat110', prompt: 'x', sources: [], stage: 'brief' as const, brief: null, outline: null, lessonIds: [], provenance: null, createdAt: '2026-09-26T00:00:00Z' };

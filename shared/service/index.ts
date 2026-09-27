@@ -11,11 +11,12 @@ import { access } from './access';
 import { files } from './files';
 import { grading } from './grading';
 import { generation } from './generation';
+import { tutor } from './tutor';
 
 import { ApiError, ROUTES, type Operation } from '../api';
 import type { Handler } from './context';
 
-const implemented = { ...session, ...admin, ...courses, ...contentHandlers, ...student, ...announcements, ...builder, ...tokens, ...access, ...files, ...grading, ...generation };
+const implemented = { ...session, ...admin, ...courses, ...contentHandlers, ...student, ...announcements, ...builder, ...tokens, ...access, ...files, ...grading, ...generation, ...tutor };
 // Night 2 lanes replace these stubs as they land (a 501-style error until then).
 const pending = Object.fromEntries(
   (Object.keys(ROUTES) as Operation[]).filter((op) => !(op in implemented)).map((op) => [op, (async () => { throw new ApiError('conflict', `${op} is not available yet`); }) as Handler<Operation>]),

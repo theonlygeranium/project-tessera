@@ -2,10 +2,10 @@
 // `put*` upserts. replaceBlocks, setEnrollments, deleteLesson, and reset each run
 // in one batch so a failure leaves the previous rows in place.
 import type {
-  AccessibleFormat, ApiToken, Assignment, Block, BlockContent, BuilderSession, Course, FileRecord, Id, Institution, Lesson, Module, Role, Submission, User,
+  AccessibleFormat, ActivityKind, ApiToken, Assignment, Block, BlockContent, BuilderSession, Course, FileRecord, Id, Institution, Lesson, Module, Role, Submission, TutorSetting, User,
 } from '../shared/domain';
 import type {
-  AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob,
+  AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession,
 } from '../shared/repo';
 import type { SeedData } from '../shared/seed';
 
@@ -361,6 +361,32 @@ export class D1Repo implements Repo {
   }
   async putSubmission(s: Submission): Promise<void> { await this.submissionStmt(s).run(); }
 
+  async getTutorSetting(kind: ActivityKind, id: Id): Promise<TutorSetting | null> {
+    const r = await this.first<{ activity_kind: ActivityKind; activity_id: Id; mode: TutorSetting['mode']; max_hints: number; allowed_source_ids: string; set_by: Id; set_at: string }>('SELECT * FROM tutor_settings WHERE activity_kind = ? AND activity_id = ?', [kind, id]);
+    return r ? { activityKind:r.activity_kind, activityId:r.activity_id, mode:r.mode, maxHints:r.max_hints, allowedSourceIds:JSON.parse(r.allowed_source_ids), setBy:r.set_by, setAt:r.set_at } : null;
+  }
+  async putTutorSetting(s: TutorSetting): Promise<void> {
+    await this.db.prepare(`INSERT INTO tutor_settings (activity_kind,activity_id,mode,max_hints,allowed_source_ids,set_by,set_at) VALUES (?,?,?,?,?,?,?)
+      ON CONFLICT(activity_kind,activity_id) DO UPDATE SET mode=excluded.mode,max_hints=excluded.max_hints,allowed_source_ids=excluded.allowed_source_ids,set_by=excluded.set_by,set_at=excluded.set_at`)
+      .bind(s.activityKind,s.activityId,s.mode,s.maxHints,JSON.stringify(s.allowedSourceIds),s.setBy,s.setAt).run();
+  }
+  async getTutorSession(id: Id): Promise<StoredTutorSession | null> {
+    const rows = await this.listTutorSessionsBy('id = ?', [id]); return rows[0] ?? null;
+  }
+  private async listTutorSessionsBy(where: string, binds: SqlBind[]): Promise<StoredTutorSession[]> {
+    const rows = await this.all<{ id:Id; student_id:Id; activity_kind:ActivityKind; activity_id:Id; course_id:Id; mode:StoredTutorSession['mode']; hints_used:number; max_hints:number; answer_requests:number; messages:string; started_at:string; updated_at:string }>(`SELECT * FROM tutor_sessions WHERE ${where} ORDER BY started_at, id`, binds);
+    return rows.map(r => ({ id:r.id, studentId:r.student_id, activityKind:r.activity_kind, activityId:r.activity_id, courseId:r.course_id, mode:r.mode, hintsUsed:r.hints_used, maxHints:r.max_hints, answerRequests:r.answer_requests, messages:JSON.parse(r.messages), startedAt:r.started_at, updatedAt:r.updated_at }));
+  }
+  async listTutorSessions(filter: { courseId?: Id; studentId?: Id; activityKind?: ActivityKind; activityId?: Id }): Promise<StoredTutorSession[]> {
+    return this.listTutorSessionsBy('(? IS NULL OR course_id = ?) AND (? IS NULL OR student_id = ?) AND (? IS NULL OR activity_kind = ?) AND (? IS NULL OR activity_id = ?)',
+      [filter.courseId??null,filter.courseId??null,filter.studentId??null,filter.studentId??null,filter.activityKind??null,filter.activityKind??null,filter.activityId??null,filter.activityId??null]);
+  }
+  async putTutorSession(s: StoredTutorSession): Promise<void> {
+    await this.db.prepare(`INSERT INTO tutor_sessions (id,student_id,activity_kind,activity_id,course_id,mode,hints_used,max_hints,answer_requests,messages,started_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET mode=excluded.mode,hints_used=excluded.hints_used,max_hints=excluded.max_hints,answer_requests=excluded.answer_requests,messages=excluded.messages,updated_at=excluded.updated_at`)
+      .bind(s.id,s.studentId,s.activityKind,s.activityId,s.courseId,s.mode,s.hintsUsed,s.maxHints,s.answerRequests,JSON.stringify(s.messages),s.startedAt,s.updatedAt).run();
+  }
+
   async getApiTokenByHash(hash: string) {
     const row = await this.first<TokenRow>('SELECT * FROM api_tokens WHERE hash = ?', [hash]);
     return row ? tokenFromRow(row) : null;
@@ -401,6 +427,8 @@ export class D1Repo implements Repo {
       ...seed.blocks.map((block) => this.blockStmt(block)),
       ...seed.assignments.map((assignment) => this.assignmentStmt(assignment)),
       ...seed.submissions.map((submission) => this.submissionStmt(submission)),
+      ...seed.tutorSettings.map((s) => this.db.prepare('INSERT INTO tutor_settings (activity_kind,activity_id,mode,max_hints,allowed_source_ids,set_by,set_at) VALUES (?,?,?,?,?,?,?)').bind(s.activityKind,s.activityId,s.mode,s.maxHints,JSON.stringify(s.allowedSourceIds),s.setBy,s.setAt)),
+      ...seed.tutorSessions.map((s) => this.db.prepare('INSERT INTO tutor_sessions (id,student_id,activity_kind,activity_id,course_id,mode,hints_used,max_hints,answer_requests,messages,started_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').bind(s.id,s.studentId,s.activityKind,s.activityId,s.courseId,s.mode,s.hintsUsed,s.maxHints,s.answerRequests,JSON.stringify(s.messages),s.startedAt,s.updatedAt)),
       ...seed.enrollments.map((row) => this.enrollmentStmt(row.courseId, row.userId)),
       ...seed.announcements.map((announcement) => this.announcementStmt(announcement)),
       ...seed.reads.map((read) => this.readStmt(read)),

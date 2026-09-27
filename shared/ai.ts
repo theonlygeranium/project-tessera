@@ -5,6 +5,7 @@
 //
 // Whatever a client returns is stored as a *draft*; a person keeps it (D-003).
 import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc } from './domain';
+import type { TutorKind } from './tutor/policy';
 
 export interface AiTasks {
   element: {
@@ -52,6 +53,16 @@ export interface AiTasks {
   feedback: {
     input: { courseTitle: string; assignmentTitle: string; rubric: RubricCriterion[]; criteria: { criterionId: string; levelId: string; points: number; comment: string }[]; submissionText: string };
     output: { feedback: string };
+  };
+  tutor: {
+    input: { kind: Exclude<TutorKind, 'refusal'>; mode: 'off' | 'hints' | 'explain' | 'open'; courseTitle: string; activityTitle: string;
+      sources: { id: string; name: string; text: string }[]; history: { role: 'student' | 'tutor'; text: string }[];
+      question: string; hintNumber: number | null; maxHints: number; readingLevel: 'standard' | 'plain'; language: string };
+    output: { text: string; citeIds: string[] };
+  };
+  'tutor-summary': {
+    input: { courseTitle: string; questions: string[] };
+    output: { summary: string };
   };
 }
 
@@ -115,6 +126,20 @@ const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K][
     return { text: context.trim() ? `${firstSentence(context).replace(/[.!?]$/, '').slice(0, 60)} (${host})` : `Page on ${host}` };
   },
   feedback: ({ criteria }) => ({ feedback: `You met ${criteria.length} rubric ${criteria.length === 1 ? 'criterion' : 'criteria'}. Review the rubric comments and revise one specific part of your work.` }),
+  tutor: ({ kind, hintNumber, maxHints, sources, activityTitle }) => ({
+    text: kind === 'hint' ? `Hint ${hintNumber} of ${maxHints}: look for the main idea in the activity, then try one step yourself.`
+      : kind === 'explain' ? 'Explanation: in a different example, start with the question, then compare the evidence before deciding.'
+      : kind === 'answer' ? activityTitle === 'What makes a question statistical?'
+        ? 'Answer: the question about how many hours a week Meridian State students study is statistical because the answers vary across students.'
+        : activityTitle === 'Cases and variables'
+          ? 'Answer: the students who answered the survey are the cases because each row represents one student.'
+          : 'Answer: use the lesson idea to choose the option that fits, and explain why it fits.'
+      : 'Let us stay with this activity. What part would you like to explore?',
+    citeIds: sources[0] ? [sources[0].id] : [],
+  }),
+  'tutor-summary': ({ questions }) => ({ summary: questions.length
+    ? 'This student asked about course ideas. They may need more practice connecting examples to the main concept.'
+    : 'No questions are available to summarize yet. There is not enough information to identify a misconception.' }),
   brief: ({ courseTitle, prompt }) => ({
     audience: /graduate|master/i.test(prompt) ? 'Graduate students new to the topic' : 'First-year undergraduates with no prior background',
     outcomes: [
