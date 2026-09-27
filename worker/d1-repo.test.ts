@@ -303,10 +303,12 @@ describe('D1Repo', () => {
     ]);
   });
 
-  it('reports an empty database until an institution row exists', async () => {
+  it('reports an empty database until both an institution and a user exist', async () => {
     const repo = fresh();
     expect(await repo.isEmpty()).toBe(true);
     await repo.putInstitution(seedData().institution);
+    expect(await repo.isEmpty()).toBe(true);
+    await repo.putUser(seedData().users[0]);
     expect(await repo.isEmpty()).toBe(false);
   });
 

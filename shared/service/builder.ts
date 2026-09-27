@@ -1,3 +1,4 @@
+import { logError } from './log';
 import { ApiError } from '../api';
 import type { Block, BlockContent, BuilderSession, CourseBrief, OutlineDraft } from '../domain';
 import type { Service, ServiceContext } from './context';
@@ -15,9 +16,9 @@ export const builder: Pick<Service, 'listBuilderSessions' | 'createBuilderSessio
     if (!Array.isArray(sources) || sources.length > 5) fail('invalid', 'Use at most five sources.');
     const docs = sources.map(x => ({ id: ctx.newId('src'), name: required(x.name, 'source name'), text: required(x.text, 'source text').slice(0,20000) }));
     let result;
-    try { result = await ctx.ai.run('brief', { courseTitle: c.title, prompt: clean, sources: docs }); } catch { return aiFailed(); }
+    try { result = await ctx.ai.run('brief', { courseTitle: c.title, prompt: clean, sources: docs }); } catch (error) { logError('AI task failed:', error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? ''); return aiFailed(); }
     let brief: CourseBrief;
-    try { brief = validateCourseBrief(result.output); } catch { return aiFailed(); }
+    try { brief = validateCourseBrief(result.output); } catch (error) { logError('AI task failed:', error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? ''); return aiFailed(); }
     const session: BuilderSession = { id: ctx.newId('bs'), courseId, prompt: clean, sources: docs, stage: 'brief', brief, outline: null, lessonIds: [], provenance: provenance(ctx, result.model, 'brief', clean.slice(0,120), docs.map(x => ({ id: x.id, name: x.name }))), createdAt: ctx.now() };
     await ctx.repo.putBuilderSession(session); return session;
   },
@@ -34,9 +35,9 @@ export const builder: Pick<Service, 'listBuilderSessions' | 'createBuilderSessio
     const brief = session.brief;
     const c = await canTeach(ctx, session.courseId);
     let result;
-    try { result = await ctx.ai.run('outline', { courseTitle: c.title, brief, sources: session.sources }); } catch { return aiFailed(); }
+    try { result = await ctx.ai.run('outline', { courseTitle: c.title, brief, sources: session.sources }); } catch (error) { logError('AI task failed:', error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? ''); return aiFailed(); }
     let outline: OutlineDraft;
-    try { outline = validateOutlineDraft(result.output); } catch { return aiFailed(); }
+    try { outline = validateOutlineDraft(result.output); } catch (error) { logError('AI task failed:', error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? ''); return aiFailed(); }
     session.outline = outline; session.stage = 'outline'; await ctx.repo.putBuilderSession(session); return session;
   },
   generateDrafts: async (ctx, { sessionId }) => {
@@ -53,9 +54,9 @@ export const builder: Pick<Service, 'listBuilderSessions' | 'createBuilderSessio
     let next = 0;
     const draftOne = async (module: OutlineDraft['modules'][number], spec: Spec) => {
       let result;
-      try { result = await ctx.ai.run('lesson-draft', { courseTitle: c.title, brief, moduleTitle: module.title, lesson: spec, sources: session.sources }); } catch { return aiFailed(); }
+      try { result = await ctx.ai.run('lesson-draft', { courseTitle: c.title, brief, moduleTitle: module.title, lesson: spec, sources: session.sources }); } catch (error) { logError('AI task failed:', error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? ''); return aiFailed(); }
       const blocks = Array.isArray(result.output?.blocks) ? result.output.blocks.flatMap(raw => { try { return [validateBlockContent(raw)]; } catch { return []; } }) : [];
-      if (!blocks.length) aiFailed();
+      if (!blocks.length) { logError('AI lesson draft had no valid blocks:', JSON.stringify(result.output).slice(0, 500)); aiFailed(); }
       return { blocks, model: result.model };
     };
     await Promise.all(Array.from({ length: Math.min(4, jobs.length) }, async () => {

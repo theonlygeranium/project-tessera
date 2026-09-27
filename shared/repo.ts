@@ -70,7 +70,7 @@ export interface Repo {
   listBuilderSessions(courseId: Id): Promise<BuilderSession[]>;
   putBuilderSession(session: BuilderSession): Promise<void>;
 
-  /** Whether any data exists (the Worker seeds an empty database on first request). */
+  /** True when there's no institution or no users: a database the Worker must seed on first request. */
   isEmpty(): Promise<boolean>;
   /** Deletes everything and loads the seed. */
   reset(seed: SeedData): Promise<void>;

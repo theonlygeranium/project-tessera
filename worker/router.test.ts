@@ -110,11 +110,11 @@ describe('worker fetch', () => {
     });
   });
 
-  it('returns a stub handler error as its status and JSON', async () => {
+  it('returns a service ApiError as its status and JSON', async () => {
     const env = testEnv(createTestDb(), assetsFor().fetcher);
-    const response = await call(env, '/api/session', { method: 'POST', body: '   ' });
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ error: { code: 'conflict', message: 'signIn is not implemented yet' } });
+    const response = await call(env, '/api/session', { method: 'POST', body: JSON.stringify({ userId: 'u-missing' }) });
+    expect(response.status).toBe(404);
+    expect(((await response.json()) as { error: { code: string } }).error.code).toBe('not-found');
   });
 
   it('reads the persona cookie before dispatch checks the role', async () => {
@@ -131,8 +131,8 @@ describe('worker fetch', () => {
     expect(unknown.status).toBe(401);
 
     const admin = await call(env, '/api/overview', { headers: { cookie: 'theme=light; tessera_user=u-admin' } });
-    expect(admin.status).toBe(409);
-    expect(await admin.json()).toEqual({ error: { code: 'conflict', message: 'getOverview is not implemented yet' } });
+    expect(admin.status).toBe(200);
+    expect(((await admin.json()) as { people: Record<string, number> }).people.student).toBe(4);
   });
 
   it('passes query and path fields to the handler and keeps ApiError details', async () => {

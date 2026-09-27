@@ -272,8 +272,8 @@ export class D1Repo implements Repo {
   }
 
   async isEmpty(): Promise<boolean> {
-    const row = await this.first<{ id: string }>('SELECT id FROM institution LIMIT 1');
-    return row == null;
+    const row = await this.first<{ i: number; u: number }>('SELECT (SELECT count(*) FROM institution) AS i, (SELECT count(*) FROM users) AS u');
+    return !row || row.i === 0 || row.u === 0;
   }
 
   async reset(seed: SeedData): Promise<void> {

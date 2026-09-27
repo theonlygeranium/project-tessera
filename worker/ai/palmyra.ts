@@ -129,7 +129,9 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 };
 
 const MAX_TOKENS: Record<AiTaskName, number> = {
-  brief: 6000, outline: 8000, 'lesson-draft': 16000, 'block-regenerate': 6000, announcement: 4000,
+  // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the
+  // occasional runaway generation within seconds instead of a minute.
+  brief: 6000, outline: 8000, 'lesson-draft': 7000, 'block-regenerate': 5000, announcement: 4000,
 };
 
 // ---- Client ---------------------------------------------------------------------------------
@@ -160,25 +162,78 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
     const choice = body.choices?.[0];
     const content = choice?.message?.content;
     if (!content) throw new ApiError('ai-failed', 'The AI service returned an empty response.');
-    // Structured output padded with whitespace can run out of tokens mid-JSON; that's worth one retry.
-    if (choice?.finish_reason === 'length') throw new Error(`The AI response was cut off (${task}, ${content.length} characters).`);
-    return MAP[task](JSON.parse(content), input as never) as AiTasks[K]['output'];
+    let raw: unknown;
+    try {
+      if (choice?.finish_reason === 'length') throw new Error('cut off');
+      raw = JSON.parse(content);
+    } catch {
+      // Palmyra occasionally runs away mid-JSON. For a lesson, keep the complete blocks
+      // that came before the runaway if there are enough of them to be a lesson.
+      const blocks = task === 'lesson-draft' ? salvageBlocks(content) : [];
+      if (blocks.length >= 3) raw = { blocks };
+      else throw new Error(`The AI response was cut off or malformed (${task}, ${content.length} characters).`);
+    }
+    return MAP[task](raw, input as never) as AiTasks[K]['output'];
   }
 
   return {
     async run(task, input) {
-      try {
-        return { output: await once(task, input), model };
-      } catch (first) {
-        if (first instanceof ApiError && (first.details as { status?: number })?.status && (first.details as { status: number }).status < 500) throw first;
-        // One retry for transient failures and malformed JSON.
+      let last: unknown;
+      // Up to three attempts for transient failures and malformed or runaway output.
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          return { output: await once(task, input), model };
-        } catch (second) {
-          if (second instanceof ApiError) throw second;
-          throw new ApiError('ai-failed', 'The AI draft could not be created. Try again.', { cause: String(second) });
+          const output = await once(task, input);
+          // Retry a lesson without a usable knowledge check (principle #4), except on the last try.
+          if (attempt < 2 && task === 'lesson-draft' && !hasUsableCheck(output as AiTasks['lesson-draft']['output'])) {
+            last = new Error('lesson draft had no usable knowledge check');
+            continue;
+          }
+          return { output, model };
+        } catch (error) {
+          last = error;
+          const status = error instanceof ApiError ? (error.details as { status?: number } | undefined)?.status : undefined;
+          if (status && status < 500 && status !== 429) break; // a client error won't fix itself
         }
       }
+      if (last instanceof ApiError) throw last;
+      throw new ApiError('ai-failed', 'The AI draft could not be created. Try again.', { cause: String(last) });
     },
   };
 }
+
+/**
+ * Complete block objects from a truncated `{"blocks":[{…},{…},…` response: scans the
+ * array, tracking strings and brace depth, and parses each closed object.
+ */
+export function salvageBlocks(content: string): FlatBlock[] {
+  const start = content.indexOf('[', content.indexOf('"blocks"'));
+  if (start < 0) return [];
+  const out: FlatBlock[] = [];
+  let depth = 0, inString = false, escaped = false, objStart = -1;
+  for (let i = start + 1; i < content.length; i++) {
+    const ch = content[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') { if (depth === 0) objStart = i; depth++; }
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0 && objStart >= 0) {
+        try { out.push(JSON.parse(content.slice(objStart, i + 1)) as FlatBlock); } catch { /* skip a malformed block */ }
+        objStart = -1;
+      }
+    } else if (ch === ']' && depth === 0) break;
+  }
+  return out;
+}
+
+/** A lesson draft is only complete with a real retrieval check: 2+ options and a valid correct answer. */
+export function hasUsableCheck(draft: { blocks: BlockContent[] }): boolean {
+  return draft.blocks.some((b) => b.type === 'check' && b.question.trim() !== '' && b.options.filter((o) => o.text.trim()).length >= 2
+    && b.options.some((o) => o.id === b.correctOptionId && o.text.trim() !== ''));
+}
+

@@ -1,3 +1,4 @@
+import { logError } from './log';
 import type { Announcement, Provenance } from '../domain';
 import type { StoredAnnouncement } from '../repo';
 import type { Service, ServiceContext } from './context';
@@ -56,7 +57,7 @@ export const announcements: Pick<Service, 'listAnnouncements' | 'createAnnouncem
     const c = await canTeach(ctx, courseId); await aiEnabled(ctx); const clean = required(prompt, 'prompt');
     let result;
     try { result = await ctx.ai.run('announcement', { courseTitle: c.title, instructorName: user(ctx).name, prompt: clean }); }
-    catch { return aiFailed(); }
+    catch (error) { logError('AI task failed:', error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? ''); return aiFailed(); }
     if (!result.output || typeof result.output.title !== 'string' || typeof result.output.body !== 'string' || !result.output.title.trim() || !result.output.body.trim()) aiFailed();
     return { title: result.output.title.trim(), body: result.output.body.trim(), provenance: provenance(ctx, result.model, 'announcement', clean.slice(0,120)) };
   },

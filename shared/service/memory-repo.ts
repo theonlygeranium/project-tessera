@@ -81,7 +81,7 @@ export class MemoryRepo implements Repo {
   async getBuilderSession(id: string): Promise<BuilderSession | null> { return copy(this.data.builderSessions.find(x => x.id === id) ?? null); }
   async listBuilderSessions(courseId: string): Promise<BuilderSession[]> { return copy(this.data.builderSessions.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt))); }
   async putBuilderSession(value: BuilderSession) { this.upsert(this.data.builderSessions, value); }
-  async isEmpty(): Promise<boolean> { return this.data.users.length === 0 && this.data.courses.length === 0 && this.data.modules.length === 0 && this.data.lessons.length === 0 && this.data.blocks.length === 0 && this.data.announcements.length === 0 && this.data.builderSessions.length === 0; }
+  async isEmpty(): Promise<boolean> { return this.data.users.length === 0; }
   async reset(seed: SeedData) { this.data = copy(seed); }
   private upsert<T extends { id: string }>(items: T[], value: T) {
     const i = items.findIndex(x => x.id === value.id);
