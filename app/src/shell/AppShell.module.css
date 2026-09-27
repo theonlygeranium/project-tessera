@@ -1,5 +1,6 @@
 .shell { display: grid; grid-template-columns: auto minmax(0, 1fr); min-height: 100vh; background: var(--paper); }
-.rail { position: sticky; top: 0; height: 100vh; }
+/* NQ-06: the rail is one viewport tall and scrolls itself, so the persona footer stays in view. */
+.shell > .rail { position: sticky; top: 0; height: 100vh; min-height: 0; overflow-y: auto; }
 .main { min-width: 0; padding: 28px clamp(16px, 4vw, 48px) 64px; outline: none; }
 .skip { position: absolute; left: 8px; top: -60px; z-index: 10; padding: 10px 14px; background: var(--surface); color: var(--accent); border: 1px solid var(--line); border-radius: var(--radius-md); font-weight: 600; }
 .skip:focus { top: 8px; }
@@ -10,7 +11,16 @@
 .name { display: block; font-weight: 600; color: var(--ink); line-height: 1.25; }
 .role { display: block; color: var(--muted); }
 .demo { margin: 0 0 16px; padding: 8px 12px; border: 1px dashed var(--line-dashed); border-radius: var(--radius-md); color: var(--muted); font-size: var(--size-text-compact); }
+/* NQ-07: on phones the rail is a compact header: institution and persona on one row,
+   the destinations as an even row of icon-over-label tiles, no scrollbar. */
 @media (max-width: 767px) {
   .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  .rail { position: static; height: auto; }
+  .shell > .rail { position: static; height: auto; overflow: visible; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "header footer" "list list"; align-items: center; gap: 6px 8px; padding: 10px 12px; }
+  .shell > .rail > div:first-child { grid-area: header; padding: 0; }
+  .shell > .rail > ul { grid-area: list; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); width: auto; min-width: 0; }
+  .shell > .rail > ul a { flex-direction: column; justify-content: center; gap: 2px; padding: 6px 2px; text-align: center; white-space: normal; overflow-wrap: normal; hyphens: auto; font-size: 12px; line-height: 1.2; }
+  .shell > .rail > div:last-child { grid-area: footer; padding: 0; margin: 0; }
+  .persona { display: flex; align-items: center; gap: 4px; }
+  .who { position: relative; gap: 6px; }
+  .who > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }

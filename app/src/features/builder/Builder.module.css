@@ -24,3 +24,5 @@
 .reviewItem > div { display: grid; gap: 8px; }
 @media (max-width: 760px) { .columns { grid-template-columns: minmax(0, 1fr); } .sidePanel { order: -1; } }
 @media (max-width: 520px) { .formGrid { grid-template-columns: minmax(0, 1fr); } .full { grid-column: auto; } }
+/* NQ-10: buttons size to their content inside stacked layouts. */
+.stack > :is(button, a), .formGrid > :is(button, a), .full > :is(button, a) { justify-self: start; }

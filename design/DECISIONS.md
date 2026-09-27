@@ -176,6 +176,6 @@ Extends D-006 from AI content to the whole product. The owner rejected the color
 **Decision:**
 - No element gets a colored bar along an edge: no `border-left`/`border-inline-start` accents, no `box-shadow: inset Npx 0 …` stripes, no pseudo-element bars. This covers cards, callouts, list rows, navigation, tables, notices, and AI content.
 - 1 px neutral borders (`--line` family) that separate panels or outline a whole box are layout, not stripes, and stay allowed.
-- State (current, selected, warning, pinned, AI) is shown with fills, type weight, text, and Tessera's own markers (the "current" marker is chosen in the stripe-replacement exploration, `design/explorations/current-marker.md`).
+- State (current, selected, warning, pinned, AI) is shown with fills, type weight, text, and shape. The current item in navigation and outlines is a **lifted tile**: white surface, full 1px outline, bold text (owner's choice, option B in `design/explorations/current-marker.md`).
 - `npm test` enforces it: `tools/no-stripes.test.ts` scans every stylesheet and artboard and fails on an edge stripe.
 

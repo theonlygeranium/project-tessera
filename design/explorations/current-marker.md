@@ -13,4 +13,4 @@ Options shown to the owner side by side:
 
 Recommendation: **A · Set tile**. It's the only one that belongs to Tessera specifically, it works at 320 px and in dense outlines, and it carries state without color alone (shape differs by state).
 
-Decision: pending the owner's choice.
+**Decision (2026-09-27): the owner chose B · Lifted tile.** Implemented in `GlobalRailNav` (`.current`) and `LessonOutline` (current lesson): the current item is a white `--surface` tile with a full 1px `--control-line` outline and bold ink text, and the rail icon takes the accent. Other items keep a transparent 1px border, so nothing shifts. Module cards sit on `--surface-alt`, so a lifted row reads as raised.

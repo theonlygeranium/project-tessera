@@ -4,6 +4,16 @@ import type { StoredAnnouncement } from '../repo';
 import type { Service, ServiceContext } from './context';
 import { aiEnabled, aiFailed, canReachCourse, canTeach, course, fail, provenance, required, user } from './helpers';
 
+/**
+ * NQ-03: an announcement's provenance is shown to students, so it never carries the
+ * instructor's private prompt. The summary is fixed, and client-sent provenance is
+ * reduced to its model, task, and time.
+ */
+const ANNOUNCEMENT_SUMMARY = "Drafted from the instructor's notes";
+const publicProvenance = (p: Provenance): Provenance => ({
+  model: String(p.model ?? 'unknown'), task: 'announcement', generatedAt: String(p.generatedAt ?? ''), sources: [], summary: ANNOUNCEMENT_SUMMARY,
+});
+
 async function joined(ctx: ServiceContext, row: StoredAnnouncement): Promise<Announcement> {
   const c = await course(ctx, row.courseId), author = await ctx.repo.getUser(row.authorId);
   const read = user(ctx).role !== 'student' || (await ctx.repo.listReads({ userId: user(ctx).id, announcementId: row.id })).length > 0;
@@ -32,7 +42,7 @@ export const announcements: Pick<Service, 'listAnnouncements' | 'createAnnouncem
   createAnnouncement: async (ctx, input) => {
     await canTeach(ctx, input.courseId);
     const now = ctx.now();
-    const row: StoredAnnouncement = { id: ctx.newId('a'), courseId: input.courseId, authorId: user(ctx).id, title: required(input.title, 'title'), body: required(input.body, 'body'), pinned: input.pinned, status: input.publish ? 'published' : 'draft', origin: input.aiDraft ? 'ai' : 'human', aiState: input.aiDraft ? (input.publish ? 'kept' : 'draft') : null, provenance: input.aiDraft ?? null, publishedAt: input.publish ? now : null, createdAt: now };
+    const row: StoredAnnouncement = { id: ctx.newId('a'), courseId: input.courseId, authorId: user(ctx).id, title: required(input.title, 'title'), body: required(input.body, 'body'), pinned: input.pinned, status: input.publish ? 'published' : 'draft', origin: input.aiDraft ? 'ai' : 'human', aiState: input.aiDraft ? (input.publish ? 'kept' : 'draft') : null, provenance: input.aiDraft ? publicProvenance(input.aiDraft) : null, publishedAt: input.publish ? now : null, createdAt: now };
     await ctx.repo.putAnnouncement(row); return joined(ctx, row);
   },
   updateAnnouncement: async (ctx, input) => {
@@ -59,6 +69,6 @@ export const announcements: Pick<Service, 'listAnnouncements' | 'createAnnouncem
     try { result = await ctx.ai.run('announcement', { courseTitle: c.title, instructorName: user(ctx).name, prompt: clean }); }
     catch (error) { logError('AI task failed:', error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? ''); return aiFailed(); }
     if (!result.output || typeof result.output.title !== 'string' || typeof result.output.body !== 'string' || !result.output.title.trim() || !result.output.body.trim()) aiFailed();
-    return { title: result.output.title.trim(), body: result.output.body.trim(), provenance: provenance(ctx, result.model, 'announcement', clean.slice(0,120)) };
+    return { title: result.output.title.trim(), body: result.output.body.trim(), provenance: provenance(ctx, result.model, 'announcement', ANNOUNCEMENT_SUMMARY) };
   },
 };
