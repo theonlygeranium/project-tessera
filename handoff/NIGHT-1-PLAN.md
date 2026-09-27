@@ -123,64 +123,18 @@ Integration happens continuously on `night1`, whose preview URL is `https://nigh
 
 ### Lanes
 
-| Lane | Area | Owns (only this lane edits these) | Agent | Depends on |
-|---|---|---|---|---|
-| **A** | Contract, shell, integration | `shared/`, `app/src/data/`, `app/src/shell/`, `app/src/routes.tsx`, `wrangler.jsonc` | **Claude** | none |
-| **B** | Components (the rest of #17 that Night 1 needs): FormField, ChoiceControl, SegmentedControl, TaskCard, CourseCard, ProgressMeter, PresenceCard, StatusNotice, LessonOutline, PipelineStepper, GlobalRailNav, TopBar, DataTable, KnowledgeCheck | `app/src/components/` | **Codex Sol** (Luna for stories and boilerplate) | tokens only |
-| **C** | API and data: Worker routes, D1 queries, role checks, the publish gate, Worker tests | `worker/`, `migrations/` | **Codex Sol** | A (types, schema) |
-| **D** | Administrator: setup, people, courses, policy | `app/src/features/admin/` | **Grok 4.7** (form-heavy, lower risk; spreads load off Codex) | A, B |
-| **E** | Instructor: course workspace, outline, block editor, announcements, roster | `app/src/features/instructor/` | **Codex Sol** | A, B |
-| **F** | AI builder: brief → outline → drafts → publish readiness; server prompts | `app/src/features/builder/`, `worker/ai/` | **Claude leads** (prompts, governance, UX calls); **Sol** implements the screens | A, B, C |
-| **G** | Student: onboarding, Today, course home, lesson player, announcements feed | `app/src/features/student/` | **Codex Sol** (second concurrent run; Grok if Codex is rate-limited) | A, B |
-| **H** | Quality: Playwright acceptance journeys, a11y audit routes, CI job, docs release notes | `tests/e2e/`, `tools/a11y_audit.mjs`, `mintlify/releases/` | **Claude subagent** (Sonnet) writes the tests; **Codex Astra** reviews every lane; **Grok** second-reviews the authorization and publish gates | A (journeys can be written against the mock adapter first) |
+| Lane | Agent (time, usage) | State |
+|---|---|---|
+| A (#31) contract, shell, integration | Claude | Merged. Shell, data adapters (http, mock), routes, persona sign-in |
+| B (#32) components | Codex Sol ×2 (302 s / 64,876 tokens; 306 s / 79,673) | Merged. 14 components, 58 stories |
+| C1 (#33) service layer | Codex Sol, high (550 s / 109,988) | Merged. Every operation, MemoryRepo, validators, repo contract suite |
+| C2 (#33) Worker, D1Repo, Access | Grok 4.7 (1,881 s; $1.42 reported) | Merged. Verified with wrangler dev + local D1 |
+| D (#34) administrator | Grok 4.7 (1,736 s; $1.66 reported) | Merged. Journey 1 walked in the browser |
+| E (#35) instructor | Codex Sol (341 s / 110,519) | Merged. Publish gate walked in the browser |
+| F (#36) AI builder | Claude (Palmyra client) + Codex Sol screens (642 s / 71,981) | Merged. Live Palmyra: brief 4 s, outline 7 s, 6 lessons in 32 s |
+| G (#37) student | Codex Sol (313 s / 100,831) | Merged. Journey 4 walked in the browser |
+| H (#38) quality | Claude subagent (Sonnet) | In progress: Playwright journeys + CI |
 
-### Coordination rules
-- **One owner per directory.** A lane that needs a change outside its directories (a new type, a route, a component prop) asks for it in its report, and Claude makes the change in lane A. This is what prevents merge conflicts.
-- **Contract first.** No lane starts before wave 0's contract is merged, except B, which depends only on tokens.
-- **Small merges, often.** Each lane lands in slices: a screen or endpoint per merge, each checked by Claude (diff read, build, a11y), not one large merge at the end.
-- **Workers never commit or push** (`AGENTS.md`). Claude merges into `night1`, and only the owner approves `night1` → `main`.
-- **Rate limits.** At most three Codex runs at once. Grok takes overflow and lane D. Moving up a tier follows `handoff/AGENT-ECOSYSTEM.md`.
-- **Status lives in one place:** GitHub milestone "Night 1", one issue per lane (with slices as checklists), plus a status table at the bottom of this file that Claude updates at each merge.
-
-### Existing backlog, mapped
-- #17 → lane B.
-- #18 → lane G (onboarding).
-- #19 → stretch.
-- #20 → lane F.
-- #21 → lane G (course home).
-- #28 and #29 stay open for after Night 1 (they need a working MVP to test).
-- #22–#27 and #30 → Night 2 and later.
-
-## 8. Risks
-
-| Risk | Mitigation |
-|---|---|
-| Lanes collide in shared files | Directory ownership, plus requests to lane A |
-| The public preview exposes a writable app | Cloudflare Access on `/app/` and `/api/` (decision D1); fictional data only |
-| AI cost or outages block the builder | A deterministic fixture provider; the gateway sets rate limits and caching |
-| Codex usage limits mid-night | Grok overflow; Claude subagents for tests and docs |
-| Scope creep | §3 "Not in Night 1" is the cut list; anything new becomes a Night 2 candidate |
-| Accessibility regressions in a dynamic app | The audit runs against the mock-adapter build on every merge, and every new route is added to the audit |
-| Workers' claims don't match their work | Claude reads every diff and re-runs the checks (as in earlier trials) |
-
-## 9. Status
-
-### Infrastructure (created 2026-09-27)
-
-| Resource | Value |
-|---|---|
-| D1 production | `tessera-prod` (`38c87cc3-1b4a-43ee-a2b1-e4561c7e6ea7`) |
-| D1 previews | `tessera-preview` (`36fc5739-9c50-43ec-b136-1934bf15fe2c`) |
-| AI Gateway | `tessera`, custom provider `writer` → `https://api.writer.com`; Palmyra-X6 verified through it |
-| Access app | "Tessera app and API" (`248af16f-5328-44f1-ad4f-9a362cc786e6`), AUD `97c83cba8bf51d22c61e77f174b69318dc2cf542178fd0201443eaebf0f59a4d`, team domain `little-brook-5f84.cloudflareaccess.com`; verified: `/app/` redirects to sign-in, `/prototype/` stays public |
-| Worker secret | `WRITER_API_KEY`: set when the Worker script first deploys (wave 2) |
-
-### Lanes
-
-| Lane | State |
-|---|---|
-| A (#31) | Wave 0 in progress |
-| B (#32) | Starting with wave 0 |
-| C (#33), D (#34), E (#35), F (#36), G (#37), H (#38) | Waiting for the wave 0 contract |
+Checks on `night1` (07b604e): 66 unit tests pass; a11y 157/157; preview built and verified: public pages public, `/app` and `/api` behind Access.
 
 GitHub milestone: "Night 1". Branch: `night1` (preview `https://night1-project-tessera.jeff-f69.workers.dev/`).
