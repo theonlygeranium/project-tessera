@@ -57,7 +57,7 @@ class Handler(BaseHTTPRequestHandler):
                 f.write(body)
             command = [
                 "ocrmypdf", "--skip-text", "--output-type", "pdf", "--optimize", "0",
-                "--jobs", "2", "--tesseract-timeout", "180", "-l", "+".join(langs), source, target,
+                "--jobs", "1", "--tesseract-timeout", "180", "-l", "+".join(langs), source, target,
             ]
             try:
                 result = subprocess.run(command, capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
