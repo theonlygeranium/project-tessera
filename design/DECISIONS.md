@@ -17,6 +17,9 @@ Settled decisions for Project Tessera, with the reason for each. Agents should t
 | D-011 | Phase-2 build approach: B, a Vite + React component app built by Cloudflare | Accepted | 2026-09-26 |
 | D-012 | Hosting: Cloudflare Workers static assets, deploy on push, per-branch previews | Accepted | 2026-09-26 |
 | D-013 | Deploy lanes: minor changes go straight to production; big features get the full check and a preview | Accepted | 2026-09-26 |
+| D-014 | Night 1 backend and access: one Worker + D1, demo persona sign-in, `/app` and `/api` behind Cloudflare Access | Accepted | 2026-09-27 |
+| D-015 | Platform LLM: WRITER Palmyra-X6 through Cloudflare AI Gateway, with a deterministic fixture provider | Accepted | 2026-09-27 |
+| D-016 | Night 1 scope and milestone model: "Night N" coordinated releases for administrator, instructor, and student | Accepted | 2026-09-27 |
 
 ---
 
@@ -140,3 +143,30 @@ Partly supersedes D-010 (when the audit runs) and extends D-012. The owner is th
 - The zero-violation accessibility bar (D-010) still stands in both lanes. In the fast lane the `a11y` workflow checks each push after it's live; a failure is fixed in a follow-up push. The current result is 45/45.
 - Worker agents (`AGENTS.md`) never push; Claude pushes after reading their diff.
 - Unchanged: destructive actions (force pushes, deleting branches or data, Cloudflare or DNS changes) need the owner's confirmation, and nothing confidential goes under `docs/` (D-012).
+
+### D-014 · Night 1 backend and access
+Extends D-011 (the full-stack foundations) and D-012. Night 1 is a working MVP with stored data, so it needs a backend, but the public site must not expose a writable app. Approved by the owner on 2026-09-27 (`handoff/NIGHT-1-PLAN.md` §6).
+**Decision:**
+- The Worker `project-tessera` gains a script (`worker/`) that serves `/api/*`; everything else is still served from the static assets.
+- Data lives in **D1**: `tessera-prod` (production) and `tessera-preview` (every branch preview, set under `previews` in `wrangler.jsonc`). Schema changes are migrations in `migrations/`.
+- **Sign-in is a demo persona picker** with seeded, fictional accounts. Real accounts (passwords, SSO, magic links) are a later Night.
+- **Cloudflare Access** app "Tessera app and API" guards `/app` and `/api` on `tessera.edstratumlabs.ai`, `project-tessera.jeff-f69.workers.dev`, and every `*-project-tessera.jeff-f69.workers.dev` preview. Only the owner (one-time PIN to `jeff@jgeronimo.com`) is allowed for now; testers are added as extra `include` rules. The rest of the site (gallery, screens, prototype, Storybook) stays public.
+- The Worker also verifies the Access JWT (`Cf-Access-Jwt-Assertion`, audience tag of the Access app) on every `/api` request, so the API is safe even if Access is misconfigured. Local development skips the check.
+
+### D-015 · Platform LLM: Palmyra-X6
+Supersedes the Claude API recommendation in the Night 1 plan draft. The owner uses WRITER's Palmyra-X6 extensively for R&D and wants Tessera's AI built on it. Verified on 2026-09-27: `palmyra-x6` answers through WRITER's OpenAI-compatible API (`https://api.writer.com/v1/chat/completions`) and returns valid JSON for a strict `json_schema` response format (a 3-module outline in about 3.5 s). Approved by the owner on 2026-09-27.
+**Decision:**
+- In-product AI (the course builder, the announcement assist, and the stretch tutor) calls **Palmyra-X6** through **Cloudflare AI Gateway** `tessera`, custom provider `writer` (`https://gateway.ai.cloudflare.com/v1/<account>/tessera/custom-writer/v1/chat/completions`). The gateway adds logs, rate limits (120 requests a minute), and a place to add fallbacks.
+- The WRITER key is a Worker secret (`WRITER_API_KEY`), never in the repo or the app bundle. The owner's key record is in the EL Wiki (Schubert Server Bible, "Cursor IDE — LiteLLM BYOK Integration", production key).
+- All prompts, schemas, and the draft-with-provenance rules live on the server (`worker/ai/`). The model's output is always stored as a **draft** (D-003); nothing it writes reaches students until a person keeps it.
+- Reasoning tokens count toward `max_tokens`, so structured calls use a generous limit (at least 4,000).
+- A **deterministic fixture provider** answers when no key is configured (tests, CI, the a11y audit, docs screenshots, local development), so nothing depends on the live model to build or test.
+- This is independent of the agent ecosystem, where Palmyra-X6 remains benched as a coding agent.
+
+### D-016 · Night milestones and Night 1 scope
+Approved by the owner on 2026-09-27.
+**Decision:**
+- Phase 2 and later work ships as coordinated **"Night N"** milestones: Claude plans the release, splits it into lanes that different agents build in parallel, integrates continuously on a `nightN` branch, and deploys to production once, at the end.
+- Planning uses three personas: **administrator** (IT and LMS administrators), **instructor** (instructors, teaching faculty, faculty), and **student**.
+- Night 1's scope, cut list, acceptance journeys, and lanes are in `handoff/NIGHT-1-PLAN.md`. The hint-first tutor is a stretch goal.
+

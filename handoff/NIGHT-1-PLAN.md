@@ -1,6 +1,6 @@
 # Night 1: the first MVP release
 
-**Status: proposed, waiting on the owner's decisions in §6.** Written 2026-09-26 by Claude (orchestrator). When the owner approves, the decisions go into `design/DECISIONS.md`, the milestone and issues are created on GitHub, and this file becomes the working plan.
+**Status: approved 2026-09-27; in progress.** Written by Claude (orchestrator). The owner approved every recommendation in §6, with one change: the platform LLM is WRITER **Palmyra-X6** instead of the Claude API. The decisions are recorded as D-014, D-015, and D-016 in `design/DECISIONS.md`.
 
 Night 1 is the first of the "Night N" milestones: coordinated efforts where several agents build separate parts of the LMS at the same time, then regroup for one integration and one production deployment. Phase 2 and later builds run this way.
 
@@ -94,18 +94,18 @@ This builds on the full-stack foundations already recorded in D-011, and adds a 
 
   Components never know which adapter is behind them.
 - **An AI provider interface** in the Worker, with two implementations:
-  - The real model chosen in §6.
+  - Palmyra-X6 through AI Gateway (D-015).
   - A deterministic fixture used in tests, CI, and previews without a key.
 
   Prompts and the draft-with-provenance rules live on the server.
 - **Routing:** React Router in the app, with one route module per persona area, so lanes don't edit the same files.
 
-## 6. Decisions the owner needs to make
+## 6. Decisions (approved 2026-09-27)
 
 | # | Decision | Recommendation | Alternatives |
 |---|---|---|---|
 | **D1** | Backend and access | **Real backend (Worker + D1), demo persona sign-in, with `/app/` and `/api/` behind Cloudflare Access (owner plus invited testers).** Real data, and nobody can vandalize the public URL. | (b) Browser-only demo: no backend, data in each browser; fastest, but not a real LMS. (c) Real accounts (email magic link): more time; better as Night 2. |
-| **D2** | AI provider for authoring (and the stretch tutor) | **The Claude API through Cloudflare AI Gateway**, Sonnet 5 for drafting: best draft quality, with logging and rate limits in the gateway. Needs an Anthropic API key; Claude checks the EL Wiki before asking. | (b) Workers AI: no key needed, weaker drafts. (c) Scripted drafts only for Night 1; real AI in Night 2. |
+| **D2** | AI provider for authoring (and the stretch tutor) | **Owner's choice: WRITER Palmyra-X6** through Cloudflare AI Gateway (custom provider `writer`), with a deterministic fixture provider for tests. See D-015. | Claude API (the original recommendation), Workers AI, scripted drafts. |
 | **D3** | Scope | **Confirm §3 as written**, with the tutor as a stretch goal. | Move the tutor into the core scope (adds about one lane), or cut the AI announcement assist. |
 | **D4** | Cloudflare changes (destructive or config actions need your go-ahead) | **Approve:** create D1 `tessera-prod` and `tessera-preview`, an AI Gateway, and a Cloudflare Access application for `/app/*` and `/api/*`. | Approve them one at a time as each lane needs them. |
 
@@ -165,6 +165,22 @@ Integration happens continuously on `night1`, whose preview URL is `https://nigh
 
 ## 9. Status
 
+### Infrastructure (created 2026-09-27)
+
+| Resource | Value |
+|---|---|
+| D1 production | `tessera-prod` (`38c87cc3-1b4a-43ee-a2b1-e4561c7e6ea7`) |
+| D1 previews | `tessera-preview` (`36fc5739-9c50-43ec-b136-1934bf15fe2c`) |
+| AI Gateway | `tessera`, custom provider `writer` → `https://api.writer.com`; Palmyra-X6 verified through it |
+| Access app | "Tessera app and API" (`248af16f-5328-44f1-ad4f-9a362cc786e6`), AUD `97c83cba8bf51d22c61e77f174b69318dc2cf542178fd0201443eaebf0f59a4d`, team domain `little-brook-5f84.cloudflareaccess.com`; verified: `/app/` redirects to sign-in, `/prototype/` stays public |
+| Worker secret | `WRITER_API_KEY`: set when the Worker script first deploys (wave 2) |
+
+### Lanes
+
 | Lane | State |
 |---|---|
-| All | Waiting on the owner's decisions (§6) |
+| A (#31) | Wave 0 in progress |
+| B (#32) | Starting with wave 0 |
+| C (#33), D (#34), E (#35), F (#36), G (#37), H (#38) | Waiting for the wave 0 contract |
+
+GitHub milestone: "Night 1". Branch: `night1` (preview `https://night1-project-tessera.jeff-f69.workers.dev/`).
