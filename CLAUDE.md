@@ -69,7 +69,7 @@ npm run a11y                                           # must print "N/N pass"; 
 1. Copy the structure of an existing `design/canvas/*.dc.html`: the `<head>` with `./support.js`, `../../docs/assets/ai-voice.css` and `.js`, a `<helmet>` with Google Fonts and base styles, and one root `<div>` with a **fixed width and height** matching its `canvas.json` entry. Include the trailing `<script type="text/x-dc" data-dc-script data-props='{"accent":…,"$preview":{…}}'>` block with `class Component extends DCLogic`.
 2. Use inline `style="…"` for layout (the canvas editor edits inline styles). `{{accent}}` is the only template variable in use.
 3. Link to other screens by their `.dc.html` name (`href="TutorSettings.dc.html"`). The build rewrites these links.
-4. Register the screen in `design/canvas/canvas.json` (`boards` + `order`). Frames in a row sit 80px apart. Rows start at y = 0 (learner), 1240 (author and instructor), and 2480 (admin), and each row's title note sits 240px above it. Keep at least 120px clear under the tallest board in a row. **and** in `SCREENS` in `tools/build_docs.py` (slug, role group, description). SCREENS order sets the gallery order.
+4. Register the screen in `design/canvas/canvas.json` (`boards` + `order`). Frames in a row sit 80px apart. Rows start at y = 0 (learner), 1240 (author and instructor), and 2480 (admin), and each row's title note sits 240px above it. Keep at least 120px clear under the tallest board in a row. Also register it in `SCREENS` in `tools/build_docs.py` (slug, role group, description). SCREENS order sets the gallery order.
 5. Build, audit, commit.
 
 ## The clickable prototype (`docs/prototype/`)
