@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import type { StudentBlock } from '../../../../shared/domain';
-import { Button, KnowledgeCheck, LessonOutline, PresenceCard, StatusNotice, TopBar, AiContent } from '../../components';
+import { Button, LessonOutline, PresenceCard, StatusNotice, TopBar, AiContent } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
@@ -9,6 +8,7 @@ import { ErrorNotice, Loading } from '../../shell/Status';
 import { useSession } from '../../shell/session';
 import { usePageTitle } from '../../shell/usePageTitle';
 import { AnnouncementCards } from './StudentPages';
+import { BlockPlayer } from '../content';
 import styles from './Student.module.css';
 
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]?.toUpperCase()).join(''); }
@@ -37,35 +37,10 @@ export function CoursePage() {
   </div>;
 }
 
-function CheckBlock({ block, lessonId }: { block: Extract<StudentBlock, { type: 'check' }>; lessonId: string }) {
-  const [feedback, setFeedback] = useState<{ correct: boolean; text: string }>();
-  const answer = useApiMutation('answerCheck', { onSuccess: result => setFeedback({ correct: result.correct, text: result.feedback }) });
-  return <div className={styles.check}><KnowledgeCheck question={block.question} options={block.options} feedback={feedback} onSubmit={optionId => answer.mutate({ lessonId, blockId: block.id, optionId })} onRetry={() => setFeedback(undefined)} />{answer.isPending && <p role="status">Checking answer…</p>}<ErrorNotice error={answer.error} /></div>;
-}
-
 /** Published AI blocks tell learners who reviewed them. */
-function ContentBlock({ block, lessonId }: { block: StudentBlock; lessonId: string }) {
-  if (block.origin === 'ai') {
-    return (
-      <AiContent kind="note" who="Drafted with AI" source="reviewed by your instructor">
-        <PlainBlock block={block} lessonId={lessonId} />
-      </AiContent>
-    );
-  }
-  return <PlainBlock block={block} lessonId={lessonId} />;
-}
-
-function PlainBlock({ block, lessonId }: { block: StudentBlock; lessonId: string }) {
-  if (block.type === 'heading') return block.level === 2 ? <h2>{block.text}</h2> : <h3>{block.text}</h3>;
-  if (block.type === 'text') return <div>{block.text.split(/\n\s*\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>;
-  if (block.type === 'callout') return <aside className={styles.callout}><p className={styles.tone}>{block.tone}</p><h3>{block.title}</h3><p>{block.text}</p></aside>;
-  if (block.type === 'image') return <figure className={styles.figure}><img src={block.src} alt={block.decorative ? '' : block.alt} />{block.caption && <figcaption>{block.caption}</figcaption>}</figure>;
-  if (block.type === 'check') return <CheckBlock block={block} lessonId={lessonId} />;
-  if (block.type === 'document') return <section>{block.sections.map((s, i) => <div key={i}><h3>{s.heading}</h3>{s.text.split(/\n\s*\n/).map((p, j) => <p key={j}>{p}</p>)}</div>)}</section>;
-  if (block.type === 'table') return <table><caption>{block.caption}</caption>{block.headerRow && <thead><tr>{block.rows[0].map((c, i) => <th scope="col" key={i}>{c}</th>)}</tr></thead>}<tbody>{block.rows.slice(block.headerRow ? 1 : 0).map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table>;
-  if (block.type === 'link') return <p><a href={block.href} rel="noopener">{block.text}</a>{block.description && <> · {block.description}</>}</p>;
-  // Players for file, video, and scenario blocks arrive with lane C.
-  return <p className="muted">{'title' in block ? block.title : 'Content'} (coming in this release)</p>;
+function ContentBlock({ block, lessonId }: { block: import('../../../../shared/domain').StudentBlock; lessonId: string }) {
+  const player = <BlockPlayer block={block} lessonId={lessonId} />;
+  return block.origin === 'ai' ? <AiContent kind="note" who="Drafted with AI" source={`${block.provenance?.model ?? 'AI'} · ${block.provenance?.summary ?? 'Reviewed by your instructor'}`}>{player}</AiContent> : player;
 }
 
 export function LessonPage() {
