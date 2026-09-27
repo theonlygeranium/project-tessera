@@ -64,9 +64,12 @@ try {
     if(!['get','delete'].includes(method) && schema.input._zod.def.type!=='void') action.requestBody={required:true,content:{'application/json':{schema:{...raw,properties:remaining,required:[...required].filter(name=>!pathNames.includes(name))}}}};
     (paths[path]??={})[method]=action;
   }
-  const output={openapi:'3.1.0',info:{title:'Tessera API',version:'1'},paths,components:{securitySchemes:{bearerAuth:{type:'http',scheme:'bearer',description:'Scoped tsk_… API token or Access JWT'}},schemas:components}};
+  const output={openapi:'3.1.0',info:{title:'Tessera API',version:'1'},servers:[{url:'https://tessera.edstratumlabs.ai',description:'Production'}],paths,components:{securitySchemes:{bearerAuth:{type:'http',scheme:'bearer',description:'Scoped tsk_… API token or Access JWT'}},schemas:components}};
   const destination=resolve('docs/api/openapi.json');
   await mkdir(resolve('docs/api'),{recursive:true});
   await writeFile(destination,JSON.stringify(output,null,2)+'\n');
+  // The public docs' API reference reads its own copy (mintlify/ deploys on its own).
+  await mkdir(resolve('mintlify/api'),{recursive:true});
+  await writeFile(resolve('mintlify/api/openapi.json'),JSON.stringify(output,null,2)+'\n');
   console.log(`${destination}: ${Object.keys(paths).length} paths, ${Object.keys(ROUTES).length} operations`);
 } finally { await rm(temp,{recursive:true,force:true}); }

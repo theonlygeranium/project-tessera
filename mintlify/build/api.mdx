@@ -1,0 +1,155 @@
+---
+title: "API"
+description: "Authentication, scopes, versioning, errors, pagination, and file transfer for the Tessera API."
+---
+
+Tessera's API is generated from a single contract: every operation's input and output is defined once, validated at runtime, and rendered into the API reference (in the navigation) from the same schemas. This page covers the conventions that apply across every endpoint; the reference covers each one, for example [creating a course from an import](/api-reference/import/post-apiv1coursesimport).
+
+## Authentication
+
+Two ways to authenticate:
+
+- **API tokens** (`tsk_…`): created in the app by an administrator, or by an instructor for their own courses. A token is shown once, at creation — copy it then, because it isn't shown again. Send it as a bearer token:
+
+  ```
+  Authorization: Bearer tsk_your_token_here
+  ```
+
+- **Browser sessions**: the app itself authenticates through Cloudflare Access; this only matters if you're calling the API from a script or another system, in which case use a token.
+
+## Scopes
+
+Every token is created with one or more scopes, and can only call routes that need a scope it has:
+
+| Scope | Grants |
+|---|---|
+| `courses:read` | Read courses, outlines, rosters, announcements |
+| `courses:write` | Create and change courses, enrollments, announcements |
+| `content:read` | Read lessons, blocks, files, assignments |
+| `content:write` | Create and change modules, lessons, blocks, files, assignments; publish |
+| `people:read` | Read people and invitations |
+| `people:write` | Add and change people, institution settings, policies |
+| `access:read` | Read accessibility reports |
+| `access:write` | Run scans and apply document fixes |
+| `grades:read` | Read submissions and gradebooks |
+| `grades:write` | Grade and release |
+| `ai:run` | Run AI drafting and suggestions |
+
+## Versioning
+
+Every route is under **`/api/v1/`**. This is the version to build against.
+
+## Errors
+
+Every error response is a JSON object:
+
+```json
+{ "error": { "code": "not-found", "message": "File not found.", "details": null } }
+```
+
+| Code | Status | Meaning |
+|---|---|---|
+| `unauthenticated` | 401 | No valid session or token |
+| `forbidden` | 403 | Wrong role, wrong scope, or not your course |
+| `not-found` | 404 | The resource doesn't exist |
+| `invalid` | 400 | Bad input; `details` may list field errors |
+| `conflict` | 409 | For example, deleting a module that isn't empty |
+| `not-ready` | 409 | Publishing is blocked; `details` explains why |
+| `ai-disabled` | 403 | The administrator turned AI authoring off |
+| `ai-failed` | 502 | The AI call failed or returned unusable output |
+| `rate-limited` | 429 | Too many requests for this token |
+| `too-large` | 413 | Upload over the size limit |
+| `unsupported` | 415 | File type not supported |
+
+## Pagination
+
+List endpoints use cursor pagination:
+
+```
+GET /api/v1/courses/{courseId}/files?limit=20
+```
+
+```json
+{ "items": [ /* … */ ], "nextCursor": "file-a1b2c3" }
+```
+
+Pass `limit` to control page size, and pass the previous response's `nextCursor` as `cursor` to get the next page. A `nextCursor` of `null` means there's nothing more.
+
+## Idempotency
+
+Send an `Idempotency-Key` header on a `POST` that creates something, to make retries safe:
+
+```
+Idempotency-Key: a-key-you-generate-once-per-attempt
+```
+
+The same key from the same caller replays the first response instead of creating a duplicate.
+
+## Rate limits
+
+Each token (or session) is limited to a fixed number of requests per minute. Going over returns `429 rate-limited` with a `Retry-After` header giving the number of seconds to wait.
+
+## Request IDs
+
+Every response carries an `X-Request-Id` header, useful when reporting an issue with a specific call.
+
+## File upload and download
+
+Files are handled outside the JSON contract, since they carry raw bytes:
+
+**Upload:**
+
+```
+POST /api/v1/courses/{courseId}/files/upload
+Content-Type: multipart/form-data
+```
+
+Send the file as a multipart field named `file`. The limit is **25 MB** per file.
+
+**Download:**
+
+```
+GET /api/v1/files/{fileId}/content
+GET /api/v1/files/{fileId}/content?format=reading
+GET /api/v1/files/{fileId}/content?format=epub
+GET /api/v1/files/{fileId}/content?format=audio
+GET /api/v1/files/{fileId}/content?format=ocr
+```
+
+Without `format`, this returns the original file. With it, it returns that accessible format once it's been generated. `Range` requests are supported, so this works for streaming audio and large files.
+
+## Example: create a course and import content
+
+This creates a course and adds a module with one lesson, in a single call, using a fictional example:
+
+```bash
+curl -X POST https://tessera.edstratumlabs.ai/api/v1/courses/import \
+  -H "Authorization: Bearer tsk_your_token_here" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: meridian-epi110-import-1" \
+  -d '{
+    "course": {
+      "code": "EPI 110",
+      "title": "Introduction to Epidemiology",
+      "term": "Spring 2027",
+      "description": "Foundations of disease surveillance and outbreak response."
+    },
+    "modules": [
+      {
+        "title": "Module 1: Counting and comparing",
+        "lessons": [
+          {
+            "title": "Rates, ratios, and proportions",
+            "minutes": 20,
+            "blocks": [
+              { "type": "heading", "level": 2, "text": "Why we compare, not just count" },
+              { "type": "text", "text": "A raw case count means little without a population to compare it to." }
+            ]
+          }
+        ]
+      }
+    ]
+  }'
+```
+
+A successful call returns the new course's outline, with its modules, lessons, and blocks.

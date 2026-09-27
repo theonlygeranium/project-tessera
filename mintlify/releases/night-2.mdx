@@ -1,0 +1,51 @@
+---
+title: "Night 2"
+description: "Accessibility becomes native, the API opens up, and AI drafting works at any scope."
+---
+
+Night 2 is Tessera's second coordinated release. It builds on [Night 1](/releases/night-1): the same courses, the same block-based lessons, the same rule that AI never publishes without a person reviewing it. Night 2 adds accessibility as a native part of authoring and learning, a versioned API for scripts and outside tools, AI drafting at any scope, and assignments with grading.
+
+## For administrators
+
+- **Institution accessibility dashboard:** the score and issue mix across every course, a trend over time, and a CSV export mapped to WCAG 2.2.
+- **Publishing policy:** a minimum accessibility score and a list of blocking issue severities. A lesson or file below the line can't be published; the server enforces it, not just the screen.
+- **API tokens:** scoped tokens for scripts and outside tools, created on a tokens page and shown once.
+- **Invitations:** coming later in Night 2 — real accounts through Cloudflare Access, replacing the demo persona picker for day-to-day sign-in. The persona picker stays for local testing and as an administrator's "view as."
+
+## For instructors
+
+- **Accessibility score and issues** on every lesson and every uploaded document, next to publish readiness, with AI-assisted alt text (lessons, Word, and PowerPoint), table headers, and document metadata.
+- **New content types:** documents, tables, scenarios (branching decision practice), links, videos, and uploaded files, each with its own accessibility check.
+- **AI drafting at any scope:** generate a whole course, a module, a lesson, or a single element — including a video script — from a scope picker, with progress as drafts come in. Everything lands as a labeled draft; nothing publishes on its own.
+- **Assignments and grading:** text, file, or link submissions; an optional rubric; a grading view with AI-drafted feedback the instructor edits and keeps; a gradebook with CSV export.
+
+## For students
+
+- **Accessible formats** on every PDF, Word, and PowerPoint file: a reading version, an e-book, an audio version, and a searchable version for scanned PDFs (OCR).
+- **Assignments:** submit, see status and due dates, and get one resubmission before the due date.
+- **The hint-first tutor:** coming later in Night 2 — hints before answers, and never an answer on graded work.
+
+## Tessera Access
+
+Tessera Access checks accessibility where the content already lives: on the blocks that make up a lesson, and on uploaded PDF, DOCX, and PowerPoint files.
+
+- **Lessons and assignment instructions** are checked live in the editor and again at the publish gate: missing alt text, skipped heading levels, vague link text, tables without a header row, videos without captions or a transcript, and more.
+- **Documents** are parsed in the Worker: PDFs for a real tag structure, extractable text, and image alt text; Word and PowerPoint files for language, headings, image descriptions, table headers, and text contrast.
+- Every issue names its **WCAG 2.2 success criterion**, level, and severity.
+- **Score:** `100 − Σ penalty × min(count, 3)` per severity — critical 30, serious 15, moderate 8, minor 3 — so three or more of the same issue count as three. See [Tessera Access](/product/access) for the grade bands.
+- **Fixes are new versions.** Applying a fix — alt text, a table header, corrected metadata, OCR — saves a new version of the document; the original is never overwritten. AI-suggested fixes are drafts a person reviews and keeps, the same rule as every other AI output (D-003). Unreviewed AI drafts block publishing but don't count against the accessibility score itself.
+- **Accessible formats** — reading version, e-book, audio, and OCR text for scanned PDFs — are generated on request and cached per document version.
+
+## The API
+
+Tessera now has a versioned, token-authenticated API for scripts, integrations, and administrators who want to work outside the app.
+
+- **`/api/v1`**: every operation is documented from one contract, with runtime validation and a generated OpenAPI reference.
+- **Scoped tokens** (`tsk_…`): administrators, and instructors for their own courses, create tokens with only the scopes they need, shown once at creation.
+- **Conventions:** cursor pagination on lists, an `Idempotency-Key` header for safe retries on creates, per-token rate limits with `Retry-After`, and an `X-Request-Id` on every response.
+- See [API](/build/api) for authentication, scopes, errors, and a walkthrough.
+
+## Quality
+
+- The accessibility audit and the no-stripe guard run on every push, as in Night 1.
+- New flows get their own acceptance journeys: creating a course by API, scanning and fixing a document, generating drafts at a chosen scope, and grading a submission.

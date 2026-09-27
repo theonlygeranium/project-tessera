@@ -55,6 +55,7 @@
       {
         "group": "Releases",
         "pages": [
+          "releases/night-2",
           "releases/night-1"
         ]
       },
@@ -62,7 +63,10 @@
         "group": "Product",
         "pages": [
           "screens",
-          "components"
+          "components",
+          "product/access",
+          "product/authoring",
+          "product/grading"
         ]
       },
       {
@@ -77,8 +81,13 @@
         "group": "Building Tessera",
         "pages": [
           "build/architecture",
+          "build/api",
           "build/decisions"
         ]
+      },
+      {
+        "group": "API reference",
+        "openapi": "api/openapi.json"
       }
     ]
   },
