@@ -1,6 +1,6 @@
 # Night 1 live QA (2026-09-27)
 
-Claude walked every persona in the in-app browser against the real stack (`wrangler dev`, local D1, live Palmyra-X6), at 1280 px and at phone width (375 px). The owner reported two issues from the preview (NQ-02 and D-017). Status: **open** until the patch lanes land and Claude re-verifies.
+Claude walked every persona in the in-app browser against the real stack (`wrangler dev`, local D1, live Palmyra-X6), at 1280 px and at phone width (375 px). The owner reported two issues from the preview (NQ-02 and D-017). Status: **all 19 resolved** on `night1` (2026-09-27): Claude re-checked the patched pages in the browser; typecheck, 109 unit tests, a11y 157/157, and all 7 acceptance journeys pass. The preview was verified live behind Access with real Palmyra-X6.
 
 | ID | Sev | Persona / area | Finding | Owner |
 |---|---|---|---|---|
@@ -25,3 +25,6 @@ Claude walked every persona in the in-app browser against the real stack (`wrang
 | NQ-19 | P3 | Admin · overview | Seven stat tiles wrap 5 + 2. | Lane D patch |
 
 Verified working during QA: persona sign-in and switching; administrator setup with accent (Blue applied app-wide); course creation, instructor assignment, enrollment; AI policy; builder brief/outline/draft on live Palmyra (4 s / 7 s / 6 lessons in 32 s); publish gate; AI announcement draft on Palmyra (3.0 s); roster; onboarding → Today; lesson checks and completion (earlier pass).
+
+Patch lanes: student (Codex Sol, 156 s / 53,383 tokens), instructor (Codex Sol, 550 s / 85,154 tokens), administrator (Grok 4.7, 678 s, $0.70 reported). Claude fixed NQ-01, NQ-03 (service), NQ-04 to NQ-07, NQ-10 (builder), NQ-14 (ring), and added `CourseSummary.startedLessonCount` so NQ-15 needs no extra request per course. The journey tests were updated for the redesigned outline, the rail link to the builder, and the jargon-free readiness copy.
+

@@ -178,7 +178,7 @@ await journey('Journey 2 · Instructor builds and publishes with AI', async (pag
   await step('Open Build with AI', async () => {
     // The rail also has a "Build with AI" nav item while inside a course; the course
     // bar's own action link is the one this step means, so scope to the page header.
-    await page.locator('header').getByRole('link', { name: 'Build with AI' }).click();
+    await page.getByRole('navigation', { name: 'Instructor navigation' }).getByRole('link', { name: 'Build with AI' }).click();
     await page.getByRole('heading', { level: 1, name: 'Build with AI' }).waitFor();
   });
   await step('Fill the prompt, add a pasted source, and draft the brief', async () => {
@@ -213,7 +213,7 @@ await journey('Journey 2 · Instructor builds and publishes with AI', async (pag
     await readinessSection(page).getByRole('heading', { name: 'Publish readiness' }).waitFor();
     const publishBtn = page.getByRole('button', { name: 'Publish', exact: true });
     if (!(await publishBtn.isDisabled())) throw new Error('Expected Publish to be disabled before every AI block is kept.');
-    await waitForIncludes(readinessSection(page), "hasn't been kept");
+    await waitForIncludes(readinessSection(page), "Review this AI draft");
   });
   await step('Keep every AI block; Publish becomes enabled', async () => {
     await keepAllAiBlocks(page);
@@ -238,10 +238,11 @@ await journey('Journey 3 · Instructor builds by hand and posts an announcement'
     await page.getByRole('heading', { level: 1, name: 'Reasoning with Data' }).waitFor();
   });
   await step('Add a lesson to the first module', async () => {
-    const titleField = page.getByLabel('New lesson in Asking statistical questions');
-    await titleField.fill('Spread: range and variability');
-    const form = page.locator('form').filter({ has: titleField });
-    await form.getByRole('button', { name: 'Add lesson' }).click();
+    // The outline shows one "Add lesson" button per module; it reveals an inline row (NQ-08).
+    await page.getByRole('button', { name: 'Add lesson' }).first().click();
+    await page.getByLabel('Lesson title').fill('Spread: range and variability');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await page.getByRole('link', { name: 'Spread: range and variability' }).click();
     await page.getByRole('heading', { level: 1, name: 'Spread: range and variability' }).waitFor();
   });
   await step('Add a heading, a text block, an image, and a knowledge check', async () => {
