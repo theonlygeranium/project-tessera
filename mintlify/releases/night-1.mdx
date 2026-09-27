@@ -1,0 +1,38 @@
+---
+title: "Night 1"
+description: "The first working MVP of Tessera: administrators, instructors, and students, end to end."
+---
+
+Night 1 is Tessera's first release built as a coordinated effort: several AI coding agents built separate parts of the product in parallel, orchestrated and verified by Claude, then everything came together for one deployment. It turns the Phase 1 design concepts into a working app with real stored data. The app is in a private preview for the team; the [screens](/screens) and [components](/components) show what's in it.
+
+## For administrators
+
+- **First-run setup:** institution name, short name, and a brand accent chosen from contrast-checked options.
+- **AI policy:** turn AI authoring on or off, and choose which tutor modes are allowed on graded work and on practice. Open answers are never allowed on graded work.
+- **People:** add people one at a time or paste a CSV, and set each person's role.
+- **Courses:** create courses, assign instructors, and enroll students.
+
+## For instructors
+
+- **Course workspace:** a course home (welcome and outcomes) and a calm outline of modules and lessons you can rename, reorder, and extend.
+- **Lesson editor:** headings, text, callouts, images with required alt text, and knowledge checks, with a student preview.
+- **Build with AI:** describe the course and add your sources; the AI drafts a brief, then an outline, then lessons. Every AI block is a labeled draft you keep, revert, or regenerate, and nothing publishes until a person has reviewed it.
+- **Publish readiness:** a lesson can't publish while it has unreviewed AI drafts, images without alt text, headings out of order, or incomplete checks. The server enforces this, not just the screen.
+- **Announcements:** write, pin, and publish, with an optional AI first draft that stays labeled.
+- **Roster:** each student's lesson progress and last activity.
+
+## For students
+
+- **Learning profile:** goals, weekly time, language, reading level, accessibility preferences, and reminders. No learning styles.
+- **Today:** the next lesson in each course, new announcements, and time this week.
+- **Course home and lessons:** the instructor's welcome, outcomes, a module map with time estimates, and a focused lesson player with knowledge checks and saved progress.
+
+## How AI shows up
+
+AI content always says what it is and where it came from, using Tessera's Marginalia style: a small drawn mark in the margin (a comment balloon for the tutor, a pilcrow for drafted blocks, a caret for notes) with a line naming the source. There are no sparkles, gradients, or colored stripes. Instructors' private prompts are never shown to students.
+
+## Quality
+
+- WCAG 2.2 AA: an automated audit of every page and component (157 of 157 pass), plus reflow at 320 px.
+- Automated end-to-end tests of the five acceptance journeys run on every push.
+- A live QA pass by persona found 19 issues before release; all were fixed and re-verified.

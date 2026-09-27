@@ -53,6 +53,12 @@
         ]
       },
       {
+        "group": "Releases",
+        "pages": [
+          "releases/night-1"
+        ]
+      },
+      {
         "group": "Product",
         "pages": [
           "screens",

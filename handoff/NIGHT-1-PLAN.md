@@ -1,6 +1,6 @@
 # Night 1: the first MVP release
 
-**Status: approved 2026-09-27; in progress.** Written by Claude (orchestrator). The owner approved every recommendation in §6, with one change: the platform LLM is WRITER **Palmyra-X6** instead of the Claude API. The decisions are recorded as D-014, D-015, and D-016 in `design/DECISIONS.md`.
+**Status: shipped to production 2026-09-27 (tag `night-1`).** Written by Claude (orchestrator). The owner approved every recommendation in §6, with one change: the platform LLM is WRITER **Palmyra-X6** instead of the Claude API. The decisions are recorded as D-014, D-015, and D-016 in `design/DECISIONS.md`.
 
 Night 1 is the first of the "Night N" milestones: coordinated efforts where several agents build separate parts of the LMS at the same time, then regroup for one integration and one production deployment. Phase 2 and later builds run this way.
 

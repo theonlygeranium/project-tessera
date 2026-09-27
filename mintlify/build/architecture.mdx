@@ -5,13 +5,17 @@ description: "How Tessera is built and deployed today, and how it grows into a f
 
 ## Today
 
-Tessera is a static site served by a single Cloudflare Worker.
+Since [Night 1](/releases/night-1), Tessera is a full-stack app on a single Cloudflare Worker: static pages, the React app, and a JSON API in one deployment.
 
 | Part | What it is |
 |---|---|
 | **Screens** | Eight design artboards, converted to standalone pages. |
 | **Clickable prototype** | A hand-written learner flow in plain HTML, CSS, and JavaScript. No network calls, no storage. |
-| **Component app** | The Phase 2 app at [`/app/`](https://tessera.edstratumlabs.ai/app/): Vite, React, and TypeScript. Every color and typeface comes from the design tokens. |
+| **App** | The Tessera app at `/app/` (private preview): Vite, React, and TypeScript, built from the shared components. Every color and typeface comes from the design tokens. |
+| **API** | The same Worker serves `/api/`: one typed contract shared by the app and the server, with every rule (roles, publish readiness, AI drafts stay drafts) enforced on the server. |
+| **Data** | Cloudflare D1 (SQLite), with a separate database for branch previews. |
+| **AI** | WRITER Palmyra-X6 through Cloudflare AI Gateway, returning structured drafts that a person reviews before anything is published. |
+| **Access** | The app and API are behind Cloudflare Access; the gallery, screens, prototype, component library, and these docs are public. |
 | **Hosting** | Cloudflare Workers static assets. Every push to the main branch deploys production; every other branch gets its own preview address. |
 
 ## How changes ship
