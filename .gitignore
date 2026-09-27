@@ -4,3 +4,6 @@ node_modules/
 
 # Claude Code machine-specific settings
 .claude/settings.local.json
+
+# Local Cloudflare dev-server state (npx wrangler dev)
+.wrangler/

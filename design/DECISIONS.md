@@ -13,9 +13,10 @@ Settled decisions for Project Tessera, with the reason for each. Agents should t
 | D-007 | Visual system: paper, ink, one teal accent, violet for AI; Fraunces + Plex | Accepted | 2026-09-25 |
 | D-008 | Hosting: private repo, public Pages from `main:/docs`, build output committed | Superseded by D-012 | 2026-09-26 |
 | D-009 | The repo is the source of truth; the design canvas is a mirror | Accepted | 2026-09-26 |
-| D-010 | Accessibility bar: WCAG 2.2 AA, zero automated violations, 320px reflow | Accepted | 2026-09-26 |
+| D-010 | Accessibility bar: WCAG 2.2 AA, zero automated violations, 320px reflow | Accepted; audit timing superseded by D-013 | 2026-09-26 |
 | D-011 | Phase-2 build approach | **Open** (#16) | — |
 | D-012 | Hosting: Cloudflare Workers static assets, deploy on push, per-branch previews | Accepted | 2026-09-26 |
+| D-013 | Deploy lanes: minor changes go straight to production; big features get the full check and a preview | Accepted | 2026-09-26 |
 
 ---
 
@@ -85,7 +86,7 @@ The owner's private Claude design canvas ("AI-Native LMS UI Concepts") holds the
 ### D-010 · Accessibility bar
 **Decision:**
 - Meet WCAG 2.2 AA.
-- `npm run a11y` (axe-core plus a 320px reflow check) must report zero violations before merging. The current result is 43/43.
+- `npm run a11y` (axe-core plus a 320px reflow check) must report zero violations before merging. The current result is 43/43. *(When the audit runs is superseded by D-013: minor changes are checked by the `a11y` workflow after they're live. The zero-violation bar itself still stands.)*
 - Keyboard paths must work with visible focus, and focus returns to the control that opened a panel.
 - Screen-reader testing is a human task (#29).
 
@@ -113,3 +114,12 @@ Supersedes D-008. The owner is the sole developer and wants every push testable 
 - For now there is no build command: `docs/` build output stays committed, because Cloudflare serves `docs/` as-is. GitHub Pages was unpublished on 2026-09-26. When D-011 lands, set the build command in the Worker's build settings (and record it in `CLAUDE.md`).
 - `.github/workflows/a11y.yml` runs the accessibility audit on every push and PR. It is informational and does not block deploys; the Definition of Done still requires a clean audit.
 - Unchanged from D-008: the repository is private, the site and every preview URL are public, nothing under `docs/` may link into the repository or be confidential. If something must be private, put Cloudflare Access in front of it.
+
+### D-013 · Deploy lanes
+Partly supersedes D-010 (when the audit runs) and extends D-012. The owner is the sole developer and tests changes live, so review stages before production slow the work down without catching much that the owner won't see immediately. Approved by the owner on 2026-09-26.
+**Decision:**
+- **Fast lane, for any normal minor change** (copy, styling tweaks, a fix in one screen or the prototype, small doc updates): edit the source, rebuild `docs/` if artboards or the report changed, commit, and push straight to `main`, which deploys production in about 30 seconds. No local audit, walkthrough, or approval step.
+- **Full lane, for big features or separate, self-contained work** (a new flow or screen, the D-011 migration, anything touching many files): follow the full Definition of done in `CLAUDE.md`, push a branch, check its preview URL, then merge to `main`.
+- The zero-violation accessibility bar (D-010) still stands in both lanes. In the fast lane the `a11y` workflow checks each push after it's live; a failure is fixed in a follow-up push. The current result is 45/45.
+- Worker agents (`AGENTS.md`) never push; Claude pushes after reading their diff.
+- Unchanged: destructive actions (force pushes, deleting branches or data, Cloudflare or DNS changes) need the owner's confirmation, and nothing confidential goes under `docs/` (D-012).

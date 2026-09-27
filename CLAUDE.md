@@ -69,7 +69,7 @@ npm install                                            # once (Node 18+) (PLAYWR
 npm run a11y                                           # must print "N/N pass"; in Claude cloud sessions: CHROMIUM=/opt/pw-browsers/chromium npm run a11y
 ```
 
-## Deploy lanes (owner's standing preference)
+## Deploy lanes (D-013, owner's standing preference)
 The owner is the sole developer and tests changes live. Pick the lane before starting.
 
 - **Fast lane: any normal, minor change** (copy, styling tweaks, a fix in one screen or the prototype, small doc updates). Edit the source, run `python3 tools/build_docs.py` if you touched `design/canvas/` or `research/report.md` (the site serves the committed build output, so the change won't show otherwise), commit, and **push to `main` right away** without asking. Skip the local audit, walkthrough, and screenshots. The `a11y` workflow runs on every push; if it fails, tell the owner and fix it in a follow-up.
