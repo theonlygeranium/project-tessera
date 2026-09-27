@@ -2,10 +2,10 @@
 // `put*` upserts. replaceBlocks, setEnrollments, deleteLesson, and reset each run
 // in one batch so a failure leaves the previous rows in place.
 import type {
-  Block, BlockContent, BuilderSession, Course, Id, Institution, Lesson, Module, Role, User, ApiToken,
+  Block, BlockContent, BuilderSession, Course, Id, Institution, Lesson, Module, Role, User, ApiToken, FileRecord, AccessibleFormat,
 } from '../shared/domain';
 import type {
-  AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress,
+  AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat,
 } from '../shared/repo';
 import type { SeedData } from '../shared/seed';
 
@@ -274,6 +274,61 @@ export class D1Repo implements Repo {
     await this.builderStmt(session).run();
   }
 
+  async getFile(id: string) { const r = await this.first<FileRow>('SELECT * FROM files WHERE id = ?', [id]); return r ? await this.fileFromRow(r) : null; }
+  async listFiles(courseId: string) {
+    const rows = await this.all<FileRow>('SELECT * FROM files WHERE course_id = ? ORDER BY uploaded_at DESC, id', [courseId]);
+    return Promise.all(rows.map((r) => this.fileFromRow(r)));
+  }
+  async putFile(f: FileRecord) {
+    await this.db.prepare(`INSERT INTO files (id, course_id, name, kind, mime, size, key, version, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET name = excluded.name, key = excluded.key, version = excluded.version, size = excluded.size`)
+      .bind(f.id, f.courseId, f.name, f.kind, f.mime, f.size, f.key, f.version, f.uploadedBy, f.uploadedAt).run();
+  }
+  async deleteFile(id: string) {
+    await this.db.batch([
+      this.db.prepare("DELETE FROM access_scans WHERE target_kind = 'file' AND target_id = ?").bind(id),
+      this.db.prepare('DELETE FROM files WHERE id = ?').bind(id),
+    ]);
+  }
+  async putFileVersion(v: FileVersion) {
+    await this.db.prepare('INSERT OR REPLACE INTO file_versions (file_id, version, key, note, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(v.fileId, v.version, v.key, v.note, v.createdBy, v.createdAt).run();
+  }
+  async listFileVersions(fileId: string) {
+    const rows = await this.all<{ file_id: string; version: number; key: string; note: string; created_by: string; created_at: string }>('SELECT * FROM file_versions WHERE file_id = ? ORDER BY version', [fileId]);
+    return rows.map((r) => ({ fileId: r.file_id, version: r.version, key: r.key, note: r.note, createdBy: r.created_by, createdAt: r.created_at }));
+  }
+  async putScan(s: StoredScan) {
+    const targetId = s.target.kind === 'lesson' ? s.target.lessonId : s.target.fileId;
+    await this.db.prepare(`INSERT OR REPLACE INTO access_scans (id, target_kind, target_id, version, course_id, score, grade, issue_count, by_severity, issues, document, scanned_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(s.id, s.target.kind, targetId, s.version, s.courseId, s.score, s.grade, s.issueCount, JSON.stringify(s.bySeverity), JSON.stringify(s.issues), s.document ? JSON.stringify(s.document) : null, s.scannedAt).run();
+  }
+  async latestScan(targetKind: 'lesson' | 'file', targetId: string) {
+    const r = await this.first<ScanRow>('SELECT * FROM access_scans WHERE target_kind = ? AND target_id = ? ORDER BY scanned_at DESC LIMIT 1', [targetKind, targetId]);
+    return r ? scanFromRow(r) : null;
+  }
+  async listScans(filter: { courseId?: string; targetKind?: 'lesson' | 'file'; since?: string }) {
+    const where: string[] = []; const params: SqlBind[] = [];
+    if (filter.courseId) { where.push('course_id = ?'); params.push(filter.courseId); }
+    if (filter.targetKind) { where.push('target_kind = ?'); params.push(filter.targetKind); }
+    if (filter.since) { where.push('scanned_at >= ?'); params.push(filter.since); }
+    const rows = await this.all<ScanRow>(`SELECT * FROM access_scans${where.length ? ' WHERE ' + where.join(' AND ') : ''} ORDER BY scanned_at DESC, id`, params);
+    return rows.map(scanFromRow);
+  }
+  async getFormat(fileId: string, version: number, format: AccessibleFormat) {
+    const r = await this.first<FormatRow>('SELECT * FROM format_jobs WHERE file_id = ? AND version = ? AND format = ?', [fileId, version, format]);
+    return r ? formatFromRow(r) : null;
+  }
+  async listFormats(fileId: string, version: number) {
+    return (await this.all<FormatRow>('SELECT * FROM format_jobs WHERE file_id = ? AND version = ? ORDER BY format', [fileId, version])).map(formatFromRow);
+  }
+  async putFormat(f: StoredFormat) {
+    await this.db.prepare('INSERT OR REPLACE INTO format_jobs (file_id, version, format, state, output_key, generated_at, error) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(f.fileId, f.version, f.format, f.state, f.outputKey, f.generatedAt, f.error).run();
+  }
+  private async fileFromRow(r: FileRow): Promise<FileRecord> {
+    const scan = await this.latestScan('file', r.id);
+    return { id: r.id, courseId: r.course_id, name: r.name, kind: r.kind, mime: r.mime, size: r.size, key: r.key, version: r.version, uploadedBy: r.uploaded_by, uploadedAt: r.uploaded_at,
+      scan: scan ? { score: scan.score, grade: scan.grade, issueCount: scan.issueCount, bySeverity: scan.bySeverity, scannedAt: scan.scannedAt } : null };
+  }
   async getApiTokenByHash(hash: string) {
     const row = await this.first<TokenRow>('SELECT * FROM api_tokens WHERE hash = ?', [hash]);
     return row ? tokenFromRow(row) : null;
@@ -331,14 +386,15 @@ export class D1Repo implements Repo {
 
   private institutionStmt(institution: Institution): D1PreparedStatement {
     return this.db.prepare(
-      `INSERT INTO institution (id, name, short_name, accent, setup_complete, policy)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO institution (id, name, short_name, accent, setup_complete, policy, access_policy)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          short_name = excluded.short_name,
          accent = excluded.accent,
          setup_complete = excluded.setup_complete,
-         policy = excluded.policy`,
+         policy = excluded.policy,
+         access_policy = excluded.access_policy`,
     ).bind(
       institution.id,
       institution.name,
@@ -346,6 +402,7 @@ export class D1Repo implements Repo {
       institution.accent,
       bit(institution.setupComplete),
       JSON.stringify(institution.policy),
+      JSON.stringify(institution.accessPolicy),
     );
   }
 
@@ -545,6 +602,17 @@ function contentJson(block: Block): string {
   return JSON.stringify(content);
 }
 
+interface FileRow extends Record<string, unknown> { id: string; course_id: string; name: string; kind: FileRecord['kind']; mime: string; size: number; key: string; version: number; uploaded_by: string; uploaded_at: string }
+interface ScanRow extends Record<string, unknown> { id: string; target_kind: 'lesson' | 'file'; target_id: string; version: number | null; course_id: string; score: number; grade: StoredScan['grade']; issue_count: number; by_severity: string; issues: string; document: string | null; scanned_at: string }
+interface FormatRow extends Record<string, unknown> { file_id: string; version: number; format: AccessibleFormat; state: StoredFormat['state']; output_key: string | null; generated_at: string | null; error: string | null }
+function scanFromRow(r: ScanRow): StoredScan {
+  return { id: r.id, courseId: r.course_id, version: r.version, target: r.target_kind === 'lesson' ? { kind: 'lesson', lessonId: r.target_id } : { kind: 'file', fileId: r.target_id, version: r.version ?? 1 },
+    score: r.score, grade: r.grade, issueCount: r.issue_count, bySeverity: JSON.parse(r.by_severity), issues: JSON.parse(r.issues), document: r.document ? JSON.parse(r.document) : null, scannedAt: r.scanned_at };
+}
+function formatFromRow(r: FormatRow): StoredFormat {
+  return { fileId: r.file_id, version: r.version, format: r.format, state: r.state, outputKey: r.output_key, generatedAt: r.generated_at, error: r.error };
+}
+
 interface TokenRow extends Record<string, unknown> {
   id: string; name: string; prefix: string; hash: string; scopes: string; owner_id: string;
   created_at: string; expires_at: string | null; last_used_at: string | null; revoked_at: string | null;
@@ -560,6 +628,7 @@ interface InstitutionRow extends Record<string, unknown> {
   accent: Institution['accent'];
   setup_complete: number;
   policy: string;
+  access_policy: string | null;
 }
 
 interface UserRow extends Record<string, unknown> {
@@ -663,6 +732,7 @@ function institutionFromRow(row: InstitutionRow): Institution {
     accent: row.accent,
     setupComplete: flag(row.setup_complete),
     policy: parseJson(row.policy),
+    accessPolicy: row.access_policy ? parseJson(row.access_policy) : { minimumScore: 0, blockingSeverities: ['critical'] },
   };
 }
 

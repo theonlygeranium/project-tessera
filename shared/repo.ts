@@ -4,11 +4,15 @@
 // Both must behave identically. `put*` is an upsert by id. Lists are returned in a
 // stable order: by `position` where the entity has one, otherwise as documented.
 import type {
-  Announcement, ApiToken, Block, BuilderSession, Course, Id, Institution, Lesson, LessonProgress, Module, Role, Timestamp, User,
+  AccessReport, AccessibleFormat, Announcement, ApiToken, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Lesson, LessonProgress, Module, Role, Timestamp, User,
 } from './domain';
 import type { SeedData } from './seed';
 
 export type StoredAnnouncement = Omit<Announcement, 'courseTitle' | 'authorName' | 'authorInitials' | 'read'>;
+export interface FileVersion { fileId: Id; version: number; key: string; note: string; createdBy: Id; createdAt: Timestamp }
+/** One scan of a lesson or file version; `courseId` lets reports roll up. */
+export type StoredScan = AccessReport & { id: Id; courseId: Id; version: number | null };
+export interface StoredFormat { fileId: Id; version: number; format: AccessibleFormat; state: FormatStatus['state']; outputKey: string | null; generatedAt: Timestamp | null; error: string | null }
 export type StoredProgress = LessonProgress & { userId: Id };
 export interface Enrollment { courseId: Id; userId: Id }
 export interface AnnouncementRead { announcementId: Id; userId: Id; readAt: Timestamp }
@@ -69,6 +73,24 @@ export interface Repo {
   /** Newest first. */
   listBuilderSessions(courseId: Id): Promise<BuilderSession[]>;
   putBuilderSession(session: BuilderSession): Promise<void>;
+
+  /** Files in R2 (D-019). `listFiles` is newest first. */
+  getFile(id: Id): Promise<FileRecord | null>;
+  listFiles(courseId: Id): Promise<FileRecord[]>;
+  putFile(file: FileRecord): Promise<void>;
+  deleteFile(id: Id): Promise<void>;
+  putFileVersion(v: FileVersion): Promise<void>;
+  listFileVersions(fileId: Id): Promise<FileVersion[]>;
+
+  /** Accessibility scans (D-022). `latestScan` is the newest for the target; `listScans` newest first, optionally per course. */
+  putScan(scan: StoredScan): Promise<void>;
+  latestScan(targetKind: 'lesson' | 'file', targetId: Id): Promise<StoredScan | null>;
+  listScans(filter: { courseId?: Id; targetKind?: 'lesson' | 'file'; since?: Timestamp }): Promise<StoredScan[]>;
+
+  /** Generated accessible formats per file version. */
+  getFormat(fileId: Id, version: number, format: AccessibleFormat): Promise<StoredFormat | null>;
+  listFormats(fileId: Id, version: number): Promise<StoredFormat[]>;
+  putFormat(f: StoredFormat): Promise<void>;
 
   /** API tokens (D-020). `hash` is the SHA-256 of the secret; never the secret. */
   getApiTokenByHash(hash: string): Promise<(ApiToken & { hash: string }) | null>;

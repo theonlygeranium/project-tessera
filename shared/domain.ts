@@ -72,6 +72,8 @@ export interface Institution {
   /** False until an administrator finishes first-run setup. */
   setupComplete: boolean;
   policy: AiPolicy;
+  /** Publishing rules for accessibility (D-022). */
+  accessPolicy: AccessPolicy;
 }
 
 // ---- Courses and structure -------------------------------------------------------

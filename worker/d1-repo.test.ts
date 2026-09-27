@@ -117,7 +117,7 @@ describe('D1Repo', () => {
   it('round-trips every entity, including JSON and null AI state', async () => {
     const repo = fresh();
     const institution: Institution = {
-      id: 'inst', name: 'Example College', shortName: 'Example', accent: 'plum', setupComplete: false, policy,
+      id: 'inst', name: 'Example College', shortName: 'Example', accent: 'plum', setupComplete: false, policy, accessPolicy: { minimumScore: 0, blockingSeverities: ['critical'] },
     };
     await repo.putInstitution(institution);
     const student: User = {
@@ -227,7 +227,7 @@ describe('D1Repo', () => {
     expect((await repo.listUsers()).map((user) => user.id)).toEqual(['u-maya', 'u-aaron', 'u-amy', 'u-zoe']);
     expect((await repo.listUsers({ role: 'student' })).map((user) => user.id)).toEqual(['u-amy', 'u-zoe']);
 
-    await repo.putInstitution({ id: 'inst', name: 'Example', shortName: 'Ex', accent: 'blue', setupComplete: true, policy });
+    await repo.putInstitution({ id: 'inst', name: 'Example', shortName: 'Ex', accent: 'blue', setupComplete: true, policy, accessPolicy: { minimumScore: 0, blockingSeverities: ['critical'] } });
     await repo.putCourse({ id: 'c1', code: 'EX 1', title: 'Example', term: 'Fall', description: '', welcome: '', outcomes: [], instructorIds: [], status: 'active' });
     await repo.putModule({ id: 'm-late', courseId: 'c1', title: 'Later', position: 1 });
     await repo.putModule({ id: 'm-early', courseId: 'c1', title: 'Early', position: 0 });

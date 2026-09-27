@@ -1,5 +1,5 @@
-import type { Announcement, Block, BuilderSession, Course, Institution, Lesson, Module, User, ApiToken } from '../domain';
-import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress } from '../repo';
+import type { Announcement, Block, BuilderSession, Course, Institution, Lesson, Module, User, ApiToken, FileRecord, AccessibleFormat } from '../domain';
+import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat } from '../repo';
 import type { SeedData } from '../seed';
 
 declare const structuredClone: <T>(value: T) => T;
@@ -81,6 +81,28 @@ export class MemoryRepo implements Repo {
   async getBuilderSession(id: string): Promise<BuilderSession | null> { return copy(this.data.builderSessions.find(x => x.id === id) ?? null); }
   async listBuilderSessions(courseId: string): Promise<BuilderSession[]> { return copy(this.data.builderSessions.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt))); }
   async putBuilderSession(value: BuilderSession) { this.upsert(this.data.builderSessions, value); }
+  async getFile(id: string) { const f = this.data.files.find(x => x.id === id); return f ? copy(f) : null; }
+  async listFiles(courseId: string) { return copy(this.data.files.filter(x => x.courseId === courseId).sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt) || a.id.localeCompare(b.id))); }
+  async putFile(file: FileRecord) { this.upsert(this.data.files, file); }
+  async deleteFile(id: string) {
+    this.data.files = this.data.files.filter(x => x.id !== id);
+    this.data.fileVersions = this.data.fileVersions.filter(x => x.fileId !== id);
+    this.data.formats = this.data.formats.filter(x => x.fileId !== id);
+    this.data.scans = this.data.scans.filter(x => !(x.target.kind === 'file' && x.target.fileId === id));
+  }
+  async putFileVersion(v: FileVersion) { const i = this.data.fileVersions.findIndex(x => x.fileId === v.fileId && x.version === v.version); if (i < 0) this.data.fileVersions.push(copy(v)); else this.data.fileVersions[i] = copy(v); }
+  async listFileVersions(fileId: string) { return copy(this.data.fileVersions.filter(x => x.fileId === fileId).sort((a, b) => a.version - b.version)); }
+  async putScan(scan: StoredScan) { this.upsert(this.data.scans, scan); }
+  async latestScan(targetKind: 'lesson' | 'file', targetId: string) {
+    const list = this.data.scans.filter(s => s.target.kind === targetKind && (s.target.kind === 'lesson' ? s.target.lessonId : s.target.fileId) === targetId).sort((a, b) => b.scannedAt.localeCompare(a.scannedAt));
+    return list[0] ? copy(list[0]) : null;
+  }
+  async listScans(filter: { courseId?: string; targetKind?: 'lesson' | 'file'; since?: string }) {
+    return copy(this.data.scans.filter(s => (!filter.courseId || s.courseId === filter.courseId) && (!filter.targetKind || s.target.kind === filter.targetKind) && (!filter.since || s.scannedAt >= filter.since)).sort((a, b) => b.scannedAt.localeCompare(a.scannedAt)));
+  }
+  async getFormat(fileId: string, version: number, format: AccessibleFormat) { const f = this.data.formats.find(x => x.fileId === fileId && x.version === version && x.format === format); return f ? copy(f) : null; }
+  async listFormats(fileId: string, version: number) { return copy(this.data.formats.filter(x => x.fileId === fileId && x.version === version)); }
+  async putFormat(f: StoredFormat) { const i = this.data.formats.findIndex(x => x.fileId === f.fileId && x.version === f.version && x.format === f.format); if (i < 0) this.data.formats.push(copy(f)); else this.data.formats[i] = copy(f); }
   async getApiTokenByHash(hash: string) { const t = this.data.apiTokens.find(x => x.hash === hash); return t ? copy(t) : null; }
   async listApiTokens(ownerId: string) { return copy(this.data.apiTokens.filter(x => x.ownerId === ownerId)); }
   async putApiToken(token: ApiToken & { hash: string }) { this.upsert(this.data.apiTokens, token); }
