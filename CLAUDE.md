@@ -2,13 +2,15 @@
 
 An **AI-native learning management system** prototype for higher-education and industry audiences. It hosts courses and has a simplified native authoring tool that drafts modular content from natural language, files, and existing material, customizable for many learner personas. The owner is an instructional-design and learning-experience practitioner. Phase 1 (research, design system, 8 screens, a clickable learner prototype) is done. **Phase 2 (more design and building) starts from the GitHub issues in milestone "Phase 2: design and build".**
 
-- Live site (public): https://theonlygeranium.github.io/project-tessera/
-- Clickable prototype: https://theonlygeranium.github.io/project-tessera/prototype/
+- Live site (public): https://project-tessera.jeff-f69.workers.dev/
+- Clickable prototype: https://project-tessera.jeff-f69.workers.dev/prototype/
+- Branch previews: `https://<branch>-project-tessera.jeff-f69.workers.dev/` (branch names are lowercased; `/` and other symbols become `-`)
+- Legacy mirror (GitHub Pages, retiring): https://theonlygeranium.github.io/project-tessera/
 - Repo: `theonlygeranium/project-tessera` (**private**)
 
 ## Read these first, in order
 1. `handoff/PHASE-1-SUMMARY.md`: the original brief, what exists, what's open, and where to start.
-2. `design/DECISIONS.md`: settled decisions (D-001…D-011). Treat Accepted ones as constraints.
+2. `design/DECISIONS.md`: settled decisions (D-001…D-012). Treat Accepted ones as constraints.
 3. `design/DESIGN-NOTES.md` and `design/tokens.json`: the visual system and the AI markup contract.
 4. `research/report.md`: the evidence base. Cite it (by § number) when proposing design changes.
 5. Open issues: `type:principle` (#1–#15) tracks the 15 design principles, and the milestone **"Phase 2: design and build"** (#16–#30) is the backlog. There's an offline copy in `handoff/PHASE-2-BACKLOG.md`. **#16 (build approach) needs an owner decision before large building starts.**
@@ -19,7 +21,9 @@ An **AI-native learning management system** prototype for higher-education and i
 | `design/canvas/*.dc.html` | **Source** artboards: 8 screens, one file each. Edit these, never `docs/screens/`. |
 | `design/canvas/canvas.json` | Artboard positions and sizes for the design canvas mirror. |
 | `design/DESIGN-NOTES.md`, `design/tokens.json`, `design/DECISIONS.md` | The design system, tokens, and decision log. |
-| `docs/` | The GitHub Pages site (`main` / `/docs`). Build output is committed. |
+| `docs/` | The site. Cloudflare Worker `project-tessera` serves it as static assets (`wrangler.jsonc`, D-012). Build output is committed. |
+| `wrangler.jsonc` | Cloudflare Workers static-assets config. The Worker name must stay `project-tessera` (it has to match the dashboard). |
+| `.github/workflows/a11y.yml` | Runs `npm run a11y` on every push and PR (informational; doesn't block deploys). |
 | `docs/screens/*.html`, `docs/screens.json`, `docs/research.html` | **Generated** by `tools/build_docs.py`. Don't hand-edit. |
 | `docs/prototype/` | Clickable learner flow, hand-written (`index.html`, `prototype.css`, `prototype.js`). |
 | `docs/assets/ai-voice.css` + `.js` | The AI visual language: 4 styles, one markup contract. `DEFAULT` in the JS sets the site-wide style. |
@@ -34,7 +38,8 @@ An **AI-native learning management system** prototype for higher-education and i
 ```bash
 pip install -r requirements.txt                        # once (Python 3.10+)
 python3 tools/build_docs.py                            # after ANY change to design/canvas or research/report.md
-python3 -m http.server 8765 --directory docs           # local preview at http://localhost:8765/
+python3 -m http.server 8765 --directory docs           # quick local preview at http://localhost:8765/
+npx wrangler dev                                       # exact Cloudflare behavior (redirects, 404) at http://localhost:8787/
 npm install                                            # once (Node 18+) (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 if Chromium is preinstalled)
 npm run a11y                                           # must print "N/N pass"; in Claude cloud sessions: CHROMIUM=/opt/pw-browsers/chromium npm run a11y
 ```
@@ -44,8 +49,8 @@ npm run a11y                                           # must print "N/N pass"; 
 2. Run `python3 tools/build_docs.py`.
 3. Run `npm run a11y` and get **zero violations**. If you add a new page, screen state, or prototype step, add it to `tools/a11y_audit.mjs`.
 4. Open the changed pages locally and walk every affected flow, including the prototype's **Reset**. Take Playwright screenshots and look at them.
-5. Commit the source **and** the regenerated `docs/`, then push to `main`. Pages redeploys in about 1 minute.
-6. Verify the live URL, if the session has a browser that can reach github.io.
+5. Commit the source **and** the regenerated `docs/`, then push. Pushing a branch gives a live preview URL in about 30 seconds; pushing to `main` deploys production. For risky work, push a branch, check its preview, then merge.
+6. Verify the deployed URL (preview or production) with a browser pane if one is attached; otherwise verify locally with `npx wrangler dev` and say so. Build logs are in the Cloudflare dashboard under Workers & Pages → project-tessera → Deployments.
 7. If artboards changed, sync the design canvas (below) or tell the owner it's behind.
 8. Comment on or close the related issue, stating which Done-when criteria are met.
 
@@ -62,7 +67,7 @@ npm run a11y                                           # must print "N/N pass"; 
   - Use real `<button>`, `<a href>`, and `<input>` + `<label>`; icon-only buttons need `aria-label`.
   - Text contrast must be at least 4.5:1, with 44px learner touch targets.
   - Keyboard paths need visible focus, and focus returns to the control that opened a panel (D-010).
-- **The public site must be self-contained.** Nothing under `docs/` may link into the private repo or contain confidential material (D-008).
+- **The public site must be self-contained.** Nothing under `docs/` may link into the private repo or contain confidential material. Branch previews are public too (D-012).
 - **Content is fictional:** "Meridian State," "Priya," "Dr. Okafor," and all numbers are illustrative. Never use real student data.
 
 ## Adding or changing a screen (artboard)
@@ -88,12 +93,13 @@ If you can't reach the canvas, say in your handoff that it's behind the repo.
 
 ## Environment notes (Claude cloud sessions)
 - GitHub REST works through the session proxy for issues, labels, milestones, and comments (`$GH_TOKEN`). **GraphQL is blocked, so Projects boards can't be created by agents**; the owner creates them in the UI. The Pages API is blocked too.
-- The sandbox shell can't reach `*.github.io` or Google Fonts. Verify the live site with a browser pane if one is attached; otherwise verify locally and say so.
+- The sandbox shell can't reach `*.workers.dev`, `*.github.io`, or Google Fonts. Verify the live site with a browser pane if one is attached; otherwise verify locally and say so.
+- Agents can't deploy with `wrangler deploy` from the sandbox (no Cloudflare token). Deploys happen by pushing to GitHub; Workers Builds does the rest.
 - Chromium for Playwright is at `/opt/pw-browsers/chromium`. Don't run `playwright install`.
-- GitHub Pages source is **Deploy from a branch → main → /docs**. There's no Actions workflow; don't add one without changing D-008.
+- Hosting (D-012): Cloudflare Workers Builds on the owner's personal account deploys `main` to production and every other branch to a preview URL. No build command runs yet; `docs/` is committed. GitHub Pages (`main` → `/docs`) still mirrors the site until the owner retires it.
 
 ## Working with the owner
 - Be direct. Lead with the result, then the reasoning. No praise or filler.
 - End development responses with a **Next steps** block: a one-line status, then 2–4 numbered options, recommended first, each saying whether you'll do it or it needs the owner's decision.
-- Act on safe, reversible steps (reading, branches, draft PRs, building, auditing). **Confirm first** before anything destructive or irreversible: force-pushes, deleting branches or data, changing Pages settings.
+- Act on safe, reversible steps (reading, branches, draft PRs, building, auditing). **Confirm first** before anything destructive or irreversible: force-pushes, deleting branches or data, changing Cloudflare or Pages settings.
 - The owner reviews visually. Show screenshots or the live link for design work, and offer options side by side when a direction is subjective (as with D-006).

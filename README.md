@@ -2,7 +2,7 @@
 
 An AI-native learning management system prototype for higher-education and industry audiences: course hosting plus a native, simplified authoring tool that drafts modular content from natural language, files, and existing material, customizable for a wide range of learner personas.
 
-**Live site:** https://theonlygeranium.github.io/project-tessera/ · **Clickable prototype:** https://theonlygeranium.github.io/project-tessera/prototype/
+**Live site:** https://project-tessera.jeff-f69.workers.dev/ · **Clickable prototype:** https://project-tessera.jeff-f69.workers.dev/prototype/
 
 *Tessera* is a working codename. It refers to the tiles of a mosaic: modular blocks that compose into a course.
 
@@ -12,12 +12,12 @@ An AI-native learning management system prototype for higher-education and indus
 
 | Path | Contents |
 |---|---|
-| `docs/` | Static microsite published with GitHub Pages (branch `main`, folder `/docs`). `index.html` is the gallery, `screens/` holds one standalone page per mockup, and `research.html` is the rendered report. |
+| `docs/` | Static microsite served by Cloudflare Workers static assets (`wrangler.jsonc`). `index.html` is the gallery, `screens/` holds one standalone page per mockup, and `research.html` is the rendered report. |
 | `docs/prototype/` | Clickable learner flow: Today → lesson → hint-first tutor → module check → result → updated Today. Plain HTML, CSS, and JS. |
 | `design/canvas/` | Source artboards (`*.dc.html`) and `canvas.json` from the design canvas. These are the editable originals. |
 | `design/DESIGN-NOTES.md` | The design system in prose: tokens, type, density, the AI markup contract, and interaction conventions. |
 | `design/tokens.json` | Machine-readable design tokens (colors, type, sizes, radii). |
-| `design/DECISIONS.md` | Decision log (D-001…D-011) with rationale. Accepted decisions are constraints. |
+| `design/DECISIONS.md` | Decision log (D-001…D-012) with rationale. Accepted decisions are constraints. |
 | `handoff/PHASE-1-SUMMARY.md` | The original brief, what exists, known gaps, the Phase 2 order, and a kickoff prompt. |
 | `CLAUDE.md` | Operating manual for Claude Code agents: commands, definition of done, hard rules, gotchas. |
 | `.claude/agents/` | Project subagents: `design-reviewer` (checks against decisions and tokens) and `a11y-auditor` (runs and fixes the audit). |
@@ -57,9 +57,9 @@ Regenerate the site after editing an artboard source:
 python3 tools/build_docs.py
 ```
 
-Open `docs/index.html` locally, or commit the regenerated `docs/` and push to `main` to publish. GitHub Pages serves `main` / `/docs` directly, so the build output must be committed.
+Open `docs/index.html` locally (or run `npx wrangler dev`), then commit the regenerated `docs/` and push. Every branch gets a live preview URL; `main` is production. The build output must be committed because Cloudflare serves `docs/` as-is.
 
-The repository is private but the Pages site is public. Anything the site links to must live inside `docs/`; the build renders `research/report.md` to `docs/research.html` for that reason.
+The repository is private but the site and its branch previews are public. Anything the site links to must live inside `docs/`; the build renders `research/report.md` to `docs/research.html` for that reason.
 
 Each artboard is a self-contained HTML file. The `*.dc.html` sources carry a small runtime header for the design canvas they were drawn in; the build script strips it and emits plain HTML. Links between screens (`href="LessonPlayer.dc.html"`) are rewritten to the `docs/screens/` names.
 

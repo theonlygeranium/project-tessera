@@ -12,7 +12,7 @@ Tessera is a research-grounded prototype. A change is good when it makes a scree
 | The research | `research/report.md` | `python3 tools/build_docs.py`, commit `docs/research.html` |
 | Tokens and conventions | `design/tokens.json` (values) and `design/DESIGN-NOTES.md` (rules) | Update any screen that no longer matches; settled choices are in `design/DECISIONS.md` |
 
-GitHub Pages serves `main` / `/docs` as committed; there is no build step on GitHub. If you don't commit the regenerated `docs/`, your change will not appear on the site.
+Cloudflare serves `docs/` as committed; there is no build step on deploy. If you don't commit the regenerated `docs/`, your change will not appear on the site. Every pushed branch gets its own preview URL (`https://<branch>-project-tessera.jeff-f69.workers.dev/`), and `main` is production.
 
 The build needs Python 3.10+ and `pip install markdown`.
 
@@ -47,7 +47,7 @@ These come straight from the research. Break one only with a linked issue that a
 
 ## The public site
 
-The repository is private and the Pages site is public. Nothing on the site may link into the repository, and nothing committed under `docs/` should be confidential.
+The repository is private and the site, including branch previews, is public. Nothing on the site may link into the repository, and nothing committed under `docs/` should be confidential.
 
 ## Labels
 

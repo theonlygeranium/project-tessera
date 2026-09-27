@@ -30,7 +30,7 @@ Check every change against this list and report findings as PASS / ISSUE, each w
   - Violet appears only for AI.
   - Typefaces are Fraunces, Plex Sans, and Plex Mono only.
 - **Accessibility (D-010):** real buttons, links, and labelled inputs; `aria-label` on icon-only buttons; 44px learner targets; visible focus; focus returns after closing panels.
-- **Content:** only fictional people, institutions, and data; no links from `docs/` into the private repo (D-008).
+- **Content:** only fictional people, institutions, and data; no links from `docs/` into the private repo (D-012).
 - **Build hygiene:**
   - Was `tools/build_docs.py` run, with the regenerated `docs/` staged?
   - Is a new screen registered in both `canvas.json` and `SCREENS`?

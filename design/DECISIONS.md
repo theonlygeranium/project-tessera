@@ -11,10 +11,11 @@ Settled decisions for Project Tessera, with the reason for each. Agents should t
 | D-005 | Tutor modes and who controls them | Accepted | 2026-09-26 |
 | D-006 | AI visual language: Marginalia; no stripes, sparkles, or gradients | Accepted | 2026-09-26 |
 | D-007 | Visual system: paper, ink, one teal accent, violet for AI; Fraunces + Plex | Accepted | 2026-09-25 |
-| D-008 | Hosting: private repo, public Pages from `main:/docs`, build output committed | Accepted | 2026-09-26 |
+| D-008 | Hosting: private repo, public Pages from `main:/docs`, build output committed | Superseded by D-012 | 2026-09-26 |
 | D-009 | The repo is the source of truth; the design canvas is a mirror | Accepted | 2026-09-26 |
 | D-010 | Accessibility bar: WCAG 2.2 AA, zero automated violations, 320px reflow | Accepted | 2026-09-26 |
 | D-011 | Phase-2 build approach | **Open** (#16) | — |
+| D-012 | Hosting: Cloudflare Workers static assets, deploy on push, per-branch previews | Accepted | 2026-09-26 |
 
 ---
 
@@ -71,8 +72,8 @@ The palette is a warm paper ground (`#F4F1EB`), ink (`#1C1B19`), one accent (tea
 - Warning **text** is `#7A5310`. `#9A6A12` is for non-text marks only.
 - Tokens live in `design/tokens.json`.
 
-### D-008 · Hosting
-**Decision:**
+### D-008 · Hosting · SUPERSEDED by D-012
+**Decision (historical):**
 - The repository is **private**; the GitHub Pages site is **public**.
 - Pages serves `main` / `/docs` directly. There's no Actions workflow; it was removed. The build output (`docs/screens/`, `docs/research.html`, `docs/screens.json`) must be committed.
 - Nothing on the site may link into the repository, and nothing under `docs/` may be confidential.
@@ -98,8 +99,17 @@ See #16. Record the owner's choice here, as Accepted, with the date.
 | Reuse and consistency | Low; inline styles are duplicated | High; one component per pattern, with states in Storybook | High |
 | Prototype fidelity | Scripted flows only | Realistic state and routing; mock data layer | Real data and AI |
 | Design canvas mirror | Works as today | Artboards stay as design specs; components become the source of truth for UI | Same as B |
-| Hosting | Pages as today | Pages as today (build output committed, or Actions if D-008 is revised) | Needs a server; D-008 changes |
+| Hosting | Cloudflare as today (D-012) | Cloudflare Workers Builds runs the build; set a build command (D-012) | Worker script + bindings on the same Worker; D-012 extends |
 | Main risk | Drift and rework as scope grows | Setup cost; the canvas and components can diverge | Premature before user testing (#28) |
 | Good fit if | More exploration, few flows | Phase 2 as described: more design **and** building, then user tests | Pilot with a real institution |
 
 Recommendation: **B**, keeping `design/canvas` artboards as the visual spec, with components in a new `app/` folder built into `docs/app/`. Revisit C after the #28 usability tests.
+
+### D-012 · Hosting: Cloudflare Workers static assets
+Supersedes D-008. The owner is the sole developer and wants every push testable live without review stages, with everything recorded in GitHub. Cloudflare recommends Workers static assets over Pages for new projects, and Workers Builds gives a stable preview URL per branch.
+**Decision:**
+- The site is served by the Worker **`project-tessera`** on the owner's personal Cloudflare account, configured by `wrangler.jsonc` (assets directory `./docs`, no Worker script, `404.html` for not-found).
+- Workers Builds is connected to the GitHub repo. A push to `main` deploys production (`npx wrangler deploy`). A push to any other branch uploads a preview version with its own stable URL (`<branch>-project-tessera.<subdomain>.workers.dev`). Cloudflare posts build status back to the commit.
+- For now there is no build command: `docs/` build output stays committed, so GitHub Pages keeps working as a fallback until the owner retires it. When D-011 lands, set the build command in the Worker's build settings (and record it in `CLAUDE.md`).
+- `.github/workflows/a11y.yml` runs the accessibility audit on every push and PR. It is informational and does not block deploys; the Definition of Done still requires a clean audit.
+- Unchanged from D-008: the repository is private, the site and every preview URL are public, nothing under `docs/` may link into the repository or be confidential. If something must be private, put Cloudflare Access in front of it.

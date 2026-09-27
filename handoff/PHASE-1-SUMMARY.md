@@ -21,7 +21,7 @@ Later direction from the owner during Phase 1:
 | Clickable prototype | `docs/prototype/` | Today → lesson with knowledge check → hint-first tutor (refuses answers per policy) → reflection → 3-question module check → results → Today updated (mastery, review cards, time ring). Includes Reset. Responsive. |
 | AI visual language | `docs/assets/ai-voice.css` / `.js` | Marginalia is the default; tabs, perforated, and tiles can be switched in with `?ai=`. The gallery has a switcher. |
 | Design system | `design/DESIGN-NOTES.md`, `design/tokens.json` | Screens still use inline hex values. Issue #17 moves them to tokens. |
-| Decisions | `design/DECISIONS.md` | D-001…D-010 accepted. **D-011 (build approach) is open (#16).** |
+| Decisions | `design/DECISIONS.md` | D-001…D-010 and D-012 (Cloudflare hosting) accepted; D-008 superseded. **D-011 (build approach) is open (#16).** |
 | Accessibility | `tools/a11y_audit.mjs`, `reports/a11y.md` | **43/43 pass**: axe WCAG 2.0–2.2 A/AA on every page and every prototype state. Screens with AI content are tested in all four AI styles. The site pages and prototype are also checked for 320px reflow. Keyboard walkthrough passed. The screen-reader pass is pending (#29, human). |
 | Contributor setup | `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/*`, PR template | Four issue forms, blank issues disabled, PR checklist requires a clean audit. |
 | Design canvas mirror | The owner's private Claude artifact "AI-Native LMS UI Concepts" | Synced with the repo as of commit `2fc9e08` plus the admin ↔ tutor-settings cross-links. See `CLAUDE.md` for the sync procedure. |
@@ -47,7 +47,7 @@ Borrow Canvas's backbone (a predictable module spine, fast grading, a unified to
 
 | Order | Issue | Why this order |
 |---|---|---|
-| 1 | **#16 Decision: build approach** (owner; trade-offs in `design/DECISIONS.md` D-011) | Everything larger depends on it. The recommendation is option B: Vite + a component framework + Storybook, still static on Pages. |
+| 1 | **#16 Decision: build approach** (owner; trade-offs in `design/DECISIONS.md` D-011) | Everything larger depends on it. The recommendation is option B: Vite + a component framework + Storybook, still static, served by Cloudflare (D-012). |
 | 2 | **#17 Tokens and component inventory** | The foundation for any building; removes inline hex values. |
 | 3 | **#18, #19** Wire the profile and tutor settings into the prototype | Finishes the open parts of #9 and #5; small and visible. |
 | 4 | **#20 Author clickable flow** | The core differentiator (plan-first authoring with provenance). |
