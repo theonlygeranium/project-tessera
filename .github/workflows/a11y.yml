@@ -1,5 +1,7 @@
 # Accessibility audit on every push and PR (D-012). Informational: it does not
 # gate Cloudflare deploys, which Workers Builds runs independently.
+# The report goes to the run's job summary (no artifact upload: the account's
+# artifact storage quota is shared and was full).
 name: a11y
 on:
   push:
@@ -9,16 +11,13 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run a11y
       - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: a11y-report
-          path: reports/a11y.md
+        run: cat reports/a11y.md >> "$GITHUB_STEP_SUMMARY" || true
