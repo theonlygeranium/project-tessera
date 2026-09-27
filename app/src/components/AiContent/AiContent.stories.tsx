@@ -14,6 +14,10 @@ const meta = {
       },
     },
   },
+  argTypes: {
+    kind: { control: 'select', options: ['chat', 'note', 'block'] },
+    state: { control: 'select', options: ['draft', 'kept'], description: 'Blocks only: draft or kept (D-003).' },
+  },
   decorators: [(Story) => <div style={{ maxWidth: 520 }}><Story /></div>],
 } satisfies Meta<typeof AiContent>;
 

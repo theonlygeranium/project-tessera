@@ -51,6 +51,8 @@ Cursor, the self-hosted Schubert models, and Palmyra-X6 are benched; don't route
 | `docs/screens/*.html`, `docs/screens.json`, `docs/research.html` | **Generated** by `tools/build_docs.py`. Don't hand-edit. |
 | `docs/prototype/` | Clickable learner flow, hand-written (`index.html`, `prototype.css`, `prototype.js`). |
 | `app/` | **Phase 2 component app** (D-011): Vite + React + TypeScript. `app/src/tokens.ts` reads `design/tokens.json` into CSS custom properties; app code never hard-codes colors. |
+| `app/src/components/` | **Shared React components** (#17): one folder per component with `<Name>.tsx`, `<Name>.module.css` (tokens only), and `<Name>.stories.tsx`; exported from `index.ts`. Plan: `design/COMPONENTS.md`. `AiContent` renders the AI markup contract. |
+| `docs/storybook/` | **Generated** Storybook (component library, every story), served at `/storybook/`; built by `npm run build`, not committed. Every story is included in `npm run a11y`. |
 | `docs/app/` | **Generated** by `npm run build` and **not committed** (gitignored). Cloudflare builds it on every push via `wrangler.jsonc` → `build.command`; served at `/app/`. |
 | `docs/assets/ai-voice.css` + `.js` | The AI visual language: 4 styles, one markup contract. `DEFAULT` in the JS sets the site-wide style. |
 | `docs/explorations/ai-voice.html` | Comparison page for the 4 AI styles (a record of D-006). |
@@ -68,7 +70,8 @@ Cursor, the self-hosted Schubert models, and Palmyra-X6 are benched; don't route
 pip install -r requirements.txt                        # once (Python 3.10+)
 python3 tools/build_docs.py                            # after ANY change to design/canvas or research/report.md
 npm run dev                                            # Phase 2 app with instant reload at http://localhost:5173/app/
-npm run build                                          # type-check + build the app into docs/app/ (Cloudflare runs this on every push)
+npm run storybook                                      # component library with instant reload at http://localhost:6006/
+npm run build                                          # tokens + type-check + app into docs/app/ + Storybook into docs/storybook/ (Cloudflare runs this on every push)
 python3 -m http.server 8765 --directory docs           # quick local preview at http://localhost:8765/
 npx wrangler dev                                       # exact Cloudflare behavior (redirects, 404) at http://localhost:8787/
 npm install                                            # once (Node 18+) (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 if Chromium is preinstalled)
