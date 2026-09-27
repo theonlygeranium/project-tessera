@@ -25,5 +25,10 @@ for (const [group, entries] of Object.entries(tokens)) {
   }
 }
 
+// Institution accent choices (D-014 setup): --accent-option-<name>.
+for (const [name, token] of Object.entries(tokens['accent-options'] ?? {})) {
+  if (!name.startsWith('$')) declarations.push(`  --accent-option-${name}: ${token.$value};`);
+}
+
 await mkdir(fileURLToPath(new URL('../docs/assets/', import.meta.url)), { recursive: true });
 await writeFile(output, `/* Generated from design/tokens.json; do not edit by hand. */\n:root {\n${declarations.join('\n')}\n}\n`);
