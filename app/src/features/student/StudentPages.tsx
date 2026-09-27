@@ -10,15 +10,12 @@ import { useSession } from '../../shell/session';
 import { usePageTitle } from '../../shell/usePageTitle';
 import styles from './Student.module.css';
 
-export function courseStatus(course: CourseSummary, hasStartedLesson = false) {
+export function courseStatus(course: CourseSummary) {
   return course.publishedLessonCount > 0 && course.progress === 1 ? 'completed' :
-    (course.progress !== null && course.progress > 0) || hasStartedLesson ? 'active' : 'not-started';
+    (course.startedLessonCount ?? 0) > 0 ? 'active' : 'not-started';
 }
 function StudentCourseCard({ course }: { course: CourseSummary }) {
-  // A started lesson leaves the completed percentage at zero, so check lesson states in that case.
-  const outline = useApiQuery('getCourseOutline', { courseId: course.id }, { enabled: course.progress === 0 && course.publishedLessonCount > 0 });
-  const hasStartedLesson = outline.data?.modules.some(module => module.lessons.some(lesson => lesson.progress === 'in-progress')) ?? false;
-  const status = courseStatus(course, hasStartedLesson);
+  const status = courseStatus(course);
   return <CourseCard title={course.title} code={course.code} term={course.term} instructor={course.instructorNames.join(', ')} progress={course.progress ?? undefined} status={status} meta={status === 'active' ? 'In progress' : undefined} href={paths.student.course(course.id)} renderLink={renderRouterLink} />;
 }
 export function CourseCards({ courses }: { courses: CourseSummary[] }) {

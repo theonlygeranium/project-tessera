@@ -100,6 +100,8 @@ export interface CourseSummary extends Course {
   studentCount: number;
   /** Students only: completed ÷ published lessons, 0–1. */
   progress: number | null;
+  /** Students only: published lessons in progress or completed (so a card can say "In progress" at 0%). */
+  startedLessonCount: number | null;
 }
 
 export interface Module {

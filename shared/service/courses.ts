@@ -7,7 +7,7 @@ export async function summary(ctx: ServiceContext, c: Course): Promise<CourseSum
   const names = await Promise.all(c.instructorIds.map(id => ctx.repo.getUser(id)));
   const u = user(ctx), published = lessons.filter(x => x.status === 'published');
   const progress = u.role === 'student' ? await ctx.repo.listProgress({ userId: u.id, lessonIds: published.map(x => x.id) }) : [];
-  return { ...c, instructorNames: names.filter(x => x !== null).map(x => x.name), moduleCount: modules.length, lessonCount: u.role === 'student' ? published.length : lessons.length, publishedLessonCount: published.length, studentCount: enrollments.length, progress: u.role === 'student' ? (published.length ? progress.filter(x => x.state === 'completed').length / published.length : 0) : null };
+  return { ...c, instructorNames: names.filter(x => x !== null).map(x => x.name), moduleCount: modules.length, lessonCount: u.role === 'student' ? published.length : lessons.length, publishedLessonCount: published.length, studentCount: enrollments.length, progress: u.role === 'student' ? (published.length ? progress.filter(x => x.state === 'completed').length / published.length : 0) : null, startedLessonCount: u.role === 'student' ? progress.filter(x => x.state !== 'not-started').length : null };
 }
 
 export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseOutline' | 'updateCourse' | 'setCourseInstructors' | 'getCourseEnrollments' | 'setCourseEnrollments' | 'getRoster' | 'createModule' | 'updateModule' | 'deleteModule' | 'createLesson' | 'updateLesson' | 'deleteLesson'> = {
