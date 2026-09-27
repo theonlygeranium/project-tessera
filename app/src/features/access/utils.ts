@@ -21,7 +21,3 @@ export function severityTone(severity: AccessSeverity): 'error' | 'warning' | 'n
 export function scoreText(summary: { score: number; grade: string } | null): string {
   return summary ? `${summary.score} out of 100 · ${summary.grade}` : 'Not scanned';
 }
-export function errorText(error: unknown): string {
-  if (error && typeof error === 'object' && 'code' in error && error.code === 'unsupported') return 'This action is unavailable in demo mode.';
-  return error instanceof Error ? error.message : 'Could not complete the action.';
-}

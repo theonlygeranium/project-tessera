@@ -41,7 +41,7 @@ export function BlockEditor({ value, onChange, courseId }: { value: BlockInput; 
   }
 }
 
-export function BlockPlayer({ block, lessonId }: { block: StudentBlock; lessonId: string }): ReactNode {
+export function BlockPlayer({ block, lessonId, readOnly = false }: { block: StudentBlock; lessonId: string; readOnly?: boolean }): ReactNode {
   switch (block.type) {
     case 'document': return createElement(DocumentPlayer, { value: block });
     case 'table': return createElement(TablePlayer, { value: block });
@@ -53,7 +53,7 @@ export function BlockPlayer({ block, lessonId }: { block: StudentBlock; lessonId
     case 'callout':
     case 'image':
     case 'check':
-      return createElement(LegacyBlockPlayer, { block, lessonId });
+      return createElement(LegacyBlockPlayer, { block, lessonId, readOnly });
     case 'file':
       return createElement(FilePlayer, { value: block });
     default: {

@@ -71,12 +71,15 @@ function CheckBlock({ block, lessonId }: { block: Extract<StudentBlock, { type: 
  * The student lesson player's plain blocks, copied for heading, text, callout,
  * image, and check. Document, table, scenario, link, and video have their own players.
  */
-export function LegacyBlockPlayer({ block, lessonId }: { block: StudentBlock; lessonId: string }) {
+/** `readOnly` renders a knowledge check as a disabled preview (staff can't answer checks). */
+export function LegacyBlockPlayer({ block, lessonId, readOnly = false }: { block: StudentBlock; lessonId: string; readOnly?: boolean }) {
   if (block.type === 'heading') return block.level === 2 ? <h2>{block.text}</h2> : <h3>{block.text}</h3>;
   if (block.type === 'text') return <div className={styles.paragraphs}>{block.text.split(/\n\s*\n/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>;
   if (block.type === 'callout') return <aside className={styles.callout}><p className={styles.tone}>{block.tone}</p><h3>{block.title}</h3><p>{block.text}</p></aside>;
   if (block.type === 'image') return <figure className={styles.figure}><img className={styles.media} src={block.src} alt={block.decorative ? '' : block.alt} />{block.caption && <figcaption>{block.caption}</figcaption>}</figure>;
-  if (block.type === 'check') return <CheckBlock block={block} lessonId={lessonId} />;
+  if (block.type === 'check') return readOnly
+    ? <fieldset className={styles.check} disabled><legend>{block.question}</legend>{block.options.map((o) => <label key={o.id}><input type="radio" name={`preview-${block.id}`} /> {o.text}</label>)}<p className={styles.note}>Preview: students answer this check.</p></fieldset>
+    : <CheckBlock block={block} lessonId={lessonId} />;
   if (block.type === 'document') return <section>{block.sections.map((section, index) => <div key={index}><h3>{section.heading}</h3>{section.text.split(/\n\s*\n/).map((paragraph, paragraphIndex) => <p key={paragraphIndex}>{paragraph}</p>)}</div>)}</section>;
   if (block.type === 'table') return <table><caption>{block.caption}</caption>{block.headerRow && <thead><tr>{block.rows[0].map((cell, index) => <th scope="col" key={index}>{cell}</th>)}</tr></thead>}<tbody>{block.rows.slice(block.headerRow ? 1 : 0).map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>)}</tbody></table>;
   if (block.type === 'link') return <p><a href={block.href} rel="noopener noreferrer">{block.text}</a>{block.description && <> · {block.description}</>}</p>;

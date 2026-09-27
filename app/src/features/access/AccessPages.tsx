@@ -11,7 +11,8 @@ import { usePageTitle } from '../../shell/usePageTitle';
 import { AccessibleFormats } from './AccessibleFormats';
 import { Suggestion } from './Suggestion';
 import { UploadFile } from './UploadFile';
-import { contentUrl, errorText, scoreText, severities, severityTone, sizeText } from './utils';
+import {contentUrl, scoreText, severities, severityTone, sizeText} from './utils';
+import { errorText } from './errors';
 import styles from './access.module.css';
 
 function Summary({ summary }: { summary: { score: number; grade: string; bySeverity: Record<AccessSeverity, number> } }) {

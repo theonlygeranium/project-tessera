@@ -3,7 +3,8 @@ import type { AccessibleFormat } from '../../../../shared/domain';
 import { Button, StatusNotice } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
 import { ErrorNotice, Loading } from '../../shell/Status';
-import { contentUrl, errorText } from './utils';
+import {contentUrl} from './utils';
+import { errorText } from './errors';
 import styles from './access.module.css';
 
 const offered: { format: AccessibleFormat; label: string }[] = [

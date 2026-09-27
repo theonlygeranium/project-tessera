@@ -29,5 +29,5 @@ export function UploadFile({ courseId, onUploaded }: { courseId: string; onUploa
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Upload failed.'); setMessage(''); }
     finally { setBusy(false); }
   }
-  return <div><FormField label="Choose a file" hint="PDF, Word, or PowerPoint; up to 25 MB." error={error || undefined}>{control => <input {...control} ref={input} type="file" accept=".pdf,.docx,.pptx" />}</FormField><Button disabled={busy} onClick={() => void upload()}>Upload file</Button>{message && <p role="status">{message}</p>}</div>;
+  return <div><FormField label="Choose a file" hint="PDF, Word, PowerPoint, images, or captions (VTT, SRT); up to 25 MB. Word, PowerPoint, and PDF files get an accessibility scan." error={error || undefined}>{control => <input {...control} ref={input} type="file" accept=".pdf,.docx,.pptx,.png,.jpg,.jpeg,.gif,.webp,.vtt,.srt" />}</FormField><Button disabled={busy} onClick={() => void upload()}>Upload file</Button>{message && <p role="status">{message}</p>}</div>;
 }

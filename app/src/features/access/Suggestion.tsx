@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Provenance } from '../../../../shared/domain';
 import { AiContent, Button, StatusNotice } from '../../components';
 import { useApiMutation } from '../../data/hooks';
-import { errorText } from './utils';
+import { errorText } from './errors';
 import styles from './access.module.css';
 
 type Target = { lessonId: string; blockId: string } | { fileId: string; element: number };
