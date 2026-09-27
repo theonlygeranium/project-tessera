@@ -97,7 +97,7 @@ PRINCIPLES = [
         "AI capabilities and limits are disclosed; no sparkle-only AI cues",
         ["area:design-system", "area:learner"],
         "NN/G (2024): no participant associated the sparkle icon with AI. PAIR warns against 'AI magic' framing (§2, §4).",
-        "Tutor header states scope and who can see the chat; AI elements use tint plus text label.",
+        "Tutor header states scope and who can see the chat; AI content uses the Marginalia markup contract (attribution, source footnotes).",
         "No first-run disclosure or settings page describing what the AI can and cannot do.",
         "A first-use disclosure exists for learners and authors, and a design-system audit finds no AI affordance without a text label.",
     ),

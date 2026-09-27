@@ -84,6 +84,25 @@ for (const t of targets) {
   process.stdout.write(`${r.length ? '✗' : '✓'} ${t.name}${r.length ? `  (${r.map((v) => `${v.id}×${v.nodes.length}`).join(', ')})` : ''}\n`);
   await page.close();
 }
+// ---- reflow: WCAG 1.4.10 (content usable at 320 CSS px without horizontal scrolling) ----
+// Screens under docs/screens/ are fixed-size design artboards and are exempt; site pages and the prototype are not.
+const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
+for (const u of REFLOW) {
+  const page = await browser.newPage({ viewport: { width: 320, height: 256 } });
+  await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  await page.goto(BASE + u);
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => {
+    const iw = innerWidth;
+    const off = [...document.querySelectorAll('body *')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.right > iw + 1 && !e.closest('pre,iframe,.viewport,table'); });
+    return { overflow: document.documentElement.scrollWidth > iw + 1, nodes: off.slice(0, 5).map((e) => ({ target: e.tagName.toLowerCase() + (typeof e.className === 'string' && e.className ? '.' + e.className.split(' ')[0] : ''), summary: 'extends past 320px' })) };
+  });
+  const v = r.overflow ? [{ id: 'reflow-320', impact: 'serious', help: 'Content must reflow at 320 CSS px without horizontal scrolling (WCAG 1.4.10)', nodes: r.nodes }] : [];
+  results.push({ name: `Reflow 320px · ${u}`, url: u, violations: v });
+  process.stdout.write(`${v.length ? '✗' : '✓'} Reflow 320px · ${u}\n`);
+  await page.close();
+}
+
 await browser.close();
 server.close();
 
@@ -91,9 +110,9 @@ server.close();
 const failing = results.filter((r) => r.violations.length);
 const lines = [
   '# Accessibility audit', '',
-  `Run: ${new Date().toISOString().slice(0, 10)} · axe-core ${JSON.parse(await readFile(require.resolve('axe-core/package.json'), 'utf8')).version} · rules tagged ${TAGS.join(', ')}`, '',
+  `Run: ${new Date().toISOString().slice(0, 10)} · reflow at 320px for site pages and the prototype · axe-core ${JSON.parse(await readFile(require.resolve('axe-core/package.json'), 'utf8')).version} · rules tagged ${TAGS.join(', ')}`, '',
   `**${results.length - failing.length} of ${results.length} targets pass with zero violations.**`, '',
-  'Automated checks catch roughly a third to half of WCAG issues. Keyboard walkthroughs and screen-reader testing are still required (tracked in issue #10).', '',
+  'Automated checks catch roughly a third to half of WCAG issues. Keyboard walkthroughs and screen-reader testing are still required (screen-reader pass tracked in issue #29).', '',
   '| Target | Result |', '|---|---|',
   ...results.map((r) => `| ${r.name} | ${r.violations.length ? r.violations.map((v) => `${v.id} (${v.nodes.length})`).join(', ') : 'Pass'} |`),
 ];

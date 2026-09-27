@@ -8,5 +8,8 @@
   "devDependencies": {
     "axe-core": "^4.10.0",
     "playwright": "^1.47.0"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

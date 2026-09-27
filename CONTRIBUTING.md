@@ -10,7 +10,7 @@ Tessera is a research-grounded prototype. A change is good when it makes a scree
 | The clickable prototype | `docs/prototype/` (plain HTML, CSS, JS) | Open it locally and walk the whole flow, including Reset |
 | The gallery page | `docs/index.html`, `docs/assets/site.css` | Open it locally |
 | The research | `research/report.md` | `python3 tools/build_docs.py`, commit `docs/research.html` |
-| Tokens and conventions | `design/DESIGN-NOTES.md` | Update any screen that no longer matches |
+| Tokens and conventions | `design/tokens.json` (values) and `design/DESIGN-NOTES.md` (rules) | Update any screen that no longer matches; settled choices are in `design/DECISIONS.md` |
 
 GitHub Pages serves `main` / `/docs` as committed; there is no build step on GitHub. If you don't commit the regenerated `docs/`, your change will not appear on the site.
 
@@ -35,7 +35,7 @@ These come straight from the research. Break one only with a linked issue that a
 - **Agents propose change sets.** Bulk or agentic actions show a was / will-be preview, affected counts, and conflicts before Apply.
 - **Personalize on evidence.** Goals, time, prior knowledge, language, accessibility, device, role. Do not add "learning style" features.
 - **Accessible as drawn.** Real `<button>`, `<a href>`, `<input>` + `<label>` elements, even in static mockups. Text contrast at least 4.5:1. Colors that must be told apart also differ in lightness. Learner touch targets at least 44px.
-- **One accent.** Use the tokens in `design/DESIGN-NOTES.md`. No new colors without updating that file.
+- **One accent.** Use the tokens in `design/tokens.json`. Add a new color there, with a description, before using it.
 - **Illustrative content only.** Names, courses, and numbers are fictional. Do not use real student or employee data.
 
 ## Research rules

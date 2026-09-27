@@ -6,6 +6,8 @@ An AI-native learning management system prototype for higher-education and indus
 
 *Tessera* is a working codename. It refers to the tiles of a mosaic: modular blocks that compose into a course.
 
+> **Status: Phase 1 complete (Sept 26, 2026).** It delivered the research, design system, 8 screens, a clickable learner prototype, and a clean accessibility audit. Phase 2 (design and build) is tracked in the [Phase 2 milestone](https://github.com/theonlygeranium/project-tessera/milestone/1). **Agents and new contributors: start with [`CLAUDE.md`](CLAUDE.md), then [`handoff/PHASE-1-SUMMARY.md`](handoff/PHASE-1-SUMMARY.md) and [`design/DECISIONS.md`](design/DECISIONS.md).**
+
 ## What is here
 
 | Path | Contents |
@@ -13,10 +15,16 @@ An AI-native learning management system prototype for higher-education and indus
 | `docs/` | Static microsite published with GitHub Pages (branch `main`, folder `/docs`). `index.html` is the gallery, `screens/` holds one standalone page per mockup, and `research.html` is the rendered report. |
 | `docs/prototype/` | Clickable learner flow: Today → lesson → hint-first tutor → module check → result → updated Today. Plain HTML, CSS, and JS. |
 | `design/canvas/` | Source artboards (`*.dc.html`) and `canvas.json` from the design canvas. These are the editable originals. |
-| `design/DESIGN-NOTES.md` | Design system tokens, the decisions the screens encode, and their research grounding. |
+| `design/DESIGN-NOTES.md` | The design system in prose: tokens, type, density, the AI markup contract, and interaction conventions. |
+| `design/tokens.json` | Machine-readable design tokens (colors, type, sizes, radii). |
+| `design/DECISIONS.md` | Decision log (D-001…D-011) with rationale. Accepted decisions are constraints. |
+| `handoff/PHASE-1-SUMMARY.md` | The original brief, what exists, known gaps, the Phase 2 order, and a kickoff prompt. |
+| `CLAUDE.md` | Operating manual for Claude Code agents: commands, definition of done, hard rules, gotchas. |
+| `.claude/agents/` | Project subagents: `design-reviewer` (checks against decisions and tokens) and `a11y-auditor` (runs and fixes the audit). |
+| `reports/a11y.md` | Latest accessibility audit result. |
 | `research/report.md` | The research report the design is based on: LXD evidence, LMS UX benchmarks, why Canvas wins, AI-authoring patterns, persona research, and the five layout briefs. |
 | `tools/a11y_audit.mjs` | Accessibility audit (axe-core, WCAG 2.0–2.2 A/AA) over every page, screen, AI style, and prototype state. `npm install && npm run a11y`; writes `reports/a11y.md`. |
-| `tools/build_docs.py` | Regenerates `docs/screens/`, `docs/screens.json`, and `docs/research.html` from `design/canvas/` and `research/report.md`. Requires `pip install markdown`. |
+| `tools/build_docs.py` | Regenerates `docs/screens/`, `docs/screens.json`, and `docs/research.html` from `design/canvas/` and `research/report.md`. Requires `pip install -r requirements.txt`. |
 
 ## The eight screens
 
@@ -61,7 +69,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md). Issues use forms (design change, resea
 
 ## Status
 
-Prototype. Names, courses, learners, and numbers in the screens are illustrative. No backend exists.
+Prototype. Phase 1 is complete; Phase 2 starts with the build-approach decision (#16). Names, courses, learners, and numbers in the screens are illustrative. No backend exists.
 
 ## License
 

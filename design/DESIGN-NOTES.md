@@ -1,6 +1,6 @@
 # Design notes
 
-Tokens, conventions, and the reasoning behind the six prototype screens. The research these rest on is in [`../research/report.md`](../research/report.md).
+Tokens, conventions, and the reasoning behind the prototype screens. Machine-readable tokens are in [`tokens.json`](tokens.json); settled decisions are in [`DECISIONS.md`](DECISIONS.md). The research these rest on is in [`../research/report.md`](../research/report.md).
 
 ## Tokens
 
@@ -66,7 +66,7 @@ AI content uses one markup contract and a switchable visual style. The current s
 - **Draft-first.** AI output lands as a draft with Accept / Revert / Regenerate. A review-coverage meter shows the share of AI blocks a person has checked.
 - **Explain and undo.** Adaptive choices show a one-line reason and an Undo ("Moved up because it is due in 26 hours…").
 - **Change sets.** Natural-language commands in the ⌘K palette produce a preview table (was / will be), a count of affected learners, surfaced conflicts, and an Apply button. Undo stays available for 30 days.
-- **Policy-bound tutor.** The tutor mode (hint-first / explain / open / off in assessments) is set per program by admins and per activity by instructors. The tutor cites course sources and offers "Give me a hint" and "Show a worked example" instead of answers.
+- **Policy-bound tutor.** The tutor mode (**Off / Hints / Explain / Open**, D-005) is limited per program by admins and chosen per activity by instructors; Open is never allowed on graded work where policy says so, and the answer key is never a tutor source. The tutor cites course sources and offers "Give me a hint" and "Show a worked example" instead of answers.
 - **Simulate before apply** for admin policy changes ("would delete 61,300 transcripts and affect 3 accreditation reviews").
 
 ## Accessibility

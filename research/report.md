@@ -385,6 +385,36 @@ The following benchmarks come from design practice rather than peer-reviewed res
 
 ---
 
+### Concept F: "Learning Profile Setup" (learner onboarding), added during Phase 1 build · `LearningProfile.dc.html`
+- **Regions:**
+  - A header with the promise: about 2 minutes, and every answer can be changed later.
+  - Two form columns.
+  - A preview column showing the suggested preset, the week preview, and who sees what.
+- **Asks only about evidence-based variables (§5):**
+  - goals and target dates, and role
+  - weekly hours and usual study windows
+  - an optional prior-knowledge check per course
+  - interface and second language, and plain-language versions
+  - accessibility (captions, larger text, reading-friendly spacing, reduced motion, focus mode, extra time)
+  - device and connection
+  - reminders and quiet hours
+- **Explicitly doesn't ask about learning styles**, and says why on the page.
+- **The AI suggestion** is a Marginalia note ("from your answers, not from a quiz") with Use and Other-presets actions.
+- **Grounding:** §5 personalization evidence and persona table; HAX G11 and G16–G17; the privacy expectations after the Canvas breach (§3).
+
+### Concept G: "Tutor Settings by Activity" (instructor), added during Phase 1 build · `TutorSettings.dc.html`
+- **Regions:**
+  - An activity table with a segmented Off / Hints / Explain / Open control per row.
+  - A program-policy banner; locked options show a lock icon and the reason.
+  - A detail pane for the selected activity: hints per question, worked examples as parallel cases only, answer-request handling, allowed sources (the answer key is never allowed), and what the instructor sees.
+  - A live learner preview, in Marginalia.
+  - A change summary with the affected-learner count.
+- **Grounding:**
+  - Bastani et al. (2025): hint-based guardrails prevent the learning loss seen with unguarded AI.
+  - Kestin et al. (2025): scaffolding and supplied solutions.
+  - Instructure's LLM-enabled assignment and D2L Lumi patterns: instructor-defined AI behavior and visible transcripts.
+  - HAX G17 (global controls).
+
 ## Design Principles Checklist
 
 - [ ] Modules are the single canonical course spine. AI edits it and never bypasses it.
