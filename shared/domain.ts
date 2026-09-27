@@ -43,6 +43,8 @@ export interface LearningProfile {
     screenReader: boolean;
   };
   reminders: 'off' | 'daily' | 'weekly';
+  /** Preferred session length in minutes (set by a preset, D-004); absent means no preference. */
+  sessionMinutes?: number;
   completedAt: Timestamp;
 }
 
@@ -149,7 +151,7 @@ export interface CourseOutline {
 
 // ---- Blocks and AI provenance (D-003, D-006) --------------------------------------------
 
-export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback' | 'alt-text' | 'rewrite' | 'link-text' | 'element';
+export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback' | 'alt-text' | 'rewrite' | 'link-text' | 'element' | 'tutor' | 'tutor-summary';
 
 /** Where AI output came from. Shown next to every AI block ("names what it is and its source"). */
 export interface Provenance {

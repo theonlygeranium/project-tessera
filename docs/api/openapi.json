@@ -3785,6 +3785,11 @@
                       "daily",
                       "weekly"
                     ]
+                  },
+                  "sessionMinutes": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 240
                   }
                 },
                 "required": [
@@ -12305,7 +12310,9 @@
               "alt-text",
               "rewrite",
               "link-text",
-              "element"
+              "element",
+              "tutor",
+              "tutor-summary"
             ]
           },
           "generatedAt": {
@@ -16019,6 +16026,11 @@
               "daily",
               "weekly"
             ]
+          },
+          "sessionMinutes": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 240
           },
           "completedAt": {
             "type": "string",

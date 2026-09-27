@@ -31,6 +31,7 @@ export const paths = {
     files: (courseId: string) => `/teach/courses/${courseId}/files`,
     file: (courseId: string, fileId: string) => `/teach/courses/${courseId}/files/${fileId}`,
     generate: (courseId: string) => `/teach/courses/${courseId}/generate`,
+    tutor: (courseId: string) => `/teach/courses/${courseId}/tutor`,
   },
 
   student: {

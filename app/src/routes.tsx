@@ -3,6 +3,7 @@
 import { createBrowserRouter, Navigate } from 'react-router';
 import { accessAdminRoutes, accessInstructorRoutes } from './features/access/routes';
 import { adminRoutes } from './features/admin/routes';
+import { tutorInstructorRoutes } from './features/tutor/routes';
 import { builderRoutes } from './features/builder/routes';
 import { instructorRoutes } from './features/instructor/routes';
 import { studentRoutes } from './features/student/routes';
@@ -24,7 +25,7 @@ export const router = createBrowserRouter(
           children: [
             { index: true, element: null },
             { element: <RequireRole roles={['administrator']} />, children: [...adminRoutes, ...accessAdminRoutes] },
-            { element: <RequireRole roles={['instructor']} />, children: [...instructorRoutes, ...builderRoutes, ...instructorGradingRoutes, ...accessInstructorRoutes] },
+            { element: <RequireRole roles={['instructor']} />, children: [...instructorRoutes, ...builderRoutes, ...instructorGradingRoutes, ...accessInstructorRoutes, ...tutorInstructorRoutes] },
             { element: <RequireRole roles={['student']} />, children: [...studentRoutes, ...studentGradingRoutes] },
             { path: '*', element: <Navigate to="/" replace /> },
           ],

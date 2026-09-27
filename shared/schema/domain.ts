@@ -15,7 +15,7 @@ export const timestamp = required;
 export const RoleSchema = z.enum(['administrator', 'instructor', 'student']);
 export const ScopeSchema = z.enum(['courses:read','courses:write','content:read','content:write','people:read','people:write','access:read','access:write','grades:read','grades:write','ai:run']);
 export const TutorModeSchema = z.enum(['off','hints','explain','open']);
-export const LearningProfileSchema = z.object({ goals: z.array(z.enum(['finish-degree','career-change','upskill','compliance','curiosity'])), goalNote: string, weeklyMinutes: integer.min(0).max(2400), language: required, readingLevel: z.enum(['standard','plain']), accessibility: z.object({ captions:z.boolean(), reducedMotion:z.boolean(), largerText:z.boolean(), screenReader:z.boolean() }), reminders:z.enum(['off','daily','weekly']), completedAt:timestamp });
+export const LearningProfileSchema = z.object({ goals: z.array(z.enum(['finish-degree','career-change','upskill','compliance','curiosity'])), goalNote: string, weeklyMinutes: integer.min(0).max(2400), language: required, readingLevel: z.enum(['standard','plain']), accessibility: z.object({ captions:z.boolean(), reducedMotion:z.boolean(), largerText:z.boolean(), screenReader:z.boolean() }), reminders:z.enum(['off','daily','weekly']), sessionMinutes:integer.min(5).max(240).optional(), completedAt:timestamp });
 export const UserSchema = z.object({ id, name:required, email, role:RoleSchema, initials:required, profile:LearningProfileSchema.nullable() });
 export const AiPolicySchema = z.object({ aiAuthoring:z.boolean(), tutorModes:z.object({ graded:z.array(TutorModeSchema), practice:z.array(TutorModeSchema) }) });
 export const AccessPolicySchema = z.object({ minimumScore:integer.min(0).max(100), blockingSeverities:z.array(z.enum(['critical','serious','moderate','minor'])) });
@@ -27,7 +27,7 @@ export const LessonSchema = z.object({ id, moduleId:id, courseId:id, title:requi
 export const LessonSummarySchema = LessonSchema.extend({ progress:z.enum(['not-started','in-progress','completed']).nullable(), draftBlockCount:nonnegative.nullable() });
 export const ModuleWithLessonsSchema = ModuleSchema.extend({ lessons:z.array(LessonSummarySchema) });
 export const CourseOutlineSchema = z.object({ course:CourseSummarySchema, modules:z.array(ModuleWithLessonsSchema) });
-export const ProvenanceSchema = z.object({ model:required, task:z.enum(['brief','outline','lesson-draft','block-regenerate','announcement','feedback','alt-text','rewrite','link-text','element']), generatedAt:timestamp, sources:z.array(z.object({ id, name:required })), summary:string });
+export const ProvenanceSchema = z.object({ model:required, task:z.enum(['brief','outline','lesson-draft','block-regenerate','announcement','feedback','alt-text','rewrite','link-text','element','tutor','tutor-summary']), generatedAt:timestamp, sources:z.array(z.object({ id, name:required })), summary:string });
 const scenarioNode = z.object({ id, text:required, choices:z.array(z.object({ id, text:required, nextNodeId:id, feedback:string, quality:z.enum(['best','okay','poor']) })).max(6), outcome:string });
 const videoUrl = required.refine(v => /^https:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com|player\.vimeo\.com)\//.test(v), 'Video src must be a YouTube or Vimeo URL.');
 const heading = z.object({ type:z.literal('heading'), level:z.union([z.literal(2),z.literal(3)]), text:required });

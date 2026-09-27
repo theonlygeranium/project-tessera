@@ -27,6 +27,7 @@ export function navFor(role: Role, options: { courseId?: string; unread?: number
         { id: 'files', label: 'Files', href: paths.teach.files(c), icon: icons.files },
         { id: 'access', label: 'Accessibility', href: paths.teach.access(c), icon: icons.access },
         { id: 'grades', label: 'Grades', href: paths.teach.gradebook(c), icon: icons.grades },
+        { id: 'tutor', label: 'Tutor', href: paths.teach.tutor(c), icon: icons.tutor },
         { id: 'announcements', label: 'Announcements', href: paths.teach.announcements(c), icon: icons.announcements },
         { id: 'roster', label: 'Roster', href: paths.teach.roster(c), icon: icons.roster },
       );

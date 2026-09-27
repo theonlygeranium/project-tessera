@@ -20,5 +20,6 @@ export const icons = {
   access: <Icon><circle cx="12" cy="4.5" r="1.8" /><path d="M5 8.5l7 1.5 7-1.5M12 10v5M12 15l-3 5M12 15l3 5" /></Icon>,
   files: <Icon><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4M9 12h6M9 16h6" /></Icon>,
   grades: <Icon><path d="M5 5h14v14H5z" /><path d="M8 12l2.5 2.5L16 9" /></Icon>,
+  tutor: <Icon><path d="M4 5h16v11H9l-5 4z" /><path d="M9 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M11.5 15.5v.01" /></Icon>,
   workspace: <Icon><path d="M4 5h16v14H4z" /><path d="M4 9h16M9 9v10" /></Icon>,
 };
