@@ -8,6 +8,19 @@ import { ErrorNotice, Loading } from '../../shell/Status';
 import { usePageTitle } from '../../shell/usePageTitle';
 import styles from './Admin.module.css';
 
+function StatTiles({ stats, className }: { stats: { label: string; value: number }[]; className: string }) {
+  return (
+    <div className={className}>
+      {stats.map((stat) => (
+        <Card key={stat.label} as="article" density="compact">
+          <p className={styles.statValue}>{stat.value}</p>
+          <p className={styles.statLabel}>{stat.label}</p>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 const LINKS = [
   { href: paths.admin.people, label: 'People', detail: 'Add someone, import a list, or change a role.' },
   { href: paths.admin.courses, label: 'Courses', detail: 'Create a course, then assign instructors and students.' },
@@ -39,11 +52,11 @@ function ResetConfirm({
     <div ref={panelRef} id="reset-confirm" className={styles.confirm} tabIndex={-1} role="region" aria-labelledby="reset-title">
       <h3 id="reset-title">Reset demo data?</h3>
       <p className={styles.note}>
-        This restores the fictional seed for everyone. People, courses, lessons, announcements, and AI policy go back to the demo, and setup is unfinished again.
+        This restores the original demo for everyone. People, courses, lessons, announcements, and AI policy go back, and setup is unfinished again.
       </p>
       {error && <StatusNotice tone="error" title="Reset didn't finish">{error}</StatusNotice>}
       <div className={styles.actions}>
-        <Button variant="primary" density="compact" onClick={onConfirm} disabled={pending}>{pending ? 'Resetting…' : 'Restore the seed'}</Button>
+        <Button variant="primary" density="compact" onClick={onConfirm} disabled={pending}>{pending ? 'Resetting…' : 'Restore demo data'}</Button>
         <Button density="compact" onClick={onCancel}>Cancel</Button>
       </div>
     </div>
@@ -68,10 +81,12 @@ export function OverviewPage() {
     requestAnimationFrame(() => openerRef.current?.querySelector('button')?.focus());
   }, []);
 
-  const stats = overview.data && [
+  const peopleStats = overview.data && [
     { label: 'Administrators', value: overview.data.people.administrator },
     { label: 'Instructors', value: overview.data.people.instructor },
     { label: 'Students', value: overview.data.people.student },
+  ];
+  const contentStats = overview.data && [
     { label: 'Courses', value: overview.data.courses },
     { label: 'Published lessons', value: overview.data.publishedLessons },
     { label: 'Draft lessons', value: overview.data.draftLessons },
@@ -88,16 +103,18 @@ export function OverviewPage() {
       )}
       {overview.isLoading && <Loading label="Loading overview" />}
       {overview.error && <ErrorNotice error={overview.error} onRetry={() => { void overview.refetch(); }} />}
-      {stats && (
+      {peopleStats && contentStats && (
         <section className={styles.section}>
           <h2>At a glance</h2>
-          <div className={styles.stats}>
-            {stats.map((stat) => (
-              <Card key={stat.label} as="article" density="compact">
-                <p className={styles.statValue}>{stat.value}</p>
-                <p className={styles.statLabel}>{stat.label}</p>
-              </Card>
-            ))}
+          <div className={styles.statGroups}>
+            <section className={styles.statGroup}>
+              <h3>People</h3>
+              <StatTiles stats={peopleStats} className={`${styles.stats} ${styles.statsPeople}`} />
+            </section>
+            <section className={styles.statGroup}>
+              <h3>Content</h3>
+              <StatTiles stats={contentStats} className={`${styles.stats} ${styles.statsContent}`} />
+            </section>
           </div>
         </section>
       )}
@@ -114,13 +131,13 @@ export function OverviewPage() {
       </section>
       <section className={styles.section}>
         <h2>Demo data</h2>
-        <p className={styles.note}>Resetting replaces everyone's work in this demo with the original fictional seed.</p>
+        <p className={styles.note}>Resetting replaces everyone's work in this demo with the original demo data.</p>
         {resetDone && (
           <StatusNotice tone="success" live="polite" title="Demo data restored" onDismiss={() => setResetDone(false)}>
-            The fictional seed is restored.
+            The original demo data is restored.
           </StatusNotice>
         )}
-        <div ref={openerRef}>
+        <div ref={openerRef} className={styles.actions}>
           <Button density="compact" aria-expanded={open} aria-controls={open ? 'reset-confirm' : undefined} onClick={() => { setResetError(null); setOpen(true); }}>
             Reset demo data
           </Button>

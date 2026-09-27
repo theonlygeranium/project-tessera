@@ -94,7 +94,6 @@ export function CoursesPage() {
                 {...control}
                 value={code}
                 spellCheck={false}
-                placeholder="DL 101"
                 onChange={(event) => {
                   setCode(event.target.value);
                   setErrors((current) => ({ ...current, code: undefined }));
@@ -102,12 +101,11 @@ export function CoursesPage() {
               />
             )}
           </FormField>
-          <FormField label="Title" required error={errors.title}>
+          <FormField label="Title" required error={errors.title} hint="The course name, for example Data Literacy 101.">
             {(control) => (
               <TextInput
                 {...control}
                 value={title}
-                placeholder="Data Literacy 101"
                 onChange={(event) => {
                   setTitle(event.target.value);
                   setErrors((current) => ({ ...current, title: undefined }));
@@ -115,12 +113,11 @@ export function CoursesPage() {
               />
             )}
           </FormField>
-          <FormField label="Term" required error={errors.term}>
+          <FormField label="Term" required error={errors.term} hint="When the course runs, for example Fall 2026.">
             {(control) => (
               <TextInput
                 {...control}
                 value={term}
-                placeholder="Fall 2026"
                 onChange={(event) => {
                   setTerm(event.target.value);
                   setErrors((current) => ({ ...current, term: undefined }));

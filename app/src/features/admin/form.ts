@@ -21,9 +21,9 @@ const REQUIRED_COPY: Record<string, string> = {
   csv: 'Paste at least one row.',
 };
 
-export const OPEN_GRADED_REASON = 'Open is never allowed on graded work (D-005).';
+export const OPEN_GRADED_REASON = 'Open is never allowed on graded work.';
 export const OFF_REASON = 'Off is always allowed.';
-export const AI_DRAFT_NOTE = 'AI drafts are always labeled and never published without an instructor keeping them.';
+export const AI_DRAFT_NOTE = 'AI drafts are always labeled, and an instructor reviews each one before it is published.';
 
 const MODE_IDS = new Set<string>(TUTOR_MODES.map((mode) => mode.id));
 
