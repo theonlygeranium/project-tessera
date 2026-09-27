@@ -13,6 +13,30 @@ An **AI-native learning management system** prototype for higher-education and i
 3. `design/DESIGN-NOTES.md` and `design/tokens.json`: the visual system and the AI markup contract.
 4. `research/report.md`: the evidence base. Cite it (by § number) when proposing design changes.
 5. Open issues: `type:principle` (#1–#15) tracks the 15 design principles, and the milestone **"Phase 2: design and build"** (#16–#30) is the backlog. There's an offline copy in `handoff/PHASE-2-BACKLOG.md`. **#16 (build approach) needs an owner decision before large building starts.**
+6. `handoff/AGENT-ECOSYSTEM.md`: how Claude orchestrates the other coding agents (below). Read it before delegating for the first time in a session.
+
+## Orchestration: Claude leads, Codex and Grok build
+
+Claude is the chief strategist and orchestrator. It decides what gets built and in what order, routes each task to the right agent, writes tight task briefs, verifies every result against the Definition of done, and integrates and commits the work. Worker agents follow `AGENTS.md`. The full plan, trial evidence, commands, and the bench of inactive agents are in `handoff/AGENT-ECOSYSTEM.md`.
+
+| Agent | Role |
+|---|---|
+| **Claude** | Orchestrator: plan, brief, verify, integrate, commit, report |
+| **Codex CLI** | Primary worker: `gpt-6-sol` implements, `gpt-6-astra` reviews, `gpt-6-luna` does mechanical work |
+| **Grok CLI** | Alternate: `grok-4.7` when Codex is limited, for parallel parts, and as a second reviewer on high-stakes changes; `grok-4.7-build-fast` for mechanical overflow |
+
+Cursor, the self-hosted Schubert models, and Palmyra-X6 are benched; don't route work to them unless the owner asks.
+
+**Delegate or do it yourself.** Delegate to Codex `gpt-6-sol` when the spec can be written as a brief with concrete examples, a check (tests, `npm run a11y`, a scripted walkthrough) can verify the result, and writing the brief takes less effort than doing the work. Do it yourself when the task is small, ambiguous, subjective design direction the owner must see, cross-cutting, architectural, or dependent on context that exists only in the conversation. Owner decisions (#16 and anything labeled `decision`) are never delegated.
+
+**Default loop:** plan → Sol implements in a git worktree → you verify (Definition of done steps 2–4, plus edge-case checks) → Astra reviews anything non-trivial → you sort the findings, commit, and push to `main` so the owner can test in production right away.
+
+**Rules when delegating:**
+- Always verify. A worker's summary is a claim, not evidence; in trials workers skipped requirements and reported "no uncertainties". Re-run `python3 tools/build_docs.py` and `npm run a11y` yourself.
+- Codex always runs with `-p tessera` (or `-m <model>` plus `-s read-only`/`-s workspace-write`), `--ephemeral`, and `-C <worktree>`. The owner's global Codex default is `danger-full-access` and must never apply to delegated runs.
+- Grok always runs with `--sandbox workspace` and `--cwd <worktree>`; `--always-approve` only together with `--sandbox`.
+- **Rapid production deploys.** The owner wants verified work live quickly for testing: once a change passes your verification, push it to `main` without asking first. Use a branch preview first only for risky or large changes. Workers never commit or push; your verification is the gate. Destructive actions (force pushes, deleting branches, Cloudflare or DNS changes) still need the owner's confirmation.
+- Report agent, model, time, and tokens for each delegated run, and record what you learn in `handoff/AGENT-ECOSYSTEM.md`.
 
 ## Repo map
 | Path | What it is |
@@ -32,6 +56,8 @@ An **AI-native learning management system** prototype for higher-education and i
 | `tools/a11y_audit.mjs` | axe-core (WCAG 2.0–2.2 A/AA) plus a 320px reflow check → `reports/a11y.md`. |
 | `tools/seed_issues.py` | Idempotently creates labels and the 15 principle issues. |
 | `.claude/agents/` | Project subagents: `design-reviewer`, `a11y-auditor`. |
+| `AGENTS.md` | Rules for worker agents (Codex, Grok): project hard rules, scope, no commits or pushes, report format. |
+| `handoff/AGENT-ECOSYSTEM.md` | The multi-agent operating plan: roles, routing, trial evidence, commands, known limits, bench. |
 
 ## Commands
 ```bash
@@ -96,6 +122,12 @@ If you can't reach the canvas, say in your handoff that it's behind the repo.
 - Agents can't deploy with `wrangler deploy` from the sandbox (no Cloudflare token). Deploys happen by pushing to GitHub; Workers Builds does the rest.
 - Chromium for Playwright is at `/opt/pw-browsers/chromium`. Don't run `playwright install`.
 - Hosting (D-012): Cloudflare Workers Builds on the owner's personal account deploys `main` to production and every other branch to a preview URL. No build command runs yet; `docs/` is committed. The production custom domain `tessera.edstratumlabs.ai` is set in `wrangler.jsonc` (`routes`). GitHub Pages was retired on 2026-09-26.
+
+## Environment notes (owner's Mac, Claude Code desktop)
+- Codex CLI is bundled with ChatGPT.app at `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`; Grok CLI is at `~/.grok/bin/grok`. Both are signed in with the owner's subscriptions.
+- Run Codex and Grok with the Bash sandbox off (`dangerouslyDisableSandbox: true`) and their own sandbox on. Codex can't reach its API through the Claude Code sandbox proxy, and Grok's sandbox can't start nested inside Claude's. Git writes to `.git` also need the Bash sandbox off.
+- Permissions, sandbox allowances, and an `autoMode.allow` rule for delegated runs are in `.claude/settings.local.json` (machine-specific, not committed). The Codex project profile is `~/.codex/tessera.config.toml`.
+- Create worktrees with `git worktree add ../tessera-<task> -b agent/<task>`, and remove them when done.
 
 ## Working with the owner
 - Be direct. Lead with the result, then the reasoning. No praise or filler.

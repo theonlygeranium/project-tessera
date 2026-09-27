@@ -1,3 +1,6 @@
 __pycache__/
 .DS_Store
 node_modules/
+
+# Claude Code machine-specific settings
+.claude/settings.local.json
