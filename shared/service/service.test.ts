@@ -60,6 +60,16 @@ describe('authoring and administration', () => {
     const error = await code(h.call('publishLesson', { lessonId: lesson.id }), 'not-ready');
     expect(error.details).toMatchObject({ issues: [{ code: 'check-incomplete' }] });
   });
+  it('applies the institution accessibility policy at publish time (D-022)', async () => {
+    const h = harness();
+    const lesson = await h.call('createLesson', { moduleId: 'm-stat-1', title: 'Links' });
+    await h.call('saveBlocks', { lessonId: lesson.id, blocks: [{ type: 'text', text: 'Read the guide.' }, { type: 'link', href: 'https://example.edu/guide', text: 'click here', description: '' }] });
+    const inst = await h.repo.getInstitution(); inst.accessPolicy = { minimumScore: 100, blockingSeverities: ['critical'] }; await h.repo.putInstitution(inst);
+    const error = await code(h.call('publishLesson', { lessonId: lesson.id }), 'not-ready');
+    expect(error.details).toMatchObject({ ready: false, accessPolicy: { score: 92 } });
+    inst.accessPolicy = { minimumScore: 0, blockingSeverities: ['critical'] }; await h.repo.putInstitution(inst);
+    expect((await h.call('publishLesson', { lessonId: lesson.id })).status).toBe('published');
+  });
   it('records previous content when an AI block is edited', async () => {
     const h = harness();
     const s = await h.call('createBuilderSession', { courseId: 'c-stat110', prompt: 'Data', sources: [] });

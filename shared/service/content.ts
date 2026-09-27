@@ -2,6 +2,8 @@ import { logError } from './log';
 import { ApiError } from '../api';
 import type { Block, BlockContent, LessonDetail } from '../domain';
 import { lessonReadiness } from '../policy';
+import { lessonAccessReport } from '../access/blocks';
+import { policyBlocks } from '../access/score';
 import type { Service, ServiceContext } from './context';
 import { aiEnabled, aiFailed, canReachCourse, content, fail, lessonFor, moduleFor, provenance, teachLesson, user } from './helpers';
 import { validateBlockContent } from './validate';
@@ -70,8 +72,13 @@ export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBl
     return detail(ctx, b.lessonId);
   },
   publishLesson: async (ctx, { lessonId }) => {
-    const l = await teachLesson(ctx, lessonId), report = lessonReadiness(await ctx.repo.listBlocks(lessonId));
-    if (!report.ready) throw new ApiError('not-ready', "This lesson isn't ready to publish.", report);
+    const l = await teachLesson(ctx, lessonId), blocks = await ctx.repo.listBlocks(lessonId), report = lessonReadiness(blocks);
+    // The institution's accessibility policy (D-022) is checked alongside readiness.
+    const access = lessonAccessReport(lessonId, blocks, ctx.now());
+    const reasons = policyBlocks(access, access.issues, (await ctx.repo.getInstitution()).accessPolicy);
+    if (!report.ready || reasons.length) {
+      throw new ApiError('not-ready', ["This lesson isn't ready to publish.", ...reasons].join(' '), reasons.length ? { ...report, ready: false, accessPolicy: { score: access.score, reasons } } : report);
+    }
     l.status = 'published'; l.publishedAt = ctx.now(); await ctx.repo.putLesson(l); return l;
   },
   unpublishLesson: async (ctx, { lessonId }) => {

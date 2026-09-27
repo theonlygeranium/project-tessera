@@ -52,3 +52,14 @@ describe('grading service',()=>{
     await expect(dispatch(service,teacher,'draftFeedback',{submissionId:s.id,criteria:[]})).rejects.toMatchObject({code:'ai-disabled'});
   });
 });
+
+describe('listAssignments', () => {
+  it('shows drafts to staff and only published assignments to students', async () => {
+    const repo = new MemoryRepo(seedData()), teacher = await context(repo, 'u-okafor'), student = await context(repo, 'u-priya');
+    const draft = await dispatch(service, teacher, 'createAssignment', { moduleId: 'm-stat-1', title: 'Draft only', submissionType: 'text', points: 5 });
+    expect((await dispatch(service, teacher, 'listAssignments', { courseId: 'c-stat110' })).map(a => a.id)).toContain(draft.id);
+    const seen = (await dispatch(service, student, 'listAssignments', { courseId: 'c-stat110' })).map(a => a.id);
+    expect(seen).toContain(id);
+    expect(seen).not.toContain(draft.id);
+  });
+});

@@ -265,6 +265,8 @@ export interface ReadinessReport {
   /** Blocks from AI, and how many of them a person has kept. */
   aiBlocks: number;
   keptAiBlocks: number;
+  /** Set when the institution's accessibility policy blocks publishing (D-022). */
+  accessPolicy?: { score: number; reasons: string[] };
 }
 
 // ---- Progress -------------------------------------------------------------------------

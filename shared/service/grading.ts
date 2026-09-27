@@ -68,12 +68,17 @@ async function book(ctx: ServiceContext, courseId: string) {
   return { assignments: assignments.map(({ id,title,points,dueAt }) => ({ id,title,points,dueAt })), rows };
 }
 const csv = (v: unknown) => `"${String(v ?? '').replaceAll('"','""')}"`;
-export const grading: Pick<Service, 'createAssignment'|'getAssignment'|'updateAssignment'|'deleteAssignment'|'publishAssignment'|'listSubmissions'|'submit'|'getMySubmission'|'gradeSubmission'|'draftFeedback'|'releaseGrades'|'getGradebook'|'exportGradebook'> = {
+export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAssignment'|'updateAssignment'|'deleteAssignment'|'publishAssignment'|'listSubmissions'|'submit'|'getMySubmission'|'gradeSubmission'|'draftFeedback'|'releaseGrades'|'getGradebook'|'exportGradebook'> = {
   createAssignment: async (ctx, input) => {
     const m = await moduleFor(ctx, input.moduleId); await canTeach(ctx, m.courseId);
     const siblings = await ctx.repo.listAssignments({ moduleId: m.id });
     const a: Assignment = { id: ctx.newId('asg'), moduleId:m.id,courseId:m.courseId,title:required(input.title,'Title'),position:siblings.length,status:'draft',publishedAt:null,dueAt:due(input.dueAt ?? null),points:validPoints(input.points),submissionType:type(input.submissionType),rubric:[],instructions:[] };
     await ctx.repo.putAssignment(a); return a;
+  },
+  listAssignments: async (ctx, { courseId }) => {
+    await canReachCourse(ctx, courseId);
+    const all = await ctx.repo.listAssignments({ courseId });
+    return user(ctx).role === 'student' ? all.filter(a => a.status === 'published') : all;
   },
   getAssignment: async (ctx, { assignmentId }) => assignment(ctx, assignmentId),
   updateAssignment: async (ctx, input) => {

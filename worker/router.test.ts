@@ -326,3 +326,19 @@ describe('input validation (shared/schema)', () => {
     expect(response.status).toBe(200);
   });
 });
+
+describe('API tokens and browser-only routes', () => {
+  it('refuses session and demo operations for a token, whatever its scopes', async () => {
+    const db = createTestDb();
+    const env = testEnv(db, assetsFor().fetcher);
+    // Seed through a browser call, then store a token with every scope.
+    await call(env, '/api/v1/session');
+    const repo = new D1Repo(db as never);
+    const { hashSecret } = await import('../shared/tokens');
+    await repo.putApiToken({ id: 'tok-all', name: 'all', prefix: 'tsk_all', scopes: ['courses:read', 'courses:write', 'content:read', 'content:write', 'people:read', 'people:write', 'access:read', 'access:write', 'grades:read', 'grades:write', 'ai:run'], ownerId: 'u-okafor', createdAt: '2026-09-27T00:00:00.000Z', expiresAt: null, lastUsedAt: null, revokedAt: null, hash: await hashSecret('tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') } as never);
+    const auth = { authorization: 'Bearer tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' };
+    expect((await call(env, '/api/v1/demo/users', { headers: auth })).status).toBe(403);
+    expect((await call(env, '/api/v1/session', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ userId: 'u-admin' }) })).status).toBe(403);
+    expect((await call(env, '/api/v1/courses', { headers: auth })).status).toBe(200);
+  });
+});

@@ -165,6 +165,8 @@ export interface ApiSpec {
 
   // Assignments, submissions, grading (plan §5.3)
   createAssignment: { input: { moduleId: Id; title: string; submissionType: SubmissionType; points: number; dueAt?: Timestamp | null }; output: Assignment };
+  /** Staff see drafts and published assignments; students see published ones. */
+  listAssignments: { input: { courseId: Id }; output: Assignment[] };
   getAssignment: { input: { assignmentId: Id }; output: Assignment };
   updateAssignment: { input: { assignmentId: Id } & Partial<Pick<Assignment, 'title' | 'dueAt' | 'points' | 'submissionType' | 'rubric' | 'position'>> & { instructions?: BlockInput[] }; output: Assignment };
   deleteAssignment: { input: { assignmentId: Id }; output: Ok };
@@ -224,6 +226,8 @@ export interface Route {
   access: Access;
   /** The scope an API token needs (browser sessions need none). */
   scope: Scope | null;
+  /** Session and demo operations: refused for API tokens. */
+  browserOnly?: true;
 }
 
 const ADMIN: Role[] = ['administrator'];
@@ -234,10 +238,10 @@ const STUDENT: Role[] = ['student'];
 /** Permissions as data (D-011 foundations): the Worker and the mock adapter both enforce this table. */
 export const ROUTES: { [K in Operation]: Route } = {
   getSession: { method: 'GET', path: '/session', access: 'public', scope: null },
-  signIn: { method: 'POST', path: '/session', access: 'public', scope: null },
-  signOut: { method: 'DELETE', path: '/session', access: 'public', scope: null },
-  listDemoUsers: { method: 'GET', path: '/demo/users', access: 'public', scope: null },
-  resetDemo: { method: 'POST', path: '/demo/reset', access: ADMIN, scope: 'people:write' },
+  signIn: { method: 'POST', path: '/session', access: 'public', scope: null, browserOnly: true },
+  signOut: { method: 'DELETE', path: '/session', access: 'public', scope: null, browserOnly: true },
+  listDemoUsers: { method: 'GET', path: '/demo/users', access: 'public', scope: null, browserOnly: true },
+  resetDemo: { method: 'POST', path: '/demo/reset', access: ADMIN, scope: 'people:write', browserOnly: true },
 
   updateInstitution: { method: 'PATCH', path: '/institution', access: ADMIN, scope: 'people:write' },
   updatePolicy: { method: 'PUT', path: '/institution/policy', access: ADMIN, scope: 'people:write' },
@@ -291,7 +295,7 @@ export const ROUTES: { [K in Operation]: Route } = {
   generateDrafts: { method: 'POST', path: '/builder/:sessionId/draft', access: INSTRUCTOR, scope: 'ai:run' },
 
   whoAmI: { method: 'GET', path: '/me', access: 'public', scope: null },
-  viewAs: { method: 'POST', path: '/session/view-as', access: ADMIN, scope: null },
+  viewAs: { method: 'POST', path: '/session/view-as', access: ADMIN, scope: null, browserOnly: true },
   listInvitations: { method: 'GET', path: '/invitations', access: ADMIN, scope: 'people:read' },
   inviteUser: { method: 'POST', path: '/invitations', access: ADMIN, scope: 'people:write' },
 
@@ -316,6 +320,7 @@ export const ROUTES: { [K in Operation]: Route } = {
   updateAccessPolicy: { method: 'PUT', path: '/institution/access-policy', access: ADMIN, scope: 'people:write' },
 
   createAssignment: { method: 'POST', path: '/modules/:moduleId/assignments', access: INSTRUCTOR, scope: 'content:write' },
+  listAssignments: { method: 'GET', path: '/courses/:courseId/assignments', access: 'signed-in', scope: 'content:read' },
   getAssignment: { method: 'GET', path: '/assignments/:assignmentId', access: 'signed-in', scope: 'content:read' },
   updateAssignment: { method: 'PATCH', path: '/assignments/:assignmentId', access: INSTRUCTOR, scope: 'content:write' },
   deleteAssignment: { method: 'DELETE', path: '/assignments/:assignmentId', access: INSTRUCTOR, scope: 'content:write' },

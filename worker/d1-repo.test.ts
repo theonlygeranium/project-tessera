@@ -334,3 +334,13 @@ describe('D1Repo', () => {
     expect((await repo.listCourses()).map((course) => course.code)).toEqual(['COMM 120', 'STAT 110']);
   });
 });
+
+describe('migration 0003', () => {
+  it('stores the Night 2 block types in D1', async () => {
+    const repo = new D1Repo(createTestDb() as never);
+    await repo.reset(seedData());
+    const table = { id: 'b-table', lessonId: 'l-stat-1', position: 9, origin: 'human' as const, aiState: null, provenance: null, previous: null, updatedAt: '2026-09-27T00:00:00.000Z', type: 'table' as const, caption: 'Hours', headerRow: true, rows: [['Student', 'Hours'], ['Priya', '3']] };
+    await repo.putBlock(table);
+    expect(await repo.getBlock('b-table')).toEqual(table);
+  });
+});

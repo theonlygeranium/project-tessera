@@ -55,6 +55,7 @@ export async function resolvePrincipal(request: Request, env: Env, repo: Repo, r
   if (secret) {
     const token = await repo.getApiTokenByHash(await hashSecret(secret));
     if (!token || isExpired(token, now)) throw new ApiError('unauthenticated', 'This API token is invalid, expired, or revoked.');
+    if (route.browserOnly) throw new ApiError('forbidden', 'Session and demo operations can\'t be called with an API token.');
     if (!hasScope(token, route.scope)) throw new ApiError('forbidden', `This token doesn't have the ${route.scope} scope.`);
     const owner = await repo.getUser(token.ownerId);
     if (!owner) throw new ApiError('unauthenticated', 'The token\'s owner no longer exists.');

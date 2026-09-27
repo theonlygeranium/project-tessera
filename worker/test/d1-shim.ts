@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 // Every migration, in order, so the shim matches production's schema.
-const migrationSql = ['0001_init.sql', '0002_night2.sql'].map((f) => readFileSync(new URL(`../../migrations/${f}`, import.meta.url), 'utf8')).join('\n');
+const migrationSql = ['0001_init.sql', '0002_night2.sql', '0003_block_types.sql'].map((f) => readFileSync(new URL(`../../migrations/${f}`, import.meta.url), 'utf8')).join('\n');
 
 type SqlValue = null | number | bigint | string | Uint8Array;
 
