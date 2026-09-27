@@ -3,6 +3,7 @@
 An **AI-native learning management system** prototype for higher-education and industry audiences. It hosts courses and has a simplified native authoring tool that drafts modular content from natural language, files, and existing material, customizable for many learner personas. The owner is an instructional-design and learning-experience practitioner. Phase 1 (research, design system, 8 screens, a clickable learner prototype) is done. **Phase 2 (more design and building) starts from the GitHub issues in milestone "Phase 2: design and build".**
 
 - Live site (public): https://tessera.edstratumlabs.ai/ (also at https://project-tessera.jeff-f69.workers.dev/)
+- Docs site (public): https://project-tessera.mintlify.site/ (source: `mintlify/`)
 - Clickable prototype: https://tessera.edstratumlabs.ai/prototype/
 - Branch previews: `https://<branch>-project-tessera.jeff-f69.workers.dev/` (branch names are lowercased; `/` and other symbols become `-`)
 - Repo: `theonlygeranium/project-tessera` (**private**)
@@ -58,7 +59,7 @@ Cursor, the self-hosted Schubert models, and Palmyra-X6 are benched; don't route
 | `tools/a11y_audit.mjs` | axe-core (WCAG 2.0–2.2 A/AA) plus a 320px reflow check → `reports/a11y.md`. |
 | `tools/seed_issues.py` | Idempotently creates labels and the 15 principle issues. |
 | `.claude/agents/` | Project subagents: `design-reviewer`, `a11y-auditor`. |
-| `mintlify/` | **Public docs site** (Mintlify): `docs.json` plus MDX pages. Its own identity; never reference other EdStratum products or link into this private repo. `design-system/tokens.mdx` is **generated** by `node tools/build_mintlify_tokens.mjs` (run it after changing `design/tokens.json`, then commit). Check with `npx mint@4 broken-links` and `npx mint@4 validate` inside `mintlify/`; preview with the `tessera-docs` launch config (port 3333). |
+| `mintlify/` | **Public docs site** (Mintlify), live at https://project-tessera.mintlify.site/ (Mintlify project `project-tessera`, deploys from `main` → `mintlify/` on every push, like the site). `docs.json` plus MDX pages. Its own identity; never reference other EdStratum products or link into this private repo. `design-system/tokens.mdx` is **generated** by `node tools/build_mintlify_tokens.mjs` (run it after changing `design/tokens.json`, then commit). Check with `npx mint@4 broken-links` and `npx mint@4 validate` inside `mintlify/`; preview with the `tessera-docs` launch config (port 3333). |
 | `AGENTS.md` | Rules for worker agents (Codex, Grok): project hard rules, scope, no commits or pushes, report format. |
 | `handoff/AGENT-ECOSYSTEM.md` | The multi-agent operating plan: roles, routing, trial evidence, commands, known limits, bench. |
 
