@@ -159,7 +159,7 @@ The MVP level of "good":
 - **Workers AI binding** (`AI`) for Aura-2, moondream, Nova-3, with AI Gateway in front for logs.
 - **Cloudflare API token** (scoped: Access groups write) as a Worker secret for invitations.
 - **D1 migrations** `0002_night2.sql`: api_tokens, idempotency_keys, files, document_versions, scans, scan_issues, format_jobs, assignments, submissions, rubrics, grades, tutor_sessions, tutor_messages, adaptations, invitations, events.
-- **Zod** added as the one new runtime dependency in `shared/`; pdfjs-dist, jszip, mammoth, pdf-lib in the Worker; `openapi-typescript` for the SDK.
+- **Zod** added as the one new runtime dependency in `shared/`; pdfjs-dist, jszip, mammoth, pdf-lib in the Worker. The SDK's types come from the zod schemas (`shared/schema/`), not `openapi-typescript`, which doesn't accept TypeScript 7 and broke `npm ci` in CI when forced in with `--legacy-peer-deps`.
 
 ## 7. Decisions for the owner
 
