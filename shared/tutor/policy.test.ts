@@ -42,5 +42,8 @@ describe('tutor policy (D-005)', () => {
     expect(leaksAnswer('The best choice is: how long do students here sleep?', key)).toBe(true);
     expect(leaksAnswer('The answer is B.', key)).toBe(true);
     expect(leaksAnswer('Think about which question would get many different answers.', key)).toBe(false);
+    const keyA = [{ correctText: 'How many hours do students study each week?', correctLabel: 'a' }];
+    for (const hint of ['Choose a question that would get different answers from different people.', 'The best answer is a question whose answers vary.', 'Pick a detail from the lesson.']) expect(leaksAnswer(hint, keyA)).toBe(false);
+    for (const leak of ['Pick option A.', 'It is (a).', 'The answer is a.', 'A is correct.']) expect(leaksAnswer(leak, keyA)).toBe(true);
   });
 });

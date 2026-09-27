@@ -9,6 +9,7 @@ import { useSession } from '../../shell/session';
 import { usePageTitle } from '../../shell/usePageTitle';
 import { AnnouncementCards } from './StudentPages';
 import { BlockPlayer } from '../content';
+import { TutorPanel } from '../tutor/TutorPanel';
 import styles from './Student.module.css';
 
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]?.toUpperCase()).join(''); }
@@ -68,6 +69,7 @@ export function LessonPage() {
       <p className={styles.intro}>{data.courseTitle} · {data.moduleTitle} · {data.lesson.minutes} minutes</p>
       <ErrorNotice error={progress.error} onRetry={progress.error && data.progress.state === 'not-started' && !completed ? () => progress.mutate({ lessonId, state: 'in-progress' }) : undefined} />
       <article className={styles.lessonBody}>{[...data.blocks].sort((a,b) => a.position - b.position).map(block => <ContentBlock key={block.id} block={block} lessonId={lessonId} />)}</article>
+      <TutorPanel key={lessonId} activityKind="lesson" activityId={lessonId} />
       <div className={styles.lessonFinish}>{isComplete ? <StatusNotice tone="success" live="polite">Lesson complete.</StatusNotice> : <Button variant="primary" disabled={progress.isPending} onClick={() => progress.mutate({ lessonId, state: 'completed' }, { onSuccess: () => setCompleted(true) })}>Mark lesson complete</Button>}
         {isComplete && <Link className={styles.primaryLink} to={data.nextLessonId ? paths.student.lesson(courseId, data.nextLessonId) : paths.student.course(courseId)}>{data.nextLessonId ? 'Next lesson' : 'Back to course'}</Link>}
       </div>

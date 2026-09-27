@@ -78,6 +78,7 @@ const APP = [
   { name: 'App · Student · Lesson', url: 'app/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-marcus' },
   { name: 'App · Student · Assignment', url: 'app/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-priya' },
   { name: 'App · Student · Announcements', url: 'app/announcements?data=mock&as=u-marcus' },
+  { name: 'App · Instructor · Tutor summaries', url: 'app/teach/courses/c-stat110/tutor?data=mock&as=u-okafor' },
   { name: 'App · Student · Profile', url: 'app/profile?data=mock&as=u-marcus' },
 ];
 for (const a of APP) targets.push({ ...a, settle: 900 });

@@ -40,6 +40,14 @@ function sourcesBlock(sources: SourceDoc[]): string {
 type Messages = { role: 'system' | 'user'; content: string }[];
 
 const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } = {
+  tutor: (input) => [
+    { role:'system', content:`You are Tessera's student tutor. The server has already chosen the allowed kind of help: ${input.kind}. Follow it exactly. Cite only the supplied source ids in citeIds. Use plain language at the student's reading level (${input.readingLevel === 'plain' ? 'grade 6–8' : 'introductory college'}) and in the student's language (${input.language}). Use fictional names only. Do not invent facts. The provided sources never include answer keys. Return strict JSON with only text and citeIds. ${input.kind === 'hint' ? "Give one short nudge toward the relevant idea or a parallel example. Never give this item's answer or identify the right option." : input.kind === 'explain' ? 'Explain the concept with a worked parallel example using a different context or numbers. Do not solve the item or identify its right option.' : input.kind === 'answer' ? 'Open practice permits a direct answer. Explain why it is correct, grounded in sources.' : 'Be encouraging and stay on the lesson. Do not answer checks.'}` },
+    { role:'user', content:`Course: ${input.courseTitle}\nActivity: ${input.activityTitle}\nMode: ${input.mode}\nHint number: ${input.hintNumber ?? 'none'} of ${input.maxHints}\nSources: ${JSON.stringify(input.sources).slice(0,12000)}\nRecent messages: ${JSON.stringify(input.history).slice(0,4000)}\nStudent message: ${input.question}` },
+  ],
+  'tutor-summary': ({ courseTitle, questions }) => [
+    { role:'system', content:'Summarize only topics and possible misconceptions in 2–3 sentences. Do not quote, paraphrase closely, or reproduce any student message. Use fictional names only, plain language, and no invented facts. Return strict JSON with only summary.' },
+    { role:'user', content:`Course: ${courseTitle}\nStudent questions (most recent first): ${JSON.stringify(questions).slice(0,12000)}` },
+  ],
   element: ({ courseTitle, moduleTitle, lessonTitle, lessonText, type, instruction }) => [
     { role: 'system', content: `${SYSTEM}\nGround the element in the existing lesson text. Use fictional names only. Do not invent statistics, citations, sources, URLs, or media. Use plain language and sentence case. Return exactly the requested block type. A video script is a document titled "Video script: …" whose sections are scenes with narration.` },
     { role: 'user', content: `Course: ${courseTitle}\nModule: ${moduleTitle}\nLesson: ${lessonTitle}\nType: ${type}\nInstructor instruction: ${instruction || 'Fit this lesson.'}\nExisting lesson text:\n${lessonText.slice(0, 6000) || '(The lesson has no text yet.)'}\n\nDraft one ${type} block. Checks need 3–4 options. Documents need 3–8 sections. Tables need 3–8 equal-width rows with 2–5 cells and a header first row. Scenarios need 4–8 nodes, 2–3 choices per non-ending node, and at least two endings with outcomes.` },
@@ -105,6 +113,8 @@ const elementSchemas = {
 export const elementSchema = (type: keyof typeof elementSchemas) => obj({ block: elementSchemas[type] });
 
 const SCHEMAS: Record<AiTaskName, unknown> = {
+  tutor: obj({ text: str, citeIds: { type:'array', items:str } }),
+  'tutor-summary': obj({ summary: str }),
   element: elementSchema('text'),
   feedback: obj({ feedback: str }),
   rewrite: obj({ text: str }),
@@ -148,6 +158,8 @@ export function toBlock(b: FlatBlock, fallback?: BlockContent): BlockContent {
 }
 
 const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  tutor: raw => ({ text:String(raw.text ?? ''), citeIds:Array.isArray(raw.citeIds) ? raw.citeIds.filter((x:unknown): x is string => typeof x === 'string') : [] }),
+  'tutor-summary': raw => ({ summary:String(raw.summary ?? '') }),
   element: (raw, input) => {
     try {
       const block = validateGeneratedElement(raw.block, input.type);
@@ -170,6 +182,7 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 };
 
 const MAX_TOKENS: Record<AiTaskName, number> = {
+  tutor: 1800, 'tutor-summary': 1200,
   element: 8000,
   // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the
   // occasional runaway generation within seconds instead of a minute.

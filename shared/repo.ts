@@ -4,7 +4,7 @@
 // Both must behave identically. `put*` is an upsert by id. Lists are returned in a
 // stable order: by `position` where the entity has one, otherwise as documented.
 import type {
-  AccessibleFormat, AccessReport, Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Lesson, LessonProgress, Module, Role, Submission, Timestamp, User,
+  AccessibleFormat, AccessReport, ActivityKind, Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Lesson, LessonProgress, Module, Role, Submission, Timestamp, TutorMessage, TutorMode, TutorSetting, User,
 } from './domain';
 import type { SeedData } from './seed';
 
@@ -26,6 +26,11 @@ export interface StoredFormat { fileId: Id; version: number; format: AccessibleF
 export type StoredProgress = LessonProgress & { userId: Id };
 export interface Enrollment { courseId: Id; userId: Id }
 export interface AnnouncementRead { announcementId: Id; userId: Id; readAt: Timestamp }
+export interface StoredTutorSession {
+  id: Id; studentId: Id; activityKind: ActivityKind; activityId: Id; courseId: Id;
+  mode: TutorMode; hintsUsed: number; maxHints: number; answerRequests: number;
+  messages: TutorMessage[]; startedAt: Timestamp; updatedAt: Timestamp;
+}
 
 export interface Repo {
   getInstitution(): Promise<Institution>;
@@ -75,6 +80,13 @@ export interface Repo {
   /** Ordered by student id, then descending attempt. */
   listSubmissions(filter: { assignmentId?: Id; studentId?: Id }): Promise<Submission[]>;
   putSubmission(submission: Submission): Promise<void>;
+
+  getTutorSetting(activityKind: ActivityKind, activityId: Id): Promise<TutorSetting | null>;
+  putTutorSetting(setting: TutorSetting): Promise<void>;
+  getTutorSession(id: Id): Promise<StoredTutorSession | null>;
+  /** Ordered by startedAt then id. */
+  listTutorSessions(filter: { courseId?: Id; studentId?: Id; activityKind?: ActivityKind; activityId?: Id }): Promise<StoredTutorSession[]>;
+  putTutorSession(session: StoredTutorSession): Promise<void>;
 
   getAnnouncement(id: Id): Promise<StoredAnnouncement | null>;
   /** Newest first (publishedAt, else createdAt). */

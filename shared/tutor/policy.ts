@@ -91,7 +91,14 @@ export function leaksAnswer(reply: string, answers: { correctText: string; corre
   return answers.some(({ correctText, correctLabel }) => {
     const t = normalize(correctText);
     if (t.length >= 4 && text.includes(t)) return true;
-    if (correctLabel) return new RegExp(`\\b(answer|correct( one)?|choose|pick|it s)\\s+(is\\s+)?(option\\s+)?${correctLabel.toLowerCase()}\\b`).test(text);
-    return false;
+    if (!correctLabel) return false;
+    // A letter only counts when it's used as an option label, not as a word ("choose a question").
+    const raw = reply.toLowerCase(), l = correctLabel.toLowerCase();
+    return [
+      new RegExp(`\\b(option|choice)\\s+${l}\\b`),
+      new RegExp(`\\(${l}\\)`),
+      new RegExp(`\\b(answer|correct (one|option|choice))\\s+is\\s+${l}\\s*([.!,;:)]|$)`, 'm'),
+      new RegExp(`(^|[\\s("'])${l}\\s+is\\s+(the\\s+)?(correct|right)\\b`, 'm'),
+    ].some((re) => re.test(raw));
   });
 }

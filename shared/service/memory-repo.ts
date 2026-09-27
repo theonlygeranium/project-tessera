@@ -1,5 +1,5 @@
-import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat } from '../domain';
-import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob } from '../repo';
+import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat, ActivityKind, TutorSetting } from '../domain';
+import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession } from '../repo';
 import type { SeedData } from '../seed';
 
 declare const structuredClone: <T>(value: T) => T;
@@ -69,6 +69,16 @@ export class MemoryRepo implements Repo {
       .sort((a,b) => a.studentId.localeCompare(b.studentId) || b.attempt - a.attempt || b.submittedAt.localeCompare(a.submittedAt)));
   }
   async putSubmission(value: Submission) { this.upsert(this.data.submissions, value); }
+  async getTutorSetting(kind: ActivityKind, id: string) { return copy(this.data.tutorSettings.find(x => x.activityKind === kind && x.activityId === id) ?? null); }
+  async putTutorSetting(value: TutorSetting) {
+    const i = this.data.tutorSettings.findIndex(x => x.activityKind === value.activityKind && x.activityId === value.activityId);
+    if (i < 0) this.data.tutorSettings.push(copy(value)); else this.data.tutorSettings[i] = copy(value);
+  }
+  async getTutorSession(id: string) { return copy(this.data.tutorSessions.find(x => x.id === id) ?? null); }
+  async listTutorSessions(filter: { courseId?: string; studentId?: string; activityKind?: ActivityKind; activityId?: string }) {
+    return copy(this.data.tutorSessions.filter(x => (!filter.courseId || x.courseId === filter.courseId) && (!filter.studentId || x.studentId === filter.studentId) && (!filter.activityKind || x.activityKind === filter.activityKind) && (!filter.activityId || x.activityId === filter.activityId)).sort((a,b) => a.startedAt.localeCompare(b.startedAt) || a.id.localeCompare(b.id)));
+  }
+  async putTutorSession(value: StoredTutorSession) { this.upsert(this.data.tutorSessions, value); }
   async getAnnouncement(id: string): Promise<StoredAnnouncement | null> { return copy(this.data.announcements.find(x => x.id === id) ?? null); }
   async listAnnouncements(filter: { courseIds?: string[] }): Promise<StoredAnnouncement[]> {
     return copy(this.data.announcements.filter(x => !filter.courseIds || filter.courseIds.includes(x.courseId)).sort(byNewest));

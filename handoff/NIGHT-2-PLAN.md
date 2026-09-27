@@ -224,5 +224,6 @@ Rules from Night 1 stand: one owner per directory, contract first, small merges,
 Branch `night2`. Workers Paid verified 2026-09-27.
 
 - **Wave 0 done (2026-09-27):** contract v2 (`shared/domain.ts`, `shared/api.ts`), `/api/v1` with scoped tokens, identity mapping, rate limit, idempotency, runtime zod validation (`shared/schema/`), OpenAPI at `docs/api/openapi.json`, Tessera Access core (`shared/access/`, services, repo storage), document engine (`worker/access/`), grading (service + pages). 145 tests.
-- **In progress:** lane C block editors and players (Grok); `worker/access/engine.ts` (DocumentEngine over the parsers, Palmyra-X5 alt text, accessible formats); upload and content routes.
+- **Done since:** lanes B (Access UI), C (block editors and players), D (authoring at scope), E (grading), F (tutor), H (presets), OCR (D-023), public docs; journeys 1–10 and H pass; Codex reviews 1–3 addressed.
+- **Remaining:** lane G (invitations; needs the owner's scoped Cloudflare token), lane I (SDK + MCP server), journey 11, migrations 0002–0004 on `tessera-prod`, and the production release.
 - **Not started:** lanes B (Access UI), D (AI authoring at scope), F (tutor), G (invitations; needs the owner's scoped Cloudflare token), H (presets), I (SDK + MCP), J (journeys, docs, release notes). `0002_night2.sql` is applied to preview and local, not to `tessera-prod`.

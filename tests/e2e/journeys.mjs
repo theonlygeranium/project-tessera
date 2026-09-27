@@ -305,7 +305,10 @@ await journey('Journey 4 · Student onboards and completes a lesson', async (pag
   await runAxe(page, 'Journey 4 · Onboarding');
   await step('Check a goal and save', async () => {
     await page.getByRole('checkbox', { name: 'Finish my degree' }).check();
-    await page.getByRole('button', { name: 'Save and go to Today' }).click();
+    await page.getByRole('button', { name: 'Save profile' }).click();
+    // Onboarding now suggests a setup (plan §5.5) before continuing; skipping it is fine.
+    await page.getByRole('heading', { name: 'Suggested setup' }).waitFor();
+    await page.getByRole('link', { name: 'Continue to Today' }).click();
     await page.getByRole('heading', { level: 1, name: 'Today' }).waitFor();
   });
   await step('Today shows a Resume task and unread announcements', async () => {
@@ -469,6 +472,75 @@ await journey('Journey 9 · Student submits; instructor grades with an AI feedba
     await waitForIncludes(page.locator('main'), '10 / 10');
     await waitForIncludes(page.locator('main'), 'Drafted with AI');
   });
+});
+
+await journey('Journey 10 · Tutor: hints on graded work, answers in Open practice, summaries for the instructor', async (page) => {
+  await step('As Dr. Okafor, set the practice lesson tutor to Open', async () => {
+    await page.goto(`${BASE}app/teach/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-okafor`);
+    await page.getByRole('heading', { level: 1, name: 'What makes a question statistical?' }).waitFor();
+    await page.getByRole('group', { name: 'Tutor mode' }).getByRole('radio', { name: /^Open/ }).check();
+    await page.getByRole('button', { name: 'Save tutor settings' }).click();
+    await waitForIncludes(page.locator('main'), 'saved');
+  });
+  await step('As Marcus, ask for the answer on the practice lesson: the tutor answers', async () => {
+    await switchTo(page, 'Marcus Bell');
+    await page.getByRole('heading', { level: 1, name: 'Today' }).waitFor();
+    await page.getByRole('navigation', { name: 'Student navigation' }).getByRole('link', { name: 'Courses' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Courses' }).waitFor();
+    await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.waitForURL(/\/courses\/c-stat110$/);
+    await page.getByRole('link', { name: /What makes a question statistical/ }).first().click();
+    await page.getByRole('heading', { level: 1, name: 'What makes a question statistical?' }).waitFor();
+    await page.getByRole('button', { name: 'Ask the tutor' }).click();
+    await waitForIncludes(page.locator('main'), 'Mode: Open');
+    await waitForIncludes(page.locator('main'), 'not your messages');
+    await page.getByRole('button', { name: 'Show me the answer' }).click();
+    await waitForIncludes(page.locator('main'), 'Answer');
+  });
+  await runAxe(page, 'Journey 10 · Tutor on a practice lesson');
+  await step('On the graded assignment, asking for the answer gets a hint that says why', async () => {
+    await page.getByRole('navigation', { name: 'Student navigation' }).getByRole('link', { name: 'Courses' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Courses' }).waitFor();
+    await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.waitForURL(/\/courses\/c-stat110$/);
+    await page.getByRole('link', { name: /Find the statistical question/ }).click();
+    await page.getByRole('heading', { level: 1, name: 'Find the statistical question' }).waitFor();
+    await page.getByRole('button', { name: 'Ask the tutor' }).click();
+    await waitForIncludes(page.locator('main'), 'Mode: Hints');
+    await page.getByRole('button', { name: 'Show me the answer' }).click();
+    await waitForIncludes(page.locator('main'), 'graded work, so the tutor gives hints');
+    await waitForIncludes(page.locator('main'), '1 of 2 hints used');
+  });
+  await step('As Dr. Okafor, the summaries page shows counts and a summary, not the transcript', async () => {
+    await switchTo(page, 'Dr. Amara Okafor');
+    await page.getByRole('heading', { level: 1, name: 'My courses' }).waitFor();
+    await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.waitForURL(/\/teach\/courses\/c-stat110$/);
+    await page.getByRole('navigation').getByRole('link', { name: 'Tutor' }).click();
+    await waitForIncludes(page.locator('main'), 'Marcus Bell');
+    await waitForIncludes(page.locator('main'), 'Summary by AI');
+    const main = await page.locator('main').innerText();
+    if (main.includes('Please show me the answer.')) throw new Error('The summaries page shows a student message verbatim.');
+  });
+  await runAxe(page, 'Journey 10 · Tutor summaries');
+});
+
+await journey('Journey H · Student applies a suggested setup and undoes one change', async (page) => {
+  await step('From the profile, use the suggested setup', async () => {
+    await page.goto(`${BASE}app/profile?data=mock&as=u-marcus`);
+    await page.getByRole('heading', { name: 'Suggested setup' }).waitFor();
+    await page.getByRole('button', { name: 'Use this setup' }).first().click();
+  });
+  await step('Today lists each change with its reason; Undo removes it and moves focus to the section', async () => {
+    await page.getByRole('navigation', { name: 'Student navigation' }).getByRole('link', { name: 'Today' }).click();
+    const heading = page.getByRole('heading', { name: 'Changes Tessera made for you' });
+    await heading.waitFor();
+    await waitForIncludes(page.locator('main'), 'Reminders: daily, was weekly');
+    await page.getByRole('button', { name: 'Undo' }).first().click();
+    await waitForIncludes(page.locator('main'), 'Change undone.');
+    await page.waitForFunction(() => document.activeElement?.id === 'adaptation-changes-heading', null, { timeout: 3000 });
+  });
+  await runAxe(page, 'Journey H · Today after undo');
 });
 
 // ---- summary --------------------------------------------------------------------------
