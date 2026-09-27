@@ -1,6 +1,7 @@
 // The app's route tree (lane A). Feature lanes own their route modules; this file
 // only mounts them behind the session and role guards. Basename: /app.
 import { createBrowserRouter, Navigate } from 'react-router';
+import { accessAdminRoutes, accessInstructorRoutes } from './features/access/routes';
 import { adminRoutes } from './features/admin/routes';
 import { builderRoutes } from './features/builder/routes';
 import { instructorRoutes } from './features/instructor/routes';
@@ -22,8 +23,8 @@ export const router = createBrowserRouter(
           element: <AppShell />,
           children: [
             { index: true, element: null },
-            { element: <RequireRole roles={['administrator']} />, children: adminRoutes },
-            { element: <RequireRole roles={['instructor']} />, children: [...instructorRoutes, ...builderRoutes, ...instructorGradingRoutes] },
+            { element: <RequireRole roles={['administrator']} />, children: [...adminRoutes, ...accessAdminRoutes] },
+            { element: <RequireRole roles={['instructor']} />, children: [...instructorRoutes, ...builderRoutes, ...instructorGradingRoutes, ...accessInstructorRoutes] },
             { element: <RequireRole roles={['student']} />, children: [...studentRoutes, ...studentGradingRoutes] },
             { path: '*', element: <Navigate to="/" replace /> },
           ],

@@ -12196,7 +12196,8 @@
               "feedback",
               "alt-text",
               "rewrite",
-              "link-text"
+              "link-text",
+              "element"
             ]
           },
           "generatedAt": {

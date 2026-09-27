@@ -17,5 +17,8 @@ export const icons = {
   policy: <Icon><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" /></Icon>,
   build: <Icon><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></Icon>,
   roster: <Icon><path d="M8 6h12M8 12h12M8 18h12" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></Icon>,
+  access: <Icon><circle cx="12" cy="4.5" r="1.8" /><path d="M5 8.5l7 1.5 7-1.5M12 10v5M12 15l-3 5M12 15l3 5" /></Icon>,
+  files: <Icon><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4M9 12h6M9 16h6" /></Icon>,
+  grades: <Icon><path d="M5 5h14v14H5z" /><path d="M8 12l2.5 2.5L16 9" /></Icon>,
   workspace: <Icon><path d="M4 5h16v14H4z" /><path d="M4 9h16M9 9v10" /></Icon>,
 };

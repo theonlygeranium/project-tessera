@@ -14,6 +14,7 @@ export const paths = {
     courses: '/admin/courses',
     course: (courseId: string) => `/admin/courses/${courseId}`,
     policy: '/admin/policy',
+    access: '/admin/access',
   },
 
   teach: {
@@ -26,6 +27,10 @@ export const paths = {
     buildSession: (courseId: string, sessionId: string) => `/teach/courses/${courseId}/build/${sessionId}`,
     assignment: (courseId: string, id: string) => `/teach/courses/${courseId}/assignments/${id}`,
     gradebook: (courseId: string) => `/teach/courses/${courseId}/grades`,
+    access: (courseId: string) => `/teach/courses/${courseId}/access`,
+    files: (courseId: string) => `/teach/courses/${courseId}/files`,
+    file: (courseId: string, fileId: string) => `/teach/courses/${courseId}/files/${fileId}`,
+    generate: (courseId: string) => `/teach/courses/${courseId}/generate`,
   },
 
   student: {
