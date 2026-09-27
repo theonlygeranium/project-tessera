@@ -1,9 +1,11 @@
-// Cloudflare Workers static-assets config for the Tessera site (D-012).
-// No Worker script: Cloudflare serves ./docs as-is. Workers Builds deploys
-// `main` to production and uploads every other branch as a preview version.
+// Cloudflare Workers config for the Tessera site (D-012, D-014).
+// worker/index.ts serves /api/* and the /app/* single-page fallback; every
+// other path is a static asset from ./docs. Workers Builds deploys `main`
+// to production and uploads every other branch as a preview version.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "project-tessera",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-09-26",
   // D-011: build the Phase 2 React app into docs/app/ before every deploy and
   // preview (Workers Builds, wrangler deploy, wrangler dev). The build output
@@ -11,15 +13,46 @@
   "build": { "command": "npm run build" },
   "assets": {
     "directory": "./docs",
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*", "/app/*"]
   },
   // Production custom domain. Wrangler creates the DNS record and certificate
   // on the edstratumlabs.ai zone (same Cloudflare account) on deploy.
   "routes": [{ "pattern": "tessera.edstratumlabs.ai", "custom_domain": true }],
   "preview_urls": true,
   "workers_dev": true,
-  // Required by `wrangler preview` (Workers Builds preview builds). Empty because
-  // a static site has no bindings that need preview-specific values.
-  "previews": {}
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tessera-prod",
+      "database_id": "38c87cc3-1b4a-43ee-a2b1-e4561c7e6ea7",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "production",
+    "ACCESS_TEAM_DOMAIN": "little-brook-5f84.cloudflareaccess.com",
+    "ACCESS_AUD": "97c83cba8bf51d22c61e77f174b69318dc2cf542178fd0201443eaebf0f59a4d",
+    "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/f69a6a0cad6e417b182bac1559292bf6/tessera/custom-writer/v1/chat/completions"
+  },
+  // Required by `wrangler preview` (Workers Builds preview builds). Preview
+  // vars and bindings are not inherited from the top level (D-014).
+  "previews": {
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "tessera-preview",
+        "database_id": "36fc5739-9c50-43ec-b136-1934bf15fe2c",
+        "migrations_dir": "migrations"
+      }
+    ],
+    "vars": {
+      "ENVIRONMENT": "preview",
+      "ACCESS_TEAM_DOMAIN": "little-brook-5f84.cloudflareaccess.com",
+      "ACCESS_AUD": "97c83cba8bf51d22c61e77f174b69318dc2cf542178fd0201443eaebf0f59a4d",
+      "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/f69a6a0cad6e417b182bac1559292bf6/tessera/custom-writer/v1/chat/completions"
+    }
+  }
 }

@@ -8,6 +8,9 @@ node_modules/
 # Local Cloudflare dev-server state (npx wrangler dev)
 .wrangler/
 
+# Local Worker secrets (copy from .dev.vars.example)
+.dev.vars
+
 # Phase 2 app build output (built by Cloudflare on every push, D-011)
 docs/app/
 docs/assets/tokens.css
