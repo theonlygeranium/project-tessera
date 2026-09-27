@@ -5,6 +5,7 @@
 import type { AiClient, AiTaskName, AiTasks } from '../../shared/ai';
 import { ApiError } from '../../shared/api';
 import type { BlockContent, SourceDoc } from '../../shared/domain';
+import { validateGeneratedElement } from '../../shared/service/generation';
 
 export interface PalmyraOptions {
   apiKey: string;
@@ -39,6 +40,10 @@ function sourcesBlock(sources: SourceDoc[]): string {
 type Messages = { role: 'system' | 'user'; content: string }[];
 
 const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } = {
+  element: ({ courseTitle, moduleTitle, lessonTitle, lessonText, type, instruction }) => [
+    { role: 'system', content: `${SYSTEM}\nGround the element in the existing lesson text. Use fictional names only. Do not invent statistics, citations, sources, URLs, or media. Use plain language and sentence case. Return exactly the requested block type. A video script is a document titled "Video script: …" whose sections are scenes with narration.` },
+    { role: 'user', content: `Course: ${courseTitle}\nModule: ${moduleTitle}\nLesson: ${lessonTitle}\nType: ${type}\nInstructor instruction: ${instruction || 'Fit this lesson.'}\nExisting lesson text:\n${lessonText.slice(0, 6000) || '(The lesson has no text yet.)'}\n\nDraft one ${type} block. Checks need 3–4 options. Documents need 3–8 sections. Tables need 3–8 equal-width rows with 2–5 cells and a header first row. Scenarios need 4–8 nodes, 2–3 choices per non-ending node, and at least two endings with outcomes.` },
+  ],
   rewrite: ({ courseTitle, text }) => [
     { role: 'system', content: `${SYSTEM}\nYou rewrite course text in plain language for accessibility (WCAG 3.1.5). Keep every fact, term, and number. Use short sentences, common words, and the same order. Don't add content.` },
     { role: 'user', content: `Course: ${courseTitle}\nRewrite this passage at about a grade 8 reading level:\n\n${text.slice(0, 8000)}` },
@@ -89,8 +94,18 @@ const BLOCK = obj({
   feedbackCorrect: str,
   feedbackIncorrect: str,
 });
+const elementSchemas = {
+  text: obj({ type: { type: 'string', enum: ['text'] }, text: str }),
+  callout: obj({ type: { type: 'string', enum: ['callout'] }, tone: { type: 'string', enum: ['info', 'tip', 'warning'] }, title: str, text: str }),
+  check: obj({ type: { type: 'string', enum: ['check'] }, question: str, options: { type: 'array', minItems: 3, maxItems: 4, items: obj({ id: str, text: str }) }, correctOptionId: str, feedbackCorrect: str, feedbackIncorrect: str }),
+  document: obj({ type: { type: 'string', enum: ['document'] }, title: str, sections: { type: 'array', minItems: 3, maxItems: 8, items: obj({ heading: str, text: str }) } }),
+  table: obj({ type: { type: 'string', enum: ['table'] }, caption: str, headerRow: { type: 'boolean', enum: [true] }, rows: { type: 'array', minItems: 3, maxItems: 8, items: { type: 'array', minItems: 2, maxItems: 5, items: str } } }),
+  scenario: obj({ type: { type: 'string', enum: ['scenario'] }, title: str, setting: str, startNodeId: str, nodes: { type: 'array', minItems: 4, maxItems: 8, items: obj({ id: str, text: str, outcome: str, choices: { type: 'array', maxItems: 3, items: obj({ id: str, text: str, nextNodeId: str, feedback: str, quality: { type: 'string', enum: ['best', 'okay', 'poor'] } }) } }) } }),
+} as const;
+export const elementSchema = (type: keyof typeof elementSchemas) => obj({ block: elementSchemas[type] });
 
 const SCHEMAS: Record<AiTaskName, unknown> = {
+  element: elementSchema('text'),
   feedback: obj({ feedback: str }),
   rewrite: obj({ text: str }),
   'link-text': obj({ text: str }),
@@ -133,6 +148,14 @@ export function toBlock(b: FlatBlock, fallback?: BlockContent): BlockContent {
 }
 
 const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  element: (raw, input) => {
+    try {
+      const block = validateGeneratedElement(raw.block, input.type);
+      if (block.type === 'document' && /video script/i.test(input.instruction) && !/^Video script:\s*\S/i.test(block.title)) throw new Error('Video script title is missing.');
+      return { block };
+    }
+    catch (error) { throw new Error(`Invalid element output: ${error instanceof Error ? error.message : String(error)}`); }
+  },
   feedback: (raw) => ({ feedback: String(raw.feedback ?? '') }),
   rewrite: (raw) => ({ text: String(raw.text ?? '') }),
   'link-text': (raw) => ({ text: String(raw.text ?? '').trim() }),
@@ -147,6 +170,7 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 };
 
 const MAX_TOKENS: Record<AiTaskName, number> = {
+  element: 8000,
   // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the
   // occasional runaway generation within seconds instead of a minute.
   brief: 6000, outline: 8000, 'lesson-draft': 7000, 'block-regenerate': 5000, announcement: 4000, feedback: 2000, rewrite: 4000, 'link-text': 1500,
@@ -168,7 +192,7 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
         // Palmyra-X6 counts reasoning tokens against max_tokens (D-015).
         max_tokens: MAX_TOKENS[task],
         messages: PROMPTS[task](input as never),
-        response_format: { type: 'json_schema', json_schema: { name: task.replace(/-/g, '_'), strict: true, schema: SCHEMAS[task] } },
+        response_format: { type: 'json_schema', json_schema: { name: task.replace(/-/g, '_'), strict: true, schema: task === 'element' ? elementSchema((input as AiTasks['element']['input']).type as keyof typeof elementSchemas) : SCHEMAS[task] } },
       }),
       signal: AbortSignal.timeout(options.timeoutMs ?? 90_000),
     });
@@ -191,7 +215,9 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
       if (blocks.length >= 3) raw = { blocks };
       else throw new Error(`The AI response was cut off or malformed (${task}, ${content.length} characters).`);
     }
-    return MAP[task](raw, input as never) as AiTasks[K]['output'];
+    const mapped = MAP[task](raw, input as never) as AiTasks[K]['output'];
+    if (task === 'element' && (mapped as AiTasks['element']['output']).block.type !== (input as AiTasks['element']['input']).type) throw new Error('Wrong element type.');
+    return mapped;
   }
 
   return {

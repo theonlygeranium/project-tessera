@@ -4,9 +4,13 @@
 // the a11y audit, docs screenshots, and local development without a key.
 //
 // Whatever a client returns is stored as a *draft*; a person keeps it (D-003).
-import type { BlockContent, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc } from './domain';
+import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc } from './domain';
 
 export interface AiTasks {
+  element: {
+    input: { courseTitle: string; moduleTitle: string; lessonTitle: string; lessonText: string; type: BlockType; instruction: string };
+    output: { block: BlockContent };
+  };
   brief: {
     input: { courseTitle: string; prompt: string; sources: SourceDoc[] };
     output: CourseBrief;
@@ -77,6 +81,31 @@ export const fixtureAi: AiClient = {
 };
 
 const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  element: ({ lessonTitle, type, instruction }) => {
+    const topic = lessonTitle.trim() || 'This lesson';
+    const note = instruction.trim() ? ` ${firstSentence(instruction.trim())}` : '';
+    switch (type) {
+      case 'text': return { block: { type, text: `${topic} introduces a useful idea. Read the example, then explain it in your own words.${note}` } };
+      case 'callout': return { block: { type, tone: 'tip', title: 'Pause and reflect', text: `How does ${topic.toLowerCase()} connect to an example you know?${note}` } };
+      case 'check': return { block: { type, question: `What is a useful first step in ${topic}?`, options: [{ id: 'a', text: 'Identify the question and available evidence.' }, { id: 'b', text: 'Choose an answer before reading.' }, { id: 'c', text: 'Ignore the context.' }], correctOptionId: 'a', feedbackCorrect: 'The question and evidence guide the next step.', feedbackIncorrect: 'Start by identifying the question and evidence.' } };
+      case 'document': {
+        const script = /video script/i.test(instruction);
+        return { block: { type, title: `${script ? 'Video script' : 'Guide'}: ${topic}`, sections: script ? [
+          { heading: 'Scene 1: Introduce the question', text: `Narration: ${topic} begins with a clear question.` },
+          { heading: 'Scene 2: Work through an example', text: 'Narration: A fictional class compares two possible explanations.' },
+          { heading: 'Scene 3: Invite practice', text: 'Narration: Write one question and name the evidence you would need.' },
+        ] : [{ heading: 'Overview', text: `${topic} begins with a clear question.` }, { heading: 'Example', text: 'A fictional class compares two possible explanations.' }, { heading: 'Practice', text: 'Write one question and name the evidence you would need.' }] } };
+      }
+      case 'table': return { block: { type, caption: `Steps in ${topic}`, headerRow: true, rows: [['Step', 'Action'], ['Observe', 'Describe what is known'], ['Compare', 'Look for differences'], ['Reflect', 'Explain the result']] } };
+      case 'scenario': return { block: { type, title: `${topic}: a decision`, setting: 'A fictional class is reviewing a short example.', startNodeId: 'start', nodes: [
+        { id: 'start', text: 'Which step should the class take first?', outcome: '', choices: [{ id: 'a', text: 'State the question.', nextNodeId: 'good', feedback: 'A clear question helps.', quality: 'best' }, { id: 'b', text: 'Guess the answer.', nextNodeId: 'retry', feedback: 'A guess may miss the evidence.', quality: 'poor' }] },
+        { id: 'retry', text: 'The class pauses. What now?', outcome: '', choices: [{ id: 'a', text: 'Gather evidence.', nextNodeId: 'good', feedback: 'Evidence helps.', quality: 'best' }, { id: 'b', text: 'Move on.', nextNodeId: 'limited', feedback: 'The class has not checked its idea.', quality: 'poor' }] },
+        { id: 'good', text: 'The class can explain its choice.', choices: [], outcome: 'The class uses evidence to support its conclusion.' },
+        { id: 'limited', text: 'The class has an untested answer.', choices: [], outcome: 'The class needs a question and evidence before concluding.' },
+      ] } };
+      default: throw new Error(`Cannot generate ${type}.`);
+    }
+  },
   rewrite: ({ text }) => ({
     text: text.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean).slice(0, 6).join('\n\n'),
   }),

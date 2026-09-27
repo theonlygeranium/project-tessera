@@ -8,6 +8,15 @@ import type {
 } from './domain';
 import type { SeedData } from './seed';
 
+export interface GenerationItem { lessonId: Id; type: Block['type'] }
+export interface GenerationFailure extends GenerationItem { message: string }
+export interface GenerationJob {
+  id: Id; courseId: Id; requestedBy: Id; state: 'running' | 'done' | 'failed';
+  done: number; total: number; lessonIds: Id[]; error: string | null;
+  work: GenerationItem[]; instruction: string; failures: GenerationFailure[];
+  createdAt: Timestamp; updatedAt: Timestamp;
+}
+
 export type StoredAnnouncement = Omit<Announcement, 'courseTitle' | 'authorName' | 'authorInitials' | 'read'>;
 export interface FileVersion { fileId: Id; version: number; key: string; note: string; createdBy: Id; createdAt: Timestamp }
 /** One scan of a lesson or file version; `courseId` lets reports roll up. */
@@ -84,6 +93,9 @@ export interface Repo {
   /** Newest first. */
   listBuilderSessions(courseId: Id): Promise<BuilderSession[]>;
   putBuilderSession(session: BuilderSession): Promise<void>;
+
+  getGenerationJob(id: Id): Promise<GenerationJob | null>;
+  putGenerationJob(job: GenerationJob): Promise<void>;
 
   /** Files in R2 (D-019). `listFiles` is newest first. */
   getFile(id: Id): Promise<FileRecord | null>;

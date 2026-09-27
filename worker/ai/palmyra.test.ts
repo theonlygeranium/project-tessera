@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { palmyraClient, salvageBlocks } from './palmyra';
+import { elementSchema, palmyraClient, salvageBlocks } from './palmyra';
+import { fixtureAi } from '../../shared/ai';
+import { validateBlockContent } from '../../shared/service/validate';
+import type { BlockType } from '../../shared/domain';
 
 const block = (text: string) => ({ type: 'text', level: 2, text, tone: '', title: '', question: '', options: [], correctOptionId: '', feedbackCorrect: '', feedbackIncorrect: '' });
 const full = JSON.stringify({ blocks: [block('One "quoted" {brace}'), block('Two'), block('Three'), block('Four')] });
@@ -50,5 +53,44 @@ describe('palmyraClient', () => {
     const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async () => { calls++; return new Response('no', { status: 401 }); } });
     await expect(ai.run('announcement', { courseTitle: 'C', instructorName: 'I', prompt: 'p' })).rejects.toMatchObject({ code: 'ai-failed' });
     expect(calls).toBe(1);
+  });
+});
+
+describe('element schemas and mapping', () => {
+  const types: BlockType[] = ['text', 'callout', 'check', 'document', 'table', 'scenario'];
+  it('requires every property and forbids extras at each object depth', () => {
+    const inspect = (schema: unknown) => {
+      if (!schema || typeof schema !== 'object') return;
+      const value = schema as Record<string, unknown>;
+      if (value.type === 'object') {
+        expect(value.additionalProperties).toBe(false);
+        expect(value.required).toEqual(Object.keys(value.properties as object));
+        Object.values(value.properties as object).forEach(inspect);
+      }
+      if (value.type === 'array') inspect(value.items);
+    };
+    for (const type of types) inspect(elementSchema(type as Parameters<typeof elementSchema>[0]));
+  });
+  it('maps a sample response of each type to validated block content', async () => {
+    for (const type of types) {
+      const input = { courseTitle: 'Course', moduleTitle: 'Module', lessonTitle: 'Lesson', lessonText: 'A lesson.', type, instruction: '' };
+      const sample = (await fixtureAi.run('element', input)).output;
+      const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async (_url, options) => {
+        const request = JSON.parse(String(options?.body));
+        expect(request.response_format.json_schema.schema).toEqual(elementSchema(type as Parameters<typeof elementSchema>[0]));
+        return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(sample) }, finish_reason: 'stop' }] }), { status: 200 });
+      } });
+      expect(validateBlockContent((await ai.run('element', input)).output.block).type).toBe(type);
+    }
+  });
+  it('retries invalid element content three times before failing', async () => {
+    let calls = 0;
+    const invalid = { block: { type: 'check', question: 'Question?', options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }, { id: 'c', text: 'C' }], correctOptionId: 'missing', feedbackCorrect: 'Yes', feedbackIncorrect: 'Try again' } };
+    const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async () => {
+      calls++;
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(invalid) }, finish_reason: 'stop' }] }), { status: 200 });
+    } });
+    await expect(ai.run('element', { courseTitle: 'C', moduleTitle: 'M', lessonTitle: 'L', lessonText: '', type: 'check', instruction: '' })).rejects.toMatchObject({ code: 'ai-failed' });
+    expect(calls).toBe(3);
   });
 });

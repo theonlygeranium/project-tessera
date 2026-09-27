@@ -11204,6 +11204,43 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "failures": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "lessonId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "heading",
+                              "text",
+                              "callout",
+                              "image",
+                              "check",
+                              "document",
+                              "file",
+                              "video",
+                              "table",
+                              "scenario",
+                              "link"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "lessonId",
+                          "type",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": [
@@ -11212,7 +11249,8 @@
                     "done",
                     "total",
                     "lessonIds",
-                    "error"
+                    "error",
+                    "failures"
                   ],
                   "additionalProperties": false
                 }

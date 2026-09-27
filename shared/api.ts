@@ -199,7 +199,7 @@ export interface ApiSpec {
   // AI authoring at any scope (plan §5.2)
   /** Generates drafts for a scope: whole course, modules, lessons, or element types; returns a job. */
   generateAtScope: { input: { courseId: Id; scope: { moduleIds?: Id[]; lessonIds?: Id[]; elementTypes?: BlockType[]; wholeCourse?: boolean }; instruction?: string }; output: { jobId: Id } };
-  getGenerationJob: { input: { jobId: Id }; output: { jobId: Id; state: 'running' | 'done' | 'failed'; done: number; total: number; lessonIds: Id[]; error: string | null } };
+  getGenerationJob: { input: { jobId: Id }; output: { jobId: Id; state: 'running' | 'done' | 'failed'; done: number; total: number; lessonIds: Id[]; error: string | null; failures: { lessonId: Id; type: BlockType; message: string }[] } };
   /** Generates one element as a draft block in a lesson. */
   generateElement: { input: { lessonId: Id; type: BlockType; instruction?: string; position?: number }; output: LessonDetail };
 
