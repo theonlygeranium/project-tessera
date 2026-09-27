@@ -55,6 +55,8 @@ const APP = [
   { name: 'App · Administrator home', url: 'app/?data=mock&as=u-admin' },
   { name: 'App · Instructor home', url: 'app/?data=mock&as=u-okafor' },
   { name: 'App · Student home', url: 'app/?data=mock&as=u-priya' },
+  // Administrator (lane D): the seed hasn't finished setup, so every admin page redirects to Setup
+  { name: 'App · Administrator · Setup', url: 'app/admin/setup?data=mock&as=u-admin' },
   // Instructor (lane E) and the AI builder (lane F)
   { name: 'App · Instructor · My courses', url: 'app/teach?data=mock&as=u-okafor' },
   { name: 'App · Instructor · Course workspace', url: 'app/teach/courses/c-stat110?data=mock&as=u-okafor' },
