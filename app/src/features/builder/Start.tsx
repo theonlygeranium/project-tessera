@@ -72,6 +72,7 @@ export function BuilderStart() {
     <TopBar title="Build with AI" breadcrumbs={[{ label: 'My courses', href: paths.teach.courses }, { label: courseName, href: paths.teach.course(courseId) }, { label: 'Build with AI' }]} renderLink={renderRouterLink} />
     {course.isPending ? <Loading label="Loading course" /> : course.error ? <ErrorNotice error={course.error} onRetry={() => course.refetch()} /> : <>
       <p className={styles.intro}>The AI drafts; you decide. Nothing reaches students until you keep the drafts and publish the lessons.</p>
+      <Link to={paths.teach.generate(courseId)}>Or add drafts to existing lessons →</Link>
       <form onSubmit={submit} className={styles.stack} noValidate>
         <h2>Start a draft</h2>
         <FormField label="What should this course or unit cover, and for whom?" required error={errors.prompt}>{control => <TextArea {...control} value={prompt} rows={5} onChange={event => setPrompt(event.target.value)} />}</FormField>

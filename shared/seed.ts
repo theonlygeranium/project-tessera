@@ -4,7 +4,7 @@
 import type {
   Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, Id, Institution, Invitation, Lesson, LessonProgress, Module, Submission, Timestamp, User,
 } from './domain';
-import type { FileVersion, StoredFormat, StoredScan } from './repo';
+import type { FileVersion, GenerationJob, StoredFormat, StoredScan } from './repo';
 
 export interface SeedData {
   institution: Institution;
@@ -21,6 +21,7 @@ export interface SeedData {
   reads: { announcementId: Id; userId: Id; readAt: Timestamp }[];
   progress: (LessonProgress & { userId: Id })[];
   builderSessions: BuilderSession[];
+  generationJobs: GenerationJob[];
   apiTokens: (ApiToken & { hash: string })[];
   invitations: Invitation[];
   files: FileRecord[];
@@ -209,5 +210,5 @@ export function seedData(): SeedData {
     ], instructions: [{ ...human('b-asg-1', 'asg-stat-1', 0, t(24)), type: 'text', text: 'Write one statistical question about your community. Explain why you expect its answers to vary.' }],
   }];
   const submissions: Submission[] = [];
-  return { institution, users, courses, enrollments, modules, lessons, blocks, assignments, submissions, announcements, reads, progress, builderSessions: [], apiTokens: [], invitations: [], files: [], fileVersions: [], scans: [], formats: [] };
+  return { institution, users, courses, enrollments, modules, lessons, blocks, assignments, submissions, announcements, reads, progress, builderSessions: [], generationJobs: [], apiTokens: [], invitations: [], files: [], fileVersions: [], scans: [], formats: [] };
 }

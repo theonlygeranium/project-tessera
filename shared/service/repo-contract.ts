@@ -23,6 +23,9 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       const progress = (await repo.getProgress('u-priya','l-stat-1'))!; await repo.putProgress(progress); expect(await repo.getProgress('u-priya','l-stat-1')).toEqual(progress);
       const session = { id: 'bs-x', courseId: 'c-stat110', prompt: 'x', sources: [], stage: 'brief' as const, brief: null, outline: null, lessonIds: [], provenance: null, createdAt: '2026-09-26T00:00:00Z' };
       await repo.putBuilderSession(session); expect(await repo.getBuilderSession(session.id)).toEqual(session);
+      const job = { id: 'gj-contract', courseId: 'c-stat110', requestedBy: 'u-okafor', state: 'running' as const, done: 0, total: 1, lessonIds: [], error: null, work: [{ lessonId: 'l-stat-1', type: 'text' as const }], instruction: 'Keep it short', failures: [], createdAt: '2026-09-26T00:00:00Z', updatedAt: '2026-09-26T00:00:00Z' };
+      await repo.putGenerationJob(job); job.work[0].lessonId = 'changed'; expect((await repo.getGenerationJob(job.id))?.work[0].lessonId).toBe('l-stat-1');
+      const storedJob = (await repo.getGenerationJob(job.id))!; storedJob.failures.push({ lessonId: 'l-stat-1', type: 'text', message: 'Failed' }); expect((await repo.getGenerationJob(job.id))?.failures).toEqual([]);
     });
     it('orders users, courses, modules, lessons, blocks, announcements, and sessions', async () => {
       const repo = await makeRepo();
@@ -59,7 +62,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
     it('replaces enrollments and resets from an empty seed', async () => {
       const repo = await makeRepo(); await repo.setEnrollments('c-stat110',['u-priya']);
       expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-priya']);
-      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.builderSessions = [];
+      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.builderSessions = []; empty.generationJobs = [];
       await repo.reset(empty); expect(await repo.isEmpty()).toBe(true);
       await repo.reset(seedData()); expect(await repo.isEmpty()).toBe(false); expect(await repo.getUser('u-priya')).not.toBeNull();
       expect(await repo.getAssignment('asg-stat-1')).not.toBeNull();
