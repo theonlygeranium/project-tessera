@@ -64,7 +64,7 @@ export function ProfilePage({ onboarding = false }: { onboarding?: boolean }) {
         <ChoiceGroup legend="Accessibility preferences" type="checkbox" name="accessibility" options={[...access]} value={selectedAccess} onChange={value => { const values = value as string[]; update({ accessibility: { captions: values.includes('captions'), reducedMotion: values.includes('reducedMotion'), largerText: values.includes('largerText'), screenReader: values.includes('screenReader') } }); }} />
         <SegmentedControl legend="Reminders" name="reminders" options={[{ value: 'off', label: 'Off' }, { value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }]} value={form.reminders} onChange={value => update({ reminders: value as ProfileInput['reminders'] })} />
       </section>
-      <aside className={styles.panel}><h2>Who sees this</h2><p>Instructors see your progress, not your profile answers.</p></aside>
+      <aside className={styles.panel}><h2>Who sees this</h2><p>Instructors see your progress, not your profile answers. A manager sees your required training only if you choose to share it.</p><p><Link className={styles.readLink} to={paths.me.sharing}>Who sees this</Link></p></aside>
       <div className={styles.actions}><Button type="submit" variant="primary" disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save profile'}</Button></div>
     </form>
     {hasProfile && <PresetSetup onChange={onPresetChange} />}
