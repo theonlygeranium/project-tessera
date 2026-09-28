@@ -37,6 +37,8 @@ export interface Directory {
 
 /** What the Worker's document engine offers the service (implemented in worker/access/engine.ts). */
 export interface DocumentEngine {
+  /** Extract anchored text from a course document, OCRing a textless PDF in memory. */
+  extract(file: FileRecord): Promise<{ sections: { page?: number; heading: string; level: number; text: string; lines?: string[] }[]; ocr: boolean }>;
   scan(file: FileRecord): Promise<AccessReport>;
   /** Applies a fix as a new version and returns the updated record (new key and version). */
   fix(file: FileRecord, fix: Input<'fixFileIssue'>['fix'], userId: Id): Promise<FileRecord>;

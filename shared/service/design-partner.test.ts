@@ -1,0 +1,127 @@
+import { describe, expect, it, vi } from 'vitest';
+import { fixtureAi } from '../ai';
+import type { FileRecord } from '../domain';
+import { seedData } from '../seed';
+import type { ServiceContext } from './context';
+import { advanceGenerationJob, WORKFLOW_STALL_MS } from './generation';
+import { MemoryRepo, service } from './index';
+
+const at = '2026-09-28T12:00:00.000Z';
+let clock = Date.parse(at);
+async function context(): Promise<ServiceContext> {
+  const repo = new MemoryRepo(seedData()); let n = 0;
+  clock = Date.parse(at);
+  return { repo, ai: fixtureAi, user: await repo.getUser('u-okafor'), now: () => new Date(clock).toISOString(), newId: prefix => `${prefix}-${++n}` };
+}
+const sample = { courseId: 'c-stat110', sourceKind: 'syllabus' as const, sample: true as const, consent: { syllabusOnly: true as const, rememberProfile: false } };
+const file: FileRecord = { id: 'f-test', courseId: 'c-stat110', name: 'Syllabus.pdf', kind: 'pdf', mime: 'application/pdf', size: 100, key: 'files/test', version: 1, uploadedBy: 'u-okafor', uploadedAt: at, scan: null };
+
+describe('design partner service', () => {
+  it('requires the instructor, consent, and enabled policy', async () => {
+    const ctx = await context();
+    await expect(service.createDesignSession({ ...ctx, user: await ctx.repo.getUser('u-priya') }, sample)).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(service.createDesignSession(ctx, { ...sample, consent: { syllabusOnly: false as never, rememberProfile: false } })).rejects.toMatchObject({ code: 'invalid' });
+    const institution = await ctx.repo.getInstitution(); institution.policy.designPartner = { enabled: false, allowedArchitectures: null }; await ctx.repo.putInstitution(institution);
+    await expect(service.createDesignSession(ctx, sample)).rejects.toMatchObject({ code: 'ai-disabled' });
+    institution.policy.designPartner.enabled = true; institution.policy.aiAuthoring = false; await ctx.repo.putInstitution(institution);
+    await expect(service.createDesignSession(ctx, sample)).rejects.toMatchObject({ code: 'ai-disabled' });
+  });
+  it('stores a sample source and advances extraction and questions on two polls', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, sample);
+    expect(started).toMatchObject({ stage: 'start', source: { name: 'STAT110_Syllabus_Fall2026.pdf', fileId: null, ocr: false }, consent: { syllabusOnly: true, at } });
+    expect(await service.listDesignSessions(ctx, { courseId: sample.courseId })).toHaveLength(1);
+    const first = await service.getDesignSession(ctx, { sessionId: started.id });
+    expect(first).toMatchObject({ stage: 'start', provisioning: { done: 1, total: 2 } });
+    expect(first.extraction?.outcomes).toHaveLength(6);
+    expect(first.questions).toHaveLength(0);
+    const done = await service.getDesignSession(ctx, { sessionId: started.id });
+    expect(done).toMatchObject({ stage: 'read', read: null, provisioning: { done: 2, total: 2 } });
+    expect(done.questions.some(question => question.fromProblem === 'empty-week' && question.text.includes('week 8'))).toBe(true);
+    expect((await ctx.repo.getGenerationJob(done.provisioning!.jobId!))?.state).toBe('done');
+  });
+  it('accepts pasted text and refuses fileId without a document engine', async () => {
+    const ctx = await context();
+    const pasted = await service.createDesignSession(ctx, { ...sample, sample: undefined, text: 'A brief\nSecond line', sourceKind: 'brief' });
+    expect(pasted.source).toMatchObject({ kind: 'brief', fileId: null, sections: [{ page: null, lines: ['A brief', 'Second line'] }] });
+    await ctx.repo.putFile(file);
+    await expect(service.createDesignSession(ctx, { ...sample, sample: undefined, fileId: file.id })).rejects.toMatchObject({ code: 'unsupported', message: "Uploads aren't available in demo mode. Use the sample syllabus or paste the text." });
+  });
+  it('limits long pasted sources and records a problem after extraction', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, { ...sample, sample: undefined, text: `Course notes\n${'A'.repeat(61_000)}` });
+    expect(started.source.chars).toBeLessThanOrEqual(60_000);
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const ready = await service.getDesignSession(ctx, { sessionId: started.id });
+    expect(ready.extraction?.problems.some(problem => problem.code === 'missing-field' && problem.message.includes('60,000'))).toBe(true);
+  });
+  it('removes roster-like table rows before they reach the AI', async () => {
+    const ctx = await context();
+    const text = 'Course notes\nStudent | ID\nAvery Smith | 1001\nBlair Jones | 1002\nCasey Brown | 1003\nPolicies\nAttendance required.';
+    const started = await service.createDesignSession(ctx, { ...sample, sample: undefined, text });
+    expect(started.source.sections[0].text).not.toContain('Avery Smith');
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const ready = await service.getDesignSession(ctx, { sessionId: started.id });
+    expect(ready.extraction?.problems.some(problem => problem.message.includes('student names'))).toBe(true);
+  });
+  it('uses the document engine and records OCR when textless files are read', async () => {
+    const ctx = await context(); await ctx.repo.putFile(file);
+    const documents = { extract: vi.fn(async () => ({ sections: [{ page: 1, heading: '', level: 0, text: 'A syllabus', lines: ['A syllabus'] }], ocr: true })) } as unknown as ServiceContext['documents'];
+    const started = await service.createDesignSession({ ...ctx, documents }, { ...sample, sample: undefined, fileId: file.id });
+    expect(documents!.extract).toHaveBeenCalledWith(file);
+    expect(started.source).toMatchObject({ fileId: file.id, version: 1, ocr: true });
+  });
+  it('rejects another course file and session access', async () => {
+    const ctx = await context(); await ctx.repo.putFile({ ...file, courseId: 'c-comm120' });
+    await expect(service.createDesignSession(ctx, { ...sample, sample: undefined, fileId: file.id })).rejects.toMatchObject({ code: 'forbidden' });
+    const started = await service.createDesignSession(ctx, sample);
+    await expect(service.getDesignSession({ ...ctx, user: await ctx.repo.getUser('u-priya') }, { sessionId: started.id })).rejects.toMatchObject({ code: 'forbidden' });
+  });
+  it('records invalid model output as a job error without writing extraction', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession({ ...ctx, ai: { run: async () => ({ output: { profile: null }, model: 'broken' }) } as ServiceContext['ai'] }, sample);
+    const after = await service.getDesignSession({ ...ctx, ai: { run: async () => ({ output: { profile: null }, model: 'broken' }) } as ServiceContext['ai'] }, { sessionId: started.id });
+    expect(after.extraction).toBeNull();
+    expect(after.provisioning?.error).toMatch(/invalid shape/);
+    expect((await ctx.repo.getGenerationJob(started.provisioning!.jobId!))?.state).toBe('failed');
+  });
+  it('validates answers and saves an opted-in teaching note to a default profile', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, { ...sample, consent: { syllabusOnly: true, rememberProfile: true } });
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const ready = await service.getDesignSession(ctx, { sessionId: started.id });
+    await expect(service.answerDesignQuestions(ctx, { sessionId: started.id, answers: [{ questionId: 'unknown', skipped: true }], teachingNote: '' })).rejects.toMatchObject({ code: 'invalid' });
+    await expect(service.answerDesignQuestions(ctx, { sessionId: started.id, answers: [], teachingNote: 'x'.repeat(2001) })).rejects.toMatchObject({ code: 'invalid' });
+    const answered = await service.answerDesignQuestions(ctx, { sessionId: started.id, answers: [{ questionId: ready.questions[0].id, optionId: ready.questions[0].options[0].id, skipped: false }], teachingNote: 'I use practice and cases.' });
+    expect(answered.questions[0].answer?.optionId).toBe(ready.questions[0].options[0].id);
+    expect((await ctx.repo.getInstructorProfile('u-okafor'))?.teachingApproach).toBe('I use practice and cases.');
+  });
+  it('keeps workflow ownership until stalled, then polling takes over', async () => {
+    const ctx = await context(); const background = { startGeneration: vi.fn(async () => {}) };
+    const started = await service.createDesignSession({ ...ctx, background }, sample);
+    expect(background.startGeneration).toHaveBeenCalledWith(started.provisioning!.jobId);
+    expect((await service.getDesignSession(ctx, { sessionId: started.id })).provisioning?.done).toBe(0);
+    clock += WORKFLOW_STALL_MS + 1000;
+    const polled = await service.getDesignSession(ctx, { sessionId: started.id });
+    expect(polled.provisioning?.done).toBe(1);
+    expect((await ctx.repo.getGenerationJob(started.provisioning!.jobId!))?.runner).toBe('poll');
+    const stale = await ctx.repo.getGenerationJob(started.provisioning!.jobId!);
+    await advanceGenerationJob(ctx, stale!);
+    expect((await ctx.repo.getGenerationJob(stale!.id))?.state).toBe('done');
+  });
+  it('does not overwrite a newer extraction after a delayed runner finishes', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, sample);
+    const initial = (await ctx.repo.getGenerationJob(started.provisioning!.jobId!))!;
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const slow = { ...ctx, ai: { run: async (task: never, input: never) => { await held; return fixtureAi.run(task, input); } } as ServiceContext['ai'] };
+    const delayed = advanceGenerationJob(slow, initial);
+    const first = await advanceGenerationJob(ctx, initial);
+    const before = await ctx.repo.getDesignSession(started.id);
+    release(); await delayed;
+    expect(first.done).toBe(1);
+    expect(await ctx.repo.getDesignSession(started.id)).toEqual(before);
+    expect((await ctx.repo.getGenerationJob(initial.id))?.done).toBe(1);
+  });
+});

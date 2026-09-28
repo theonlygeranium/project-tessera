@@ -15,7 +15,7 @@ const rubricInput=z.object({name:required,version:required.optional(),attributio
 const rubricRef={courseId:id,itemId:id,rubricId:id.optional()};
 const activity=z.object({activityKind:z.enum(['lesson','assignment']),activityId:id});
 export const OPERATIONS: { [K in Operation]: { input: z.ZodType<Input<K>>; output: z.ZodType<Output<K>> } } = {
- createDesignSession:{input:z.object({courseId:id,sourceKind:S.DesignSourceKindSchema,fileId:id.optional(),text:required.optional(),name:string.optional(),consent:z.object({syllabusOnly:z.literal(true),rememberProfile:z.boolean()})}).superRefine((v,ctx)=>{if (Boolean(v.fileId) === Boolean(v.text)) ctx.addIssue({code:'custom',path:['sourceKind'],message:'Provide exactly one of fileId or text.'});}),output:S.DesignSessionSchema},
+ createDesignSession:{input:z.object({courseId:id,sourceKind:S.DesignSourceKindSchema,fileId:id.optional(),text:required.optional(),sample:z.literal(true).optional(),name:string.optional(),consent:z.object({syllabusOnly:z.literal(true),rememberProfile:z.boolean()})}).superRefine((v,ctx)=>{if (Number(Boolean(v.fileId))+Number(Boolean(v.text))+Number(Boolean(v.sample))!==1) ctx.addIssue({code:'custom',path:['sourceKind'],message:'Provide exactly one of fileId, text, or sample.'});}),output:S.DesignSessionSchema},
  listDesignSessions:{input:by('courseId'),output:z.array(S.DesignSessionSchema)},
  getDesignSession:{input:by('sessionId'),output:S.DesignSessionSchema},
  answerDesignQuestions:{input:z.object({sessionId:id,answers:z.array(z.object({questionId:id,optionId:id.optional(),value:string.optional(),skipped:z.boolean()})),teachingNote:string}),output:S.DesignSessionSchema},

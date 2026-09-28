@@ -3,6 +3,7 @@ import { elementSchema, palmyraClient, salvageBlocks } from './palmyra';
 import { fixtureAi } from '../../shared/ai';
 import { validateBlockContent } from '../../shared/service/validate';
 import type { BlockType } from '../../shared/domain';
+import seed from '../../shared/seed-syllabus.json';
 
 const block = (text: string) => ({ type: 'text', level: 2, text, tone: '', title: '', question: '', options: [], correctOptionId: '', feedbackCorrect: '', feedbackIncorrect: '' });
 const full = JSON.stringify({ blocks: [block('One "quoted" {brace}'), block('Two'), block('Three'), block('Four')] });
@@ -20,6 +21,32 @@ describe('salvageBlocks', () => {
 describe('palmyraClient', () => {
   const reply = (content: string, finish = 'stop') =>
     new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: finish }] }), { status: 200 });
+
+  it('sends page-anchored syllabus lines with the design-partner prompt and 8,000 token limit', async () => {
+    const input = { sourceKind: 'syllabus' as const, name: seed.name, sections: seed.sections };
+    const fixture = (await fixtureAi.run('syllabus-extract', input)).output;
+    const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async (_url, options) => {
+      const body = JSON.parse(String(options?.body));
+      expect(body.max_tokens).toBe(8000);
+      expect(body.response_format).toMatchObject({ type: 'json_schema', json_schema: { strict: true, schema: { required: ['profile', 'outcomes', 'assessments', 'schedule', 'policies'] } } });
+      expect(body.messages[0].content).toContain("You are Tessera's design partner. The instructor is the subject-matter expert and the instructor of record;");
+      expect(body.messages[1].content).toContain('[p. 4] Course schedule\nWeek Dates Topic Reading Due');
+      expect(body.messages[1].content).toContain('8 Oct 13–17\n9 Oct 20–24');
+      return reply(JSON.stringify(fixture));
+    } });
+    expect((await ai.run('syllabus-extract', input)).output.schedule).toHaveLength(14);
+  });
+  it('caps only the syllabus source block at 60,000 characters', async () => {
+    const long = 'X'.repeat(60_000) + 'SHOULD_NOT_APPEAR';
+    const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async (_url, options) => {
+      const body = JSON.parse(String(options?.body));
+      const source = body.messages[1].content.split('Source:\n')[1];
+      expect(source).toHaveLength(60_000);
+      expect(source).not.toContain('SHOULD_NOT_APPEAR');
+      return reply(JSON.stringify((await fixtureAi.run('syllabus-extract', { sourceKind: 'syllabus', name: seed.name, sections: seed.sections })).output));
+    } });
+    await ai.run('syllabus-extract', { sourceKind: 'syllabus', name: 'Long', sections: [{ page: 1, heading: '', level: 0, text: long, lines: [long] }] });
+  });
 
   it('salvages a runaway lesson draft instead of failing (after retrying for a check)', async () => {
     const cut = full.slice(0, full.indexOf('Four') + 2) + ' '.repeat(50);

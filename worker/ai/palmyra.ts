@@ -26,6 +26,7 @@ Rules:
 - Return only JSON that matches the schema, as compact single-line JSON with no indentation.`;
 
 const MAX_SOURCE_CHARS = 12_000;
+const DESIGN_SYSTEM = "You are Tessera's design partner. The instructor is the subject-matter expert and the instructor of record; you handle sequencing, alignment, scaffolding and quality checks. Cite the syllabus page for every claim. Never invent readings, citations, URLs, statistics, or names. Keep the instructor's own outcome wording verbatim; a rewrite is a labelled suggestion. Phrase content suggestions as questions or optional drafts, never corrections. Never use the phrase 'learning styles'.";
 function sourcesBlock(sources: SourceDoc[]): string {
   if (!sources.length) return 'Sources: none provided.';
   let budget = MAX_SOURCE_CHARS;
@@ -40,6 +41,10 @@ function sourcesBlock(sources: SourceDoc[]): string {
 type Messages = { role: 'system' | 'user'; content: string }[];
 
 const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } = {
+  'syllabus-extract': ({ sourceKind, name, sections, institutionTerm }) => [
+    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nExtract only facts present in the source. Every extracted or inferred field has an origin and a verbatim source span with its page; use null pages for pasted text. Missing fields have origin missing, value null, confidence 0 and no spans. Keep each outcome's original wording. Return the course profile, outcomes, grading assessments, schedule rows and policies. An empty schedule row has empty true. The service will compute problems and questions.` },
+    { role: 'user', content: `Source kind: ${sourceKind}\nName: ${name}\nInstitution term: ${institutionTerm ? JSON.stringify(institutionTerm) : 'not supplied'}\nSource:\n${sections.map(section => `${section.page === null ? '[pasted]' : `[p. ${section.page}]`} ${(section.lines.length ? section.lines.join('\n') : section.text)}`).join('\n\n').slice(0, 60_000)}` },
+  ],
   tutor: (input) => [
     { role:'system', content:`You are Tessera's student tutor. The server has already chosen the allowed kind of help: ${input.kind}. Follow it exactly. Cite only the supplied source ids in citeIds. Use plain language at the student's reading level (${input.readingLevel === 'plain' ? 'grade 6–8' : 'introductory college'}) and in the student's language (${input.language}). Use fictional names only. Do not invent facts. The provided sources never include answer keys. Return strict JSON with only text and citeIds. ${input.kind === 'answer' ? '' : "Never confirm or rule out any specific option or guess, even indirectly: no 'right track', 'close', 'yes', 'not quite', or hints about whether their pick is correct. If the student asks whether a choice is right, say you can't confirm answers here, suggest they use the Check answer button, and redirect to the reasoning. "}${input.kind === 'hint' ? "Give one short nudge toward the relevant idea or a parallel example. Never give this item's answer or identify the right option." : input.kind === 'explain' ? 'Explain the concept with a worked parallel example using a different context or numbers. Do not solve the item or identify its right option.' : input.kind === 'answer' ? 'Open practice permits a direct answer. Explain why it is correct, grounded in sources.' : 'Be encouraging and stay on the lesson. Do not answer checks.'}` },
     { role:'user', content:`Course: ${input.courseTitle}\nActivity: ${input.activityTitle}\nMode: ${input.mode}\nHint number: ${input.hintNumber ?? 'none'} of ${input.maxHints}\nSources: ${JSON.stringify(input.sources).slice(0,12000)}\nRecent messages: ${JSON.stringify(input.history).slice(0,4000)}\nStudent message: ${input.question}` },
@@ -98,6 +103,19 @@ const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } =
 
 const str = { type: 'string' } as const;
 const obj = (properties: Record<string, unknown>) => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
+const integer = { type: 'integer' } as const;
+const number = { type: 'number' } as const;
+const nullable = (schema: unknown) => ({ anyOf: [schema, { type: 'null' }] });
+const array = (schema: unknown) => ({ type: 'array', items: schema });
+const span = obj({ page: nullable(integer), text: str });
+const extracted = (schema: unknown) => obj({ value: nullable(schema), origin: { type: 'string', enum: ['extracted','inferred','user_supplied','missing'] }, confidence: number, spans: array(span) });
+const extractionSchema = obj({
+  profile: obj({ code: extracted(str), title: extracted(str), credits: extracted(number), termWeeks: extracted(number), termStart: extracted(str), termEnd: extracted(str), meeting: extracted(obj({ days: array(str), minutes: number })), modality: extracted({ type: 'string', enum: ['in-person','online-async','online-sync','hybrid','hyflex'] }), level: extracted(str), prerequisites: extracted(array(str)), enrolment: extracted(number), instructor: extracted(obj({ name: str, email: str, officeHours: str })), description: extracted(str), materials: extracted(array(obj({ title: str, kind: { type: 'string', enum: ['textbook','reading','tool'] }, span }))), business: extracted(obj({ goal: str, metric: str, audienceRole: str })), weeklyHoursBudget: number }),
+  outcomes: array(obj({ id: str, text: str, span: nullable(span), origin: { type: 'string', enum: ['extracted','inferred','user_supplied','missing'] } })),
+  assessments: array(obj({ id: str, title: str, weightPercent: nullable(number), dueAt: nullable(str), format: str, span: nullable(span) })),
+  schedule: array(obj({ week: integer, dates: str, topic: str, reading: str, due: str, span: nullable(span), empty: { type: 'boolean' } })),
+  policies: array(obj({ kind: { type: 'string', enum: ['attendance','late-work','integrity','ai-use','accommodations','other'] }, text: str, span })),
+});
 const BLOCK = obj({
   type: { type: 'string', enum: ['heading', 'text', 'callout', 'check'] },
   level: { type: 'integer', enum: [2, 3] },
@@ -121,6 +139,7 @@ const elementSchemas = {
 export const elementSchema = (type: keyof typeof elementSchemas) => obj({ block: elementSchemas[type] });
 
 const SCHEMAS: Record<AiTaskName, unknown> = {
+  'syllabus-extract': extractionSchema,
   tutor: obj({ text: str, citeIds: { type:'array', items:str } }),
   'tutor-summary': obj({ summary: str }),
   element: elementSchema('text'),
@@ -168,6 +187,7 @@ export function toBlock(b: FlatBlock, fallback?: BlockContent): BlockContent {
 }
 
 const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  'syllabus-extract': raw => raw,
   tutor: raw => ({ text:String(raw.text ?? ''), citeIds:Array.isArray(raw.citeIds) ? raw.citeIds.filter((x:unknown): x is string => typeof x === 'string') : [] }),
   'tutor-summary': raw => ({ summary:String(raw.summary ?? '') }),
   element: (raw, input) => {
@@ -209,6 +229,7 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 };
 
 const MAX_TOKENS: Record<AiTaskName, number> = {
+  'syllabus-extract': 8000,
   tutor: 1800, 'tutor-summary': 1200,
   element: 8000,
   // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the

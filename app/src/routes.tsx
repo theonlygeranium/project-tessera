@@ -5,6 +5,7 @@ import { accessAdminRoutes, accessInstructorRoutes } from './features/access/rou
 import { adminRoutes } from './features/admin/routes';
 import { tutorInstructorRoutes } from './features/tutor/routes';
 import { builderRoutes } from './features/builder/routes';
+import { designPartnerRoutes } from './features/design-partner/routes';
 import { instructorRoutes } from './features/instructor/routes';
 import { studentRoutes } from './features/student/routes';
 import { instructorGradingRoutes, studentGradingRoutes } from './features/grading/routes';
@@ -30,7 +31,7 @@ export const router = createBrowserRouter(
           children: [
             { index: true, element: null },
             { element: <RequireRole roles={['administrator']} />, children: [...adminRoutes, ...accessAdminRoutes, ...adminTemplateRoutes, ...adminReadinessRoutes, ...adminTrainingRoutes, ...adminManagerRoutes] },
-            { element: <RequireRole roles={['instructor']} />, children: [...instructorRoutes, ...builderRoutes, ...instructorGradingRoutes, ...accessInstructorRoutes, ...tutorInstructorRoutes, ...instructorTemplateRoutes, ...instructorReadinessRoutes, ...instructorVariantRoutes, ...instructorTrainingRoutes] },
+            { element: <RequireRole roles={['instructor']} />, children: [...instructorRoutes, ...builderRoutes, ...designPartnerRoutes, ...instructorGradingRoutes, ...accessInstructorRoutes, ...tutorInstructorRoutes, ...instructorTemplateRoutes, ...instructorReadinessRoutes, ...instructorVariantRoutes, ...instructorTrainingRoutes] },
             { element: <RequireRole roles={['student']} />, children: [...studentRoutes, ...studentGradingRoutes, ...studentTrainingRoutes] },
             // Night 3: any signed-in person (required training, certificates, sharing, the manager view).
             ...anyTrainingRoutes,

@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { checkDocument } from './index';
+import { fixtureAi } from '../../shared/ai';
 
 const fixture = async (name: string) => {
   const buf = await readFile(fileURLToPath(new URL(`../../tests/fixtures/syllabus/${name}`, import.meta.url)));
@@ -16,6 +17,25 @@ const fixture = async (name: string) => {
 const textOf = (r: Awaited<ReturnType<typeof checkDocument>>) => r.text.sections.map((s) => s.text).join('\n');
 
 describe('syllabus extraction feasibility (pdfjs + JSZip)', () => {
+  for (const kind of ['pdf', 'docx'] as const) it(`keeps schedule and grading rows separate in ${kind.toUpperCase()} lines`, async () => {
+    const r = await checkDocument(kind, await fixture(`STAT110_Syllabus_Fall2026.${kind}`));
+    const lines = r.text.sections.flatMap(section => section.lines ?? []);
+    const week8 = lines.filter(line => /^8\s*(?:\|\s*)?Oct\s+13[–-]17(?:\s*\|\s*)*$/.test(line));
+    expect(week8).toHaveLength(1);
+    expect(week8[0]).not.toMatch(/Comparing|Midterm|Ch\./);
+    for (const [title, weight] of [['Weekly quizzes', '15%'], ['Homework sets', '20%'], ['Course project', '40%'], ['Participation', '5%']]) {
+      const rows = lines.filter(line => line.includes(title));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toContain(weight);
+    }
+  });
+  it('lets the deterministic task read the DOCX table rows', async () => {
+    const r = await checkDocument('docx', await fixture('STAT110_Syllabus_Fall2026.docx'));
+    const output = (await fixtureAi.run('syllabus-extract', { sourceKind: 'syllabus', name: 'STAT110_Syllabus_Fall2026.docx', sections: r.text.sections.map(section => ({ page: section.page ?? null, heading: section.heading, level: section.level, text: section.text, lines: section.lines ?? [] })) })).output;
+    expect(output.schedule).toHaveLength(14);
+    expect(output.schedule.find(row => row.week === 8)?.empty).toBe(true);
+    expect(output.assessments.map(item => item.weightPercent)).toEqual([15, 20, 20, 40, 5]);
+  });
   it('recovers the syllabus text from a PDF with page anchors', async () => {
     const r = await checkDocument('pdf', await fixture('STAT110_Syllabus_Fall2026.pdf'));
     const text = textOf(r);

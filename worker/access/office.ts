@@ -26,7 +26,14 @@ export async function checkDocx(bytes: ArrayBuffer): Promise<DocumentCheck> {
   const paras = descendants(root,'w:p'), tables = descendants(root,'w:tbl'), pictures = descendants(root,'wp:docPr');
   const issues: DocumentCheck['issues'] = [], elements: Element[] = [];
   const heading = (p: XmlNode) => /^Heading[1-6]$/i.test(first(p,'w:pStyle')?.attrs['w:val'] ?? '');
-  const sections = paras.map(p => ({ heading: heading(p) ? paragraphText(xml,p) : '', level: heading(p) ? Number((first(p,'w:pStyle')?.attrs['w:val'] ?? '').replace(/\D/g,'')) : 0, text: paragraphText(xml,p) }));
+  const sections = paras.map(p => {
+    let row: XmlNode | undefined = p.parent;
+    while (row && row.name !== 'w:tr') row = row.parent;
+    const rowParas = row ? descendants(row,'w:p') : [];
+    const cells = row?.children.filter(c => c.name === 'w:tc').map(c => content(xml,c,['w:t']).trim()) ?? [];
+    const line = row ? (rowParas[0] === p ? cells.join(' | ') : '') : paragraphText(xml,p);
+    return { heading: heading(p) ? paragraphText(xml,p) : '', level: heading(p) ? Number((first(p,'w:pStyle')?.attrs['w:val'] ?? '').replace(/\D/g,'')) : 0, text: paragraphText(xml,p), lines: line ? [line] : [] };
+  });
   const title = first(coreRoot,'dc:title') ? content(core,coreRoot,['dc:title']).trim() || decodeXml(core.slice(first(coreRoot,'dc:title')!.openEnd,first(coreRoot,'dc:title')!.closeStart)).trim() : '';
   if (!first(first(styleRoot,'w:docDefaults') ?? styleRoot,'w:lang')?.attrs['w:val'] && !first(coreRoot,'dc:language')) issues.push(issue('docx_no_language','serious','Document language missing','No default or core language is set.','Set the document language.','metadata'));
   if (paras.length > 10 && !paras.some(heading)) issues.push(issue('docx_no_headings','serious','No headings','Long document has no heading styles.','Apply Heading styles.','manual'));

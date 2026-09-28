@@ -228,6 +228,18 @@ function provenance(model: string, task: Provenance['task'], summary: string, so
 
 export function createDocumentEngine(env: EngineEnv): DocumentEngine {
   return {
+    async extract(file) {
+      if (file.kind !== 'pdf' && file.kind !== 'docx') throw new ApiError('unsupported', 'Use a PDF or DOCX syllabus.');
+      let doc = await check(env, file);
+      let ocr = false;
+      if (!doc.document?.hasText && file.kind === 'pdf') {
+        const result = await runOcr(env.OCR, file.id, await bytesOf(env, file.key), undefined, ocrInstances(env));
+        doc = await checkDocument('pdf', result.pdf);
+        ocr = true;
+      }
+      if (!doc.document?.hasText) throw new ApiError('invalid', 'I could not find readable text in this file.');
+      return { sections: doc.text.sections, ocr };
+    },
     async scan(file): Promise<AccessReport> {
       const doc = await check(env, file);
       if (file.kind === 'pdf') {

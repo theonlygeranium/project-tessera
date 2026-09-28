@@ -31,9 +31,10 @@ export async function checkPdf(bytes:ArrayBuffer):Promise<DocumentCheck>{
       const figures=nodes.filter(n=>n.role==='Figure');
       const missingFigures=figures.filter(n=>!n.alt?.trim()).length;
       const pageLines=textItems.map(t=>({text:t.str,y:t.transform[5],x:t.transform[4]}));
-      const byLine=new Map<number,string[]>();
-      for(const item of pageLines){ const key=Math.round(item.y/3)*3; byLine.set(key,[...(byLine.get(key)??[]),item.text]); }
-      if([...byLine.values()].some(parts=>{ const line=parts.join(' ').trim(); return line.length>=3 && line.length<=60 && !/[.!?]$/.test(line); })) heuristicHeadings++;
+      const byLine=new Map<number,{text:string;x:number}[]>();
+      for(const item of pageLines){ const key=Math.round(item.y/3)*3; byLine.set(key,[...(byLine.get(key)??[]),{text:item.text,x:item.x}]); }
+      if([...byLine.values()].some(parts=>{ const line=parts.map(part=>part.text).join(' ').trim(); return line.length>=3 && line.length<=60 && !/[.!?]$/.test(line); })) heuristicHeadings++;
+      const lines=[...byLine].sort(([a],[b])=>b-a).map(([,parts])=>parts.sort((a,b)=>a.x-b.x).map(part=>part.text).join(' ').trim());
       if(tree && nodes.some(n=>n.type==='content')) {
         const ids=nodes.filter(n=>n.type==='content').map(n=>n.id).filter((id):id is string=>!!id);
         const positions=new Map<string,{x:number;y:number}>();
@@ -47,7 +48,7 @@ export async function checkPdf(bytes:ArrayBuffer):Promise<DocumentCheck>{
         const visual=[...first20].sort((a,b)=>{ const pa=positions.get(a)!,pb=positions.get(b)!; return Math.abs(pb.y-pa.y)>2 ? pb.y-pa.y : pa.x-pb.x; });
         if(first20.length>1 && first20.join('|')!==visual.join('|')) orderMismatch++;
       }
-      sections.push({heading:'',level:0,text:pageLines.map(l=>l.text).join(' '),page:pageNum});
+      sections.push({heading:'',level:0,text:pageLines.map(l=>l.text).join(' '),page:pageNum,lines});
       const viewport=page.getViewport({scale:1});
       let ctm=[1,0,0,1,0,0]; const stack:number[][]=[];
       for(let i=0;i<list.fnArray.length;i++){

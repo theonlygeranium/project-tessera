@@ -440,10 +440,10 @@ export interface Extracted<T> { value: T | null; origin: FieldOrigin; confidence
 export type DesignSourceKind = 'syllabus' | 'brief';                           // D-035
 export interface DesignSource {
   kind: DesignSourceKind;
-  fileId: Id | null;                      // FileRecord when uploaded or chosen; null when pasted
+  fileId: Id | null;                      // FileRecord when uploaded or chosen; null when pasted or sample
   version: number | null;
   name: string;
-  /** Section text with anchors; from checkDocument() for files, one section for a paste. */
+  /** Section text with anchors; from checkDocument() for files or the fictional sample, one section for a paste. */
   sections: { page: number | null; heading: string; level: number; text: string; lines: string[] }[];
   chars: number;
   ocr: boolean;

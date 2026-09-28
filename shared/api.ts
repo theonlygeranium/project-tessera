@@ -44,7 +44,7 @@ export type Ok = { ok: true };
 /** Every operation: its input and output. */
 export interface ApiSpec {
   // ---- Night 4 · Syllabus design partner (D-030 to D-036) ----
-  createDesignSession: { input: { courseId: Id; sourceKind: DesignSourceKind; fileId?: Id; text?: string; name?: string; consent: { syllabusOnly: true; rememberProfile: boolean } }; output: DesignSession };
+  createDesignSession: { input: { courseId: Id; sourceKind: DesignSourceKind; fileId?: Id; text?: string; sample?: true; name?: string; consent: { syllabusOnly: true; rememberProfile: boolean } }; output: DesignSession };
   listDesignSessions: { input: { courseId: Id }; output: DesignSession[] };
   getDesignSession: { input: { sessionId: Id }; output: DesignSession };
   answerDesignQuestions: { input: { sessionId: Id; answers: { questionId: Id; optionId?: Id; value?: string; skipped: boolean }[]; teachingNote: string }; output: DesignSession };

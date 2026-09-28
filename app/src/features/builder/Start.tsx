@@ -72,6 +72,7 @@ export function BuilderStart() {
     <TopBar title="Build with AI" breadcrumbs={[{ label: 'My courses', href: paths.teach.courses }, { label: courseName, href: paths.teach.course(courseId) }, { label: 'Build with AI' }]} renderLink={renderRouterLink} />
     {course.isPending ? <Loading label="Loading course" /> : course.error ? <ErrorNotice error={course.error} onRetry={() => course.refetch()} /> : <>
       <p className={styles.intro}>The AI drafts; you decide. Nothing reaches students until you keep the drafts and publish the lessons.</p>
+      <section className={styles.module} aria-labelledby="syllabus-start-heading"><h2 id="syllabus-start-heading">Start from a syllabus</h2><p>Upload your syllabus and I'll read it first, ask what I can't tell, then propose structures.</p><Link to={paths.teach.design(courseId)}>Start from a syllabus</Link></section>
       <Link to={paths.teach.generate(courseId)}>Or add drafts to existing lessons →</Link>
       <form onSubmit={submit} className={styles.stack} noValidate>
         <h2>Start a draft</h2>

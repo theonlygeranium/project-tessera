@@ -1,0 +1,100 @@
+{
+  "kind": "syllabus",
+  "fileId": null,
+  "version": null,
+  "name": "STAT110_Syllabus_Fall2026.pdf",
+  "sections": [
+    {
+      "page": 1,
+      "heading": "",
+      "level": 0,
+      "text": "STAT 110 · Reasoning with Data Meridian State University · Fall 2026 · 3 credits · 15 weeks (Aug 24 – Dec 11) Instructor: Dr. Amara Okafor · a.okafor@meridianstate.example · Office hours Tue 2–4 pm, Hale 214 Meets Tuesday and Thursday, 9:30–10:45 (75 min), Hale 110. Prerequisite: none. 100-level. Course description An introduction to reasoning with data for students who will read statistics far more often than they compute them. We ask statistical questions, collect and describe data, compare groups, and judge claims made in public. Required text OpenIntro Statistics, 4th edition (free online).",
+      "lines": [
+        "STAT 110 · Reasoning with Data",
+        "Meridian State University · Fall 2026 · 3 credits · 15 weeks (Aug 24 – Dec 11)",
+        "Instructor: Dr. Amara Okafor · a.okafor@meridianstate.example · Office hours Tue 2–4 pm, Hale 214",
+        "Meets Tuesday and Thursday, 9:30–10:45 (75 min), Hale 110. Prerequisite: none. 100-level.",
+        "Course description",
+        "An introduction to reasoning with data for students who will read statistics far more often than they",
+        "compute them. We ask statistical questions, collect and describe data, compare groups, and judge",
+        "claims made in public.",
+        "Required text",
+        "OpenIntro Statistics, 4th edition (free online)."
+      ]
+    },
+    {
+      "page": 2,
+      "heading": "",
+      "level": 0,
+      "text": "Learning outcomes By the end of the course you will be able to: 1. Tell a statistical question from a non-statistical one. 2. Understand variability in data. 3. Describe the center and spread of a distribution. 4. Design a simple study to answer a question. 5. Communicate findings to a non-technical audience. 6. Critique a statistical claim in the news.",
+      "lines": [
+        "Learning outcomes",
+        "By the end of the course you will be able to:",
+        "1. Tell a statistical question from a non-statistical one.",
+        "2. Understand variability in data.",
+        "3. Describe the center and spread of a distribution.",
+        "4. Design a simple study to answer a question.",
+        "5. Communicate findings to a non-technical audience.",
+        "6. Critique a statistical claim in the news."
+      ]
+    },
+    {
+      "page": 3,
+      "heading": "",
+      "level": 0,
+      "text": "Grading Component Weight Notes Weekly quizzes 15% Lowest two dropped Homework sets 20% Six sets Midterm exam 20% Week 8, in class, multiple choice Course project 40% Due Thursday, December 4 Participation 5% Final grades: A 90–100, B 80–89, C 70–79, D 60–69.",
+      "lines": [
+        "Grading",
+        "Component Weight Notes",
+        "Weekly quizzes 15% Lowest two dropped",
+        "Homework sets 20% Six sets",
+        "Midterm exam 20% Week 8, in class, multiple choice",
+        "Course project 40% Due Thursday, December 4",
+        "Participation 5%",
+        "Final grades: A 90–100, B 80–89, C 70–79, D 60–69."
+      ]
+    },
+    {
+      "page": 4,
+      "heading": "",
+      "level": 0,
+      "text": "Course schedule Week Dates Topic Reading Due 1 Aug 25–29 What is a statistical question? Ch. 1 — 2 Sep 1–5 Cases, variables, data tables Ch. 1 HW 1 3 Sep 8–12 Summarizing one variable Ch. 2 Quiz 1 4 Sep 15–19 Center and spread Ch. 2 HW 2 5 Sep 22–26 Shapes of distributions Ch. 2 Quiz 2 6 Sep 29–Oct 3 Sampling and study design Ch. 3 HW 3 7 Oct 6–10 Bias and confounding Ch. 3 Quiz 3 8 Oct 13–17 9 Oct 20–24 Comparing two groups Ch. 4 HW 4 10 Oct 27–31 Sampling variability Ch. 4 Quiz 4 11 Nov 3–7 Confidence intervals Ch. 5 HW 5, project draft 12 Nov 10–14 Hypothesis tests Ch. 5 Quiz 5 13 Nov 17–21 Reading a study Ch. 6 HW 6 14 Dec 1–5 Communicating results Ch. 6 Project due Dec 4",
+      "lines": [
+        "Course schedule",
+        "Week Dates Topic Reading Due",
+        "1 Aug 25–29 What is a statistical question? Ch. 1 —",
+        "2 Sep 1–5 Cases, variables, data tables Ch. 1 HW 1",
+        "3 Sep 8–12 Summarizing one variable Ch. 2 Quiz 1",
+        "4 Sep 15–19 Center and spread Ch. 2 HW 2",
+        "5 Sep 22–26 Shapes of distributions Ch. 2 Quiz 2",
+        "6 Sep 29–Oct 3 Sampling and study design Ch. 3 HW 3",
+        "7 Oct 6–10 Bias and confounding Ch. 3 Quiz 3",
+        "8 Oct 13–17",
+        "9 Oct 20–24 Comparing two groups Ch. 4 HW 4",
+        "10 Oct 27–31 Sampling variability Ch. 4 Quiz 4",
+        "11 Nov 3–7 Confidence intervals Ch. 5 HW 5, project draft",
+        "12 Nov 10–14 Hypothesis tests Ch. 5 Quiz 5",
+        "13 Nov 17–21 Reading a study Ch. 6 HW 6",
+        "14 Dec 1–5 Communicating results Ch. 6 Project due Dec 4"
+      ]
+    },
+    {
+      "page": 5,
+      "heading": "",
+      "level": 0,
+      "text": "Course policies Attendance: attend both weekly meetings; more than three unexcused absences lowers the participation grade. Late work: 10% per day, up to five days. No late quizzes. Academic integrity: the Meridian State honor code applies to all work. Generative AI: you may use AI tools to check your reasoning; you may not submit AI-written text as your own. Cite any AI use. Accommodations: contact Accessibility Services in the first two weeks to arrange accommodations.",
+      "lines": [
+        "Course policies",
+        "Attendance: attend both weekly meetings; more than three unexcused absences lowers the",
+        "participation grade.",
+        "Late work: 10% per day, up to five days. No late quizzes.",
+        "Academic integrity: the Meridian State honor code applies to all work.",
+        "Generative AI: you may use AI tools to check your reasoning; you may not submit AI-written text as",
+        "your own. Cite any AI use.",
+        "Accommodations: contact Accessibility Services in the first two weeks to arrange accommodations."
+      ]
+    }
+  ],
+  "chars": 2373,
+  "ocr": false
+}

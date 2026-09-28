@@ -13,9 +13,11 @@ describe('design operation input contracts', () => {
     const schema = OPERATIONS.createDesignSession.input;
     expect(schema.safeParse(create).success).toBe(true);
     expect(schema.safeParse({ ...create, text: undefined, fileId: 'f-1' }).success).toBe(true);
+    expect(schema.safeParse({ ...create, text: undefined, sample: true }).success).toBe(true);
     expect(schema.safeParse({ ...create, consent: { ...create.consent, syllabusOnly: false } }).success).toBe(false);
     expect(schema.safeParse({ ...create, text: undefined }).success).toBe(false);
     expect(schema.safeParse({ ...create, fileId: 'f-1' }).success).toBe(false);
+    expect(schema.safeParse({ ...create, sample: true }).success).toBe(false);
     expect(schema.safeParse({ ...create, text: '   ' }).success).toBe(false);
   });
   it('checks the rationale after trimming', () => {

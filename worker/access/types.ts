@@ -4,7 +4,7 @@ export interface Element { index: number; page: number; kind: 'image' | 'table';
 export interface DocumentCheck {
   issues: AccessIssue[];
   document: AccessReport['document'];
-  text: { title: string; sections: { heading: string; level: number; text: string; page?: number }[] };
+  text: { title: string; sections: { heading: string; level: number; text: string; page?: number; lines?: string[] }[] };
   elements: Element[];
 }
 export function issue(code: string, severity: AccessSeverity, title: string, description: string, fixHint: string, fix: AccessIssue['fix'], count = 1, page?: number, element?: number): AccessIssue {

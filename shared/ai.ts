@@ -4,10 +4,15 @@
 // the a11y audit, docs screenshots, and local development without a key.
 //
 // Whatever a client returns is stored as a *draft*; a person keeps it (D-003).
-import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc, VariantAudience } from './domain';
+import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc, VariantAudience, DesignSourceKind, SyllabusExtraction } from './domain';
+import { extractSyllabusFixture } from './syllabus-fixture';
 import type { TutorKind } from './tutor/policy';
 
 export interface AiTasks {
+  'syllabus-extract': {
+    input: { sourceKind: DesignSourceKind; name: string; sections: { page: number | null; heading: string; level: number; text: string; lines: string[] }[]; institutionTerm?: { start: string; end: string; holidays: string[] } };
+    output: Omit<SyllabusExtraction, 'problems' | 'provenance'>;
+  };
   element: {
     input: { courseTitle: string; moduleTitle: string; lessonTitle: string; lessonText: string; type: BlockType; instruction: string };
     output: { block: BlockContent };
@@ -114,6 +119,7 @@ export const fixtureAi: AiClient = {
 };
 
 const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  'syllabus-extract': extractSyllabusFixture,
   element: ({ lessonTitle, type, instruction }) => {
     const topic = lessonTitle.trim() || 'This lesson';
     const note = instruction.trim() ? ` ${firstSentence(instruction.trim())}` : '';

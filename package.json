@@ -12,6 +12,7 @@
     "docs:sync": "npm run build && node tools/docs_sync.mjs && node tools/build_mintlify_tokens.mjs",
     "test": "vitest run",
     "build:openapi": "node tools/build_openapi.mjs",
+    "seed:syllabus": "node tools/build_seed_syllabus.mjs",
     "typecheck": "tsc -p shared && tsc -p app && tsc -p worker && tsc -p sdk",
     "dev:api": "wrangler dev --port 8787",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",

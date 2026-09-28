@@ -1,17 +1,38 @@
 import { ApiError } from '../api';
 import type { ArchitectureId, DesignSource, SourceSpan, StructureOption } from '../domain';
+import type { AiTasks } from '../ai';
+import { SyllabusExtractionSchema } from '../schema/domain';
 
 /** Check cited pages against the source document's anchored pages. */
 export function validateSpans(spans: SourceSpan[], source: DesignSource): void {
   const pages = source.sections.map(section => section.page).filter((page): page is number => page !== null);
-  const first = Math.min(...pages);
-  const last = Math.max(...pages);
+  const available = new Set(pages);
   spans.forEach((span, index) => {
-    const valid = source.fileId === null
-      ? span.page === null
-      : Number.isInteger(span.page) && span.page !== null && span.page >= first && span.page <= last;
+    const valid = available.size === 0 ? span.page === null : span.page !== null && available.has(span.page);
     if (!valid) throw new ApiError('invalid', `spans[${index}].page is outside the source page range.`);
   });
+}
+
+/** Validate the complete extraction before any session field is written. */
+export function validateExtraction(output: unknown, source: DesignSource): AiTasks['syllabus-extract']['output'] {
+  const parsed = SyllabusExtractionSchema.omit({ problems: true, provenance: true }).strict().safeParse(output);
+  if (!parsed.success) throw new ApiError('invalid', 'The syllabus extraction has an invalid shape.');
+  const value = parsed.data;
+  const ids = [...value.outcomes.map(item => item.id), ...value.assessments.map(item => item.id)];
+  if (new Set(ids).size !== ids.length) throw new ApiError('invalid', 'The syllabus extraction repeats an id.');
+  if (value.assessments.some(item => item.weightPercent !== null && (item.weightPercent < 0 || item.weightPercent > 100))) throw new ApiError('invalid', 'A grading weight is outside 0–100%.');
+  const spans: SourceSpan[] = [];
+  const collect = (node: unknown): void => {
+    if (node && typeof node === 'object') {
+      if ('page' in node && 'text' in node && Object.keys(node).length === 2) spans.push(node as SourceSpan);
+      else if (Array.isArray(node)) node.forEach(collect);
+      else Object.values(node).forEach(collect);
+    }
+  };
+  collect(value);
+  validateSpans(spans, source);
+  validateNoLearningStyles(value);
+  return value;
 }
 
 /** Reject the unsupported learning-styles claim anywhere in JSON output. */
