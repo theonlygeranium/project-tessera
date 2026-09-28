@@ -5,6 +5,7 @@
 // stable order: by `position` where the entity has one, otherwise as documented.
 import type {
   AccessibleFormat, AccessReport, ActivityKind, Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Invitation, Lesson, LessonProgress, Module, Role, Submission, Timestamp, TutorMessage, TutorMode, TutorSetting, User,
+  AiFinding, AlignableKind, Attestation, Certificate, CompletionEvent, CourseTemplate, ManagerConsent, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, TestOut,
 } from './domain';
 import type { SeedData } from './seed';
 
@@ -31,6 +32,13 @@ export interface StoredTutorSession {
   mode: TutorMode; hintsUsed: number; maxHints: number; answerRequests: number;
   messages: TutorMessage[]; startedAt: Timestamp; updatedAt: Timestamp;
 }
+
+/** Night 3: a course's stored AI finding and attestation for one rubric item. */
+export interface StoredReadinessItem {
+  courseId: Id; rubricId: Id; itemId: Id;
+  finding: AiFinding | null; attestation: Attestation | null; updatedAt: Timestamp;
+}
+export interface TestOutAttempt { id: Id; courseId: Id; userId: Id; percent: number; passed: boolean; at: Timestamp }
 
 export interface Repo {
   getInstitution(): Promise<Institution>;
@@ -149,6 +157,82 @@ export interface Repo {
   acceptInvitation(userId: Id, at: Timestamp): Promise<void>;
   /** Whether any invitation exists (D-021): once one does, the persona cookie no longer signs anyone in. */
   hasInvitations(): Promise<boolean>;
+
+  // ---- Night 3 (D-024 to D-029; migration 0006) ----
+  // Lessons: `listLessons` never returns variant lessons (`variantOf` set); `getLesson` returns any lesson.
+  // Deleting a master lesson also deletes its variants (and their blocks and progress).
+
+  /** Variant lessons of a master, ordered by audience ('micro', then 'plain'). */
+  listVariantLessons(masterLessonId: Id): Promise<Lesson[]>;
+
+  getProgram(id: Id): Promise<Program | null>;
+  /** Ordered by name, then id. */
+  listPrograms(): Promise<Program[]>;
+  putProgram(program: Program): Promise<void>;
+  deleteProgram(id: Id): Promise<void>;
+
+  getTemplate(id: Id): Promise<CourseTemplate | null>;
+  /** Ordered by name, then id. */
+  listTemplates(): Promise<CourseTemplate[]>;
+  putTemplate(template: CourseTemplate): Promise<void>;
+  deleteTemplate(id: Id): Promise<void>;
+
+  /** Custom rubrics only (built-ins live in shared/quality/rubrics.ts). Ordered by name, then id. */
+  getRubric(id: Id): Promise<Rubric | null>;
+  listRubrics(): Promise<Rubric[]>;
+  putRubric(rubric: Rubric): Promise<void>;
+  deleteRubric(id: Id): Promise<void>;
+
+  /** Ordered by item id. */
+  listReadinessItems(courseId: Id, rubricId: Id): Promise<StoredReadinessItem[]>;
+  /** Upsert by (courseId, rubricId, itemId); a row with neither a finding nor an attestation is deleted. */
+  putReadinessItem(item: StoredReadinessItem): Promise<void>;
+
+  /** Ordered by position. */
+  listOutcomes(courseId: Id): Promise<Outcome[]>;
+  /** Replaces the course's outcomes with these; outcomes not in the list are deleted with their links. */
+  replaceOutcomes(courseId: Id, outcomes: Outcome[]): Promise<void>;
+  /** Links for a course's outcomes, or for one target. Ordered by outcome id, then target kind and id. */
+  listOutcomeLinks(filter: { courseId?: Id; targetKind?: AlignableKind; targetId?: Id }): Promise<OutcomeLink[]>;
+  /** Replaces the outcomes linked to one target. */
+  setOutcomeLinks(targetKind: AlignableKind, targetId: Id, outcomeIds: Id[]): Promise<void>;
+
+  getRequirement(id: Id): Promise<Requirement | null>;
+  /** Newest first (createdAt, then id). */
+  listRequirements(filter?: { targetKind?: Requirement['target']['kind']; targetId?: Id }): Promise<Requirement[]>;
+  putRequirement(requirement: Requirement): Promise<void>;
+  deleteRequirement(id: Id): Promise<void>;
+
+  /** Append-only: a second event with the same id is refused (throws). */
+  appendCompletionEvent(event: CompletionEvent): Promise<void>;
+  /** Chronological (at, then id). `since` is inclusive. */
+  listCompletionEvents(filter: { userId?: Id; courseId?: Id; since?: Timestamp }): Promise<CompletionEvent[]>;
+
+  getTestOut(courseId: Id): Promise<TestOut | null>;
+  putTestOut(testOut: TestOut): Promise<void>;
+  deleteTestOut(courseId: Id): Promise<void>;
+  putTestOutAttempt(attempt: TestOutAttempt): Promise<void>;
+  /** Oldest first. */
+  listTestOutAttempts(userId: Id, courseId: Id): Promise<TestOutAttempt[]>;
+
+  getCertificate(id: Id): Promise<Certificate | null>;
+  getCertificateByCode(code: string): Promise<Certificate | null>;
+  /** Newest first (issuedAt, then id). */
+  listCertificates(filter: { userId?: Id; courseId?: Id }): Promise<Certificate[]>;
+  /** Inserts a new certificate; an existing id or code is refused (throws). */
+  insertCertificate(certificate: Certificate): Promise<void>;
+  /** Sets `replacedBy` once; throws ApiError('conflict') if it's already set or the certificate doesn't exist. */
+  markCertificateReplaced(id: Id, replacedBy: Id): Promise<void>;
+
+  /** Ordered by manager id, then report id. */
+  listReportingLines(filter: { managerId?: Id; reportId?: Id }): Promise<ReportingLine[]>;
+  /** Upsert by (managerId, reportId); keeps the first createdAt. */
+  putReportingLine(line: ReportingLine): Promise<void>;
+  /** Also deletes the report's consent for that manager. */
+  deleteReportingLine(managerId: Id, reportId: Id): Promise<void>;
+  /** Ordered by manager id, then report id. */
+  listManagerConsents(filter: { managerId?: Id; reportId?: Id }): Promise<ManagerConsent[]>;
+  putManagerConsent(consent: ManagerConsent): Promise<void>;
 
   /** True when there's no institution or no users: a database the Worker must seed on first request. */
   isEmpty(): Promise<boolean>;

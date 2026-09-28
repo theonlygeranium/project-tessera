@@ -16,6 +16,11 @@ import type {
   LearningProfile, Lesson, LessonDetail, LessonProgress, LessonProgressState, Module, OutlineDraft, Overview, Preset,
   Provenance, Role, RosterEntry, RubricCriterion, ScenarioNode, Scope, StudentLesson, Submission, SubmissionType, Today,
   Timestamp, TutorMessage, TutorSession, TutorSetting, TutorSummary, User,
+  // Night 3
+  AlignableKind, Brand, Certificate, CertificateVerification, CompletionEvent, ComplianceRow, CourseTemplate, ManagerView,
+  MyVisibility, Outcome, OutcomeLink, Program, ReadinessPolicy, ReadinessResult, RequiredTraining, Requirement,
+  RequirementAudience, Rubric, RubricCheckKind, AutomaticCheck, StudentTestOut, TemplateChangeSet, TemplateModule,
+  TestOut, LessonVariant, ReportingLine, TrainingStatus, VariantAudience, VariantDiff,
 } from './domain';
 
 /** Every API route lives under this prefix (D-020). `/api` without a version is an alias during Night 2. */
@@ -56,7 +61,12 @@ export interface ApiSpec {
 
   // Courses
   listCourses: { input: void; output: CourseSummary[] };
-  createCourse: { input: { code: string; title: string; term: string; description?: string }; output: Course };
+  /**
+   * Night 3: instructors can create courses too (they become its instructor). With a
+   * program, the course joins it; the effective template's skeleton is created unless
+   * `skipTemplate` is set (D-024).
+   */
+  createCourse: { input: { code: string; title: string; term: string; description?: string; programId?: Id | null; skipTemplate?: boolean }; output: Course };
   getCourseOutline: { input: { courseId: Id }; output: CourseOutline };
   updateCourse: {
     input: { courseId: Id } & Partial<Pick<Course, 'code' | 'title' | 'term' | 'description' | 'welcome' | 'outcomes'>>;
@@ -69,7 +79,7 @@ export interface ApiSpec {
 
   // Course structure (instructor)
   createModule: { input: { courseId: Id; title: string }; output: Module };
-  updateModule: { input: { moduleId: Id; title?: string; position?: number }; output: Module };
+  updateModule: { input: { moduleId: Id; title?: string; position?: number; objective?: string | null }; output: Module };
   /** Only an empty module can be deleted (409 otherwise). */
   deleteModule: { input: { moduleId: Id }; output: Ok };
   createLesson: { input: { moduleId: Id; title: string; minutes?: number }; output: Lesson };
@@ -95,7 +105,8 @@ export interface ApiSpec {
   // Student
   saveProfile: { input: Omit<LearningProfile, 'completedAt'>; output: User };
   getToday: { input: void; output: Today };
-  getStudentLesson: { input: { lessonId: Id }; output: StudentLesson };
+  /** Night 3: `version: 'full'` skips a matching variant (the way back, principle #7); default 'auto'. */
+  getStudentLesson: { input: { lessonId: Id; version?: 'auto' | 'full' }; output: StudentLesson };
   answerCheck: { input: { lessonId: Id; blockId: Id; optionId: string }; output: CheckResult };
   setLessonProgress: { input: { lessonId: Id; state: Exclude<LessonProgressState, 'not-started'> }; output: LessonProgress };
 
@@ -205,6 +216,120 @@ export interface ApiSpec {
 
   // Import (D-020)
   importCourse: { input: { course: { code: string; title: string; term: string; description?: string; welcome?: string; outcomes?: string[] }; modules: { title: string; lessons: { title: string; minutes?: number; blocks: BlockInput[] }[] }[] }; output: CourseOutline };
+
+  // ---- Night 3 (D-024 to D-029) ----
+
+  // Programs and templates (lane A, #24)
+  listPrograms: { input: void; output: Program[] };
+  createProgram: { input: { name: string; description?: string; templateId?: Id | null; brand?: Brand }; output: Program };
+  updateProgram: { input: { programId: Id; name?: string; description?: string; templateId?: Id | null; brand?: Brand }; output: Program };
+  /** 409 while courses belong to it. */
+  deleteProgram: { input: { programId: Id }; output: Ok };
+  setCourseProgram: { input: { courseId: Id; programId: Id | null }; output: Course };
+  listTemplates: { input: void; output: CourseTemplate[] };
+  getTemplate: { input: { templateId: Id }; output: CourseTemplate };
+  createTemplate: { input: TemplateInput; output: CourseTemplate };
+  updateTemplate: { input: { templateId: Id } & Partial<TemplateInput>; output: CourseTemplate };
+  /** 409 while the institution or a program uses it. */
+  deleteTemplate: { input: { templateId: Id }; output: Ok };
+  setInstitutionTemplate: { input: { templateId: Id | null }; output: Institution };
+  /** What applying the course's effective template (or `templateId`) would add. */
+  previewTemplate: { input: { courseId: Id; templateId?: Id }; output: TemplateChangeSet };
+  /** Applies exactly the previewed change set; 409 if the course or template changed since (`hash` differs). */
+  applyTemplate: { input: { courseId: Id; templateId?: Id; hash: string }; output: CourseOutline };
+
+  // Readiness rubrics and outcomes (lane B, #25)
+  /** Built-in (Tessera standard, OSCQR) and custom rubrics. */
+  listRubrics: { input: void; output: Rubric[] };
+  getRubric: { input: { rubricId: Id }; output: Rubric };
+  createRubric: { input: RubricInput; output: Rubric };
+  /** Custom rubrics only; built-ins are read-only. */
+  updateRubric: { input: { rubricId: Id } & Partial<RubricInput>; output: Rubric };
+  /** Custom rubrics only; 409 while the readiness policy uses it. */
+  deleteRubric: { input: { rubricId: Id }; output: Ok };
+  updateReadinessPolicy: { input: ReadinessPolicy; output: Institution };
+  /** Automatic items computed now; AI findings and attestations as stored. Defaults to the policy's rubric. */
+  getCourseReadiness: { input: { courseId: Id; rubricId?: Id }; output: ReadinessResult };
+  /** Runs AI-assisted items (all, or `itemIds`) and stores each finding as a draft. */
+  runReadinessAi: { input: { courseId: Id; rubricId?: Id; itemIds?: Id[] }; output: ReadinessResult };
+  /** A person accepts or dismisses an AI finding (D-003: AI never auto-passes an item). */
+  reviewFinding: { input: { courseId: Id; itemId: Id; rubricId?: Id; decision: 'accept' | 'dismiss' }; output: ReadinessResult };
+  attestItem: { input: { courseId: Id; itemId: Id; rubricId?: Id; status: 'attested' | 'not-applicable'; note: string }; output: ReadinessResult };
+  clearAttestation: { input: { courseId: Id; itemId: Id; rubricId?: Id }; output: ReadinessResult };
+  listOutcomes: { input: { courseId: Id }; output: Outcome[] };
+  /** Replaces the course's outcomes in order (existing ones keep their id); mirrors the text into `Course.outcomes`. Removing an outcome removes its links. */
+  saveOutcomes: { input: { courseId: Id; outcomes: { id?: Id; text: string }[] }; output: Outcome[] };
+  listOutcomeLinks: { input: { courseId: Id }; output: OutcomeLink[] };
+  /** Replaces the outcomes a check, scenario, or assignment is tagged with. */
+  setOutcomeLinks: { input: { courseId: Id; targetKind: AlignableKind; targetId: Id; outcomeIds: Id[] }; output: OutcomeLink[] };
+
+  // Persona variants (lane C, #23). A variant is a lesson; publish and delete it like one.
+  listVariants: { input: { lessonId: Id }; output: LessonVariant[] };
+  /** AI derives the variant from the master as draft blocks (D-003). One variant per audience per lesson. */
+  createVariant: { input: { lessonId: Id; audience: VariantAudience }; output: LessonDetail };
+  getVariantDiff: { input: { variantId: Id }; output: VariantDiff };
+  /** AI rewrites diverged (or listed) variant blocks from the current master, as drafts. */
+  resyncVariant: { input: { variantId: Id; blockIds?: Id[] }; output: LessonDetail };
+  /** "Keep variant": marks the listed blocks in sync with the current master without rewriting them. */
+  keepVariant: { input: { variantId: Id; blockIds: Id[] }; output: LessonDetail };
+
+  // Required training, test-out, certificates (lane D, #22)
+  listRequirements: { input: { courseId?: Id }; output: Requirement[] };
+  /** Enrolls the audience in the course(s) and records "assigned" events. */
+  createRequirement: { input: { target: Requirement['target']; audience: RequirementAudience; dueAt?: Timestamp | null; recurrence?: Requirement['recurrence'] }; output: Requirement };
+  /** Records "due-date-changed" events for affected people. */
+  updateRequirement: { input: { requirementId: Id; dueAt?: Timestamp | null; recurrence?: Requirement['recurrence'] }; output: Requirement };
+  /** Records "unassigned" events; enrollments and completions stay. */
+  deleteRequirement: { input: { requirementId: Id }; output: Ok };
+  getComplianceReport: { input: { courseId?: Id; status?: TrainingStatus } & PageInput; output: Page<ComplianceRow> };
+  listCompletionEvents: { input: { courseId?: Id; userId?: Id } & PageInput; output: Page<CompletionEvent> };
+  exportCompletionEvents: { input: { courseId?: Id; since?: Timestamp }; output: { csv: string } };
+  /** The signed-in person's required training, soonest due first. */
+  listMyTraining: { input: void; output: RequiredTraining[] };
+  getTestOut: { input: { courseId: Id }; output: TestOut | null };
+  saveTestOut: { input: { courseId: Id; items: TestOut['items']; passPercent: number }; output: TestOut };
+  deleteTestOut: { input: { courseId: Id }; output: Ok };
+  /** Without the answer key; null when the course has no test-out. */
+  getMyTestOut: { input: { courseId: Id }; output: StudentTestOut | null };
+  /** Passing completes the course as "tested out" and issues a certificate. */
+  takeTestOut: { input: { courseId: Id; answers: { itemId: string; optionId: string }[] }; output: { passed: boolean; percent: number; certificate: Certificate | null } };
+  listMyCertificates: { input: void; output: Certificate[] };
+  /** The learner, an administrator, or a manager the learner shares with. */
+  getCertificate: { input: { certificateId: Id }; output: Certificate };
+  /** Public: validity, course, and date only, never the name (D-027). Also served as a page at /verify/:code. */
+  verifyCertificate: { input: { code: string }; output: CertificateVerification };
+  /** A correction: issues a new certificate and marks this one replaced (certificates are immutable). */
+  reissueCertificate: { input: { certificateId: Id; learnerName?: string }; output: Certificate };
+
+  // Managers (lane D2, D-025, D-026)
+  listReportingLines: { input: { managerId?: Id; reportId?: Id }; output: ReportingLine[] };
+  addReportingLine: { input: { managerId: Id; reportId: Id }; output: ReportingLine };
+  /** Also clears the learner's sharing choice for that manager. */
+  removeReportingLine: { input: { managerId: Id; reportId: Id }; output: Ok };
+  /** The signed-in person's managers and what each can see. */
+  getMyVisibility: { input: void; output: MyVisibility };
+  /** Opt in or out per manager; opting out removes visibility immediately. A person's own choice: browser only. */
+  setManagerSharing: { input: { managerId: Id; sharing: boolean }; output: MyVisibility };
+  /** Completion only, for people who opted in (shared/managers/policy.ts). */
+  getManagerView: { input: void; output: ManagerView };
+}
+
+/** Template fields an administrator edits. */
+export interface TemplateInput {
+  name: string;
+  description?: string;
+  owner: CourseTemplate['owner'];
+  modules: TemplateModule[];
+  tutorDefaults: CourseTemplate['tutorDefaults'];
+  accessFloor: number | null;
+}
+
+/** A custom rubric as an administrator enters it; ids are assigned by Tessera. */
+export interface RubricInput {
+  name: string;
+  version?: string;
+  attribution?: string | null;
+  standards: { number: string; title: string; description?: string; items: { number: string; text: string; kind: RubricCheckKind; check?: AutomaticCheck | null; criteria?: string }[] }[];
 }
 
 export type Operation = keyof ApiSpec;
@@ -253,7 +378,7 @@ export const ROUTES: { [K in Operation]: Route } = {
   updateUser: { method: 'PATCH', path: '/users/:userId', access: ADMIN, scope: 'people:write' },
 
   listCourses: { method: 'GET', path: '/courses', access: 'signed-in', scope: 'courses:read' },
-  createCourse: { method: 'POST', path: '/courses', access: ADMIN, scope: 'courses:write' },
+  createCourse: { method: 'POST', path: '/courses', access: STAFF, scope: 'courses:write' },
   getCourseOutline: { method: 'GET', path: '/courses/:courseId', access: 'signed-in', scope: 'courses:read' },
   updateCourse: { method: 'PATCH', path: '/courses/:courseId', access: STAFF, scope: 'courses:write' },
   setCourseInstructors: { method: 'PUT', path: '/courses/:courseId/instructors', access: ADMIN, scope: 'courses:write' },
@@ -352,6 +477,68 @@ export const ROUTES: { [K in Operation]: Route } = {
   generateElement: { method: 'POST', path: '/lessons/:lessonId/generate', access: INSTRUCTOR, scope: 'ai:run' },
 
   importCourse: { method: 'POST', path: '/courses/import', access: ADMIN, scope: 'courses:write' },
+
+  // ---- Night 3 ----
+  listPrograms: { method: 'GET', path: '/programs', access: STAFF, scope: 'courses:read' },
+  createProgram: { method: 'POST', path: '/programs', access: ADMIN, scope: 'courses:write' },
+  updateProgram: { method: 'PATCH', path: '/programs/:programId', access: ADMIN, scope: 'courses:write' },
+  deleteProgram: { method: 'DELETE', path: '/programs/:programId', access: ADMIN, scope: 'courses:write' },
+  setCourseProgram: { method: 'PUT', path: '/courses/:courseId/program', access: ADMIN, scope: 'courses:write' },
+  listTemplates: { method: 'GET', path: '/templates', access: STAFF, scope: 'courses:read' },
+  getTemplate: { method: 'GET', path: '/templates/:templateId', access: STAFF, scope: 'courses:read' },
+  createTemplate: { method: 'POST', path: '/templates', access: ADMIN, scope: 'courses:write' },
+  updateTemplate: { method: 'PATCH', path: '/templates/:templateId', access: ADMIN, scope: 'courses:write' },
+  deleteTemplate: { method: 'DELETE', path: '/templates/:templateId', access: ADMIN, scope: 'courses:write' },
+  setInstitutionTemplate: { method: 'PUT', path: '/institution/template', access: ADMIN, scope: 'people:write' },
+  previewTemplate: { method: 'GET', path: '/courses/:courseId/template', access: STAFF, scope: 'content:read' },
+  applyTemplate: { method: 'POST', path: '/courses/:courseId/template/apply', access: STAFF, scope: 'content:write' },
+
+  listRubrics: { method: 'GET', path: '/rubrics', access: STAFF, scope: 'courses:read' },
+  getRubric: { method: 'GET', path: '/rubrics/:rubricId', access: STAFF, scope: 'courses:read' },
+  createRubric: { method: 'POST', path: '/rubrics', access: ADMIN, scope: 'people:write' },
+  updateRubric: { method: 'PATCH', path: '/rubrics/:rubricId', access: ADMIN, scope: 'people:write' },
+  deleteRubric: { method: 'DELETE', path: '/rubrics/:rubricId', access: ADMIN, scope: 'people:write' },
+  updateReadinessPolicy: { method: 'PUT', path: '/institution/readiness-policy', access: ADMIN, scope: 'people:write' },
+  getCourseReadiness: { method: 'GET', path: '/courses/:courseId/readiness', access: STAFF, scope: 'courses:read' },
+  runReadinessAi: { method: 'POST', path: '/courses/:courseId/readiness/ai', access: STAFF, scope: 'ai:run' },
+  reviewFinding: { method: 'POST', path: '/courses/:courseId/readiness/items/:itemId/review', access: STAFF, scope: 'content:write' },
+  attestItem: { method: 'PUT', path: '/courses/:courseId/readiness/items/:itemId/attestation', access: STAFF, scope: 'content:write' },
+  clearAttestation: { method: 'DELETE', path: '/courses/:courseId/readiness/items/:itemId/attestation', access: STAFF, scope: 'content:write' },
+  listOutcomes: { method: 'GET', path: '/courses/:courseId/outcomes', access: 'signed-in', scope: 'courses:read' },
+  saveOutcomes: { method: 'PUT', path: '/courses/:courseId/outcomes', access: STAFF, scope: 'courses:write' },
+  listOutcomeLinks: { method: 'GET', path: '/courses/:courseId/outcome-links', access: STAFF, scope: 'content:read' },
+  setOutcomeLinks: { method: 'PUT', path: '/courses/:courseId/outcome-links', access: INSTRUCTOR, scope: 'content:write' },
+
+  listVariants: { method: 'GET', path: '/lessons/:lessonId/variants', access: STAFF, scope: 'content:read' },
+  createVariant: { method: 'POST', path: '/lessons/:lessonId/variants', access: INSTRUCTOR, scope: 'ai:run' },
+  getVariantDiff: { method: 'GET', path: '/variants/:variantId/diff', access: STAFF, scope: 'content:read' },
+  resyncVariant: { method: 'POST', path: '/variants/:variantId/resync', access: INSTRUCTOR, scope: 'ai:run' },
+  keepVariant: { method: 'POST', path: '/variants/:variantId/keep', access: INSTRUCTOR, scope: 'content:write' },
+
+  listRequirements: { method: 'GET', path: '/requirements', access: ADMIN, scope: 'people:read' },
+  createRequirement: { method: 'POST', path: '/requirements', access: ADMIN, scope: 'people:write' },
+  updateRequirement: { method: 'PATCH', path: '/requirements/:requirementId', access: ADMIN, scope: 'people:write' },
+  deleteRequirement: { method: 'DELETE', path: '/requirements/:requirementId', access: ADMIN, scope: 'people:write' },
+  getComplianceReport: { method: 'GET', path: '/compliance', access: ADMIN, scope: 'people:read' },
+  listCompletionEvents: { method: 'GET', path: '/compliance/events', access: ADMIN, scope: 'people:read' },
+  exportCompletionEvents: { method: 'GET', path: '/compliance/events/export', access: ADMIN, scope: 'people:read' },
+  listMyTraining: { method: 'GET', path: '/me/training', access: 'signed-in', scope: null },
+  getTestOut: { method: 'GET', path: '/courses/:courseId/test-out', access: STAFF, scope: 'content:read' },
+  saveTestOut: { method: 'PUT', path: '/courses/:courseId/test-out', access: INSTRUCTOR, scope: 'content:write' },
+  deleteTestOut: { method: 'DELETE', path: '/courses/:courseId/test-out', access: INSTRUCTOR, scope: 'content:write' },
+  getMyTestOut: { method: 'GET', path: '/me/courses/:courseId/test-out', access: 'signed-in', scope: null },
+  takeTestOut: { method: 'POST', path: '/me/courses/:courseId/test-out', access: 'signed-in', scope: null, browserOnly: true },
+  listMyCertificates: { method: 'GET', path: '/me/certificates', access: 'signed-in', scope: null },
+  getCertificate: { method: 'GET', path: '/certificates/:certificateId', access: 'signed-in', scope: 'people:read' },
+  verifyCertificate: { method: 'GET', path: '/verify/:code', access: 'public', scope: null },
+  reissueCertificate: { method: 'POST', path: '/certificates/:certificateId/reissue', access: ADMIN, scope: 'people:write' },
+
+  listReportingLines: { method: 'GET', path: '/reporting-lines', access: ADMIN, scope: 'people:read' },
+  addReportingLine: { method: 'POST', path: '/reporting-lines', access: ADMIN, scope: 'people:write' },
+  removeReportingLine: { method: 'DELETE', path: '/reporting-lines', access: ADMIN, scope: 'people:write' },
+  getMyVisibility: { method: 'GET', path: '/me/visibility', access: 'signed-in', scope: null },
+  setManagerSharing: { method: 'PUT', path: '/me/visibility/:managerId', access: 'signed-in', scope: null, browserOnly: true },
+  getManagerView: { method: 'GET', path: '/me/team', access: 'signed-in', scope: 'people:read' },
 };
 
 /** All scopes, for the token form and the docs. */

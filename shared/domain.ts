@@ -76,6 +76,10 @@ export interface Institution {
   policy: AiPolicy;
   /** Publishing rules for accessibility (D-022). */
   accessPolicy: AccessPolicy;
+  /** Night 3: the institution's course template (D-024), when one is set. */
+  templateId?: Id | null;
+  /** Night 3: the readiness rubric and whether a minimum result blocks publishing (D-029). */
+  readinessPolicy?: ReadinessPolicy;
 }
 
 // ---- Courses and structure -------------------------------------------------------
@@ -93,6 +97,8 @@ export interface Course {
   outcomes: string[];
   instructorIds: Id[];
   status: CourseStatus;
+  /** Night 3: the program the course belongs to (at most one); its template applies (D-024). */
+  programId?: Id | null;
 }
 
 /** A course as it appears in a list, with counts for the viewer's role. */
@@ -113,6 +119,10 @@ export interface Module {
   courseId: Id;
   title: string;
   position: number;
+  /** Night 3: what a learner can do after the module (a readiness item checks it's present). */
+  objective?: string | null;
+  /** Night 3: the template item this module came from, so readiness can spot deviations. */
+  templateKey?: string | null;
 }
 
 export type LessonStatus = 'draft' | 'published';
@@ -127,6 +137,10 @@ export interface Lesson {
   position: number;
   status: LessonStatus;
   publishedAt: Timestamp | null;
+  /** Night 3: the template item this lesson came from. */
+  templateKey?: string | null;
+  /** Night 3: set on a variant lesson (#23); variants never appear in outlines. */
+  variantOf?: { lessonId: Id; audience: VariantAudience } | null;
 }
 
 /** A lesson in an outline, with the viewer's progress (students) or block counts (staff). */
@@ -151,7 +165,7 @@ export interface CourseOutline {
 
 // ---- Blocks and AI provenance (D-003, D-006) --------------------------------------------
 
-export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback' | 'alt-text' | 'rewrite' | 'link-text' | 'element' | 'tutor' | 'tutor-summary' | 'agent';
+export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback' | 'alt-text' | 'rewrite' | 'link-text' | 'element' | 'tutor' | 'tutor-summary' | 'agent' | 'readiness-item' | 'variant';
 
 /** Where AI output came from. Shown next to every AI block ("names what it is and its source"). */
 export interface Provenance {
@@ -179,6 +193,10 @@ export interface BlockMeta {
   /** The previous content when a person edited or regenerated an AI block (for the diff and Revert). */
   previous: BlockContent | null;
   updatedAt: Timestamp;
+  /** Night 3: the template item this block came from (a required block). */
+  templateKey?: string | null;
+  /** Night 3, variants only: the master block this came from and the master's content hash at the last sync. */
+  source?: { blockId: Id; hash: string } | null;
 }
 
 export type BlockContent =
@@ -249,6 +267,10 @@ export interface StudentLesson {
   progress: LessonProgress;
   previousLessonId: Id | null;
   nextLessonId: Id | null;
+  /** Night 3: set when the student is reading a variant, with why and the way back (D-004, principle #7). */
+  variant?: { audience: VariantAudience; why: string; fullLessonId: Id } | null;
+  /** Night 3: set on the full lesson when a variant matches the student, so the player can offer it. */
+  variantAvailable?: { audience: VariantAudience; lessonId: Id; why: string } | null;
 }
 
 // ---- Publish readiness (principle #12) ----------------------------------------------
@@ -334,6 +356,8 @@ export interface Today {
   unreadCount: number;
   courses: CourseSummary[];
   week: { minutesGoal: number; minutesDone: number };
+  /** Night 3: required training, shown first, soonest due first (#22). */
+  required?: RequiredTraining[];
 }
 
 // ---- Rosters and overview ------------------------------------------------------------------
@@ -658,4 +682,428 @@ export interface Invitation {
   accessGranted: boolean;
   accessError?: string | null;
   acceptedAt: Timestamp | null;
+}
+
+// =====================================================================================
+// ---- Night 3 (D-024 to D-029) --------------------------------------------------------
+// =====================================================================================
+
+// ---- Programs and templates (D-024, #24) ----------------------------------------------------
+
+/** A group of courses that share a template and brand. A course belongs to at most one. */
+export interface Program {
+  id: Id;
+  name: string;
+  description: string;
+  /** The program's template; null means its courses use the institution's. */
+  templateId: Id | null;
+  brand: Brand;
+  createdAt: Timestamp;
+}
+
+/** Brand applied to a program's courses. The accent comes from `accent-options` (D-007). */
+export interface Brand {
+  accent: AccentId | null;
+  /** An uploaded image; alt text is required. */
+  logo: { fileId: Id; alt: string } | null;
+}
+
+/** A required block inside a template lesson: a label for the report and starter content. */
+export interface TemplateBlock {
+  /** Stable within the template, for example "contact". */
+  key: string;
+  /** What's required, in words: "Instructor contact". */
+  label: string;
+  content: BlockContent;
+}
+
+export interface TemplateLesson {
+  key: string;
+  title: string;
+  minutes: number;
+  blocks: TemplateBlock[];
+}
+
+export interface TemplateModule {
+  key: string;
+  title: string;
+  /** Where the module goes when applied to an existing course. */
+  placement: 'start' | 'end';
+  objective: string;
+  lessons: TemplateLesson[];
+}
+
+/**
+ * The required structure and defaults for courses (D-024). Applying a template never
+ * deletes or renames content; deviations show up in the readiness report.
+ */
+export interface CourseTemplate {
+  id: Id;
+  name: string;
+  description: string;
+  /** Who owns it: the institution, or one program. */
+  owner: { kind: 'institution' } | { kind: 'program'; programId: Id };
+  modules: TemplateModule[];
+  /** Default tutor mode per activity kind, clamped to the AI policy when applied. */
+  tutorDefaults: { lesson: TutorMode; assignment: TutorMode };
+  /** An accessibility floor at or above the institution's minimum score, or null. */
+  accessFloor: number | null;
+  updatedBy: Id;
+  updatedAt: Timestamp;
+}
+
+/** What applying a template would do: shown before Apply (principle #11, D-003). */
+export interface TemplateChangeSet {
+  courseId: Id;
+  templateId: Id;
+  templateName: string;
+  addModules: { key: string; title: string; placement: 'start' | 'end' }[];
+  addLessons: { key: string; moduleTitle: string; title: string }[];
+  addBlocks: { key: string; lessonTitle: string; label: string }[];
+  /** "Adds 2 lessons and 3 blocks. Renames nothing. Removes nothing." Templates never remove or rename. */
+  summary: string;
+  /** Pass back to `applyTemplate` so what's applied is what was previewed. */
+  hash: string;
+}
+
+// ---- Readiness rubrics (D-024, D-029, #25) ----------------------------------------------------
+
+/** How an item is judged. AI-assisted findings are drafts until a person reviews them. */
+export type RubricCheckKind = 'automatic' | 'ai' | 'attestation';
+
+/** Automatic checks computed from course data (shared/quality/checks.ts). */
+export type AutomaticCheck =
+  | 'outcomes-present'
+  | 'module-objectives'
+  | 'assessments-aligned'
+  | 'outcomes-assessed'
+  | 'access-score'
+  | 'reading-level'
+  | 'navigation-instructions'
+  | 'instructor-contact'
+  | 'template-followed'
+  | 'time-estimates'
+  | 'ai-drafts-kept'
+  | 'media-alternatives'
+  | 'descriptive-links';
+
+export interface RubricItem {
+  id: Id;
+  /** As printed, for example "1.2" or "17". */
+  number: string;
+  text: string;
+  kind: RubricCheckKind;
+  /** Set when `kind` is automatic. */
+  check: AutomaticCheck | null;
+  /** For AI-assisted items: what the model judges against. For attestations: what the reviewer confirms. */
+  criteria: string;
+}
+
+export interface RubricStandard {
+  id: Id;
+  number: string;
+  title: string;
+  description: string;
+  items: RubricItem[];
+}
+
+export interface Rubric {
+  id: Id;
+  name: string;
+  /** Built-in rubrics ship with Tessera and can't be edited. QM text is never built in (D-024). */
+  source: 'tessera' | 'oscqr' | 'custom';
+  version: string;
+  /** Required for OSCQR (CC BY 4.0). */
+  attribution: string | null;
+  builtIn: boolean;
+  standards: RubricStandard[];
+  updatedAt: Timestamp;
+}
+
+/** D-029: advisory by default; a minimum makes it block publishing, like the accessibility policy. */
+export interface ReadinessPolicy {
+  rubricId: Id;
+  /** 0–100, or null for advisory only. */
+  minimumPercent: number | null;
+}
+
+/** Where to go to fix an item. */
+export type FixTarget =
+  | { kind: 'block'; lessonId: Id; blockId: Id }
+  | { kind: 'lesson'; lessonId: Id }
+  | { kind: 'module'; moduleId: Id }
+  | { kind: 'assignment'; assignmentId: Id }
+  | { kind: 'course'; courseId: Id; field: 'outcomes' | 'welcome' | 'description' | 'program' }
+  | { kind: 'template'; courseId: Id }
+  | { kind: 'access'; courseId: Id };
+
+export interface FixLink {
+  label: string;
+  target: FixTarget;
+}
+
+/** An AI judgment of one item: a draft with evidence until a person accepts or dismisses it. */
+export interface AiFinding {
+  verdict: 'likely-met' | 'likely-not-met' | 'unclear';
+  evidence: string;
+  suggestion: string;
+  provenance: Provenance;
+  state: 'draft' | 'accepted' | 'dismissed';
+  reviewedBy: Id | null;
+  reviewedAt: Timestamp | null;
+}
+
+/** A named reviewer's confirmation of an item. */
+export interface Attestation {
+  status: 'attested' | 'not-applicable';
+  by: Id;
+  byName: string;
+  note: string;
+  at: Timestamp;
+}
+
+export type ItemStatus = 'met' | 'not-met' | 'needs-review' | 'attested' | 'not-applicable';
+
+export interface ItemResult {
+  itemId: Id;
+  number: string;
+  text: string;
+  kind: RubricCheckKind;
+  status: ItemStatus;
+  /** Plain sentences: what was found. */
+  evidence: string[];
+  fixes: FixLink[];
+  finding: AiFinding | null;
+  attestation: Attestation | null;
+}
+
+export interface StandardResult {
+  standardId: Id;
+  number: string;
+  title: string;
+  /** Met or attested items, and items that apply. */
+  met: number;
+  applicable: number;
+  status: 'met' | 'partly-met' | 'not-met' | 'not-applicable';
+  items: ItemResult[];
+}
+
+export interface ReadinessResult {
+  courseId: Id;
+  rubricId: Id;
+  rubricName: string;
+  attribution: string | null;
+  computedAt: Timestamp;
+  met: number;
+  applicable: number;
+  /** 0–100, rounded down. */
+  percent: number;
+  needsReview: number;
+  standards: StandardResult[];
+  /** True when the policy has a minimum and the result is below it (D-029). */
+  blocksPublishing: boolean;
+}
+
+// ---- Outcomes and alignment (#25) ------------------------------------------------------------
+
+/** A course learning outcome as an entity, so activities can be aligned to it. */
+export interface Outcome {
+  id: Id;
+  courseId: Id;
+  /** Short label shown in tags, for example "O2". */
+  code: string;
+  text: string;
+  position: number;
+}
+
+export type AlignableKind = 'block' | 'assignment';
+
+/** A check, scenario, or assignment tagged with an outcome it assesses. */
+export interface OutcomeLink {
+  outcomeId: Id;
+  targetKind: AlignableKind;
+  targetId: Id;
+}
+
+// ---- Persona variants (D-028, #23) -------------------------------------------------------------
+
+/** Plain language, or a micro-path of at most 15 minutes with essentials only. */
+export type VariantAudience = 'plain' | 'micro';
+
+export interface LessonVariant {
+  /** The variant's own lesson id. */
+  lessonId: Id;
+  masterLessonId: Id;
+  audience: VariantAudience;
+  title: string;
+  minutes: number;
+  status: LessonStatus;
+  /** Variant blocks whose master block changed since the last sync. */
+  divergedBlocks: number;
+  /** Master blocks added since the last sync that the variant doesn't cover. */
+  uncoveredBlocks: number;
+}
+
+export type VariantRowState = 'in-sync' | 'diverged' | 'master-removed' | 'new-in-master' | 'variant-only';
+
+/** One row of the side-by-side diff. */
+export interface VariantDiffRow {
+  state: VariantRowState;
+  master: Block | null;
+  variant: Block | null;
+}
+
+export interface VariantDiff {
+  variant: LessonVariant;
+  rows: VariantDiffRow[];
+}
+
+// ---- Required training, test-out, certificates (D-026, D-027, #22) ---------------------------
+
+export type RequirementAudience =
+  | { kind: 'role'; role: Role }
+  | { kind: 'users'; userIds: Id[] };
+
+/** An administrator's assignment of required training. */
+export interface Requirement {
+  id: Id;
+  target: { kind: 'course'; courseId: Id } | { kind: 'program'; programId: Id };
+  audience: RequirementAudience;
+  dueAt: Timestamp | null;
+  recurrence: 'none' | 'annual';
+  createdBy: Id;
+  createdAt: Timestamp;
+}
+
+export type TrainingStatus = 'not-started' | 'in-progress' | 'completed' | 'tested-out' | 'overdue';
+
+/** One person's required course, as they (and an opted-in manager) see it. */
+export interface RequiredTraining {
+  requirementId: Id;
+  courseId: Id;
+  courseTitle: string;
+  dueAt: Timestamp | null;
+  status: TrainingStatus;
+  completedAt: Timestamp | null;
+  certificateId: Id | null;
+}
+
+export type CompletionEventKind =
+  | 'assigned'
+  | 'unassigned'
+  | 'started'
+  | 'completed'
+  | 'tested-out'
+  | 'certificate-issued'
+  | 'certificate-replaced'
+  | 'due-date-changed';
+
+/** Append-only audit trail (the table refuses updates). */
+export interface CompletionEvent {
+  id: Id;
+  at: Timestamp;
+  userId: Id;
+  courseId: Id;
+  requirementId: Id | null;
+  kind: CompletionEventKind;
+  /** Who did it; null when Tessera did it (for example a completion). */
+  actorId: Id | null;
+  /** One plain sentence, for example "Due date changed from 1 Oct to 15 Oct." */
+  detail: string;
+}
+
+/** A placement check: pass it and the course completes as "tested out". */
+export interface TestOut {
+  courseId: Id;
+  items: { id: string; question: string; options: { id: string; text: string }[]; correctOptionId: string }[];
+  /** 0–100. */
+  passPercent: number;
+  updatedBy: Id;
+  updatedAt: Timestamp;
+}
+
+/** What a learner receives: no answer key. */
+export interface StudentTestOut {
+  courseId: Id;
+  items: { id: string; question: string; options: { id: string; text: string }[] }[];
+  passPercent: number;
+  /** This learner's earlier attempts (never shown to managers). */
+  attempts: { at: Timestamp; percent: number; passed: boolean }[];
+}
+
+/** Immutable once issued; a correction issues a new certificate and marks this one replaced. */
+export interface Certificate {
+  id: Id;
+  /** Public verification code, for example "TSR-7K2M-94QD". */
+  code: string;
+  userId: Id;
+  learnerName: string;
+  courseId: Id;
+  courseTitle: string;
+  issuedAt: Timestamp;
+  basis: 'completed' | 'tested-out';
+  replaces: Id | null;
+  replacedBy: Id | null;
+}
+
+/** What the public verification URL shows (D-027): never the learner's name. */
+export interface CertificateVerification {
+  code: string;
+  valid: boolean;
+  courseTitle: string | null;
+  issuedAt: Timestamp | null;
+  replaced: boolean;
+}
+
+/** One row of the administrator's compliance report. */
+export interface ComplianceRow {
+  user: Pick<User, 'id' | 'name' | 'email'>;
+  training: RequiredTraining;
+}
+
+// ---- Managers (D-025, D-026) --------------------------------------------------------------
+
+/** Who reports to whom: a relationship on any user, not a role (D-026). */
+export interface ReportingLine {
+  managerId: Id;
+  reportId: Id;
+  createdBy: Id;
+  createdAt: Timestamp;
+}
+
+/** A learner's choice per manager. Removing the reporting line clears it. */
+export interface ManagerConsent {
+  managerId: Id;
+  reportId: Id;
+  sharing: boolean;
+  at: Timestamp;
+}
+
+/** The learner's "Who sees this" panel. */
+export interface MyVisibility {
+  managers: { manager: Pick<User, 'id' | 'name' | 'initials'>; sharing: boolean; since: Timestamp | null }[];
+  /** What a manager sees when sharing is on, and what they never see (shared/managers/policy.ts). */
+  sees: string[];
+  neverSees: string[];
+}
+
+/** What a manager sees about one person who opted in: completion only (D-025). */
+export interface ManagerTrainingRow {
+  courseId: Id;
+  courseTitle: string;
+  dueAt: Timestamp | null;
+  status: TrainingStatus;
+  completedAt: Timestamp | null;
+  certificate: { id: Id; code: string } | null;
+}
+
+export interface ManagerReportRow {
+  person: Pick<User, 'id' | 'name' | 'initials'>;
+  training: ManagerTrainingRow[];
+}
+
+export interface ManagerView {
+  rows: ManagerReportRow[];
+  /** People who report to this manager and haven't chosen to share. Names are not shown. */
+  notSharingCount: number;
 }
