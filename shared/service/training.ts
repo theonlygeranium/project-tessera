@@ -1,4 +1,3 @@
-import { ApiError } from '../api';
 import type { Certificate, CompletionEvent, CompletionEventKind, Requirement, RequiredTraining, TestOut, User } from '../domain';
 import { managerMayReadCertificate } from '../managers/policy';
 import type { Service, ServiceContext } from './context';
@@ -26,14 +25,16 @@ async function targetCourses(ctx: ServiceContext, r: Requirement): Promise<strin
 async function audience(ctx: ServiceContext, r: Requirement): Promise<User[]> {
   return r.audience.kind === 'role' ? ctx.repo.listUsers({ role: r.audience.role }) : (await Promise.all(r.audience.userIds.map(id => ctx.repo.getUser(id)))).filter((x):x is User => !!x);
 }
-async function event(ctx: ServiceContext, kind: CompletionEventKind, userId: string, courseId: string, requirementId: string | null, detail: string, actorId: string | null = null) {
-  const e: CompletionEvent = { id:ctx.newId('ev'),at:ctx.now(),userId,courseId,requirementId,kind,detail,actorId }; await ctx.repo.appendCompletionEvent(e);
+async function event(ctx: ServiceContext, kind: CompletionEventKind, userId: string, courseId: string, requirementId: string | null, detail: string, actorId: string | null = null, id?: string) {
+  const e: CompletionEvent = { id:id ?? ctx.newId('ev'),at:ctx.now(),userId,courseId,requirementId,kind,detail,actorId };
+  try { await ctx.repo.appendCompletionEvent(e); }
+  catch (error) {
+    if (!id || !(await ctx.repo.listCompletionEvents({ userId, courseId })).some(existing => existing.id === id)) throw error;
+  }
 }
 async function ensureAssignment(ctx: ServiceContext, r: Requirement, person: User, courseId: string) {
-  const events = await ctx.repo.listCompletionEvents({ userId:person.id,courseId });
-  if (!events.some(e => e.requirementId === r.id && e.kind === 'assigned')) await event(ctx,'assigned',person.id,courseId,r.id,`Assigned ${courseId}, due ${date(r.dueAt)}.`,r.createdBy);
-  const enrolled = await ctx.repo.listEnrollments({courseId});
-  if (!enrolled.some(e=>e.userId===person.id)) await ctx.repo.setEnrollments(courseId,[...enrolled.map(e=>e.userId),person.id]);
+  await event(ctx,'assigned',person.id,courseId,r.id,`Assigned ${courseId}, due ${date(r.dueAt)}.`,r.createdBy,`ev-assigned-${r.id}-${person.id}-${courseId}`);
+  await ctx.repo.addEnrollment(courseId,person.id);
 }
 async function applicable(ctx:ServiceContext, person:User) {
   const rows:{r:Requirement; courseId:string}[]=[];
@@ -68,11 +69,17 @@ async function rowsFor(ctx:ServiceContext, person:User) { const rows=[]; for (co
 function sortedTraining(rows:RequiredTraining[]) { return rows.sort((a,b)=> (a.status==='overdue'?-1:0)-(b.status==='overdue'?-1:0) || Number(['completed','tested-out'].includes(a.status))-Number(['completed','tested-out'].includes(b.status)) || (a.dueAt ?? '9999').localeCompare(b.dueAt ?? '9999') || a.courseTitle.localeCompare(b.courseTitle)); }
 const alphabet='0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 function code() { const values=new Uint8Array(8); crypto.getRandomValues(values); return `TSR-${[...values.slice(0,4)].map(x=>alphabet[x%32]).join('')}-${[...values.slice(4)].map(x=>alphabet[x%32]).join('')}`; }
-async function issue(ctx:ServiceContext, person:User, courseId:string, basis:Certificate['basis'], replaces:string|null=null, learnerName=person.name) {
+async function issue(ctx:ServiceContext, person:User, courseId:string, basis:Certificate['basis'], cycleKey:string, replaces:string|null=null, learnerName=person.name, replacementId?:string):Promise<{certificate:Certificate;created:boolean}> {
   const c=await course(ctx,courseId);
+  const id=replacementId ?? `cert-${person.id}-${courseId}-${cycleKey.slice(0,10)}`;
   for(let tries=0;tries<20;tries++) { const value=code(); if(await ctx.repo.getCertificateByCode(value)) continue;
-    const cert:Certificate={id:ctx.newId('cert'),code:value,userId:person.id,learnerName,courseId,courseTitle:c.title,issuedAt:ctx.now(),basis,replaces,replacedBy:null};
-    try { await ctx.repo.insertCertificate(cert); return cert; } catch(error) { if(error instanceof ApiError && error.code==='conflict') continue; throw error; }
+    const cert:Certificate={id,code:value,userId:person.id,learnerName,courseId,courseTitle:c.title,issuedAt:ctx.now(),basis,replaces,replacedBy:null};
+    try { await ctx.repo.insertCertificate(cert); return {certificate:cert,created:true}; } catch(error) {
+      const existing=await ctx.repo.getCertificate(id);
+      if(existing)return {certificate:existing,created:false};
+      if(await ctx.repo.getCertificateByCode(value))continue;
+      throw error;
+    }
   }
   return fail('conflict','Could not create a unique certificate code.');
 }
@@ -86,8 +93,8 @@ export async function onLessonProgress(ctx:ServiceContext,courseId:string) {
   const cycle=trainingCycle(r,ctx.now(),events.filter(e=>e.kind==='completed'||e.kind==='tested-out').at(-1)?.at??null);
   const row=await trainingRow(ctx,person,r,courseId);
   if(!events.some(e=>e.kind==='started'&&e.at>=cycle.start))await event(ctx,'started',person.id,courseId,r.id,'Training started.');
-  if(row.status==='completed'&&!events.some(e=>e.kind==='completed'&&e.at>=cycle.start))await event(ctx,'completed',person.id,courseId,r.id,'All published lessons completed.');
-  if(row.status==='completed'&&!row.certificateId){await issue(ctx,person,courseId,'completed');await event(ctx,'certificate-issued',person.id,courseId,r.id,'Certificate issued for completed training.');}
+  if(row.status==='completed'&&!events.some(e=>e.kind==='completed'&&e.at>=cycle.start))await event(ctx,'completed',person.id,courseId,r.id,'All published lessons completed.',null,`ev-completed-${person.id}-${courseId}-${cycle.start.slice(0,10)}`);
+  if(row.status==='completed'&&!row.certificateId){const issued=await issue(ctx,person,courseId,'completed',cycle.start);if(issued.created)await event(ctx,'certificate-issued',person.id,courseId,r.id,'Certificate issued for completed training.',null,`ev-certificate-issued-${person.id}-${courseId}-${cycle.start.slice(0,10)}`);}
 }
 
 const csvCell=(v:unknown)=>`"${String(v??'').replace(/^[=+\-@]/,"'$&").replaceAll('"','""')}"`;
@@ -107,11 +114,11 @@ export const training: Pick<Service,'listRequirements'|'createRequirement'|'upda
   saveTestOut:async(ctx,{courseId,items,passPercent})=>{await instructorCourse(ctx,courseId);if(!Number.isInteger(passPercent)||passPercent<1||passPercent>100||!items.length||new Set(items.map(i=>i.id)).size!==items.length||items.some(i=>!i.id.trim()||!i.question.trim()||i.options.length<2||i.options.length>6||new Set(i.options.map(o=>o.id)).size!==i.options.length||i.options.some(o=>!o.id.trim()||!o.text.trim())||!i.options.some(o=>o.id===i.correctOptionId)))fail('invalid','Test-out items are invalid.');const t:TestOut={courseId,items,passPercent,updatedBy:user(ctx).id,updatedAt:ctx.now()};await ctx.repo.putTestOut(t);return t;},
   deleteTestOut:async(ctx,{courseId})=>{await instructorCourse(ctx,courseId);await ctx.repo.deleteTestOut(courseId);return {ok:true};},
   getMyTestOut:async(ctx,{courseId})=>{await assignedOrEnrolled(ctx,courseId);const t=await ctx.repo.getTestOut(courseId);if(!t)return null;return {courseId,passPercent:t.passPercent,items:t.items.map(({id,question,options})=>({id,question,options})),attempts:(await ctx.repo.listTestOutAttempts(user(ctx).id,courseId)).map(({at,percent,passed})=>({at,percent,passed}))};},
-  takeTestOut:async(ctx,{courseId,answers})=>{await assignedOrEnrolled(ctx,courseId);const t=await ctx.repo.getTestOut(courseId)??fail('not-found','Test-out not found.');if(answers.length!==t.items.length||new Set(answers.map(a=>a.itemId)).size!==answers.length||answers.some(a=>!t.items.some(i=>i.id===a.itemId&&i.options.some(o=>o.id===a.optionId))))fail('invalid','Answer every question once.');const percent=Math.floor(100*t.items.filter(i=>answers.find(a=>a.itemId===i.id)?.optionId===i.correctOptionId).length/t.items.length),passed=percent>=t.passPercent,person=user(ctx);await ctx.repo.putTestOutAttempt({id:ctx.newId('attempt'),courseId,userId:person.id,percent,passed,at:ctx.now()});if(!passed)return {passed,percent,certificate:null};const assigned=(await applicable(ctx,person)).filter(x=>x.courseId===courseId),events=await ctx.repo.listCompletionEvents({userId:person.id,courseId});let certificate:Certificate|null=null;const active=assigned[0]?.r??null;const cycle=active?trainingCycle(active,ctx.now(),events.filter(e=>e.kind==='completed'||e.kind==='tested-out').at(-1)?.at??null):null;if(!events.some(e=>['completed','tested-out'].includes(e.kind)&&(!cycle||e.at>=cycle.start)))await event(ctx,'tested-out',person.id,courseId,active?.id??null,'Passed the test-out.');const existing=await currentCertificate(ctx,person.id,courseId,cycle?.start??'');const alreadyFinished=events.some(e=>['completed','tested-out'].includes(e.kind)&&(!cycle||e.at>=cycle.start));certificate=existing??(alreadyFinished?null:await issue(ctx,person,courseId,'tested-out'));if(!existing&&!alreadyFinished)await event(ctx,'certificate-issued',person.id,courseId,assigned[0]?.r.id??null,'Certificate issued for test-out.');return {passed,percent,certificate};},
+  takeTestOut:async(ctx,{courseId,answers})=>{await assignedOrEnrolled(ctx,courseId);const t=await ctx.repo.getTestOut(courseId)??fail('not-found','Test-out not found.');if(answers.length!==t.items.length||new Set(answers.map(a=>a.itemId)).size!==answers.length||answers.some(a=>!t.items.some(i=>i.id===a.itemId&&i.options.some(o=>o.id===a.optionId))))fail('invalid','Answer every question once.');const percent=Math.floor(100*t.items.filter(i=>answers.find(a=>a.itemId===i.id)?.optionId===i.correctOptionId).length/t.items.length),passed=percent>=t.passPercent,person=user(ctx);await ctx.repo.putTestOutAttempt({id:ctx.newId('attempt'),courseId,userId:person.id,percent,passed,at:ctx.now()});if(!passed)return {passed,percent,certificate:null};const assigned=(await applicable(ctx,person)).filter(x=>x.courseId===courseId),events=await ctx.repo.listCompletionEvents({userId:person.id,courseId});let certificate:Certificate|null=null;const active=assigned[0]?.r??null;const cycle=active?trainingCycle(active,ctx.now(),events.filter(e=>e.kind==='completed'||e.kind==='tested-out').at(-1)?.at??null):null;const existing=await currentCertificate(ctx,person.id,courseId,cycle?.start??'');const alreadyFinished=events.some(e=>['completed','tested-out'].includes(e.kind)&&(!cycle||e.at>=cycle.start));const cycleKey=cycle?.start??ctx.now();const issued=existing||alreadyFinished?null:await issue(ctx,person,courseId,'tested-out',cycleKey);certificate=existing??issued?.certificate??null;if(issued?.created){await event(ctx,'tested-out',person.id,courseId,active?.id??null,'Passed the test-out.',null,`ev-tested-out-${person.id}-${courseId}-${cycleKey.slice(0,10)}`);await event(ctx,'certificate-issued',person.id,courseId,active?.id??null,'Certificate issued for test-out.',null,`ev-certificate-issued-${person.id}-${courseId}-${cycleKey.slice(0,10)}`);}return {passed,percent,certificate};},
   listMyCertificates:async(ctx)=>ctx.repo.listCertificates({userId:user(ctx).id}),
   getCertificate:async(ctx,{certificateId})=>{const c=await ctx.repo.getCertificate(certificateId)??fail('not-found','Certificate not found.');const u=user(ctx);if(u.id===c.userId||u.role==='administrator')return c;const [lines,consents,learner]=await Promise.all([ctx.repo.listReportingLines({managerId:u.id,reportId:c.userId}),ctx.repo.listManagerConsents({managerId:u.id,reportId:c.userId}),ctx.repo.getUser(c.userId)]);const requiredIds=learner?(await rowsFor(ctx,learner)).map(x=>x.courseId):[];if(managerMayReadCertificate(lines,consents,u.id,c,requiredIds))return c;return fail('forbidden','You cannot view this certificate.');},
   verifyCertificate:async(ctx,{code:value})=>{const c=await ctx.repo.getCertificateByCode(value);return {code:value,valid:!!c&&!c.replacedBy,courseTitle:c?.courseTitle??null,issuedAt:c?.issuedAt??null,replaced:!!c?.replacedBy};},
-  reissueCertificate:async(ctx,{certificateId,learnerName})=>{const old=await ctx.repo.getCertificate(certificateId)??fail('not-found','Certificate not found.');if(old.replacedBy)fail('conflict','Certificate was already replaced.');const person=await ctx.repo.getUser(old.userId)??fail('not-found','Learner not found.');const cert=await issue(ctx,person,old.courseId,old.basis,old.id,learnerName===undefined?old.learnerName:required(learnerName,'Learner name'));await ctx.repo.markCertificateReplaced(old.id,cert.id);await event(ctx,'certificate-replaced',person.id,old.courseId,null,`Certificate ${old.code} replaced by ${cert.code}.`,user(ctx).id);await event(ctx,'certificate-issued',person.id,old.courseId,null,`Replacement certificate ${cert.code} issued.`,user(ctx).id);return cert;},
+  reissueCertificate:async(ctx,{certificateId,learnerName})=>{const old=await ctx.repo.getCertificate(certificateId)??fail('not-found','Certificate not found.');if(old.replacedBy)fail('conflict','Certificate was already replaced.');const person=await ctx.repo.getUser(old.userId)??fail('not-found','Learner not found.');const name=learnerName===undefined?old.learnerName:required(learnerName,'Learner name');const newId=ctx.newId('cert');await ctx.repo.markCertificateReplaced(old.id,newId);const {certificate:cert}=await issue(ctx,person,old.courseId,old.basis,old.issuedAt,old.id,name,newId);await event(ctx,'certificate-replaced',person.id,old.courseId,null,`Certificate ${old.code} replaced by ${cert.code}.`,user(ctx).id);await event(ctx,'certificate-issued',person.id,old.courseId,null,`Replacement certificate ${cert.code} issued.`,user(ctx).id);return cert;},
 };
 
 /** A person's required training (status per course), for other services such as the manager view. */

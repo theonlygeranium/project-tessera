@@ -23,6 +23,8 @@ async function twoPagePdf(scanned = false): Promise<ArrayBuffer> {
     sheet.drawImage(image, { x: 25, y: 100, width: 100, height: 100 });
     if (!scanned) sheet.drawText(`Page ${page} text`, { x: 25, y: 350, font, size: 12 });
   }
+  // Fixed dates make the bytes deterministic, so the test can compare two generations.
+  pdf.setCreationDate(new Date(0)); pdf.setModificationDate(new Date(0));
   return Uint8Array.from(await pdf.save()).buffer;
 }
 

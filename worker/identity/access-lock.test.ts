@@ -23,11 +23,12 @@ const emails = (group: { include: { email: { email: string } }[] }) => group.inc
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Access group lock (carry-over 1)', () => {
-  it('shows the race: two unserialized grants lose one email', async () => {
+  it('retries two unserialized grants until both emails land', async () => {
     const api = fakeAccessApi();
-    const directory = createAccessDirectory({ token: 't', accountId: 'a', groupId: 'g', fetch: api.fetch as unknown as typeof fetch });
-    await Promise.all([directory.grant('a@example.test'), directory.grant('b@example.test')]);
-    expect(emails(api.group)).toHaveLength(2); // owner plus only one of the two
+    const a = createAccessDirectory({ token: 't', accountId: 'a', groupId: 'g', fetch: api.fetch as unknown as typeof fetch });
+    const b = createAccessDirectory({ token: 't', accountId: 'a', groupId: 'g', fetch: api.fetch as unknown as typeof fetch });
+    await Promise.all([a.grant('a@example.test'), b.grant('b@example.test')]);
+    expect(emails(api.group)).toEqual(['a@example.test', 'b@example.test', 'owner@example.test']);
   });
 
   it('serializes grants so simultaneous invitations both land', async () => {

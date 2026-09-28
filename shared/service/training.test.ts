@@ -10,6 +10,37 @@ const courseId='c-ops101';
 const answers=[{itemId:'q1',optionId:'a'},{itemId:'q2',optionId:'a'},{itemId:'q3',optionId:'b'},{itemId:'q4',optionId:'a'}];
 
 describe('required training',()=>{
+  it('adds concurrent eligible learners without removing enrollments or duplicating assigned events',async()=>{
+    const repo=new MemoryRepo(seedData()),admin=await ctx(repo,'u-admin');
+    const r=await dispatch(service,admin,'createRequirement',{target:{kind:'course',courseId},audience:{kind:'role',role:'student'}});
+    const dana=(await repo.getUser('u-dana'))!;
+    await repo.putUser({...dana,id:'u-concurrent-a',name:'Alex Example',email:'alex@example.test'});
+    await repo.putUser({...dana,id:'u-concurrent-b',name:'Bea Example',email:'bea@example.test'});
+    const a=await ctx(repo,'u-concurrent-a'),b=await ctx(repo,'u-concurrent-b');
+    await Promise.all([dispatch(service,a,'listMyTraining',undefined),dispatch(service,b,'listMyTraining',undefined),dispatch(service,a,'listMyTraining',undefined)]);
+    expect((await repo.listEnrollments({courseId})).map(e=>e.userId)).toEqual(expect.arrayContaining(['u-concurrent-a','u-concurrent-b']));
+    for(const id of ['u-concurrent-a','u-concurrent-b'])expect((await repo.listCompletionEvents({userId:id,courseId})).filter(e=>e.kind==='assigned'&&e.requirementId===r.id)).toHaveLength(1);
+  });
+  it('issues one certificate and one event of each kind for concurrent passing attempts',async()=>{
+    const repo=new MemoryRepo(seedData()),dana=await ctx(repo,'u-dana');
+    const [a,b]=await Promise.all([dispatch(service,dana,'takeTestOut',{courseId,answers}),dispatch(service,dana,'takeTestOut',{courseId,answers})]);
+    expect(a.certificate?.id).toBe(b.certificate?.id);
+    expect(await repo.listCertificates({userId:'u-dana',courseId})).toHaveLength(1);
+    const events=await repo.listCompletionEvents({userId:'u-dana',courseId});
+    for(const kind of ['tested-out','certificate-issued'])expect(events.filter(e=>e.kind===kind)).toHaveLength(1);
+  });
+  it('allows only one concurrent replacement and keeps verification valid only for it',async()=>{
+    const repo=new MemoryRepo(seedData()),dana=await ctx(repo,'u-dana'),admin=await ctx(repo,'u-admin');
+    const first=(await dispatch(service,dana,'takeTestOut',{courseId,answers})).certificate!;
+    const outcomes=await Promise.allSettled([dispatch(service,admin,'reissueCertificate',{certificateId:first.id,learnerName:'Dana A.'}),dispatch(service,admin,'reissueCertificate',{certificateId:first.id,learnerName:'Dana B.'})]);
+    expect(outcomes.filter(x=>x.status==='fulfilled')).toHaveLength(1);
+    expect(outcomes.filter(x=>x.status==='rejected').map(x=>(x as PromiseRejectedResult).reason.code)).toEqual(['conflict']);
+    const replacement=(outcomes.find(x=>x.status==='fulfilled') as PromiseFulfilledResult<Awaited<ReturnType<typeof service.reissueCertificate>>>).value;
+    expect((await repo.getCertificate(first.id))?.replacedBy).toBe(replacement.id);
+    expect((await repo.listCertificates({userId:'u-dana',courseId})).filter(c=>c.replaces===first.id)).toHaveLength(1);
+    expect((await dispatch(service,admin,'verifyCertificate',{code:first.code})).valid).toBe(false);
+    expect((await dispatch(service,admin,'verifyCertificate',{code:replacement.code})).valid).toBe(true);
+  });
   it('lists the seed assignment on Today, lets Dana test out, issues one immutable certificate, and keeps the answer key private',async()=>{
     const repo=new MemoryRepo(seedData()),dana=await ctx(repo,'u-dana');
     const today=await dispatch(service,dana,'getToday',undefined);

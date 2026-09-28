@@ -53,8 +53,11 @@ export default {
 
 
 async function handleVerification(request: Request, env: Env): Promise<Response> {
+  let code:string;
+  try { code=decodeURIComponent(new URL(request.url).pathname.split('/').at(-1)!); }
+  catch { code=''; }
+  if(code.length>40||!/^[-A-Za-z0-9]+$/.test(code))return verificationPage({code,valid:false,courseTitle:null,issuedAt:null,replaced:false},404);
   const repo=new D1Repo(env.DB); await ensureSeeded(env.DB,repo);
-  const code=decodeURIComponent(new URL(request.url).pathname.split('/').at(-1)!);
   const result=await dispatch(service,createServiceContext(env,repo,{user:null,token:null,rateKey:'public'} as never),'verifyCertificate',{code});
   return verificationPage(result);
 }

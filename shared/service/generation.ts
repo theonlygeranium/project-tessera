@@ -57,7 +57,8 @@ async function draft(ctx: ServiceContext, item: GenerationItem, instruction: str
   const block = validateGeneratedElement(result.output.block, item.type);
   return { block, model: result.model, lessonTitle: lesson.title };
 }
-async function insert(ctx: ServiceContext, item: GenerationItem, generated: Awaited<ReturnType<typeof draft>>, position?: number, blockId?: string) {
+async function insert(ctx: ServiceContext, item: GenerationItem, generated: Awaited<ReturnType<typeof draft>>, position?: number, blockId?: string): Promise<boolean> {
+  if (blockId && await ctx.repo.getBlock(blockId)) return false;
   const old = await ctx.repo.listBlocks(item.lessonId);
   if (position !== undefined && (!Number.isInteger(position) || position < 0 || position > old.length)) fail('invalid', `Position must be 0–${old.length}.`);
   const at = position ?? old.length;
@@ -66,23 +67,28 @@ async function insert(ctx: ServiceContext, item: GenerationItem, generated: Awai
     provenance: provenance(ctx, generated.model, 'element', `${item.variant === 'video-script' ? 'Video script' : labels[item.type]} drafted for ${generated.lessonTitle}`, []), updatedAt: ctx.now() } as Block;
   if (at === old.length) await ctx.repo.putBlock(block);
   else await ctx.repo.replaceBlocks(item.lessonId, [...old.slice(0, at), block, ...old.slice(at)].map((value, index) => ({ ...value, position: index })));
+  return true;
 }
 function publicJob(job: GenerationJob) {
   return { jobId: job.id, state: job.state, done: job.done, total: job.total, lessonIds: job.lessonIds, error: job.error, failures: job.failures };
 }
 
 /** A running job untouched this long is taken over by polling (the background runner stalled). */
-export const WORKFLOW_STALL_MS = 120_000;
+export const WORKFLOW_STALL_MS = 20 * 60_000;
 
 /** Drafts the next batch (up to two elements) of a running job and saves it. Used by polling and by the background runner. */
 export async function advanceGenerationJob(ctx: ServiceContext, job: GenerationJob): Promise<GenerationJob> {
+    const { done, state, runner } = job;
     const batch = job.work.slice(0, 2);
     const results = await Promise.allSettled(batch.map(item => draft(ctx, item, job.instruction)));
+    const current = await ctx.repo.getGenerationJob(job.id);
+    if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
+    job = current;
     for (const [index, result] of results.entries()) {
       const item = batch[index];
       if (result.status === 'fulfilled') {
         try {
-          await insert(ctx, item, result.value, undefined, `b-${job.id}-${job.done}`);
+          if (!await insert(ctx, item, result.value, undefined, `b-${job.id}-${job.done}`)) return await ctx.repo.getGenerationJob(job.id) ?? job;
           if (!job.lessonIds.includes(item.lessonId)) job.lessonIds.push(item.lessonId);
         } catch (error) { job.failures.push({ ...item, message: error instanceof Error ? error.message : 'Could not save the draft.' }); }
       } else job.failures.push({ ...item, message: result.reason instanceof Error ? result.reason.message : 'Could not create the draft.' });
@@ -139,6 +145,7 @@ export const generation: Pick<Service, 'generateAtScope' | 'getGenerationJob' | 
       // The background runner owns it, unless it has stalled; then polling takes over.
       if (Date.parse(ctx.now()) - Date.parse(job.updatedAt) < WORKFLOW_STALL_MS) return publicJob(job);
       job.runner = 'poll';
+      await ctx.repo.putGenerationJob(job);
     }
     await aiEnabled(ctx);
     return publicJob(await advanceGenerationJob(ctx, job));

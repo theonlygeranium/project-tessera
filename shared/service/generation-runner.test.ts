@@ -14,6 +14,52 @@ async function ctxFor(background: ServiceContext['background'] = null): Promise<
 const scope = { courseId: 'c-stat110', scope: { lessonIds: ['l-stat-1', 'l-stat-2'], elementTypes: ['text' as const, 'check' as const] } };
 
 describe('generation runner (carry-over 4)', () => {
+  it('abandons a delayed workflow advance after polling keeps its block', async () => {
+    const ctx = await ctxFor({ startGeneration: async () => {} });
+    const { jobId } = await service.generateAtScope(ctx, scope);
+    const stale = (await ctx.repo.getGenerationJob(jobId))!;
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    let calls = 0;
+    const slow = { ...ctx, ai: { run: async (task: never, input: never) => { if (++calls <= 2) await held; return fixtureAi.run(task, input); } } as ServiceContext['ai'] };
+    const delayed = advanceGenerationJob(slow, stale);
+    clock += WORKFLOW_STALL_MS + 1000;
+    const polled = await service.getGenerationJob(ctx, { jobId });
+    const blockId = `b-${jobId}-0`;
+    expect(polled.done).toBe(2);
+    const kept = (await ctx.repo.getBlock(blockId))!;
+    await ctx.repo.putBlock({ ...kept, aiState: 'kept' });
+    const before = await ctx.repo.getGenerationJob(jobId);
+    release(); await delayed;
+    expect(await ctx.repo.getBlock(blockId)).toMatchObject({ aiState: 'kept' });
+    expect(await ctx.repo.getGenerationJob(jobId)).toEqual(before);
+  });
+  it('does not write a second concurrent advance of the same batch', async () => {
+    const ctx = await ctxFor();
+    const { jobId } = await service.generateAtScope(ctx, scope);
+    const initial = (await ctx.repo.getGenerationJob(jobId))!;
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const slow = { ...ctx, ai: { run: async (task: never, input: never) => { await held; return fixtureAi.run(task, input); } } as ServiceContext['ai'] };
+    const second = advanceGenerationJob(slow, initial);
+    const first = await advanceGenerationJob(ctx, initial);
+    const before = await ctx.repo.listBlocks('l-stat-1');
+    release(); await second;
+    expect((await ctx.repo.getGenerationJob(jobId))?.done).toBe(first.done);
+    expect(await ctx.repo.listBlocks('l-stat-1')).toEqual(before);
+  });
+  it('skips a deterministic block id that already belongs to a kept draft', async () => {
+    const ctx = await ctxFor();
+    const { jobId } = await service.generateAtScope(ctx, scope);
+    const job = (await ctx.repo.getGenerationJob(jobId))!;
+    const block = (await ctx.repo.listBlocks(job.work[0].lessonId))[0];
+    const kept = { ...block, id: `b-${jobId}-0`, aiState: 'kept' as const };
+    await ctx.repo.putBlock(kept);
+    const before = await ctx.repo.getGenerationJob(jobId);
+    await advanceGenerationJob(ctx, job);
+    expect(await ctx.repo.getBlock(kept.id)).toEqual(kept);
+    expect(await ctx.repo.getGenerationJob(jobId)).toEqual(before);
+  });
   it('without a background runner, each poll advances the job (previews, local, demo)', async () => {
     const ctx = await ctxFor();
     const { jobId } = await service.generateAtScope(ctx, scope);

@@ -56,7 +56,7 @@ function aiBlock(ctx: ServiceContext, lessonId: string, content: BlockContent, m
   return { ...content, id: id ?? ctx.newId('b'), lessonId, position: 0, origin: 'ai', aiState: 'draft', provenance: provenance(ctx, model, 'variant', summary), previous, updatedAt: ctx.now(), ...(source ? { source: { blockId: source.id, hash: masterHash(source) } } : {}) } as Block;
 }
 function humanCopy(ctx: ServiceContext, lessonId: string, master: Block): Block {
-  return { ...blockContent(master), id: ctx.newId('b'), lessonId, position: 0, origin: 'human', aiState: null, provenance: null, previous: null, updatedAt: ctx.now(), source: { blockId: master.id, hash: masterHash(master) } } as Block;
+  return { ...blockContent(master), id: ctx.newId('b'), lessonId, position: 0, origin: master.origin, aiState: master.aiState, provenance: master.provenance, previous: null, updatedAt: ctx.now(), source: { blockId: master.id, hash: masterHash(master) } } as Block;
 }
 function validateResult(output: unknown, sent: Block[], audience: VariantAudience, requireAll: boolean) {
   if (!output || typeof output !== 'object') aiFailed();
@@ -152,7 +152,7 @@ export const variants: Pick<Service, 'listVariants' | 'createVariant' | 'getVari
       } else next.push(added);
     }
     next.forEach((b, i) => { b.position = i; });
-    variant.variantOf!.syncedAt = ctx.now();
+    if (blockIds === undefined || (status(variant, masters, next).divergedBlocks === 0 && status(variant, masters, next).uncoveredBlocks === 0)) variant.variantOf!.syncedAt = ctx.now();
     await ctx.repo.replaceBlocks(variant.id, next); await ctx.repo.putLesson(variant);
     return detail(ctx, variant);
   },

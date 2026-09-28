@@ -75,7 +75,9 @@ export const AUTOMATIC_CHECKS: Record<AutomaticCheck, (s: CourseSnapshot) => Che
 
   'outcomes-assessed'(s) {
     if (s.outcomes.length === 0) return notMet(['The course has no outcomes to assess.'], [{ label: 'Add course outcomes', target: { kind: 'course', courseId: s.course.id, field: 'outcomes' } }]);
-    const assessed = new Set(s.outcomeLinks.map((l) => l.outcomeId));
+    const assessmentIds = new Set(allBlocks(s).filter(({ block }) => ASSESSMENT_BLOCKS.has(block.type)).map(({ block }) => block.id));
+    const assignmentIds = new Set(s.assignments.map((assignment) => assignment.id));
+    const assessed = new Set(s.outcomeLinks.filter((link) => link.targetKind === 'block' ? assessmentIds.has(link.targetId) : link.targetKind === 'assignment' && assignmentIds.has(link.targetId)).map((link) => link.outcomeId));
     const unassessed = s.outcomes.filter((o) => !assessed.has(o.id));
     if (unassessed.length === 0) return met(`Every outcome is assessed by at least one check, scenario, or assignment.`);
     return notMet([`${unassessed.length} of ${s.outcomes.length} outcomes aren't assessed anywhere: ${listed(unassessed.map((o) => `${o.code} ${o.text}`))}.`], [{ label: 'Review outcomes', target: { kind: 'course', courseId: s.course.id, field: 'outcomes' } }]);

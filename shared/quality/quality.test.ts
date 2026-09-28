@@ -146,6 +146,29 @@ describe('automatic checks', () => {
 });
 
 describe('evaluateReadiness', () => {
+  it('excludes unkept AI content from contact and assessment checks while counting drafts', () => {
+    const s = goodSnapshot();
+    s.course = { ...s.course, welcome: '' };
+    s.blocks.l1 = [block('l1', { type: 'text', text: 'Start here and work through each section in order before the course ends.' }, { origin: 'ai', aiState: 'draft' })];
+    const contact = block('l2', { type: 'text', text: 'Office hours are on Monday.' }, { origin: 'ai', aiState: 'draft' });
+    s.blocks.l2.push(contact);
+    const statuses = () => new Map(evaluateReadiness(TESSERA_RUBRIC, s, [], null, NOW).standards.flatMap(st => st.items).map(item => [item.number, item.status]));
+    expect(statuses().get('1.2')).toBe('not-met');
+    expect(statuses().get('6.1')).toBe('not-met');
+    contact.aiState = 'kept';
+    expect(statuses().get('1.2')).toBe('met');
+    expect(statuses().get('6.1')).toBe('not-met');
+    const check = s.blocks.l2.find(b => b.type === 'check')!;
+    check.origin = 'ai'; check.aiState = 'draft';
+    expect(statuses().get('3.2')).toBe('not-met');
+  });
+  it('does not count outcome links to assessments removed with a lesson', () => {
+    const s = goodSnapshot();
+    expect(AUTOMATIC_CHECKS['outcomes-assessed'](s).status).toBe('met');
+    s.lessons = s.lessons.filter(lesson => lesson.id !== 'l2');
+    delete s.blocks.l2;
+    expect(AUTOMATIC_CHECKS['outcomes-assessed'](s).status).toBe('not-met');
+  });
   const finding = (verdict: AiFinding['verdict'], state: AiFinding['state']): AiFinding => ({
     verdict, state, evidence: 'The welcome names the instructor.', suggestion: '', reviewedBy: state === 'draft' ? null : 'u-i', reviewedAt: state === 'draft' ? null : NOW,
     provenance: { model: 'fixture', task: 'readiness-item', generatedAt: NOW, sources: [], summary: 'Judged item 1.3' },

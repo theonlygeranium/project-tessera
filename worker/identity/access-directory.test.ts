@@ -7,9 +7,9 @@ const directory = (request: typeof fetch) => createAccessDirectory({ token: 'tes
 
 describe('Access directory', () => {
   it('appends a lowercased email and preserves every other rule and field', async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(ok(group)).mockResolvedValueOnce(ok(group));
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(ok(group)).mockResolvedValueOnce(ok(group)).mockResolvedValueOnce(ok({ ...group, include: [...group.include, { email: { email: 'sam@example.test' } }] }));
     await directory(request).grant('SAM@EXAMPLE.TEST');
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenCalledTimes(3);
     expect(request.mock.calls[0][0]).toBe('https://api.cloudflare.com/client/v4/accounts/account/access/groups/group');
     expect(request.mock.calls[0][1]).toMatchObject({ method: 'GET', headers: { authorization: 'Bearer test-token' } });
     expect(request.mock.calls[1][1]).toMatchObject({ method: 'PUT' });
