@@ -15,10 +15,13 @@ export function navFor(role: Role, options: { courseId?: string; unread?: number
       { id: 'courses', label: 'Courses', href: paths.admin.courses, icon: icons.courses },
       { id: 'policy', label: 'AI policy', href: paths.admin.policy, icon: icons.policy },
       { id: 'access', label: 'Accessibility', href: paths.admin.access, icon: icons.access },
+      { id: 'training', label: 'Required training', href: paths.admin.training, icon: icons.courses },
+      { id: 'compliance', label: 'Compliance', href: paths.admin.compliance, icon: icons.grades },
+      { id: 'my-training', label: 'My training', href: paths.me.training, icon: icons.today },
     ];
   }
   if (role === 'instructor') {
-    const items: NavItem[] = [{ id: 'courses', label: 'My courses', href: paths.teach.courses, icon: icons.courses }];
+    const items: NavItem[] = [{ id: 'courses', label: 'My courses', href: paths.teach.courses, icon: icons.courses }, { id: 'my-training', label: 'My training', href: paths.me.training, icon: icons.today }];
     const c = options.courseId;
     if (c) {
       items.push(
@@ -30,6 +33,7 @@ export function navFor(role: Role, options: { courseId?: string; unread?: number
         { id: 'tutor', label: 'Tutor', href: paths.teach.tutor(c), icon: icons.tutor },
         { id: 'announcements', label: 'Announcements', href: paths.teach.announcements(c), icon: icons.announcements },
         { id: 'roster', label: 'Roster', href: paths.teach.roster(c), icon: icons.roster },
+        { id: 'test-out', label: 'Test-out', href: paths.teach.testOut(c), icon: icons.grades },
       );
     }
     return items;
@@ -39,6 +43,7 @@ export function navFor(role: Role, options: { courseId?: string; unread?: number
     { id: 'courses', label: 'Courses', href: paths.student.courses, icon: icons.courses },
     { id: 'announcements', label: 'Announcements', href: paths.student.announcements, icon: icons.announcements, badge: options.unread || undefined },
     { id: 'profile', label: 'Profile', href: paths.student.profile, icon: icons.profile },
+    { id: 'my-training', label: 'Training', href: paths.me.training, icon: icons.courses },
   ];
 }
 

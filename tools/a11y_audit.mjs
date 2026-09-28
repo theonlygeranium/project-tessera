@@ -80,6 +80,14 @@ const APP = [
   { name: 'App · Student · Announcements', url: 'app/announcements?data=mock&as=u-marcus' },
   { name: 'App · Instructor · Tutor summaries', url: 'app/teach/courses/c-stat110/tutor?data=mock&as=u-okafor' },
   { name: 'App · Student · Profile', url: 'app/profile?data=mock&as=u-marcus' },
+  // Night 3 lane D. Keep setup and the admin page in one mock session.
+  { name: 'App · Required training admin', url: 'app/admin/setup?data=mock&as=u-admin', steps: async (p) => { await p.getByRole('button', { name: 'Finish setup' }).click(); await p.getByRole('link', { name: 'Required training' }).click(); } },
+  { name: 'App · Compliance', url: 'app/admin/setup?data=mock&as=u-admin', steps: async (p) => { await p.getByRole('button', { name: 'Finish setup' }).click(); await p.getByRole('link', { name: 'Compliance' }).click(); } },
+  { name: 'App · Instructor · Test-out editor', url: 'app/teach/courses/c-ops101/test-out?data=mock&as=u-okafor' },
+  { name: 'App · Dana · Today', url: 'app/today?data=mock&as=u-dana' },
+  { name: 'App · Dana · Training', url: 'app/training?data=mock&as=u-dana' },
+  { name: 'App · Dana · Test-out', url: 'app/courses/c-ops101/test-out?data=mock&as=u-dana' },
+  { name: 'App · Dana · Certificate', url: 'app/courses/c-ops101/test-out?data=mock&as=u-dana', steps: async (p) => { for (const [q, a] of [['q1','a'],['q2','a'],['q3','b'],['q4','a']]) await p.locator(`input[name=question-${q}][value=${a}]`).check(); await p.getByRole('button', { name: 'Submit' }).click(); await p.getByRole('link', { name: 'View certificate' }).click(); } },
 ];
 for (const a of APP) targets.push({ ...a, settle: 900 });
 for (const s of screens) {

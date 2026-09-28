@@ -4,6 +4,7 @@ import type { Service, ServiceContext } from './context';
 import { canReachCourse, fail, moduleFor, studentLesson, user, content } from './helpers';
 import { courses } from './courses';
 import { announcements } from './announcements';
+import { training, onLessonProgress } from './training';
 
 const defaultProgress = (lessonId: string): LessonProgress => ({ lessonId, state: 'not-started', checks: {}, updatedAt: null });
 const publicProgress = (p: LessonProgress): LessonProgress => ({ lessonId: p.lessonId, state: p.state, checks: p.checks, updatedAt: p.updatedAt });
@@ -16,6 +17,7 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
     await ctx.repo.putUser(u); return u;
   },
   getToday: async ctx => {
+    const required = await training.listMyTraining(ctx, undefined);
     const u = await ctx.repo.getUser(user(ctx).id) ?? user(ctx), summaries = await courses.listCourses(ctx, undefined);
     const tasks: TaskItem[] = [];
     for (const c of summaries) {
@@ -44,7 +46,7 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
         if (p.state === 'completed' && p.updatedAt && Date.parse(p.updatedAt) >= cutoff && Date.parse(p.updatedAt) <= Date.parse(ctx.now())) minutesDone += byId.get(p.lessonId)?.minutes ?? 0;
       }
     }
-    return { doNext: tasks, announcements: recent, unreadCount, courses: summaries, week: { minutesGoal: u.profile?.weeklyMinutes ?? 120, minutesDone } };
+    return { required, doNext: tasks, announcements: recent, unreadCount, courses: summaries, week: { minutesGoal: u.profile?.weeklyMinutes ?? 120, minutesDone } };
   },
   getStudentLesson: async (ctx, { lessonId }) => {
     const l = await studentLesson(ctx, lessonId), c = await canReachCourse(ctx, l.courseId), m = await moduleFor(ctx, l.moduleId);
@@ -70,10 +72,10 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
     await ctx.repo.putProgress(p); return { correct, feedback: correct ? b.feedbackCorrect : b.feedbackIncorrect, attempts };
   },
   setLessonProgress: async (ctx, { lessonId, state }) => {
-    await studentLesson(ctx, lessonId);
+    const lesson = await studentLesson(ctx, lessonId);
     if (state !== 'in-progress' && state !== 'completed') fail('invalid', 'Invalid progress state.');
     const u = user(ctx), p = await ctx.repo.getProgress(u.id, lessonId) ?? { ...defaultProgress(lessonId), userId: u.id };
     if (p.state !== 'completed' || state === 'completed') p.state = state;
-    p.updatedAt = ctx.now(); await ctx.repo.putProgress(p); return publicProgress(p);
+    p.updatedAt = ctx.now(); await ctx.repo.putProgress(p); await onLessonProgress(ctx, lesson.courseId); return publicProgress(p);
   },
 };
