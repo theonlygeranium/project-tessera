@@ -77,7 +77,10 @@ function score(session: DesignSession, key: Key): Check[] {
   const same = <T,>(field: { value: T | null; origin: string }, want: T | null) => want == null ? field.value == null || field.origin !== 'extracted' : field.value === want;
   add('E1', code === key.code.replace(/\s+/g, '').toLowerCase() && similarity(String(p.title.value ?? ''), key.title) >= 0.9 && same(p.credits, key.credits),
     `code ${p.code.value} / title ${p.title.value} / credits ${p.credits.value} (key ${key.code} / ${key.title} / ${key.credits})`);
-  add('E2', same(p.termWeeks, key.termWeeks) && same(p.termStart, key.termStart) && same(p.termEnd, key.termEnd),
+  // Dates the syllabus implies but doesn't state may come back derived from the schedule.
+  const alt = (field: { value: unknown }, ok?: string[]) => !!ok && ok.includes(String(field.value));
+  const k2 = key as Key & { termStartAcceptable?: string[]; termEndAcceptable?: string[] };
+  add('E2', same(p.termWeeks, key.termWeeks) && (same(p.termStart, key.termStart) || alt(p.termStart, k2.termStartAcceptable)) && (same(p.termEnd, key.termEnd) || alt(p.termEnd, k2.termEndAcceptable)),
     `weeks ${p.termWeeks.value} ${p.termStart.value}–${p.termEnd.value} (key ${key.termWeeks} ${key.termStart}–${key.termEnd})`);
   const instructor = p.instructor.value;
   const surname = (key.instructor?.name ?? '').replace(/,.*$/, '').trim().split(/\s+/).pop()?.toLowerCase() ?? '';
