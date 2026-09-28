@@ -7,6 +7,8 @@
 // - Asking for the answer gets a hint unless the activity is practice in Open mode.
 // - Hints are counted; when they run out, Explain and Open modes explain instead, and
 //   Hints mode says so plainly.
+// - Free-typed chat is treated by mode: open only in Open practice, otherwise an
+//   explanation (Explain) or a counted hint (Hints).
 // - The answer key is never a source, and a reply that contains a correct answer on
 //   work where answers aren't allowed is replaced before the student sees it.
 import type { ActivityKind, AiPolicy, TutorMode, TutorSetting } from '../domain';
@@ -67,7 +69,12 @@ export function decide(input: { mode: TutorMode; activityKind: ActivityKind; int
     return hintsLeft > 0 ? hint('The tutor gives hints on this activity, so here is a hint.') : noHints();
   }
   if (intent === 'hint') return hintsLeft > 0 ? hint() : noHints();
-  return { kind: 'chat', hintNumber: null, note: null };
+  // Free-typed messages follow the mode too, so typing can't get around the buttons:
+  // open conversation only in Open practice; otherwise an explanation (Explain) or a
+  // counted hint (Hints).
+  if (mode === 'open' && !graded) return { kind: 'chat', hintNumber: null, note: null };
+  if (mode === 'explain') return { kind: 'explain', hintNumber: null, note: null };
+  return hintsLeft > 0 ? hint() : noHints();
 }
 
 /** What the student always sees about the tutor (D-005): the mode, who set it, and what the instructor can see. */

@@ -51,7 +51,8 @@ function instructionBlocks(ctx: ServiceContext, id: string, blocks: BlockInput[]
 function current(items: Submission[]) { return items[0] ?? null; }
 function studentView(s: Submission | null): Submission | null { return s ? s.grade?.releasedAt ? s : { ...s, grade: null } : null; }
 async function book(ctx: ServiceContext, courseId: string) {
-  await canTeach(ctx, courseId);
+  // Instructors of the course and administrators (the route is STAFF).
+  if (user(ctx).role === 'administrator') await canReachCourse(ctx, courseId); else await canTeach(ctx, courseId);
   const assignments = (await ctx.repo.listAssignments({ courseId })).filter(a => a.status === 'published');
   const students = await Promise.all((await ctx.repo.listEnrollments({ courseId })).map(e => ctx.repo.getUser(e.userId)));
   const submissions = await ctx.repo.listSubmissions({});

@@ -20,9 +20,14 @@ export function useApiMutation<K extends Operation>(op: K, options: { onSuccess?
   const client = useQueryClient();
   return useMutation<Output<K>, ApiError, Input<K>>({
     mutationFn: (input) => run(op, input),
+    // Run the caller's handler right away with the mutation's own result, and refresh
+    // every query alongside. Waiting for the refresh first let a slow or restarted
+    // refetch delay the handler until much later: "Switch persona" navigated to sign-in
+    // after a later mutation, signing the next persona out (found by journey 9).
     onSuccess: async (data) => {
-      await client.invalidateQueries();
+      const refresh = client.invalidateQueries();
       options.onSuccess?.(data);
+      await refresh;
     },
   });
 }

@@ -82,3 +82,11 @@ describe('review 3 fixes', () => {
     expect((await dispatch(service, student, 'submit', { assignmentId: id, text: 'On time' })).attempt).toBe(1);
   });
 });
+
+describe('review 4: gradebook access', () => {
+  it('lets an administrator read the gradebook and its CSV', async () => {
+    const repo = new MemoryRepo(seedData()), admin = await context(repo, 'u-admin');
+    expect((await dispatch(service, admin, 'getGradebook', { courseId: 'c-stat110' })).rows.length).toBeGreaterThan(0);
+    expect((await dispatch(service, admin, 'exportGradebook', { courseId: 'c-stat110' })).csv).toContain('"Student"');
+  });
+});

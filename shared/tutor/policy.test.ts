@@ -28,6 +28,11 @@ describe('tutor policy (D-005)', () => {
     expect(decide({ mode: 'hints', activityKind: 'lesson', intent: 'hint', hintsUsed: 2, maxHints: 2 })).toMatchObject({ kind: 'refusal', note: expect.stringMatching(/used all 2 hints/) });
     expect(decide({ mode: 'explain', activityKind: 'assignment', intent: 'hint', hintsUsed: 2, maxHints: 2 }).kind).toBe('explain');
     expect(decide({ mode: 'off', activityKind: 'lesson', intent: 'chat', hintsUsed: 0, maxHints: 2 }).kind).toBe('refusal');
+    // Free-typed chat can't get around the mode (Codex review 4).
+    expect(decide({ mode: 'hints', activityKind: 'assignment', intent: 'chat', hintsUsed: 0, maxHints: 2 })).toMatchObject({ kind: 'hint', hintNumber: 1 });
+    expect(decide({ mode: 'hints', activityKind: 'lesson', intent: 'chat', hintsUsed: 2, maxHints: 2 }).kind).toBe('refusal');
+    expect(decide({ mode: 'explain', activityKind: 'assignment', intent: 'chat', hintsUsed: 0, maxHints: 2 }).kind).toBe('explain');
+    expect(decide({ mode: 'open', activityKind: 'lesson', intent: 'chat', hintsUsed: 0, maxHints: 2 }).kind).toBe('chat');
     expect(decide({ mode: 'hints', activityKind: 'lesson', intent: 'explain', hintsUsed: 0, maxHints: 2 }).kind).toBe('hint');
   });
 

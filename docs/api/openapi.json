@@ -10165,8 +10165,9 @@
                     "$ref": "#/components/schemas/TutorMode"
                   },
                   "maxHints": {
-                    "type": "number",
-                    "minimum": 0
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10
                   },
                   "allowedSourceIds": {
                     "type": "array",
@@ -11192,17 +11193,12 @@
                         "items": {
                           "type": "string",
                           "enum": [
-                            "heading",
                             "text",
                             "callout",
-                            "image",
                             "check",
                             "document",
-                            "file",
-                            "video",
                             "table",
-                            "scenario",
-                            "link"
+                            "scenario"
                           ]
                         }
                       },
@@ -11511,17 +11507,12 @@
                   "type": {
                     "type": "string",
                     "enum": [
-                      "heading",
                       "text",
                       "callout",
-                      "image",
                       "check",
                       "document",
-                      "file",
-                      "video",
                       "table",
-                      "scenario",
-                      "link"
+                      "scenario"
                     ]
                   },
                   "instruction": {
@@ -17652,8 +17643,9 @@
             "$ref": "#/components/schemas/TutorMode"
           },
           "maxHints": {
-            "type": "number",
-            "minimum": 0
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
           },
           "allowedSourceIds": {
             "type": "array",

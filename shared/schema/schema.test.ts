@@ -46,3 +46,12 @@ describe('schemas match service rules (review 3)', () => {
     expect(() => validateInput('createApiToken', { name: 'bot', scopes: ['content:read'], expiresInDays: 366 })).toThrow();
   });
 });
+
+describe('review 4: schema limits', () => {
+  it('rejects ungeneratable types and out-of-range hint limits', () => {
+    expect(() => validateInput('generateElement', { lessonId: 'l', type: 'image' })).toThrow();
+    expect(() => validateInput('generateAtScope', { courseId: 'c', scope: { elementTypes: ['video'] } })).toThrow();
+    expect(() => validateInput('setTutorSetting', { activityKind: 'lesson', activityId: 'l', mode: 'hints', maxHints: 11, allowedSourceIds: [] })).toThrow();
+    expect(() => validateInput('setTutorSetting', { activityKind: 'lesson', activityId: 'l', mode: 'hints', maxHints: 1.5, allowedSourceIds: [] })).toThrow();
+  });
+});

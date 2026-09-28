@@ -89,13 +89,6 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       documents: createDocumentEngine(env),
     };
 
-    // Binary file routes (upload, content) answer directly.
-    if (fileRoute) {
-      if (!principal.user) throw new ApiError('unauthenticated', 'Sign in first.');
-      return withId(await fileRoute.handle(request, ctx, env.FILES, fileRoute.params));
-    }
-    if (!found) throw new ApiError('not-found', 'No route matches.');
-
     // Idempotent creates (D-020): the same key from the same principal replays the first response.
     const idempotencyKey = request.method === 'POST' ? request.headers.get('idempotency-key') : null;
     const idemPrincipal = principal.token ? `tok:${principal.token.id}` : principal.user ? `user:${principal.user.id}` : null;
@@ -105,6 +98,20 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
         return withId(json(JSON.parse(replay.body), replay.status, new Headers({ 'idempotency-replayed': 'true' })));
       }
     }
+
+    // Binary file routes (upload, content) answer directly; a successful upload is stored
+    // for replay like any other create.
+    if (fileRoute) {
+      if (!principal.user) throw new ApiError('unauthenticated', 'Sign in first.');
+      const res = await fileRoute.handle(request, ctx, env.FILES, fileRoute.params);
+      if (idempotencyKey && idemPrincipal && res.status === 201) {
+        const body = await res.clone().text();
+        await env.DB.prepare('INSERT OR REPLACE INTO idempotency_keys (key, principal, status, body, created_at) VALUES (?, ?, ?, ?, ?)')
+          .bind(idempotencyKey, idemPrincipal, 201, body, now).run();
+      }
+      return withId(res);
+    }
+    if (!found) throw new ApiError('not-found', 'No route matches.');
 
     const input = validateInput(found.op, coerceQuery(found.op, await readInput(request, found.params)));
     let output: unknown;

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { Assignment, BlockContent, Grade, Provenance, RubricCriterion, Submission } from '../../../../shared/domain';
 import { AiContent, Button, DataTable, FormField, Select, StatusNotice, TextArea, TextInput, TopBar } from '../../components';
-import { useApiMutation, useApiQuery } from '../../data/hooks';
+import { useQuery } from '@tanstack/react-query';
+import type { ApiError } from '../../../../shared/api';
+import { api, useApiMutation, useApiQuery } from '../../data/hooks';
 import { dataMode } from '../../data/client';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
@@ -41,7 +43,8 @@ export function GradesPage() {
 
 export function AssignmentEditor() {
   const {courseId='',assignmentId=''}=useParams(); usePageTitle('Assignment editor');
-  const q=useApiQuery('getAssignment',{assignmentId}); const submissions=useApiQuery('listSubmissions',{assignmentId,limit:100});
+  const q=useApiQuery('getAssignment',{assignmentId}); // Every submission, following the page cursor (the API returns at most 100 per page).
+  const submissions=useQuery<{ items: Awaited<ReturnType<typeof api.listSubmissions>>['items'] }, ApiError>({ queryKey:['listSubmissions',{assignmentId,all:true}], queryFn: async () => { const items: Awaited<ReturnType<typeof api.listSubmissions>>['items'] = []; let cursor: string | undefined; do { const page = await api.listSubmissions({ assignmentId, limit:100, cursor }); items.push(...page.items); cursor = page.nextCursor ?? undefined; } while (cursor); return { items }; } });
   const update=useApiMutation('updateAssignment'); const publish=useApiMutation('publishAssignment'); const remove=useApiMutation('deleteAssignment'); const release=useApiMutation('releaseGrades'); const navigate=useNavigate();
   const [title,setTitle]=useState(''); const [dueAt,setDueAt]=useState(''); const [points,setPoints]=useState(''); const [kind,setKind]=useState<Assignment['submissionType']>('text'); const [rubric,setRubric]=useState<RubricCriterion[]>([]); const [blocks,setBlocks]=useState<BlockContent[]>([]); const [message,setMessage]=useState(''); const [error,setError]=useState(''); const [selected,setSelected]=useState<string|null>(null);
   const lastSelected=useRef<string|null>(null);
