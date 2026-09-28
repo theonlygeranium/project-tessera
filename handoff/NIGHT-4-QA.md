@@ -16,4 +16,16 @@ Row-preserving `lines` in the PDF and DOCX parsers; file, paste, and sample sour
 
 ## D-032 Palmyra check
 
-(Filled in on the preview with `WRITER_API_KEY`: per syllabus, field accuracy, rules fired, questions asked, time per stage.)
+Run on the `night4` preview with real Palmyra-X6 (`tools`: scratchpad `d032_check.py`; uploads, sessions, jobs, and the temporary token deleted after each run).
+
+**Extraction, fixtures (2026-09-28, after M2):**
+
+| Syllabus | Code, credits, term | Outcomes | Weights | Schedule rows | Contact | Empty week found | Time |
+|---|---|---|---|---|---|---|---|
+| STAT110 PDF | correct | 6/6, all with page | 5/5, sum 100 | 14/14 (100%) | correct | yes | 34 s |
+| STAT110 DOCX | correct | 6/6 (DOCX has no pages) | 5/5, sum 100 | 14/14 (100%) | **missed** | yes | 27 s |
+
+Findings:
+- **Rule bug (real model only):** `due-outside-term` compared due dates as text, so Palmyra's "Weekly" and "Oct 15" read as outside an ISO term and produced four false questions on the PDF, crowding out useful ones. The fixture AI returns ISO dates, so unit tests missed it. Fix after M3: compare real dates only (resolve month-day with the term year), ignore recurring or unparseable values, and merge date problems into one question.
+- **DOCX contact:** Palmyra didn't return the instructor's email from the DOCX. To look at with the real syllabi.
+- Real syllabi (at least five, different departments, one scanned) are still needed from the owner; analysis accuracy is measured after M3.
