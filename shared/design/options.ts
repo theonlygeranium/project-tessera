@@ -81,9 +81,24 @@ export function finalizeOptions(raw: unknown, input: Input): StructureOption[] {
   return options;
 }
 
+/** Unobservable verbs an outcome shouldn't lead with. */
+const UNOBSERVABLE = /^(?:understand|know|learn|appreciate|grasp|realize|be aware|become aware|become familiar|be familiar|comprehend|internalize|believe|value)\b/i;
+/**
+ * Suggested outcomes (D-037): strip "Students will be able to …" preambles, keep the ones that
+ * lead with an observable action, and ask again when fewer than three are left.
+ */
 export function validateSuggestions(raw: unknown): AiTasks['outcome-suggest']['output'] {
-  const output = raw as AiTasks['outcome-suggest']['output'];
-  if (!output || !Array.isArray(output.suggestions) || output.suggestions.length < 3 || output.suggestions.length > 6 || output.suggestions.some(item => !item || typeof item.text !== 'string' || typeof item.why !== 'string' || !/^(?:Analyze|Apply|Assess|Calculate|Categorize|Classify|Communicate|Compare|Compose|Compute|Construct|Contrast|Create|Critique|Defend|Demonstrate|Describe|Design|Develop|Distinguish|Draft|Evaluate|Explain|Formulate|Identify|Illustrate|Implement|Interpret|Justify|List|Map|Measure|Model|Organize|Plan|Predict|Present|Rank|Recommend|Revise|Select|Solve|Summarize|Synthesize|Test|Trace|Use|Write)\b/i.test(item.text))) bad('Outcome suggestions need 3–6 observable actions.');
+  const items = Array.isArray((raw as { suggestions?: unknown })?.suggestions) ? (raw as { suggestions: { text?: unknown; why?: unknown }[] }).suggestions : [];
+  const suggestions = items
+    .filter(item => item && typeof item.text === 'string' && typeof item.why === 'string')
+    .map(item => {
+      const text = String(item.text).trim().replace(/^(?:by the end of (?:this|the) course,?\s*)?(?:students|learners|you|participants)\s+(?:will|should|can)\s+(?:be able to\s+)?/i, '').replace(/^\s*[-•\d.)]+\s*/, '');
+      return { text: text.charAt(0).toUpperCase() + text.slice(1), why: String(item.why).trim() };
+    })
+    .filter(item => item.text.split(/\s+/).length >= 3 && !UNOBSERVABLE.test(item.text))
+    .slice(0, 6);
+  if (suggestions.length < 3) bad('Outcome suggestions need 3–6 observable actions.');
+  const output = { suggestions };
   validateNoLearningStyles(output);
   return output;
 }

@@ -40,6 +40,15 @@ describe('structure option validation', () => {
     const shouted = raw.map((option, index) => index === 0 ? { ...option, id: option.id.toUpperCase() as never } : index === 1 ? { ...option, id: 'something-else' as never } : option);
     expect(finalizeOptions(shouted, input).map(option => option.id).sort()).toEqual([...input.candidates].sort());
   });
+  it('cleans suggestion preambles and drops unobservable ones', () => {
+    const out = validateSuggestions({ suggestions: [
+      { text: 'Students will be able to conduct a needs assessment for a training problem.', why: 'Module 1.' },
+      { text: 'Differentiate training from non-training solutions.', why: 'Module 2.' },
+      { text: 'Understand human performance technology.', why: 'Vague.' },
+      { text: '3. Design a job aid for a documented performance gap.', why: 'Module 4.' },
+    ] });
+    expect(out.suggestions.map(item => item.text)).toEqual(['Conduct a needs assessment for a training problem.', 'Differentiate training from non-training solutions.', 'Design a job aid for a documented performance gap.']);
+  });
   it('validates suggestions and makes deterministic combination notes', () => {
     expect(validateSuggestions({ suggestions: ['Explain', 'Apply', 'Evaluate'].map(verb => ({ text: `${verb} the evidence.`, why: 'From the topics.' })) }).suggestions).toHaveLength(3);
     expect(() => validateSuggestions({ suggestions: [{ text: 'Understand data', why: '' }] })).toThrow();
