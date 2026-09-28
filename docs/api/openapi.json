@@ -15936,6 +15936,12 @@
           "accessGranted": {
             "type": "boolean"
           },
+          "accessError": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "acceptedAt": {
             "anyOf": [
               {

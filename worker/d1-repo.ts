@@ -2,7 +2,7 @@
 // `put*` upserts. replaceBlocks, setEnrollments, deleteLesson, and reset each run
 // in one batch so a failure leaves the previous rows in place.
 import type {
-  AccessibleFormat, ActivityKind, Adaptation, ApiToken, Assignment, Block, BlockContent, BuilderSession, Course, FileRecord, Id, Institution, Lesson, Module, Role, Submission, TutorSetting, User,
+  AccessibleFormat, ActivityKind, Adaptation, ApiToken, Assignment, Block, BlockContent, BuilderSession, Course, FileRecord, Id, Institution, Invitation, Lesson, Module, Role, Submission, TutorSetting, User,
 } from '../shared/domain';
 import type {
   AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession,
@@ -422,6 +422,28 @@ export class D1Repo implements Repo {
   async touchApiToken(id: string, usedAt: string) {
     await this.db.prepare('UPDATE api_tokens SET last_used_at = ? WHERE id = ?').bind(usedAt, id).run();
   }
+  async getInvitation(userId: Id): Promise<Invitation | null> {
+    const row = await this.first<InvitationRow>('SELECT * FROM invitations WHERE user_id = ?', [userId]);
+    return row ? invitationFromRow(row) : null;
+  }
+  async getInvitationByEmail(email: string): Promise<Invitation | null> {
+    const row = await this.first<InvitationRow>('SELECT * FROM invitations WHERE lower(email) = lower(?)', [email]);
+    return row ? invitationFromRow(row) : null;
+  }
+  async listInvitations(): Promise<Invitation[]> {
+    return (await this.all<InvitationRow>('SELECT * FROM invitations ORDER BY invited_at DESC, user_id ASC')).map(invitationFromRow);
+  }
+  async putInvitation(invitation: Invitation): Promise<void> {
+    await this.db.prepare(`INSERT INTO invitations (user_id, email, invited_by, invited_at, access_granted, access_error, accepted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET email = excluded.email, invited_by = excluded.invited_by,
+        invited_at = excluded.invited_at, access_granted = excluded.access_granted,
+        access_error = excluded.access_error, accepted_at = COALESCE(invitations.accepted_at, excluded.accepted_at)`)
+      .bind(invitation.userId, invitation.email, invitation.invitedBy, invitation.invitedAt, Number(invitation.accessGranted), invitation.accessError ?? null, invitation.acceptedAt).run();
+  }
+  async acceptInvitation(userId: Id, at: string): Promise<void> {
+    await this.db.prepare('UPDATE invitations SET accepted_at = ? WHERE user_id = ? AND accepted_at IS NULL').bind(at, userId).run();
+  }
   async hasInvitations() {
     const row = await this.first<{ n: number }>('SELECT count(*) AS n FROM invitations');
     return !!row && row.n > 0;
@@ -688,6 +710,12 @@ export class D1Repo implements Repo {
         before_value = excluded.before_value, after_value = excluded.after_value, undone_at = excluded.undone_at`)
       .bind(value.id, value.studentId, value.kind, value.why, JSON.stringify({ value: value.before }), JSON.stringify({ value: value.after }), value.appliedAt, value.undoneAt);
   }
+}
+
+interface InvitationRow extends Record<string, unknown> { user_id: string; email: string; invited_by: string; invited_at: string; access_granted: number; access_error: string | null; accepted_at: string | null }
+function invitationFromRow(row: InvitationRow): Invitation {
+  return { userId: row.user_id, email: row.email, invitedBy: row.invited_by, invitedAt: row.invited_at,
+    accessGranted: Boolean(row.access_granted), accessError: row.access_error, acceptedAt: row.accepted_at };
 }
 
 interface AdaptationRow extends Record<string, unknown> {

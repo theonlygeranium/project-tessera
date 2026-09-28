@@ -4,7 +4,7 @@
 // Both must behave identically. `put*` is an upsert by id. Lists are returned in a
 // stable order: by `position` where the entity has one, otherwise as documented.
 import type {
-  AccessibleFormat, AccessReport, ActivityKind, Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Lesson, LessonProgress, Module, Role, Submission, Timestamp, TutorMessage, TutorMode, TutorSetting, User,
+  AccessibleFormat, AccessReport, ActivityKind, Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Invitation, Lesson, LessonProgress, Module, Role, Submission, Timestamp, TutorMessage, TutorMode, TutorSetting, User,
 } from './domain';
 import type { SeedData } from './seed';
 
@@ -140,6 +140,13 @@ export interface Repo {
   listApiTokens(ownerId: Id): Promise<(ApiToken & { hash: string })[]>;
   putApiToken(token: ApiToken & { hash: string }): Promise<void>;
   touchApiToken(id: Id, usedAt: Timestamp): Promise<void>;
+  getInvitation(userId: Id): Promise<Invitation | null>;
+  getInvitationByEmail(email: string): Promise<Invitation | null>;
+  /** Newest first by invitation time, then user id. */
+  listInvitations(): Promise<Invitation[]>;
+  putInvitation(invitation: Invitation): Promise<void>;
+  /** First acceptance wins. */
+  acceptInvitation(userId: Id, at: Timestamp): Promise<void>;
   /** Whether any invitation exists (D-021): once one does, the persona cookie no longer signs anyone in. */
   hasInvitations(): Promise<boolean>;
 

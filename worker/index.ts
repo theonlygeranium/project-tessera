@@ -2,6 +2,7 @@
 // Night 2), /app/* is the React app, and every other path is a static asset.
 import { createAiClient } from './ai';
 import { createDocumentEngine } from './access/engine';
+import { createAccessDirectory } from './identity/access-directory';
 import { RateLimiter, bearerToken, hasAccessCredential, readCookie, resolvePrincipal } from './api/auth';
 import { findFileRoute } from './api/files';
 import { handleMcp } from './mcp';
@@ -144,6 +145,9 @@ function createServiceContext(env: Env, repo: Repo, principal: Awaited<ReturnTyp
     now: () => new Date().toISOString(),
     newId: (prefix) => prefix + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12),
     documents: createDocumentEngine(env),
+    directory: env.CF_ACCESS_API_TOKEN && env.ACCESS_GROUP_ID && env.CLOUDFLARE_ACCOUNT_ID
+      ? createAccessDirectory({ token: env.CF_ACCESS_API_TOKEN, accountId: env.CLOUDFLARE_ACCOUNT_ID, groupId: env.ACCESS_GROUP_ID })
+      : null,
   };
 }
 

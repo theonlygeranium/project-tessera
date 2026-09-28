@@ -19,8 +19,15 @@ export interface ServiceContext {
   newId(prefix: string): Id;
   /** The document engine (D-022): parsers, fixers, format generation, AI suggestions. The Worker provides it; mock mode has none. */
   documents?: DocumentEngine | null;
+  /** Grants an email access to the application through its identity directory. */
+  directory?: Directory | null;
   /** Set when an assistant calls through the MCP server: content it writes is an AI draft a person keeps (D-003). */
   agent?: { name: string } | null;
+}
+
+export interface Directory {
+  /** Idempotent: an email already present succeeds without changing the directory. */
+  grant(email: string): Promise<void>;
 }
 
 /** What the Worker's document engine offers the service (implemented in worker/access/engine.ts). */
