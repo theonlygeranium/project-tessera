@@ -4,7 +4,7 @@
 // the a11y audit, docs screenshots, and local development without a key.
 //
 // Whatever a client returns is stored as a *draft*; a person keeps it (D-003).
-import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc, VariantAudience, DesignSource, DesignSourceKind, SyllabusExtraction, InstructionalRead, WorkloadRates, ExtractedOutcome } from './domain';
+import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc, VariantAudience, DesignSource, DesignSourceKind, SyllabusExtraction, InstructionalRead, WorkloadRates, ExtractedOutcome, ArchitectureId, OverlayId, InstructorProfile, StructureOption, DesignQuestion } from './domain';
 import { extractSyllabusFixture } from './syllabus-fixture';
 import { analyzeSyllabusFixture, rewriteObjectiveFixture } from './design/read-fixture';
 import type { TutorKind } from './tutor/policy';
@@ -21,6 +21,14 @@ export interface AiTasks {
   'objective-rewrite': {
     input: { outcome: ExtractedOutcome; nearbyTopics: string[]; industry: boolean };
     output: { text: string; why: string };
+  };
+  'outcome-suggest': {
+    input: { title: string; description: string; scheduleTopics: string[]; assessments: { title: string; format: string }[] };
+    output: { suggestions: { text: string; why: string }[] };
+  };
+  'structure-options': {
+    input: { profile: SyllabusExtraction['profile']; schedule: SyllabusExtraction['schedule']; assessments: SyllabusExtraction['assessments']; source: DesignSource; confirmedOutcomes: { code: string; text: string; originalText: string }[]; answers: DesignQuestion[]; teachingNote: string; instructorProfile: InstructorProfile | null; candidates: ArchitectureId[]; closest: ArchitectureId; overlaysDefault: OverlayId[]; rates: WorkloadRates; weeks: number };
+    output: StructureOption[];
   };
   element: {
     input: { courseTitle: string; moduleTitle: string; lessonTitle: string; lessonText: string; type: BlockType; instruction: string };
@@ -131,6 +139,17 @@ const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K][
   'syllabus-extract': extractSyllabusFixture,
   'syllabus-analyze': analyzeSyllabusFixture,
   'objective-rewrite': rewriteObjectiveFixture,
+  'outcome-suggest': ({ title, scheduleTopics }) => ({ suggestions: Array.from({ length: 3 }, (_, index) => ({ text: `${['Explain', 'Apply', 'Evaluate'][index]} ${scheduleTopics[index] || title} using a course example.`, why: `This draws on ${scheduleTopics[index] ? `the ${scheduleTopics[index]} topic` : 'the course title'}; please check its fit.` })) }),
+  'structure-options': input => input.candidates.map(id => {
+    const schedule = input.schedule.filter(row => !row.empty);
+    const rows = schedule.length ? schedule : Array.from({ length: input.weeks }, (_, index) => ({ week: index + 1, topic: `Session ${index + 1}`, reading: '', due: '', span: null, dates: '', empty: false }));
+    const chunk = ['case', 'project', 'thematic', 'performance', 'competency'].includes(id) ? 2 : 1;
+    const modules = Array.from({ length: Math.ceil(rows.length / chunk) }, (_, index) => {
+      const part = rows.slice(index * chunk, (index + 1) * chunk);
+      return { title: `${id[0].toUpperCase()}${id.slice(1)}: ${part[0].topic}`, objective: input.confirmedOutcomes[index % input.confirmedOutcomes.length]?.text ?? 'Explain the topic.', outcomeIds: input.confirmedOutcomes.map(o => o.code), weeks: part.map(row => row.week), lessons: 2, lessonMinutes: 20, assessment: part.map(row => row.due).filter(Boolean).join('; ') || 'Retrieval check', hours: 0 };
+    });
+    return { id, label: `${id[0].toUpperCase()}${id.slice(1)} approach`, tag: id === input.closest ? 'Closest to your syllabus' : 'Another possible structure', description: `An optional ${id} structure for ${input.profile.title.value ?? 'this course'}, using the stated schedule as a starting point.`, fits: [{ text: schedule.length ? 'Your syllabus lists a sequence of topics.' : input.assessments.length ? `Your source names ${input.assessments[0].title} as an assessment.` : 'Your source describes the course; please supply the missing schedule.', span: schedule[0]?.span ?? input.assessments.find(item => item.span)?.span ?? input.profile.description.spans[0] ?? null }], changes: 'Groups the listed topics into draft modules for your review.', tradeoffs: 'Check the pacing and assessment load before using this structure.', evidence: 'Sequencing can support practice, but this proposal has not been tested with your students.', frameworks: ['backward design', 'Tessera standard 2.2'], modules, workload: { averageHours: 0, peakHours: 0, peakModule: 0 } };
+  }),
   element: ({ lessonTitle, type, instruction }) => {
     const topic = lessonTitle.trim() || 'This lesson';
     const note = instruction.trim() ? ` ${firstSentence(instruction.trim())}` : '';

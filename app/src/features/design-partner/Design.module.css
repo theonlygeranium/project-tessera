@@ -49,3 +49,11 @@
 .assumptions { margin: 0; padding-left: 20px; color: var(--ink-3); }
 @media (max-width: 1150px) { .readSplit { grid-template-columns: 1fr; } }
 @media (max-width: 800px) { .profileList, .rateGrid { grid-template-columns: 1fr; } }
+.optionGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.overlayGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.overlayGrid .choice { min-height: 44px; }
+.overlayGrid input { width: 24px; height: 24px; flex: none; accent-color: var(--accent); }
+.card textarea, .card input:not([type='checkbox']):not([type='radio']) { box-sizing: border-box; width: 100%; min-height: 44px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); padding: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+.card textarea { min-height: 90px; }
+@media (max-width: 1100px) { .optionGrid { grid-template-columns: 1fr; } .overlayGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .overlayGrid { grid-template-columns: 1fr; } }

@@ -177,7 +177,7 @@ export interface CourseOutline {
 
 // ---- Blocks and AI provenance (D-003, D-006) --------------------------------------------
 
-export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback' | 'alt-text' | 'rewrite' | 'link-text' | 'element' | 'tutor' | 'tutor-summary' | 'agent' | 'readiness-item' | 'variant' | 'syllabus-extract' | 'syllabus-analyze' | 'structure-options' | 'module-scaffold' | 'objective-rewrite';
+export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback' | 'alt-text' | 'rewrite' | 'link-text' | 'element' | 'tutor' | 'tutor-summary' | 'agent' | 'readiness-item' | 'variant' | 'syllabus-extract' | 'syllabus-analyze' | 'structure-options' | 'module-scaffold' | 'objective-rewrite' | 'outcome-suggest';
 
 /** Where AI output came from. Shown next to every AI block ("names what it is and its source"). */
 export interface Provenance {
@@ -548,7 +548,7 @@ export type LessonSkeleton = 'gagne' | 'merrill' | 'case' | 'milestone' | 'start
 export interface DesignRecord {
   sessionId: Id; source: Pick<DesignSource, 'name' | 'kind' | 'chars'>;
   extraction: SyllabusExtraction | null; read: InstructionalRead | null; questions: DesignQuestion[];
-  confirmedOutcomes: { code: string; text: string; originalText: string }[];
+  confirmedOutcomes: { code: string; text: string; originalText: string; source?: 'syllabus' | 'instructor' | 'suggested'; suggestedText?: string }[];
   optionsShown: StructureOption[]; selection: ApproachSelection | null;
   plan: ProvisionPlan | null; appliedAt: Timestamp | null; undoneAt: Timestamp | null;
   decisions: { at: Timestamp; who: Id; what: string }[];                     // per-item keep/revert etc. summarised
@@ -559,7 +559,8 @@ export interface DesignSession {
   id: Id; courseId: Id; mode: 'syllabus'; stage: DesignStage; createdBy: Id; createdAt: Timestamp; updatedAt: Timestamp;
   source: DesignSource; consent: { syllabusOnly: true; at: Timestamp; rememberProfile: boolean };
   extraction: SyllabusExtraction | null; read: InstructionalRead | null; questions: DesignQuestion[];
-  confirmedOutcomes: { code: string; text: string; originalText: string }[] | null; teachingNote: string;
+  confirmedOutcomes: { code: string; text: string; originalText: string; source?: 'syllabus' | 'instructor' | 'suggested'; suggestedText?: string }[] | null; teachingNote: string;
+  suggestedOutcomes?: { text: string; why: string }[];
   /** Per-session assumptions override institution workload rates. */
   workloadRates?: WorkloadRates | null;
   options: StructureOption[] | null; selection: ApproachSelection | null;

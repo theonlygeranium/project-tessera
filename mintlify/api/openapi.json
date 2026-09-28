@@ -848,8 +848,18 @@
                           "minLength": 1
                         },
                         "originalText": {
+                          "type": "string"
+                        },
+                        "source": {
                           "type": "string",
-                          "minLength": 1
+                          "enum": [
+                            "syllabus",
+                            "instructor",
+                            "suggested"
+                          ]
+                        },
+                        "suggestedText": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -863,6 +873,253 @@
                 "required": [
                   "outcomes"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/suggest-outcomes": {
+      "post": {
+        "operationId": "suggestDesignOutcomes",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "suggestions": {
+                      "minItems": 3,
+                      "maxItems": 6,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "why": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "text",
+                          "why"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "suggestions"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "ai:run",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/options/retry": {
+      "post": {
+        "operationId": "retryDesignOptions",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "ai:run",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
               }
             }
           }
@@ -20823,7 +21080,8 @@
               "syllabus-analyze",
               "structure-options",
               "module-scaffold",
-              "objective-rewrite"
+              "objective-rewrite",
+              "outcome-suggest"
             ]
           },
           "generatedAt": {
@@ -26185,6 +26443,17 @@
                 },
                 "originalText": {
                   "type": "string"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "syllabus",
+                    "instructor",
+                    "suggested"
+                  ]
+                },
+                "suggestedText": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -27476,6 +27745,17 @@
                     },
                     "originalText": {
                       "type": "string"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "syllabus",
+                        "instructor",
+                        "suggested"
+                      ]
+                    },
+                    "suggestedText": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -27493,6 +27773,25 @@
           },
           "teachingNote": {
             "type": "string"
+          },
+          "suggestedOutcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "why": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "why"
+              ],
+              "additionalProperties": false
+            }
           },
           "workloadRates": {
             "anyOf": [

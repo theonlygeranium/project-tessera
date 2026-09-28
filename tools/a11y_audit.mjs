@@ -88,9 +88,11 @@ const APP = [
   { name: 'App · Builder · Start', url: 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor' },
   { name: 'App · Design partner · Start', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor' },
   { name: 'App · Design partner · Sample read', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: async (page) => { await page.getByRole('checkbox', { name: /I understand\. Read this syllabus/ }).check(); await page.getByRole('button', { name: 'Read my syllabus' }).click(); await page.getByRole('heading', { name: 'Course profile' }).waitFor(); } },
+  { name: 'App · Design partner · Approaches', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: async (page) => { await page.getByRole('checkbox', { name: /I understand\. Read this syllabus/ }).check(); await page.getByRole('button', { name: 'Read my syllabus' }).click(); await page.getByRole('heading', { name: 'Course profile' }).waitFor(); await page.getByRole('button', { name: 'Confirm and show approaches' }).click(); await page.getByRole('heading', { name: 'Three ways to structure this course' }).waitFor(); } },
   { name: 'Story · Design partner · Citation', url: 'storybook/iframe.html?id=components-citation--page&viewMode=story' },
   { name: 'Story · Design partner · Alignment matrix', url: 'storybook/iframe.html?id=components-alignmentmatrix--audit&viewMode=story' },
   { name: 'Story · Design partner · Workload chart', url: 'storybook/iframe.html?id=components-workloadchart--weekly&viewMode=story' },
+  { name: 'Story · Design partner · Option card', url: 'storybook/iframe.html?id=components-optioncard--selected&viewMode=story' },
   // Student (lane G): Priya has no profile yet (onboarding); Marcus has one
   { name: 'App · Student · Onboarding', url: 'app/onboarding?data=mock&as=u-priya' },
   { name: 'App · Student · Today', url: 'app/today?data=mock&as=u-marcus' },

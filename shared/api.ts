@@ -50,7 +50,9 @@ export interface ApiSpec {
   answerDesignQuestions: { input: { sessionId: Id; answers: { questionId: Id; optionId?: Id; value?: string; skipped: boolean }[]; teachingNote: string }; output: DesignSession };
   contestDesignField: { input: { sessionId: Id; field: string; correction: string }; output: DesignSession };
   updateDesignRates: { input: { sessionId: Id; rates: WorkloadRates }; output: DesignSession };
-  confirmOutcomes: { input: { sessionId: Id; outcomes: { code: string; text: string; originalText: string }[] }; output: DesignSession };
+  confirmOutcomes: { input: { sessionId: Id; outcomes: { code: string; text: string; originalText: string; source?: 'syllabus' | 'instructor' | 'suggested'; suggestedText?: string }[] }; output: DesignSession };
+  suggestDesignOutcomes: { input: { sessionId: Id }; output: { suggestions: { text: string; why: string }[] } };
+  retryDesignOptions: { input: { sessionId: Id }; output: DesignSession };
   selectApproach: { input: { sessionId: Id; optionIds: ArchitectureId[]; overlays: OverlayId[]; rationale: string }; output: DesignSession };
   previewProvisionPlan: { input: { sessionId: Id }; output: ProvisionPlan };
   applyProvisionPlan: { input: { sessionId: Id; hash: string; leastSureModuleKey?: string }; output: DesignSession };
@@ -393,6 +395,8 @@ export const ROUTES: { [K in Operation]: Route } = {
   contestDesignField: { method: 'POST', path: '/design/:sessionId/contest', access: INSTRUCTOR, scope: 'content:write' },
   updateDesignRates: { method: 'PUT', path: '/design/:sessionId/rates', access: INSTRUCTOR, scope: 'content:write' },
   confirmOutcomes: { method: 'POST', path: '/design/:sessionId/outcomes', access: INSTRUCTOR, scope: 'ai:run' },
+  suggestDesignOutcomes: { method: 'POST', path: '/design/:sessionId/suggest-outcomes', access: INSTRUCTOR, scope: 'ai:run' },
+  retryDesignOptions: { method: 'POST', path: '/design/:sessionId/options/retry', access: INSTRUCTOR, scope: 'ai:run' },
   selectApproach: { method: 'POST', path: '/design/:sessionId/approach', access: INSTRUCTOR, scope: 'content:write' },
   previewProvisionPlan: { method: 'POST', path: '/design/:sessionId/plan', access: INSTRUCTOR, scope: 'content:read' },
   applyProvisionPlan: { method: 'POST', path: '/design/:sessionId/apply', access: INSTRUCTOR, scope: 'ai:run' },

@@ -1,0 +1,13 @@
+.card { display: grid; align-content: start; gap: 12px; min-width: 0; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.selected { border: 2px solid var(--accent); background: var(--surface-sunk); }
+.top { display: flex; justify-content: space-between; gap: 12px; }
+.top h2 { margin: 4px 0 0; font: 500 20px/1.2 var(--font-display); }
+.tag, .card h3 { font-size: 12px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-3); }
+.card h3 { margin: 0 0 4px; }
+.card p { margin: 0; line-height: 1.45; }
+.card ul, .card ol { margin: 0; padding-left: 20px; }
+.card li { margin: 3px 0; }
+.use { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; cursor: pointer; font-weight: 600; }
+.use input { width: 24px; height: 24px; accent-color: var(--accent); }
+.bottom { align-self: end; color: var(--ink-3); font-size: 12px; }
+.modules { max-height: 180px; overflow: auto; }

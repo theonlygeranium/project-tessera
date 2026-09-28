@@ -37,4 +37,5 @@ export type { TaskCardProps } from './TaskCard/TaskCard';
 export { CourseCard } from './CourseCard/CourseCard';
 export type { CourseCardProps } from './CourseCard/CourseCard';
 export { PresenceCard } from './PresenceCard/PresenceCard';
+export { OptionCard } from './OptionCard/OptionCard';
 export type { PresenceCardProps } from './PresenceCard/PresenceCard';
