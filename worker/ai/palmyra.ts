@@ -45,6 +45,14 @@ const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } =
     { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nExtract only facts present in the source. Every extracted or inferred field has an origin and a verbatim source span with its page; use null pages for pasted text. Missing fields have origin missing, value null, confidence 0 and no spans. Keep each outcome's original wording. Return the course profile, outcomes, grading assessments, schedule rows and policies. An empty schedule row has empty true. The service will compute problems and questions.` },
     { role: 'user', content: `Source kind: ${sourceKind}\nName: ${name}\nInstitution term: ${institutionTerm ? JSON.stringify(institutionTerm) : 'not supplied'}\nSource:\n${sections.map(section => `${section.page === null ? '[pasted]' : `[p. ${section.page}]`} ${(section.lines.length ? section.lines.join('\n') : section.text)}`).join('\n\n').slice(0, 60_000)}` },
   ],
+  'syllabus-analyze': ({ extraction, profileAnswers, rates, rubricRefsAllowed, sourceKind }) => [
+    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nAudit each outcome for an observable verb, Bloom level, Fink category, and assessment alignment. For a training brief provide Mager performance, condition and criterion checks; otherwise mager is null. Multiple-choice assessments cannot demonstrate create or evaluate by themselves. Cite exact page passages in cites and deficiencies. Start the summary "Here is what I understood, and here is what I need from you." Do not claim completeness. Evaluate Palmer (maximum 46) and Cullen-Harris only when this is a syllabus. Use only these rubric names: ${rubricRefsAllowed.join(', ')}. Never reproduce QM rubric text. The server computes workload and provenance.` },
+    { role: 'user', content: `Source kind: ${sourceKind ?? 'syllabus'}\nProfile answers: ${JSON.stringify(profileAnswers)}\nWorkload rates: ${JSON.stringify(rates)}\nExtraction:\n${JSON.stringify(extraction).slice(0, 60_000)}` },
+  ],
+  'objective-rewrite': ({ outcome, nearbyTopics, industry }) => [
+    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nOffer one labelled alternative outcome with an observable action, preserving the instructor's disciplinary meaning. Give a concise why. The original remains unchanged. ${industry ? 'Use Mager performance, condition and criterion where supported.' : 'Use an observable Bloom verb.'}` },
+    { role: 'user', content: `Original outcome: ${JSON.stringify(outcome)}\nNearby topics: ${nearbyTopics.join('; ')}` },
+  ],
   tutor: (input) => [
     { role:'system', content:`You are Tessera's student tutor. The server has already chosen the allowed kind of help: ${input.kind}. Follow it exactly. Cite only the supplied source ids in citeIds. Use plain language at the student's reading level (${input.readingLevel === 'plain' ? 'grade 6–8' : 'introductory college'}) and in the student's language (${input.language}). Use fictional names only. Do not invent facts. The provided sources never include answer keys. Return strict JSON with only text and citeIds. ${input.kind === 'answer' ? '' : "Never confirm or rule out any specific option or guess, even indirectly: no 'right track', 'close', 'yes', 'not quite', or hints about whether their pick is correct. If the student asks whether a choice is right, say you can't confirm answers here, suggest they use the Check answer button, and redirect to the reasoning. "}${input.kind === 'hint' ? "Give one short nudge toward the relevant idea or a parallel example. Never give this item's answer or identify the right option." : input.kind === 'explain' ? 'Explain the concept with a worked parallel example using a different context or numbers. Do not solve the item or identify its right option.' : input.kind === 'answer' ? 'Open practice permits a direct answer. Explain why it is correct, grounded in sources.' : 'Be encouraging and stay on the lesson. Do not answer checks.'}` },
     { role:'user', content:`Course: ${input.courseTitle}\nActivity: ${input.activityTitle}\nMode: ${input.mode}\nHint number: ${input.hintNumber ?? 'none'} of ${input.maxHints}\nSources: ${JSON.stringify(input.sources).slice(0,12000)}\nRecent messages: ${JSON.stringify(input.history).slice(0,4000)}\nStudent message: ${input.question}` },
@@ -116,6 +124,8 @@ const extractionSchema = obj({
   schedule: array(obj({ week: integer, dates: str, topic: str, reading: str, due: str, span: nullable(span), empty: { type: 'boolean' } })),
   policies: array(obj({ kind: { type: 'string', enum: ['attendance','late-work','integrity','ai-use','accommodations','other'] }, text: str, span })),
 });
+const auditSchema = obj({ outcomeId: str, measurable: { type: 'boolean' }, verb: nullable(str), bloom: nullable({ type: 'string', enum: ['remember','understand','apply','analyze','evaluate','create'] }), fink: nullable({ type: 'string', enum: ['foundational','application','integration','human','caring','learning-how'] }), mager: nullable(obj({ performance: { type: 'boolean' }, condition: { type: 'boolean' }, criterion: { type: 'boolean' } })), assessedBy: array(obj({ assessmentId: str, fit: { type: 'string', enum: ['assessed','verb-mismatch'] } })), suggestion: nullable(obj({ text: str, why: str })) });
+const analysisSchema = obj({ summary: str, cites: array(span), outcomeAudits: array(auditSchema), alignment: array(obj({ outcomeId: str, assessmentId: str, state: { type: 'string', enum: ['assessed','verb-mismatch','none'] } })), learnerCenteredness: nullable(obj({ palmer: obj({ score: number, max: { type: 'integer', enum: [46] }, band: { type: 'string', enum: ['content-focused','transitional','learning-focused'] }, components: array(obj({ name: str, score: number, max: number, evidence: nullable(span) })) }), cullenHarris: obj({ community: number, powerAndControl: number, evaluation: number, evidence: array(obj({ factor: str, quote: span })) }) })), deficiencies: array(obj({ code: str, message: str, rubricRefs: array(obj({ rubric: { type: 'string', enum: ['tessera','oscqr','qm'] }, item: str })), spans: array(span) })) });
 const BLOCK = obj({
   type: { type: 'string', enum: ['heading', 'text', 'callout', 'check'] },
   level: { type: 'integer', enum: [2, 3] },
@@ -140,6 +150,8 @@ export const elementSchema = (type: keyof typeof elementSchemas) => obj({ block:
 
 const SCHEMAS: Record<AiTaskName, unknown> = {
   'syllabus-extract': extractionSchema,
+  'syllabus-analyze': analysisSchema,
+  'objective-rewrite': obj({ text: str, why: str }),
   tutor: obj({ text: str, citeIds: { type:'array', items:str } }),
   'tutor-summary': obj({ summary: str }),
   element: elementSchema('text'),
@@ -188,6 +200,8 @@ export function toBlock(b: FlatBlock, fallback?: BlockContent): BlockContent {
 
 const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
   'syllabus-extract': raw => raw,
+  'syllabus-analyze': raw => raw,
+  'objective-rewrite': raw => raw,
   tutor: raw => ({ text:String(raw.text ?? ''), citeIds:Array.isArray(raw.citeIds) ? raw.citeIds.filter((x:unknown): x is string => typeof x === 'string') : [] }),
   'tutor-summary': raw => ({ summary:String(raw.summary ?? '') }),
   element: (raw, input) => {
@@ -230,6 +244,7 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 
 const MAX_TOKENS: Record<AiTaskName, number> = {
   'syllabus-extract': 8000,
+  'syllabus-analyze': 8000, 'objective-rewrite': 1800,
   tutor: 1800, 'tutor-summary': 1200,
   element: 8000,
   // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the

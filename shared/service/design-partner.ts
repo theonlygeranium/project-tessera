@@ -1,11 +1,12 @@
 import seed from '../seed-syllabus.json';
 import { ApiError, type Input } from '../api';
-import type { DesignSession, DesignSource, DesignQuestion, SyllabusExtraction } from '../domain';
+import type { DesignSession, DesignSource, DesignQuestion, SyllabusExtraction, WorkloadRates } from '../domain';
 import type { GenerationJob } from '../repo';
 import type { Service, ServiceContext } from './context';
-import { DEFAULT_AI_DISCLOSURE, designPartnerPolicy } from '../policy';
+import { DEFAULT_AI_DISCLOSURE, designPartnerPolicy, workloadRatesFor } from '../policy';
 import { aiEnabled, canTeach, fail, provenance, required, user } from './helpers';
-import { validateExtraction } from './validate-design';
+import { validateExtraction, validateRead, validateObjectiveRewrite } from './validate-design';
+import { estimateWorkload } from '../design/workload';
 import { problemsFrom, questionsFrom } from './design-rules';
 import { WORKFLOW_STALL_MS } from './generation';
 
@@ -80,6 +81,24 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
   try {
     let result: Awaited<ReturnType<ServiceContext['ai']['run']>> | undefined;
     if (done === 0) result = await ctx.ai.run('syllabus-extract', { sourceKind: session.source.kind, name: session.source.name, sections: session.source.sections });
+    if (done === 1 && session.extraction) {
+      const institution = await ctx.repo.getInstitution();
+      const policyRubric = institution.readinessPolicy?.rubricId ? await ctx.repo.getRubric(institution.readinessPolicy.rubricId) : null;
+      const allowQm = policyRubric?.source === 'custom' && /quality matters|QM/i.test(policyRubric.name);
+      const rates = session.workloadRates ?? workloadRatesFor(institution.policy);
+      const extraction = { ...session.extraction, problems: [...session.extraction.problems, ...problemsFrom(session.extraction)] };
+      const allowed: ('tessera' | 'oscqr' | 'qm')[] = allowQm ? ['tessera', 'oscqr', 'qm'] : ['tessera', 'oscqr'];
+      const analyzed = await ctx.ai.run('syllabus-analyze', { extraction, profileAnswers: {}, rates, rubricRefsAllowed: allowed, sourceKind: session.source.kind });
+      const validated = validateRead(analyzed.output, extraction, session.source);
+      if (session.source.kind === 'brief' && validated.outcomeAudits.some(audit => audit.mager === null)) fail('invalid', 'The training brief read needs a Mager objective audit.');
+      const audits = await Promise.all(validated.outcomeAudits.map(async audit => {
+        if (audit.measurable) return audit;
+        const outcome = extraction.outcomes.find(item => item.id === audit.outcomeId)!;
+        const rewritten = await ctx.ai.run('objective-rewrite', { outcome, nearbyTopics: extraction.schedule.filter(row => !row.empty).map(row => row.topic).slice(0, 5), industry: session.source.kind === 'brief' });
+        return { ...audit, suggestion: validateObjectiveRewrite(rewritten.output) };
+      }));
+      result = { model: analyzed.model, output: { ...validated, outcomeAudits: audits, deficiencies: validated.deficiencies.map(item => ({ ...item, rubricRefs: item.rubricRefs.filter(ref => allowed.includes(ref.rubric)) })), learnerCenteredness: session.source.kind === 'brief' ? null : validated.learnerCenteredness } } as typeof result;
+    }
     const current = await ctx.repo.getGenerationJob(job.id);
     if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
     const latest = await ctx.repo.getDesignSession(job.sessionId);
@@ -97,7 +116,14 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
       const extraction: SyllabusExtraction = { ...prior, problems };
       latest.extraction = extraction;
       latest.record.extraction = extraction;
-      latest.questions = questionsFrom(problems, extraction, await ctx.repo.getInstructorProfile(latest.createdBy));
+      const readOutput = result!.output as ReturnType<typeof validateRead>;
+      const institution = await ctx.repo.getInstitution();
+      const rates = latest.workloadRates ?? workloadRatesFor(institution.policy);
+      const citations = readOutput.cites;
+      const read = { ...readOutput, workload: estimateWorkload(extraction.profile, extraction.schedule, extraction.assessments, rates), provenance: provenance(ctx, result!.model, 'syllabus-analyze', `Instructional read of ${latest.source.name}`, citations.map((span, index) => ({ id: `${latest.id}-cite-${index + 1}`, name: `${latest.source.name}${span.page ? ` p. ${span.page}` : ''}`, span }))) };
+      latest.read = read;
+      latest.record.read = read;
+      latest.questions = questionsFrom(problems, extraction, await ctx.repo.getInstructorProfile(latest.createdBy), read);
       latest.record.questions = latest.questions;
       latest.stage = 'read';
     }
@@ -122,7 +148,7 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
   }
 }
 
-export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSession' | 'listDesignSessions' | 'answerDesignQuestions' | 'getInstructorProfile' | 'updateInstructorProfile'> = {
+export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSession' | 'listDesignSessions' | 'answerDesignQuestions' | 'contestDesignField' | 'updateDesignRates' | 'confirmOutcomes' | 'getInstructorProfile' | 'updateInstructorProfile'> = {
   createDesignSession: async (ctx, input) => {
     await canTeach(ctx, input.courseId);
     await aiEnabled(ctx);
@@ -131,7 +157,7 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     const { source, problems } = await sourceFor(ctx, input);
     const now = ctx.now(), id = ctx.newId('ds'), jobId = ctx.newId('gj');
     const record: DesignSession['record'] = { sessionId: id, source: { name: source.name, kind: source.kind, chars: source.chars }, extraction: null, read: null, questions: [], confirmedOutcomes: [], optionsShown: [], selection: null, plan: null, appliedAt: null, undoneAt: null, decisions: [] };
-    const session: DesignSession = { id, courseId: input.courseId, mode: 'syllabus', stage: 'start', createdBy: user(ctx).id, createdAt: now, updatedAt: now, source, consent: { syllabusOnly: true, at: now, rememberProfile: input.consent.rememberProfile }, extraction: null, read: null, questions: [], confirmedOutcomes: null, teachingNote: '', options: null, selection: null, plan: null, provisioning: { jobId, done: 0, total: 2, error: null }, created: { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] }, record };
+    const session: DesignSession = { id, courseId: input.courseId, mode: 'syllabus', stage: 'start', createdBy: user(ctx).id, createdAt: now, updatedAt: now, source, consent: { syllabusOnly: true, at: now, rememberProfile: input.consent.rememberProfile }, extraction: null, read: null, questions: [], confirmedOutcomes: null, teachingNote: '', workloadRates: null, options: null, selection: null, plan: null, provisioning: { jobId, done: 0, total: 2, error: null }, created: { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] }, record };
     const job: GenerationJob = { id: jobId, courseId: input.courseId, requestedBy: user(ctx).id, kind: 'extract', sessionId: id, state: 'running', done: 0, total: 2, lessonIds: [], error: null, work: [], instruction: JSON.stringify(problems), failures: [], createdAt: now, updatedAt: now };
     await ctx.repo.putDesignSession(session);
     await ctx.repo.putGenerationJob(job);
@@ -159,7 +185,7 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
   listDesignSessions: async (ctx, { courseId }) => { await canTeach(ctx, courseId); return ctx.repo.listDesignSessions(courseId); },
   answerDesignQuestions: async (ctx, { sessionId, answers, teachingNote }) => {
     const session = await sessionFor(ctx, sessionId);
-    if (!session.extraction) fail('invalid', 'Wait until the syllabus has been read.');
+    if (!session.read || session.stage !== 'read') fail('invalid', 'Wait until the syllabus has been read.');
     if (teachingNote.length > 2_000) fail('invalid', 'Keep the teaching note to 2,000 characters or fewer.');
     const byId = new Map(session.questions.map(question => [question.id, question]));
     if (answers.some(answer => !byId.has(answer.questionId))) fail('invalid', 'One or more question ids are unknown.');
@@ -171,12 +197,62 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     });
     session.questions = updated;
     session.record.questions = updated;
-    session.teachingNote = teachingNote.trim();
+    const openAnswer = updated.find(question => question.id === 'question-teaching-approach')?.answer;
+    session.teachingNote = openAnswer?.skipped ? '' : (openAnswer?.value ?? teachingNote).trim();
     session.updatedAt = ctx.now();
     if (session.consent.rememberProfile && session.teachingNote) {
       const existing = await ctx.repo.getInstructorProfile(user(ctx).id);
       await ctx.repo.putInstructorProfile({ userId: user(ctx).id, teachingApproach: session.teachingNote, voice: existing?.voice ?? '', assessmentPreferences: existing?.assessmentPreferences ?? { formativeEveryModule: false, prefers: [] }, disclosureText: existing?.disclosureText ?? DEFAULT_AI_DISCLOSURE, updatedAt: ctx.now() });
     }
+    await ctx.repo.putDesignSession(session);
+    return session;
+  },
+  contestDesignField: async (ctx, { sessionId, field, correction }) => {
+    const session = await sessionFor(ctx, sessionId);
+    if (!session.read || session.stage !== 'read') fail('invalid', 'Wait until the syllabus has been read.');
+    const profile = session.extraction!.profile;
+    if (!Object.prototype.hasOwnProperty.call(profile, field) || field === 'weeklyHoursBudget' || !correction.trim() || correction.length > 1000) fail('invalid', 'Provide a profile field and a correction.');
+    const item = profile[field as keyof Omit<typeof profile, 'weeklyHoursBudget'>];
+    const id = `question-contest-${field}`;
+    const question: DesignQuestion = { id, text: `You marked ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} as needing a change. What should I use?`, spans: item.spans, kind: 'text', options: [], required: false, answer: { optionId: null, value: correction.trim(), skipped: false }, fromProblem: 'missing-field' };
+    session.questions = [...session.questions.filter(q => q.id !== id && q.id !== 'question-teaching-approach').slice(0, 4), question, ...session.questions.filter(q => q.id === 'question-teaching-approach')];
+    session.record.questions = session.questions;
+    session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `Contested profile ${field}: ${correction.trim()}` });
+    session.updatedAt = ctx.now();
+    await ctx.repo.putDesignSession(session);
+    return session;
+  },
+  updateDesignRates: async (ctx, { sessionId, rates }) => {
+    const session = await sessionFor(ctx, sessionId);
+    if (!session.read || !session.extraction || session.stage !== 'read') fail('invalid', 'Wait until the syllabus has been read.');
+    const names: (keyof WorkloadRates)[] = ['readingPagesPerHour', 'problemSetHours', 'writingHoursPerPage', 'projectHours', 'quizMinutes', 'discussionMinutes'];
+    if (names.some(name => !Number.isFinite(rates[name]) || rates[name] <= 0 || rates[name] > 1000)) fail('invalid', 'Workload rates must be positive numbers.');
+    session.workloadRates = { ...rates };
+    session.read!.workload = estimateWorkload(session.extraction!.profile, session.extraction!.schedule, session.extraction!.assessments, rates);
+    session.record.read = session.read;
+    session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: 'Edited workload assumptions for this session.' });
+    session.updatedAt = ctx.now();
+    await ctx.repo.putDesignSession(session);
+    return session;
+  },
+  confirmOutcomes: async (ctx, { sessionId, outcomes }) => {
+    const session = await sessionFor(ctx, sessionId);
+    if (session.stage !== 'read' || !session.read || !session.extraction) fail('invalid', 'Read and confirm the syllabus before approaches.');
+    if (!outcomes.length) fail('invalid', 'Confirm at least one outcome.');
+    const originals = new Map(session.extraction!.outcomes.map(item => [item.text, item]));
+    const codes = new Set<string>();
+    const sourceTexts = new Set<string>();
+    for (const outcome of outcomes) {
+      if (!outcome.code.trim() || !outcome.text.trim() || !originals.has(outcome.originalText) || codes.has(outcome.code) || sourceTexts.has(outcome.originalText)) fail('invalid', 'Outcomes must have unique codes, text, and an original syllabus outcome.');
+      codes.add(outcome.code);
+      sourceTexts.add(outcome.originalText);
+    }
+    session.confirmedOutcomes = outcomes.map(item => ({ code: item.code.trim(), text: item.text.trim(), originalText: item.originalText }));
+    session.record.confirmedOutcomes = session.confirmedOutcomes;
+    session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `Confirmed ${outcomes.length} outcomes before approaches.` });
+    session.stage = 'approaches';
+    session.options = null;
+    session.updatedAt = ctx.now();
     await ctx.repo.putDesignSession(session);
     return session;
   },

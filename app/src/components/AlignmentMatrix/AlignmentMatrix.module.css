@@ -1,0 +1,12 @@
+.wrap { max-width: 100%; overflow-x: auto; }
+.wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.table caption { text-align: left; font-weight: 600; padding: 0 0 8px; }
+.table th, .table td { border-bottom: 1px solid var(--line); padding: 7px; text-align: left; vertical-align: top; }
+.table th[scope='col'] { min-width: 66px; }
+.table th[scope='row'] { min-width: 175px; font-weight: 500; }
+.assessed { color: var(--success-text); }
+.verb-mismatch { color: var(--warning-text); }
+.none { color: var(--ink-3); }
+.cellText { display: block; font-size: 10px; color: var(--ink); }
+.legend { margin: 8px 0 0; font-size: 12px; color: var(--ink-3); }

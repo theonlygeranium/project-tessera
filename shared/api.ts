@@ -21,7 +21,7 @@ import type {
   MyVisibility, Outcome, PageTranscription, OutcomeLink, Program, ReadinessPolicy, ReadinessResult, RequiredTraining, Requirement,
   RequirementAudience, Rubric, RubricCheckKind, AutomaticCheck, StudentTestOut, TemplateChangeSet, TemplateModule,
   TestOut, LessonVariant, ReportingLine, TrainingStatus, VariantAudience, VariantDiff,
-  DesignSourceKind, DesignSession, ProvisionPlan, InstructorProfile, ArchitectureId, OverlayId,
+  DesignSourceKind, DesignSession, ProvisionPlan, InstructorProfile, ArchitectureId, OverlayId, WorkloadRates,
 } from './domain';
 
 /** Every API route lives under this prefix (D-020). `/api` without a version is an alias during Night 2. */
@@ -48,6 +48,8 @@ export interface ApiSpec {
   listDesignSessions: { input: { courseId: Id }; output: DesignSession[] };
   getDesignSession: { input: { sessionId: Id }; output: DesignSession };
   answerDesignQuestions: { input: { sessionId: Id; answers: { questionId: Id; optionId?: Id; value?: string; skipped: boolean }[]; teachingNote: string }; output: DesignSession };
+  contestDesignField: { input: { sessionId: Id; field: string; correction: string }; output: DesignSession };
+  updateDesignRates: { input: { sessionId: Id; rates: WorkloadRates }; output: DesignSession };
   confirmOutcomes: { input: { sessionId: Id; outcomes: { code: string; text: string; originalText: string }[] }; output: DesignSession };
   selectApproach: { input: { sessionId: Id; optionIds: ArchitectureId[]; overlays: OverlayId[]; rationale: string }; output: DesignSession };
   previewProvisionPlan: { input: { sessionId: Id }; output: ProvisionPlan };
@@ -388,6 +390,8 @@ export const ROUTES: { [K in Operation]: Route } = {
   listDesignSessions: { method: 'GET', path: '/courses/:courseId/design', access: INSTRUCTOR, scope: 'content:read' },
   getDesignSession: { method: 'GET', path: '/design/:sessionId', access: INSTRUCTOR, scope: 'content:read' },
   answerDesignQuestions: { method: 'PATCH', path: '/design/:sessionId/answers', access: INSTRUCTOR, scope: 'content:write' },
+  contestDesignField: { method: 'POST', path: '/design/:sessionId/contest', access: INSTRUCTOR, scope: 'content:write' },
+  updateDesignRates: { method: 'PUT', path: '/design/:sessionId/rates', access: INSTRUCTOR, scope: 'content:write' },
   confirmOutcomes: { method: 'POST', path: '/design/:sessionId/outcomes', access: INSTRUCTOR, scope: 'ai:run' },
   selectApproach: { method: 'POST', path: '/design/:sessionId/approach', access: INSTRUCTOR, scope: 'content:write' },
   previewProvisionPlan: { method: 'POST', path: '/design/:sessionId/plan', access: INSTRUCTOR, scope: 'content:read' },
