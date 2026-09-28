@@ -257,3 +257,24 @@ Approved 2026-09-27 (#50 D5). Plain-language and micro-path (at most 15 minutes)
 
 ### D-029 · Readiness and publishing
 Approved 2026-09-27 (#50 D6). The rubric result is advisory by default; an administrator can require a minimum result to publish, enforced by the server like the accessibility policy (D-022).
+
+### D-030 · Start from a syllabus is an entry mode of Build with AI
+Approved 2026-09-28 (spec `handoff/SYLLABUS-DESIGN-PARTNER-SPEC.md` §1). A second card on the builder start page, and the first "How to start" option in the guided New-course flow once that exists. The AI's role label is **Design partner**; learners never see it, only the usual "Drafted with AI · edited by …" line on kept content.
+
+### D-031 · QM numbers only with a licensed QM rubric
+Approved 2026-09-28. Deficiencies map to Tessera-standard and OSCQR items by default. QM standard numbers may be cited only when the institution's readiness policy uses a custom rubric named Quality Matters or QM; QM text is never reproduced (D-024 stands).
+
+### D-032 · Extraction with the existing parsers plus Palmyra-X6
+Approved 2026-09-28. pdfjs and JSZip (as in Tessera Access) plus Palmyra-X6 for the MVP, measured on the fixtures and real syllabi. If schedule-row accuracy on real syllabi is below 90%, propose Docling in the OCR container instead of working around it.
+
+### D-033 · Lesson objectives and an instructor profile
+Approved 2026-09-28. `Lesson.objective` is stored (the builder's lesson objectives are no longer dropped). An `InstructorProfile` (teaching approach, voice, assessment preferences, AI-use disclosure) is persisted on the instructor, editable and visible.
+
+### D-034 · Workload rates with Rice CTE defaults
+Approved 2026-09-28. Workload estimates use rate tables with Rice CTE defaults, editable by the institution on the Policy page.
+
+### D-035 · Industry mode
+Approved 2026-09-28. A training brief or competency list is accepted instead of a syllabus: Mager objective audit, performance-first, competency, and microlearning architectures, and seat time instead of the credit-hour budget.
+
+### D-036 · Workflow, voice, provisioning, and governance
+Approved 2026-09-28. Everything else follows `research/syllabus-design-partner/recommendations.md` §5–§8, made normative in the spec: analysis before generation, questions instead of silent fixes, outcomes confirmed before structures, three options plus overlays, a required rationale, a hashed preview before apply, drafts only, and one-action undo.
