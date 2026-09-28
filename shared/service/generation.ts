@@ -7,6 +7,7 @@ import { validateBlockContent } from './validate';
 import { courses } from './courses';
 import { saveCourseOutcomes } from './outcomes';
 import { advanceExtractJob } from './design-partner';
+import { advanceScaffoldJob } from './design-plan';
 
 const GENERATABLE: readonly BlockType[] = ['text', 'callout', 'check', 'document', 'table', 'scenario'];
 const VIDEO_SCRIPT = 'Write a video script. Title it "Video script: …" and make each section a scene with narration.';
@@ -80,6 +81,7 @@ export const WORKFLOW_STALL_MS = 20 * 60_000;
 /** Drafts the next batch (up to two elements) of a running job and saves it. Used by polling and by the background runner. */
 export async function advanceGenerationJob(ctx: ServiceContext, job: GenerationJob): Promise<GenerationJob> {
     if (job.kind === 'extract') return advanceExtractJob(ctx, job);
+    if (job.kind === 'scaffold') return advanceScaffoldJob(ctx, job);
     const { done, state, runner } = job;
     const batch = job.work.slice(0, 2);
     const results = await Promise.allSettled(batch.map(item => draft(ctx, item, job.instruction)));

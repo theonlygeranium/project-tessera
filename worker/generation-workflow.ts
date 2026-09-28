@@ -11,8 +11,8 @@ import { serviceContextFor } from './index';
 
 export interface GenerationParams { jobId: string }
 
-/** Enough steps for the largest job (60 elements, two per step) with room for retries. */
-const MAX_STEPS = 40;
+/** Scaffold jobs advance one lesson per step; allow long syllabus outlines to finish. */
+const MAX_STEPS = 120;
 
 export class GenerationWorkflow extends WorkflowEntrypoint<Env, GenerationParams> {
   async run(event: WorkflowEvent<GenerationParams>, step: WorkflowStep): Promise<string> {

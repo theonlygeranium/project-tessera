@@ -4,12 +4,16 @@
 // the a11y audit, docs screenshots, and local development without a key.
 //
 // Whatever a client returns is stored as a *draft*; a person keeps it (D-003).
-import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc, VariantAudience, DesignSource, DesignSourceKind, SyllabusExtraction, InstructionalRead, WorkloadRates, ExtractedOutcome, ArchitectureId, OverlayId, InstructorProfile, StructureOption, DesignQuestion } from './domain';
+import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc, VariantAudience, DesignSource, DesignSourceKind, SyllabusExtraction, InstructionalRead, WorkloadRates, ExtractedOutcome, ArchitectureId, OverlayId, InstructorProfile, StructureOption, DesignQuestion, ProvisionPlan, SourceSpan, LessonSkeleton } from './domain';
 import { extractSyllabusFixture } from './syllabus-fixture';
 import { analyzeSyllabusFixture, rewriteObjectiveFixture } from './design/read-fixture';
 import type { TutorKind } from './tutor/policy';
 
 export interface AiTasks {
+  'module-scaffold': {
+    input: { courseTitle: string; module: ProvisionPlan['modules'][number]; lesson: ProvisionPlan['modules'][number]['lessons'][number]; skeleton: LessonSkeleton; outcomes: { code: string; text: string }[]; spans: SourceSpan[]; teachingNote: string; instructorProfile: InstructorProfile | null; priorLessonTitles: string[] };
+    output: { blocks: BlockContent[]; assignment?: { purpose: string; task: string; criteria: string[]; rubric: RubricCriterion[] } };
+  };
   'syllabus-extract': {
     input: { sourceKind: DesignSourceKind; name: string; sections: { page: number | null; heading: string; level: number; text: string; lines: string[] }[]; institutionTerm?: { start: string; end: string; holidays: string[] } };
     output: Omit<SyllabusExtraction, 'problems' | 'provenance'>;
@@ -135,7 +139,15 @@ export const fixtureAi: AiClient = {
   },
 };
 
+export const moduleScaffoldFixture = ({ lesson, skeleton }: AiTasks['module-scaffold']['input']): AiTasks['module-scaffold']['output'] => ({ blocks: [
+    { type: 'heading', level: 2, text: lesson.title },
+    { type: 'callout', tone: 'info', title: skeleton === 'case' ? 'Claim to test' : 'Before you begin', text: skeleton === 'start-here' ? 'Find the course outline and note where to contact your instructor.' : `What would you need to know to ${lesson.objective.charAt(0).toLowerCase()}${lesson.objective.slice(1)}?` },
+    { type: 'text', text: `${lesson.objective}\n\n[Your example from class]` },
+    { type: 'check', question: `Which choice best matches this lesson objective: ${lesson.objective}?`, options: [{ id: 'a', text: lesson.objective }, { id: 'b', text: 'Skip the evidence.' }, { id: 'c', text: 'Choose without explaining.' }], correctOptionId: 'a', feedbackCorrect: 'This matches the lesson objective.', feedbackIncorrect: 'Look again at the lesson objective and try another choice.' },
+  ] });
+
 const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  'module-scaffold': moduleScaffoldFixture,
   'syllabus-extract': extractSyllabusFixture,
   'syllabus-analyze': analyzeSyllabusFixture,
   'objective-rewrite': rewriteObjectiveFixture,

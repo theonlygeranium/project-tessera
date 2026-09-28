@@ -532,8 +532,10 @@ export interface ProvisionPlan {
   outcomes: { code: string; text: string; source: 'confirmed' | 'rewritten' }[];
   modules: { key: string; title: string; objective: string; position: number; outcomeCodes: string[]; templateKey: string | null;
     overlaps: { moduleId: Id; title: string } | null;
-    lessons: { key: string; title: string; objective: string; minutes: number; week: number | null; skeleton: LessonSkeleton }[];
+    lessons: { key: string; title: string; objective: string; minutes: number; week: number | null; skeleton: LessonSkeleton; patternNote?: string; resurface?: boolean; announcementSlot?: boolean; alternativeFormatSlot?: boolean }[];
     assignment: { key: string; title: string; points: number; dueAt: string | null; outcomeCodes: string[]; replaces: string | null } | null;
+    /** Additional distinct graded components due in the same module. */
+    assignments?: { key: string; title: string; points: number; dueAt: string | null; outcomeCodes: string[]; replaces: string | null }[];
     hours: number; leastSure: boolean }[];
   readings: { title: string; span: SourceSpan; moduleKey: string }[];       // only readings with a span
   placeholders: number;                                                     // "[Reading to select]" count
@@ -564,7 +566,7 @@ export interface DesignSession {
   /** Per-session assumptions override institution workload rates. */
   workloadRates?: WorkloadRates | null;
   options: StructureOption[] | null; selection: ApproachSelection | null;
-  plan: ProvisionPlan | null; provisioning: { jobId: Id | null; done: number; total: number; error: string | null } | null;
+  plan: ProvisionPlan | null; provisioning: { jobId: Id | null; done: number; total: number; error: string | null; modules?: { key: string; done: number; total: number }[] } | null;
   /** Everything the plan created, for undo. */
   created: { outcomeIds: Id[]; moduleIds: Id[]; lessonIds: Id[]; blockIds: Id[]; assignmentIds: Id[]; linkKeys: string[] };
   record: DesignRecord;

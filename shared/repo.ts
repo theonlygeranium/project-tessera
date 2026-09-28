@@ -130,6 +130,8 @@ export interface Repo {
 
   getDesignSession(id: Id): Promise<DesignSession | null>;
   putDesignSession(session: DesignSession): Promise<void>;
+  /** Atomically claims a preview for one apply; false when another request claimed it. */
+  claimDesignApply(session: DesignSession): Promise<boolean>;
   /** Newest by createdAt, then id. */
   listDesignSessions(courseId: Id): Promise<DesignSession[]>;
   getInstructorProfile(userId: Id): Promise<InstructorProfile | null>;

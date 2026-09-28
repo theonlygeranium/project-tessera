@@ -14,6 +14,7 @@ import { normalizeExtraction } from './normalize-extraction';
 import { WORKFLOW_STALL_MS } from './generation';
 import { selectCandidates } from '../design/candidates';
 import { combinationNote, finalizeOptions, validateSuggestions } from '../design/options';
+import { advanceScaffoldJob } from './design-plan';
 
 type Problem = SyllabusExtraction['problems'][number];
 const MAX_CHARS = 60_000;
@@ -277,16 +278,17 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
   getDesignSession: async (ctx, { sessionId }) => {
     const session = await sessionFor(ctx, sessionId);
     const jobId = session.provisioning?.jobId;
-    if ((session.stage !== 'start' && !(session.stage === 'approaches' && !session.options)) || !jobId || session.provisioning?.error) return session;
+    if ((session.stage !== 'start' && !(session.stage === 'approaches' && !session.options) && session.stage !== 'provisioning') || !jobId || (session.stage !== 'provisioning' && session.provisioning?.error)) return session;
     const job = await ctx.repo.getGenerationJob(jobId);
-    if (!job || job.kind !== 'extract' || job.state !== 'running') return session;
+    if (!job || job.state !== 'running' || (job.kind !== 'extract' && job.kind !== 'scaffold')) return session;
     if (job.runner === 'workflow') {
       if (Date.parse(ctx.now()) - Date.parse(job.updatedAt) < WORKFLOW_STALL_MS) return session;
       job.runner = 'poll';
       await ctx.repo.putGenerationJob(job);
     }
     await aiEnabled(ctx);
-    await advanceExtractJob(ctx, job);
+    if (job.kind === 'scaffold') await advanceScaffoldJob(ctx, job);
+    else await advanceExtractJob(ctx, job);
     return sessionFor(ctx, sessionId);
   },
   listDesignSessions: async (ctx, { courseId }) => { await canTeach(ctx, courseId); return ctx.repo.listDesignSessions(courseId); },

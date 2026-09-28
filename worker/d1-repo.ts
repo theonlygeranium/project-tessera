@@ -307,6 +307,10 @@ export class D1Repo implements Repo {
   }
 
   async putDesignSession(session: DesignSession): Promise<void> { await this.designSessionStmt(session).run(); }
+  async claimDesignApply(session: DesignSession): Promise<boolean> {
+    const result = await this.db.prepare("UPDATE design_sessions SET data = ?, stage = 'provisioning', updated_at = ? WHERE id = ? AND stage = 'preview'").bind(JSON.stringify(session), session.updatedAt, session.id).run();
+    return (result.meta.changes ?? 0) === 1;
+  }
 
   async getInstructorProfile(userId: Id): Promise<InstructorProfile | null> {
     const row = await this.first<{ data: string }>('SELECT data FROM instructor_profiles WHERE user_id = ?', [userId]);

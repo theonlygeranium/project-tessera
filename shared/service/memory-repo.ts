@@ -144,6 +144,7 @@ export class MemoryRepo implements Repo {
   async getDesignSession(id: string): Promise<DesignSession | null> { return copy(this.data.designSessions!.find(x => x.id === id) ?? null); }
   async listDesignSessions(courseId: string): Promise<DesignSession[]> { return copy(this.data.designSessions!.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt) || cmp(a.id,b.id))); }
   async putDesignSession(value: DesignSession) { this.upsert(this.data.designSessions!, value); }
+  async claimDesignApply(value: DesignSession) { const current = this.data.designSessions!.find(x => x.id === value.id); if (current?.stage !== 'preview') return false; this.upsert(this.data.designSessions!, value); return true; }
   async getInstructorProfile(userId: string): Promise<InstructorProfile | null> { return copy(this.data.instructorProfiles!.find(x => x.userId === userId) ?? null); }
   async putInstructorProfile(value: InstructorProfile) { const rows = this.data.instructorProfiles!; const i = rows.findIndex(x => x.userId === value.userId); if (i < 0) rows.push(copy(value)); else rows[i] = copy(value); }
   async getGenerationJob(id: string): Promise<GenerationJob | null> { return copy(this.data.generationJobs.find(x => x.id === id) ?? null); }

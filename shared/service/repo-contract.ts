@@ -21,6 +21,12 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect((await repo.getDesignSession('ds-b'))?.source.name).toBe('Fictional syllabus');
       await repo.putDesignSession({ ...(await repo.getDesignSession('ds-b'))!, stage: 'read', updatedAt: '2026-09-28T13:00:00Z' });
       expect((await repo.getDesignSession('ds-b'))?.stage).toBe('read');
+      const preview = { ...(await repo.getDesignSession('ds-b'))!, stage: 'preview' as const };
+      await repo.putDesignSession(preview);
+      const claimed = { ...preview, stage: 'provisioning' as const };
+      expect(await Promise.all([repo.claimDesignApply(claimed), repo.claimDesignApply(claimed)])).toEqual([true, false]);
+      expect((await repo.getDesignSession('ds-b'))?.stage).toBe('provisioning');
+      await repo.putDesignSession({ ...preview, stage: 'read' });
       (await repo.getDesignSession('ds-b'))!.created.moduleIds.push('local');
       expect((await repo.getDesignSession('ds-b'))?.created.moduleIds).toEqual([]);
       const base = (await repo.getDesignSession('ds-b'))!;
