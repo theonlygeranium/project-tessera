@@ -19,6 +19,8 @@ export const OPERATIONS: { [K in Operation]: { input: z.ZodType<Input<K>>; outpu
  listDesignSessions:{input:by('courseId'),output:z.array(S.DesignSessionSchema)},
  getDesignSession:{input:by('sessionId'),output:S.DesignSessionSchema},
  answerDesignQuestions:{input:z.object({sessionId:id,answers:z.array(z.object({questionId:id,optionId:id.optional(),value:string.optional(),skipped:z.boolean()})),teachingNote:string}),output:S.DesignSessionSchema},
+ contestDesignField:{input:z.object({sessionId:id,field:required,correction:required.max(1000)}),output:S.DesignSessionSchema},
+ updateDesignRates:{input:z.object({sessionId:id,rates:S.WorkloadRatesSchema}),output:S.DesignSessionSchema},
  confirmOutcomes:{input:z.object({sessionId:id,outcomes:z.array(z.object({code:required,text:required,originalText:required}))}),output:S.DesignSessionSchema},
  selectApproach:{input:z.object({sessionId:id,optionIds:z.array(S.ArchitectureIdSchema).min(1).refine(v=>new Set(v).size===v.length,'Choose each approach once.'),overlays:z.array(S.OverlayIdSchema).refine(v=>new Set(v).size===v.length,'Choose each overlay once.'),rationale:required.min(12)}),output:S.DesignSessionSchema},
  previewProvisionPlan:{input:by('sessionId'),output:S.ProvisionPlanSchema},

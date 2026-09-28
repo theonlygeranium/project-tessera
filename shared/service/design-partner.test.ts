@@ -36,9 +36,71 @@ describe('design partner service', () => {
     expect(first.extraction?.outcomes).toHaveLength(6);
     expect(first.questions).toHaveLength(0);
     const done = await service.getDesignSession(ctx, { sessionId: started.id });
-    expect(done).toMatchObject({ stage: 'read', read: null, provisioning: { done: 2, total: 2 } });
+    expect(done).toMatchObject({ stage: 'read', read: { provenance: { task: 'syllabus-analyze' } }, provisioning: { done: 2, total: 2 } });
     expect(done.questions.some(question => question.fromProblem === 'empty-week' && question.text.includes('week 8'))).toBe(true);
+    expect(done.questions.at(-1)?.id).toBe('question-teaching-approach');
+    expect(done.questions.some(question => question.id.startsWith('question-unassessed-'))).toBe(true);
+    expect(done.questions.some(question => question.id.startsWith('question-milestones-'))).toBe(true);
+    expect(done.questions.length).toBeLessThanOrEqual(6);
+    expect(done.read?.outcomeAudits.find(audit => audit.outcomeId === 'outcome-2')?.suggestion?.text).toContain('Explain variability');
+    expect(done.read?.workload.weeks.find(week => week.week === 11)?.overBudget).toBe(true);
     expect((await ctx.repo.getGenerationJob(done.provisioning!.jobId!))?.state).toBe('done');
+  });
+  it('filters QM refs unless the readiness rubric is a matching custom rubric', async () => {
+    const ctx = await context();
+    const ai = { run: async (task: never, input: never) => {
+      const result = await fixtureAi.run(task, input);
+      if (task === 'syllabus-analyze') return { ...result, output: { ...(result.output as object), deficiencies: [{ code: 'qm-test', message: 'Possible gap', spans: [], rubricRefs: [{ rubric: 'qm', item: '2.1' }] }] } };
+      return result;
+    } } as ServiceContext['ai'];
+    const started = await service.createDesignSession({ ...ctx, ai }, sample);
+    await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    const read = await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    expect(read.read?.deficiencies[0].rubricRefs).toEqual([]);
+    const rubric = (await ctx.repo.getRubric('rubric-tessera'))!;
+    await ctx.repo.putRubric({ ...rubric, id: 'rubric-qm-test', name: 'Quality Matters local copy', source: 'custom', builtIn: false });
+    const institution = await ctx.repo.getInstitution(); institution.readinessPolicy = { rubricId: 'rubric-qm-test', minimumPercent: null }; await ctx.repo.putInstitution(institution);
+    const second = await service.createDesignSession({ ...ctx, ai }, sample);
+    await service.getDesignSession({ ...ctx, ai }, { sessionId: second.id });
+    const allowed = await service.getDesignSession({ ...ctx, ai }, { sessionId: second.id });
+    expect(allowed.read?.deficiencies[0].rubricRefs).toEqual([{ rubric: 'qm', item: '2.1' }]);
+  });
+  it('rejects malformed analysis without writing a read', async () => {
+    const ctx = await context();
+    const ai = { run: async (task: never, input: never) => task === 'syllabus-analyze' ? { output: { summary: 'bad' }, model: 'broken' } : fixtureAi.run(task, input) } as ServiceContext['ai'];
+    const started = await service.createDesignSession({ ...ctx, ai }, sample);
+    await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    const failed = await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    expect(failed.read).toBeNull();
+    expect(failed.provisioning?.error).toMatch(/invalid shape/);
+  });
+  it('rejects malformed suggested rewrites without writing a read', async () => {
+    const ctx = await context();
+    const ai = { run: async (task: never, input: never) => task === 'objective-rewrite' ? { output: { text: 'Explain it.' }, model: 'broken' } : fixtureAi.run(task, input) } as ServiceContext['ai'];
+    const started = await service.createDesignSession({ ...ctx, ai }, sample);
+    await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    const failed = await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    expect(failed.read).toBeNull();
+    expect(failed.provisioning?.error).toMatch(/rewrite has an invalid shape/);
+  });
+  it('confirms edited, reordered outcomes only after the read, records a contest, and recomputes rates', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, sample);
+    await expect(service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: [] })).rejects.toMatchObject({ code: 'invalid' });
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const ready = await service.getDesignSession(ctx, { sessionId: started.id });
+    await expect(service.confirmOutcomes(ctx, { sessionId: ready.id, outcomes: [] })).rejects.toMatchObject({ code: 'invalid' });
+    const contested = await service.contestDesignField(ctx, { sessionId: ready.id, field: 'meeting', correction: 'Wednesday only' });
+    expect(contested.questions.find(question => question.id === 'question-contest-meeting')?.answer?.value).toBe('Wednesday only');
+    const rates = { ...ready.read!.workload.rates, problemSetHours: 4 };
+    const updated = await service.updateDesignRates(ctx, { sessionId: ready.id, rates });
+    expect(updated.read!.workload.weeks.find(week => week.week === 2)!.hours).toBeGreaterThan(ready.read!.workload.weeks.find(week => week.week === 2)!.hours);
+    const original = ready.extraction!.outcomes;
+    const confirmed = await service.confirmOutcomes(ctx, { sessionId: ready.id, outcomes: [{ code: 'O6', text: original[5].text, originalText: original[5].text }, { code: 'O2', text: 'Explain variability with an example.', originalText: original[1].text }] });
+    expect(confirmed).toMatchObject({ stage: 'approaches', options: null, confirmedOutcomes: [{ code: 'O6' }, { code: 'O2' }] });
+    expect(confirmed.record.confirmedOutcomes).toEqual(confirmed.confirmedOutcomes);
+    expect(confirmed.record.decisions.some(item => item.what.includes('Contested profile meeting'))).toBe(true);
+    await expect(service.confirmOutcomes(ctx, { sessionId: ready.id, outcomes: [{ code: 'O1', text: original[0].text, originalText: original[0].text }] })).rejects.toMatchObject({ code: 'invalid' });
   });
   it('accepts pasted text and refuses fileId without a document engine', async () => {
     const ctx = await context();

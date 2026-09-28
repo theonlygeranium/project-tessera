@@ -1,4 +1,4 @@
-import type { DesignQuestion, ExtractionProblemCode, InstructorProfile, SourceSpan, SyllabusExtraction } from '../domain';
+import type { DesignQuestion, ExtractionProblemCode, InstructorProfile, SourceSpan, SyllabusExtraction, InstructionalRead } from '../domain';
 
 type Problem = SyllabusExtraction['problems'][number];
 type TermInfo = { start: string; end: string; holidays: string[] } | undefined;
@@ -32,7 +32,7 @@ export function problemsFrom(extraction: SyllabusExtraction, termInfo?: TermInfo
 
 const choice = (id: string, text: string) => ({ id, text });
 /** At most five source questions plus the always-present teaching approach question. */
-export function questionsFrom(problems: Problem[], extraction: SyllabusExtraction, profile: InstructorProfile | null): DesignQuestion[] {
+export function questionsFrom(problems: Problem[], extraction: SyllabusExtraction, profile: InstructorProfile | null, read?: InstructionalRead): DesignQuestion[] {
   const hasEmptyWeek = problems.some(problem => problem.code === 'empty-week');
   const rank: Record<ExtractionProblemCode, number> = { 'week-count-mismatch': 0, 'empty-week': 0, 'weights-not-100': 1, 'due-outside-term': 3, 'missing-field': 4, 'objective-no-verb': 5 };
   const questions: DesignQuestion[] = [];
@@ -61,6 +61,16 @@ export function questionsFrom(problems: Problem[], extraction: SyllabusExtractio
     }
     questions.push({ id: `question-${problem.code}-${index}`, text, spans: problem.spans, kind, options, required: false, answer: null, fromProblem: problem.code });
   }
-  questions.push({ id: 'question-teaching-approach', text: 'In a sentence or two: how do you like to teach this course, and what do you want from this redesign?', spans: [], kind: 'text', options: [], required: false, answer: profile?.teachingApproach ? { optionId: null, value: profile.teachingApproach, skipped: false } : null, fromProblem: null });
-  return questions;
+  if (read) {
+    for (const audit of read.outcomeAudits.filter(item => !item.assessedBy.length)) {
+      const outcome = extraction.outcomes.find(item => item.id === audit.outcomeId);
+      if (!outcome) continue;
+      questions.push({ id: `question-unassessed-${audit.outcomeId}`, text: `Outcome ${audit.outcomeId}, “${outcome.text}”, isn't assessed by anything I can find. How should we handle it?`, spans: outcome.span ? [outcome.span] : [], kind: 'choice', options: [choice('assess', 'Assess it (propose how)'), choice('inside', "It's inside an existing assessment"), choice('drop', 'Drop it')], required: false, answer: null, fromProblem: null });
+    }
+    for (const assessment of extraction.assessments.filter(item => (item.weightPercent ?? 0) >= 30 && item.dueAt)) {
+      questions.push({ id: `question-milestones-${assessment.id}`, text: `${assessment.title} is ${assessment.weightPercent}% with one due date. Would milestones with feedback help, or is the single deadline deliberate?`, spans: assessment.span ? [assessment.span] : [], kind: 'choice', options: [choice('milestones', 'Add milestones with feedback'), choice('single', 'Keep one deadline')], required: false, answer: null, fromProblem: null });
+    }
+  }
+  const open: DesignQuestion = { id: 'question-teaching-approach', text: 'In a sentence or two: how do you like to teach this course, and what do you want from this redesign?', spans: [], kind: 'text', options: [], required: false, answer: profile?.teachingApproach ? { optionId: null, value: profile.teachingApproach, skipped: false } : null, fromProblem: null };
+  return [...questions.slice(0, 5), open];
 }

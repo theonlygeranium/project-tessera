@@ -560,6 +560,8 @@ export interface DesignSession {
   source: DesignSource; consent: { syllabusOnly: true; at: Timestamp; rememberProfile: boolean };
   extraction: SyllabusExtraction | null; read: InstructionalRead | null; questions: DesignQuestion[];
   confirmedOutcomes: { code: string; text: string; originalText: string }[] | null; teachingNote: string;
+  /** Per-session assumptions override institution workload rates. */
+  workloadRates?: WorkloadRates | null;
   options: StructureOption[] | null; selection: ApproachSelection | null;
   plan: ProvisionPlan | null; provisioning: { jobId: Id | null; done: number; total: number; error: string | null } | null;
   /** Everything the plan created, for undo. */

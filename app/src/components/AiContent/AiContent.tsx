@@ -10,7 +10,7 @@ type Common = {
   /** What it's working from, or where it is in a sequence: "hint 1 of 2", "from Week3_slides.pdf p. 4–7". */
   source?: string;
   /** Numbered sources, rendered as footnotes. Mark references in the body with <AiRef n={…} />. */
-  cites?: string[];
+  cites?: ReactNode[];
   /** Buttons or links acting on this content. */
   actions?: ReactNode;
   /** The AI's text. */
@@ -53,7 +53,7 @@ export function AiContent(props: AiContentProps) {
       {cites && cites.length > 0 && (
         <div className="ai-cites">
           {cites.map((c, i) => (
-            <span className="ai-cite" data-n={i + 1} key={c}>
+            <span className="ai-cite" data-n={i + 1} key={i}>
               {c}
             </span>
           ))}
