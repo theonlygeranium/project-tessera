@@ -20,5 +20,6 @@ export interface Env {
   OCR_INSTANCES?: string;
   /** Lane G (D-021): a Cloudflare API token scoped to Access groups, and the group invitations add to. */
   CF_ACCESS_API_TOKEN?: string;
+  CLOUDFLARE_ACCOUNT_ID?: string;
   ACCESS_GROUP_ID?: string;
 }

@@ -656,6 +656,6 @@ export interface Invitation {
   invitedAt: Timestamp;
   /** Whether the email was added to the Access group. */
   accessGranted: boolean;
+  accessError?: string | null;
   acceptedAt: Timestamp | null;
 }
-

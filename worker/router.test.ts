@@ -485,3 +485,22 @@ describe('persona picker outside local (Codex review 5)', () => {
     expect((await call(env, '/api/v1/users', { headers: { 'cf-access-jwt-assertion': stranger, cookie: 'tessera_user=u-admin' } })).status).toBe(401);
   });
 });
+
+describe('view as (journey 11)', () => {
+  it('lets an administrator view as a student and stop, running viewAs as the administrator', async () => {
+    const env = testEnv(createTestDb(), assetsFor().fetcher);
+    const admin = { cookie: 'tessera_user=u-admin', 'content-type': 'application/json' };
+    const start = await call(env, '/api/v1/session/view-as', { method: 'POST', headers: admin, body: JSON.stringify({ userId: 'u-marcus' }) });
+    expect(start.status).toBe(200);
+    expect(start.headers.get('set-cookie')).toContain('tessera_view_as=u-marcus');
+    const viewing = { cookie: 'tessera_user=u-admin; tessera_view_as=u-marcus', 'content-type': 'application/json' };
+    const who = await (await call(env, '/api/v1/me', { headers: viewing })).json() as { user: { id: string }; viewingAs: { id: string } | null };
+    expect(who.viewingAs?.id).toBe('u-marcus');
+    // Stopping works although the viewed user is a student.
+    const stop = await call(env, '/api/v1/session/view-as', { method: 'POST', headers: viewing, body: JSON.stringify({ userId: null }) });
+    expect(stop.status).toBe(200);
+    expect(stop.headers.get('set-cookie')).toContain('tessera_view_as=;');
+    // A student can't view as anyone.
+    expect((await call(env, '/api/v1/session/view-as', { method: 'POST', headers: { cookie: 'tessera_user=u-marcus', 'content-type': 'application/json' }, body: JSON.stringify({ userId: 'u-priya' }) })).status).toBe(403);
+  });
+});

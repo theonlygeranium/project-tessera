@@ -543,6 +543,38 @@ await journey('Journey H · Student applies a suggested setup and undoes one cha
   await runAxe(page, 'Journey H · Today after undo');
 });
 
+await journey('Journey 11 · Administrator invites a person, views as a student, and the invitee lands in their persona', async (page) => {
+  await step('Finish setup and open People', async () => {
+    await page.goto(`${BASE}app/?data=mock&as=u-admin`);
+    await page.getByRole('heading', { level: 1, name: 'Setup' }).waitFor();
+    await page.getByRole('button', { name: 'Finish setup' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor();
+    await page.getByRole('navigation', { name: 'Administrator navigation' }).getByRole('link', { name: 'People' }).click();
+    await page.getByRole('heading', { level: 2, name: 'Invite someone' }).waitFor();
+  });
+  await step('Invite Taylor Brooks as a student; the demo says Access isn\'t connected', async () => {
+    const form = page.locator('form', { has: page.getByRole('button', { name: 'Invite someone' }) });
+    await form.getByLabel('Name').fill('Taylor Brooks');
+    await form.getByLabel('Email').fill('taylor.brooks@meridian.example.edu');
+    await form.getByRole('radio', { name: 'Student' }).check();
+    await form.getByRole('button', { name: 'Invite someone' }).click();
+    await waitForIncludes(page.locator('main'), 'taylor.brooks@meridian.example.edu');
+    await waitForIncludes(page.locator('main'), "Access isn't connected");
+  });
+  await runAxe(page, 'Journey 11 · People with an invitation');
+  await step('View as Marcus, see the banner, then stop viewing', async () => {
+    await page.getByRole('button', { name: 'View Tessera as Marcus Bell' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Today' }).waitFor();
+    await waitForIncludes(page.locator('main'), "You're viewing Tessera as");
+    await page.getByRole('button', { name: 'Stop viewing' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor();
+  });
+  await step('Sign in as Taylor: a student with no profile lands on onboarding', async () => {
+    await switchTo(page, 'Taylor Brooks');
+    await page.getByRole('heading', { level: 1, name: 'Set up your learning profile' }).waitFor();
+  });
+});
+
 // ---- summary --------------------------------------------------------------------------
 await browser.close();
 server.close();

@@ -1,9 +1,10 @@
 // People directory: filter, add one person, import rows, and change roles.
 import { useState, type FormEvent } from 'react';
-import type { Role, User } from '../../../../shared/domain';
+import { useNavigate } from 'react-router';
+import type { Invitation, Role, User } from '../../../../shared/domain';
 import { isRole, ROLE_LABELS } from '../../../../shared/policy';
 import {
-  Button, DataTable, FormField, SegmentedControl, Select, StatusNotice, TextArea, TextInput, TopBar,
+  Button, ChoiceGroup, DataTable, FormField, SegmentedControl, Select, StatusNotice, TextArea, TextInput, TopBar,
 } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
 import { ErrorNotice, Loading } from '../../shell/Status';
@@ -33,7 +34,15 @@ function profileStatus(person: User): string {
   return person.profile ? 'Profile set' : 'Not yet';
 }
 
+function invitationStatus(invitation: Invitation): string {
+  if (invitation.acceptedAt) return `Signed in ${new Date(invitation.acceptedAt).toLocaleDateString()}`;
+  if (invitation.accessGranted) return 'Access granted, waiting for first sign-in';
+  return `Access pending: ${invitation.accessError ?? 'Please try again.'}`;
+}
+
 export function PeoplePage() {
+  const navigate = useNavigate();
+  const viewAs = useApiMutation('viewAs');
   const { user: current } = useSession();
   const [filter, setFilter] = useState<RoleFilter>('all');
   const people = useApiQuery('listUsers', {});
@@ -41,6 +50,17 @@ export function PeoplePage() {
   const create = useApiMutation('createUser');
   const update = useApiMutation('updateUser');
   const importer = useApiMutation('importUsers');
+  const [invitationCursor, setInvitationCursor] = useState<string | undefined>(undefined);
+  const [previousCursors, setPreviousCursors] = useState<(string | undefined)[]>([]);
+  const invitations = useApiQuery('listInvitations', { limit: 20, cursor: invitationCursor });
+  const invite = useApiMutation('inviteUser');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<Role | ''>('');
+  const [inviteErrors, setInviteErrors] = useState<FieldErrors>({});
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteNotice, setInviteNotice] = useState<{ message: string; granted: boolean } | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -60,6 +80,45 @@ export function PeoplePage() {
   const [roleNotice, setRoleNotice] = useState<string | null>(null);
 
   usePageTitle('People');
+
+  function onInvite(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setInviteNotice(null);
+    setInviteError(null);
+    const next = blankErrors([{ field: 'name', value: inviteName }, { field: 'email', value: inviteEmail }]);
+    if (!inviteRole) next.role = 'Choose a role.';
+    setInviteErrors(next);
+    if (hasErrors(next) || !isRole(inviteRole)) {
+      requestAnimationFrame(() => focusInvalid(form));
+      return;
+    }
+    invite.mutate({ name: inviteName.trim(), email: inviteEmail.trim(), role: inviteRole }, {
+      onSuccess: (result) => {
+        setInviteNotice({ message: invitationStatus(result), granted: result.accessGranted });
+        setInviteName(''); setInviteEmail(''); setInviteRole('');
+        setInvitationCursor(undefined); setPreviousCursors([]);
+      },
+      onError: (error) => {
+        const fields = applyApiFieldError(error, { email: inviteEmail, role: inviteRole });
+        setInviteErrors(fields);
+        if (!hasErrors(fields)) setInviteError(error.message);
+        requestAnimationFrame(() => focusInvalid(form));
+      },
+    });
+  }
+
+  function retryInvitation(invitation: Invitation) {
+    const person = people.data?.find((candidate) => candidate.id === invitation.userId);
+    if (!person) return;
+    setRetryingId(invitation.userId);
+    setInviteError(null);
+    invite.mutate({ name: person.name, email: invitation.email, role: person.role }, {
+      onSuccess: (result) => setInviteNotice({ message: `${person.name}: ${invitationStatus(result)}`, granted: result.accessGranted }),
+      onError: (error) => setInviteError(error.message),
+      onSettled: () => setRetryingId(null),
+    });
+  }
 
   function onAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -203,8 +262,52 @@ export function PeoplePage() {
                 },
               },
               { key: 'profile', header: 'Profile', render: (person) => profileStatus(person) },
+              { key: 'viewAs', header: 'See their view', render: (person) => person.id === current.id || person.role === 'administrator' ? null : <Button density="compact" variant="text" disabled={viewAs.isPending} aria-label={`View Tessera as ${person.name}`} onClick={() => viewAs.mutate({ userId: person.id }, { onSuccess: () => navigate('/') })}>View as</Button> },
             ]}
           />
+        )}
+      </section>
+
+      <section className={styles.section}>
+        <h2>Invite someone</h2>
+        <form className={styles.form} noValidate onSubmit={onInvite}>
+          {inviteNotice && <StatusNotice tone={inviteNotice.granted ? 'success' : 'warning'} live="polite" title="Invitation updated" onDismiss={() => setInviteNotice(null)}>{inviteNotice.message}</StatusNotice>}
+          {inviteError && <StatusNotice tone="error" live="polite" title="Invitation wasn't updated">{inviteError}</StatusNotice>}
+          <FormField label="Name" required error={inviteErrors.name}>
+            {(control) => <TextInput {...control} autoComplete="name" value={inviteName} onChange={(event) => { setInviteName(event.target.value); setInviteErrors((currentErrors) => ({ ...currentErrors, name: undefined })); }} />}
+          </FormField>
+          <FormField label="Email" required error={inviteErrors.email}>
+            {(control) => <TextInput {...control} type="email" autoComplete="off" spellCheck={false} value={inviteEmail} onChange={(event) => { setInviteEmail(event.target.value); setInviteErrors((currentErrors) => ({ ...currentErrors, email: undefined })); }} />}
+          </FormField>
+          <ChoiceGroup legend="Role" type="radio" name="invite-role" value={inviteRole} options={ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }))} error={inviteErrors.role} onChange={(value) => { setInviteRole(typeof value === 'string' && isRole(value) ? value : ''); setInviteErrors((currentErrors) => ({ ...currentErrors, role: undefined })); }} />
+          <div className={styles.actions}><Button type="submit" variant="primary" density="compact" disabled={invite.isPending}>{invite.isPending ? 'Inviting…' : 'Invite someone'}</Button></div>
+        </form>
+      </section>
+
+      <section className={styles.section}>
+        <h2>Invitations</h2>
+        {invitations.isLoading && <Loading label="Loading invitations" />}
+        {invitations.error && <ErrorNotice error={invitations.error} onRetry={() => { void invitations.refetch(); }} />}
+        {invitations.data && (
+          <>
+            <DataTable className={styles.directory} density="compact" caption="Invitations" hideCaption rows={invitations.data.items} rowKey={(item) => item.userId} empty="No invitations yet." columns={[
+              { key: 'name', header: 'Name', render: (item) => people.data?.find((person) => person.id === item.userId)?.name ?? 'Loading person…' },
+              { key: 'email', header: 'Email' },
+              { key: 'role', header: 'Role', render: (item) => {
+                const person = people.data?.find((candidate) => candidate.id === item.userId);
+                return person ? ROLE_LABELS[person.role] : 'Loading person…';
+              } },
+              { key: 'invitedAt', header: 'Invited', render: (item) => new Date(item.invitedAt).toLocaleDateString() },
+              { key: 'status', header: 'Status', render: invitationStatus },
+              { key: 'action', header: 'Action', render: (item) => !item.accessGranted && people.data?.some((person) => person.id === item.userId)
+                ? <Button density="compact" variant="secondary" disabled={invite.isPending || retryingId === item.userId} onClick={() => retryInvitation(item)}>Try again</Button>
+                : null },
+            ]} />
+            <div className={styles.actions}>
+              {previousCursors.length > 0 && <Button density="compact" variant="secondary" onClick={() => { const previous = [...previousCursors]; setInvitationCursor(previous.pop()); setPreviousCursors(previous); }}>Previous</Button>}
+              {invitations.data.nextCursor && <Button density="compact" variant="secondary" onClick={() => { setPreviousCursors((current) => [...current, invitationCursor]); setInvitationCursor(invitations.data.nextCursor ?? undefined); }}>Next</Button>}
+            </div>
+          </>
         )}
       </section>
 

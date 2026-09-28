@@ -1,4 +1,4 @@
-import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat, ActivityKind, TutorSetting } from '../domain';
+import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Invitation, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat, ActivityKind, TutorSetting } from '../domain';
 import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession } from '../repo';
 import type { SeedData } from '../seed';
 
@@ -147,6 +147,15 @@ export class MemoryRepo implements Repo {
   async listApiTokens(ownerId: string) { return copy(this.data.apiTokens.filter(x => x.ownerId === ownerId)); }
   async putApiToken(token: ApiToken & { hash: string }) { this.upsert(this.data.apiTokens, token); }
   async touchApiToken(id: string, usedAt: string) { const t = this.data.apiTokens.find(x => x.id === id); if (t) t.lastUsedAt = usedAt; }
+  async getInvitation(userId: string) { return copy(this.data.invitations.find(x => x.userId === userId) ?? null); }
+  async getInvitationByEmail(email: string) { return copy(this.data.invitations.find(x => x.email.toLowerCase() === email.toLowerCase()) ?? null); }
+  async listInvitations() { return copy(this.data.invitations.sort((a, b) => b.invitedAt.localeCompare(a.invitedAt) || a.userId.localeCompare(b.userId))); }
+  async putInvitation(value: Invitation) {
+    const i = this.data.invitations.findIndex(x => x.userId === value.userId);
+    if (i < 0) this.data.invitations.push(copy(value));
+    else this.data.invitations[i] = copy({ ...value, acceptedAt: this.data.invitations[i].acceptedAt ?? value.acceptedAt });
+  }
+  async acceptInvitation(userId: string, at: string) { const invitation = this.data.invitations.find(x => x.userId === userId); if (invitation && !invitation.acceptedAt) invitation.acceptedAt = at; }
   async hasInvitations() { return this.data.invitations.length > 0; }
   async isEmpty(): Promise<boolean> { return this.data.users.length === 0; }
   async reset(seed: SeedData) { this.data = copy(seed); }

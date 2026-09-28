@@ -39,6 +39,8 @@ export function AppShell() {
   const courseMatch = useMatch('/teach/courses/:courseId/*');
   const today = useApiQuery('getToday', undefined, { enabled: user.role === 'student' && !!user.profile });
   const signOut = useApiMutation('signOut', { onSuccess: () => navigate(paths.signIn) });
+  const who = useApiQuery('whoAmI', undefined);
+  const stopViewing = useApiMutation('viewAs');
   useAccent(institution);
 
   // Move focus to the page on client-side navigation so screen readers start at the new content.
@@ -78,6 +80,7 @@ export function AppShell() {
       />
       <main id="main" ref={mainRef} tabIndex={-1} className={styles.main}>
         {dataMode === 'mock' && <p className={styles.demo}>Demo data: changes stay in this browser tab and reset on reload.</p>}
+        {who.data?.viewingAs && <div className={styles.viewing} role="status"><p>You're viewing Tessera as <strong>{who.data.viewingAs.name}</strong> ({ROLE_LABELS[who.data.viewingAs.role]}). Changes you make are made as them.</p><Button density="compact" onClick={() => stopViewing.mutate({ userId: null }, { onSuccess: () => navigate('/') })}>Stop viewing</Button></div>}
         <Outlet />
       </main>
     </div>

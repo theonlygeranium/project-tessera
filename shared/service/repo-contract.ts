@@ -94,5 +94,24 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       await repo.reset(seedData()); expect(await repo.isEmpty()).toBe(false); expect(await repo.getUser('u-priya')).not.toBeNull();
       expect(await repo.getAssignment('asg-stat-1')).not.toBeNull();
     });
+    it('round trips invitations, finds email without case, orders newest first, and accepts once', async () => {
+      const repo = await makeRepo();
+      const firstUser = { id: 'u-invite-one', name: 'Sam Ibarra', email: 'sam@example.test', role: 'student' as const, initials: 'SI', profile: null };
+      const secondUser = { ...firstUser, id: 'u-invite-two', name: 'Tess Ibarra', email: 'tess@example.test' };
+      await repo.putUser(firstUser); await repo.putUser(secondUser);
+      const first = { userId: firstUser.id, email: firstUser.email, invitedBy: 'u-admin', invitedAt: '2026-01-01T00:00:00Z', accessGranted: false, accessError: 'Unavailable', acceptedAt: null };
+      const second = { ...first, userId: secondUser.id, email: secondUser.email, invitedAt: '2026-02-01T00:00:00Z', accessError: null };
+      expect(await repo.hasInvitations()).toBe(false);
+      await repo.putInvitation(first); await repo.putInvitation(second);
+      expect(await repo.hasInvitations()).toBe(true);
+      expect(await repo.getInvitation(first.userId)).toEqual(first);
+      expect(await repo.getInvitationByEmail('SAM@EXAMPLE.TEST')).toEqual(first);
+      expect((await repo.listInvitations()).map(x => x.userId)).toEqual([secondUser.id, firstUser.id]);
+      await repo.putInvitation({ ...first, accessGranted: true, accessError: null });
+      await repo.acceptInvitation(first.userId, '2026-03-01T00:00:00Z');
+      await repo.acceptInvitation(first.userId, '2026-04-01T00:00:00Z');
+      await repo.putInvitation({ ...first, accessGranted: true, accessError: null });
+      expect(await repo.getInvitation(first.userId)).toEqual({ ...first, accessGranted: true, accessError: null, acceptedAt: '2026-03-01T00:00:00Z' });
+    });
   });
 }

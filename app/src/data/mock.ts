@@ -11,14 +11,17 @@ import { MemoryRepo, dispatch, service, type ServiceContext } from '../../../sha
 export function createMockApi(options: { signedInAs?: string | null } = {}): TesseraApi {
   const repo = new MemoryRepo(seedData());
   let userId: string | null = options.signedInAs ?? null;
+  // "View as" (administrators): like the Worker's tessera_view_as cookie.
+  let viewAsId: string | null = null;
   let counter = 0;
   // A clock that starts at the seed's "now" and moves forward in real time, so new
   // items sort after seeded ones and relative dates stay stable in screenshots.
   const started = Date.now();
   const now = () => new Date(Date.parse(SEED_NOW) + (Date.now() - started)).toISOString();
 
-  async function context(): Promise<ServiceContext> {
-    const user: User | null = userId ? await repo.getUser(userId) : null;
+  async function context(asAdmin = false): Promise<ServiceContext> {
+    let user: User | null = userId ? await repo.getUser(userId) : null;
+    if (!asAdmin && user?.role === 'administrator' && viewAsId && viewAsId !== user.id) user = (await repo.getUser(viewAsId)) ?? user;
     return { repo, ai: fixtureAi, user, now, newId: (p) => `${p}-mock${++counter}` };
   }
 
@@ -28,9 +31,15 @@ export function createMockApi(options: { signedInAs?: string | null } = {}): Tes
       async (input?: unknown) => {
         // Let the UI show loading states, as it would with a network.
         await new Promise((r) => setTimeout(r, 30));
-        const result = await dispatch(service, await context(), op, input as never);
-        if (op === 'signIn') userId = (input as { userId: string }).userId;
-        if (op === 'signOut') userId = null;
+        if (op === 'whoAmI') {
+          const admin = userId ? await repo.getUser(userId) : null;
+          const viewing = admin?.role === 'administrator' && viewAsId && viewAsId !== admin.id ? await repo.getUser(viewAsId) : null;
+          return structuredClone({ email: null, user: viewing ?? admin, viewingAs: viewing });
+        }
+        const result = await dispatch(service, await context(op === 'viewAs'), op, input as never);
+        if (op === 'signIn') { userId = (input as { userId: string }).userId; viewAsId = null; }
+        if (op === 'signOut') { userId = null; viewAsId = null; }
+        if (op === 'viewAs') viewAsId = (input as { userId: string | null }).userId;
         return structuredClone(result);
       },
     ]),

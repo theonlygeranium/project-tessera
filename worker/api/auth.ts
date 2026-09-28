@@ -71,6 +71,14 @@ export async function resolvePrincipal(request: Request, env: Env, repo: Repo, r
     email = access.email.toLowerCase();
   }
   const identified = email ? await repo.findUserByEmail(email) : null;
+  if (identified) {
+    try {
+      const invitation = await repo.getInvitation(identified.id);
+      if (invitation && !invitation.acceptedAt) await repo.acceptInvitation(identified.id, now);
+    } catch (error) {
+      console.error('Invitation acceptance could not be recorded', error);
+    }
+  }
 
   // 3. Persona cookie (the demo persona picker): local dev, or an owner's verified Access
   // email (OWNER_EMAILS). Anyone else whose email isn't a Tessera user gets no account;

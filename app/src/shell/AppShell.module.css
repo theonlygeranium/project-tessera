@@ -24,3 +24,6 @@
   .who { position: relative; gap: 6px; }
   .who > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
+
+.viewing { display: flex; flex-wrap: wrap; gap: var(--space-3, .75rem); align-items: center; justify-content: space-between; margin: 0 0 var(--space-4, 1rem); padding: var(--space-3, .75rem) var(--space-4, 1rem); background: var(--warning-soft); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-md, .5rem); }
+.viewing p { margin: 0; }
