@@ -67,7 +67,7 @@ export const files: Pick<Service, 'listFiles' | 'getFile' | 'deleteFile' | 'getF
     if (existing?.state === 'ready') return status(existing, format, f.id);
     await ctx.repo.putFormat({ fileId: f.id, version: f.version, format, state: 'generating', outputKey: null, generatedAt: null, error: null });
     try {
-      const outputKey = await engine.generateFormat(f, format);
+      const outputKey = await engine.generateFormat(f, format, (await ctx.repo.getInstitution()).policy.aiAuthoring);
       const done = { fileId: f.id, version: f.version, format, state: 'ready' as const, outputKey, generatedAt: ctx.now(), error: null };
       await ctx.repo.putFormat(done);
       return status(done, format, f.id);

@@ -11,11 +11,77 @@ import re
 import subprocess
 import tempfile
 import time
+import base64
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MAX_BYTES = 30 * 1024 * 1024
 LANGS = {"eng", "spa", "fra"}
 TIMEOUT_SECONDS = 600
+MAX_IMAGES = 40
+MAX_PNG_BYTES = 12 * 1024 * 1024
+MAX_CONFIDENCE_PAGES = 60
+
+
+def image_manifest(listing, paths):
+    """Match pdfimages output to its -list order, including skipped small images."""
+    details = {}
+    image_index = 0
+    for line in listing.splitlines():
+        fields = line.split()
+        if len(fields) < 5 or not fields[0].isdigit() or not fields[1].isdigit():
+            continue
+        if fields[2] != "image":
+            continue
+        page, number, width, height = int(fields[0]), int(fields[1]), int(fields[3]), int(fields[4])
+        details[(page, number)] = (image_index, width, height)
+        image_index += 1
+    images, total, truncated = [], 0, False
+    for path in sorted(paths):
+        match = re.search(r"-(\d+)-(\d+)\.png$", str(path))
+        if not match:
+            continue
+        page, number = map(int, match.groups())
+        index, width, height = details.get((page, number), (-1, 0, 0))
+        if width < 48 or height < 48:
+            continue
+        size = path.stat().st_size
+        if len(images) >= MAX_IMAGES or total + size > MAX_PNG_BYTES:
+            truncated = True
+            break
+        data = path.read_bytes()
+        images.append({"index": index, "page": page, "width": width, "height": height,
+                       "png": base64.b64encode(data).decode("ascii")})
+        total += size
+    return {"images": images, "truncated": truncated}
+
+
+def tsv_confidence(tsv):
+    values = []
+    for line in tsv.splitlines()[1:]:
+        fields = line.split("\t")
+        if len(fields) > 11 and fields[11].strip():
+            try:
+                value = float(fields[10])
+                if value >= 0:
+                    values.append(value)
+            except ValueError:
+                pass
+    return round(sum(values) / len(values), 1) if values else 0.0
+
+
+def run(command, **kwargs):
+    return subprocess.run(command, capture_output=True, timeout=TIMEOUT_SECONDS, **kwargs)
+
+
+def page_count(source):
+    result = run(["pdfinfo", source], text=True)
+    if result.returncode:
+        raise ValueError("Invalid PDF.")
+    match = re.search(r"^Pages:\s*(\d+)", result.stdout, re.M)
+    if not match:
+        raise ValueError("PDF page count is unavailable.")
+    return int(match.group(1))
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -39,9 +105,13 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(404, {"error": "not found"})
 
     def do_POST(self):
-        if not self.path.startswith("/ocr"):
+        path = self.path.partition("?")[0]
+        if path not in ("/ocr", "/images", "/confidence", "/page"):
             return self.reply(404, {"error": "not found"})
-        length = int(self.headers.get("content-length") or 0)
+        try:
+            length = int(self.headers.get("content-length") or 0)
+        except ValueError:
+            return self.reply(400, {"error": "Invalid content length."})
         if length <= 0 or length > MAX_BYTES:
             return self.reply(413 if length > MAX_BYTES else 400, {"error": "Send a PDF up to 30 MB."})
         query = self.path.partition("?")[2]
@@ -55,6 +125,39 @@ class Handler(BaseHTTPRequestHandler):
             source, target = os.path.join(work, "in.pdf"), os.path.join(work, "out.pdf")
             with open(source, "wb") as f:
                 f.write(body)
+            try:
+                count = page_count(source) if path != "/ocr" else 0
+                if path == "/images":
+                    prefix = os.path.join(work, "img")
+                    listing = run(["pdfimages", "-list", source], text=True)
+                    if listing.returncode:
+                        return self.reply(400, {"error": "Invalid PDF."})
+                    result = run(["pdfimages", "-png", "-p", source, prefix])
+                    if result.returncode:
+                        return self.reply(400, {"error": "Images could not be extracted."})
+                    return self.reply(200, image_manifest(listing.stdout, Path(work).glob("img-*.png")))
+                if path in ("/page", "/confidence"):
+                    if path == "/page":
+                        match = re.search(r"(?:^|&)page=(\d+)(?:&|$)", query)
+                        page = int(match.group(1)) if match else 0
+                        if page < 1 or page > count:
+                            return self.reply(400, {"error": "Page is out of range."})
+                        result = run(["pdftoppm", "-f", str(page), "-l", str(page), "-singlefile", "-r", "150", "-png", source, os.path.join(work, "page")])
+                        if result.returncode:
+                            return self.reply(400, {"error": "Page could not be rendered."})
+                        return self.reply(200, Path(work, "page.png").read_bytes(), "image/png")
+                    scores = []
+                    for page in range(1, min(count, MAX_CONFIDENCE_PAGES) + 1):
+                        rendered = run(["pdftoppm", "-f", str(page), "-l", str(page), "-singlefile", "-r", "150", "-png", source, os.path.join(work, "page")])
+                        if rendered.returncode:
+                            return self.reply(400, {"error": "Page could not be rendered."})
+                        tsv = run(["tesseract", os.path.join(work, "page.png"), "stdout", "tsv"], text=True)
+                        if tsv.returncode:
+                            return self.reply(422, {"error": "Confidence could not be measured."})
+                        scores.append({"page": page, "confidence": tsv_confidence(tsv.stdout)})
+                    return self.reply(200, {"pages": scores, "truncated": count > MAX_CONFIDENCE_PAGES, "totalPages": count})
+            except (ValueError, OSError, subprocess.TimeoutExpired):
+                return self.reply(400, {"error": "Invalid PDF or processing timed out."})
             command = [
                 "ocrmypdf", "--skip-text", "--output-type", "pdf", "--optimize", "0",
                 "--jobs", "1", "--tesseract-timeout", "180", "-l", "+".join(langs), source, target,

@@ -6,11 +6,11 @@ import JSZip from 'jszip';
 import tokens from '../../design/tokens.json';
 import { ApiError } from '../../shared/api';
 import { summarize } from '../../shared/access/score';
-import type { AccessReport, AccessibleFormat, Block, FileRecord, Provenance } from '../../shared/domain';
+import type { AccessReport, AccessibleFormat, Block, FileRecord, PageTranscription, Provenance, User } from '../../shared/domain';
 import { canReadFile, type DocumentEngine, type ServiceContext } from '../../shared/service';
-import { describeImage, type VisionEnv } from '../ai/vision';
+import { describeImage, transcribePage, type VisionEnv } from '../ai/vision';
 import { applyFix, checkDocument, extractImage, type DocumentCheck } from './index';
-import { runOcr, type OcrContainer } from '../ocr';
+import { extractPdfImages, pageConfidences, renderPdfPage, runOcr, type OcrContainer } from '../ocr';
 
 export interface EngineEnv extends VisionEnv { FILES: R2Bucket; OCR?: DurableObjectNamespace<OcrContainer>; OCR_INSTANCES?: string }
 
@@ -37,6 +37,9 @@ export const fileKeys = {
   prefix: (f: Pick<FileRecord, 'courseId' | 'id'>) => `files/${f.courseId}/${f.id}/`,
   version: (f: Pick<FileRecord, 'courseId' | 'id' | 'name'>, version: number) => `files/${f.courseId}/${f.id}/v${version}/${safeName(f.name)}`,
   format: (f: Pick<FileRecord, 'courseId' | 'id' | 'version'>, format: keyof typeof FORMAT_FILES) => `files/${f.courseId}/${f.id}/v${f.version}/formats/${format}.${FORMAT_FILES[format].ext}`,
+  alt: (f: Pick<FileRecord, 'courseId' | 'id' | 'version'>) => `files/${f.courseId}/${f.id}/v${f.version}/pdf-alt.json`,
+  transcriptions: (f: Pick<FileRecord, 'courseId' | 'id' | 'version'>) => `files/${f.courseId}/${f.id}/v${f.version}/transcriptions.json`,
+  ocrSource: (f: Pick<FileRecord, 'courseId' | 'id' | 'version'>) => `files/${f.courseId}/${f.id}/v${f.version}/ocr-source.json`,
 };
 
 export function safeName(name: string): string {
@@ -51,6 +54,36 @@ async function bytesOf(env: EngineEnv, key: string): Promise<ArrayBuffer> {
   return object.arrayBuffer();
 }
 
+type PdfAlt = Record<string, { alt: string; decorative: boolean }>;
+async function readJson<T>(env: EngineEnv, key: string, fallback: T): Promise<T> {
+  const object = await env.FILES.get(key);
+  return object ? JSON.parse(await object.text()) as T : fallback;
+}
+function pngBytes(encoded: string): Uint8Array {
+  return Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+}
+
+async function secondPass(env: EngineEnv, file: FileRecord, pdf: ArrayBuffer): Promise<void> {
+  if (!env.OCR || await env.FILES.get(fileKeys.transcriptions(file))) return;
+  if (!env.WRITER_API_KEY) { console.info(`AI transcription skipped for ${file.id} v${file.version}: Palmyra-X5 is not configured.`); return; }
+  let measured: Awaited<ReturnType<typeof pageConfidences>>;
+  try { measured = await pageConfidences(env.OCR, file.id, pdf, ocrInstances(env)); }
+  catch (error) { console.warn(`AI transcription confidence pass failed for ${file.id} v${file.version}: ${String(error)}`); return; }
+  if (measured.truncated) console.info(`AI transcription confidence checked the first ${measured.pages.length} of ${measured.totalPages} pages for ${file.id}.`);
+  const pending: PageTranscription[] = [];
+  for (const result of measured.pages.filter((p) => p.confidence < 70)) {
+    try {
+      const image = await renderPdfPage(env.OCR, file.id, pdf, result.page, ocrInstances(env));
+      const transcription = await transcribePage(env, image, result.page);
+      if (!transcription) continue;
+      pending.push({ fileId: file.id, version: file.version, page: result.page, confidence: result.confidence,
+        text: transcription.text, provenance: provenance(transcription.model, 'element', `Transcribed page ${result.page} of ${file.name}`, { id: file.id, name: file.name }, new Date().toISOString()),
+        state: 'pending', reviewedBy: null, reviewedByName: null, reviewedAt: null });
+    } catch (error) { console.warn(`AI transcription failed for ${file.id} page ${result.page}: ${String(error)}`); }
+  }
+  await env.FILES.put(fileKeys.transcriptions(file), JSON.stringify(pending), { httpMetadata: { contentType: 'application/json' } });
+}
+
 async function check(env: EngineEnv, file: FileRecord): Promise<DocumentCheck> {
   if (!SCANNABLE.has(file.kind)) throw new ApiError('unsupported', 'Tessera Access scans PDF, Word, and PowerPoint files.');
   try {
@@ -62,7 +95,7 @@ async function check(env: EngineEnv, file: FileRecord): Promise<DocumentCheck> {
 }
 
 /** The document as semantic HTML: title, headings in order, paragraphs. Shared by the reading version and the EPUB. */
-export function documentBody(file: Pick<FileRecord, 'name'>, doc: DocumentCheck): { title: string; html: string; text: string } {
+export function documentBody(file: Pick<FileRecord, 'name'>, doc: DocumentCheck, replacements: Map<number, PageTranscription> = new Map(), pageExtras: Map<number, string[]> = new Map()): { title: string; html: string; text: string } {
   const title = doc.text.title.trim() || file.name.replace(/\.[^.]+$/, '');
   const parts: string[] = [];
   const spoken: string[] = [title];
@@ -75,10 +108,15 @@ export function documentBody(file: Pick<FileRecord, 'name'>, doc: DocumentCheck)
       spoken.push(s.heading);
       const rest = s.text.trim() === s.heading.trim() ? '' : s.text.trim();
       if (rest) { parts.push(...rest.split(/\n+/).map((p) => `<p>${escapeHtml(p)}</p>`)); spoken.push(rest); }
-    } else if (s.text.trim()) {
-      parts.push(...s.text.trim().split(/\n+/).map((p) => `<p>${escapeHtml(p)}</p>`));
-      spoken.push(s.text.trim());
+    } else if (s.text.trim() || (s.page && replacements.has(s.page))) {
+      const replacement = s.page ? replacements.get(s.page) : undefined;
+      const content = replacement?.text ?? s.text.trim();
+      const paragraphs = content.split(/\n+/).filter(Boolean).map((p) => `<p>${escapeHtml(p)}</p>`).join('\n');
+      if (replacement) parts.push(`<section class="ai ai--block" data-state="kept"><p class="ai-who">Page ${s.page} was transcribed with AI and reviewed by ${escapeHtml(replacement.reviewedByName ?? 'a reviewer')}. <span class="ai-src">· Page ${s.page} of ${escapeHtml(file.name)}</span></p><div class="ai-body">${paragraphs}</div></section>`);
+      else parts.push(paragraphs);
+      spoken.push(content);
     }
+    if (s.page) parts.push(...(pageExtras.get(s.page) ?? []));
   }
   return { title, html: parts.join('\n'), text: spoken.join('\n\n') };
 }
@@ -94,12 +132,15 @@ function readingHtml(title: string, body: string, language: string): string {
   body { max-width: 42rem; margin: 2rem auto; padding: 0 1rem; font: 1.125rem/1.6 system-ui, sans-serif; color: ${INK}; background: ${PAPER}; }
   h1, h2, h3, h4, h5, h6 { line-height: 1.25; }
   p { margin: 0 0 1em; }
+  img { max-width: 100%; height: auto; }
+  .ai { border: 1px solid ${INK}; padding: 1rem; margin: 1rem 0; }
+  .ai-who { font-weight: 600; }
 </style>
 </head>
 <body>
 <main>
 <h1>${escapeHtml(title)}</h1>
-<p><em>Reading version generated by Tessera from the original file. Layout and images are not included.</em></p>
+<p><em>Reading version generated by Tessera from the original file.</em></p>
 ${body}
 </main>
 </body>
@@ -107,21 +148,22 @@ ${body}
 `;
 }
 
-export async function buildEpub(title: string, body: string, language: string, id: string): Promise<ArrayBuffer> {
+export async function buildEpub(title: string, body: string, language: string, id: string, images: { path: string; bytes: Uint8Array }[] = []): Promise<ArrayBuffer> {
   const zip = new JSZip();
   zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
   zip.file('META-INF/container.xml', '<?xml version="1.0" encoding="UTF-8"?>\n<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
   const t = escapeHtml(title), lang = escapeHtml(language);
   zip.file('OEBPS/content.opf', `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid" xml:lang="${lang}">
-<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="uid">urn:tessera:${escapeHtml(id)}</dc:identifier><dc:title>${t}</dc:title><dc:language>${lang}</dc:language><meta property="dcterms:modified">${new Date().toISOString().slice(0, 19)}Z</meta><meta property="schema:accessMode">textual</meta><meta property="schema:accessibilityFeature">structuralNavigation</meta><meta property="schema:accessibilityHazard">none</meta><meta property="schema:accessibilitySummary">Text and headings from the original document; images are not included.</meta></metadata>
-<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="text" href="text.xhtml" media-type="application/xhtml+xml"/></manifest>
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="uid">urn:tessera:${escapeHtml(id)}</dc:identifier><dc:title>${t}</dc:title><dc:language>${lang}</dc:language><meta property="dcterms:modified">${new Date().toISOString().slice(0, 19)}Z</meta><meta property="schema:accessMode">textual</meta><meta property="schema:accessibilityFeature">structuralNavigation</meta><meta property="schema:accessibilityHazard">none</meta><meta property="schema:accessibilitySummary">Text and headings from the original document; reviewed images are included when available.</meta></metadata>
+<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="text" href="text.xhtml" media-type="application/xhtml+xml"/>${images.map((image, index) => `<item id="image${index}" href="${image.path}" media-type="image/png"/>`).join('')}</manifest>
 <spine><itemref idref="text"/></spine>
 </package>`);
   const xhtml = (inner: string, extra = '') => `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${lang}" xml:lang="${lang}"><head><title>${t}</title></head><body${extra}>${inner}</body></html>`;
   zip.file('OEBPS/nav.xhtml', xhtml(`<nav epub:type="toc" id="toc"><h1>Contents</h1><ol><li><a href="text.xhtml">${t}</a></li></ol></nav>`));
   // EPUB content is XHTML: close void-free markup already; just make sure it's well formed.
   zip.file('OEBPS/text.xhtml', xhtml(`<h1>${t}</h1>\n${body}`));
+  for (const image of images) zip.file(`OEBPS/${image.path}`, image.bytes);
   const out = await zip.generateAsync({ type: 'uint8array', mimeType: 'application/epub+zip' });
   return Uint8Array.from(out).buffer;
 }
@@ -188,13 +230,29 @@ export function createDocumentEngine(env: EngineEnv): DocumentEngine {
   return {
     async scan(file): Promise<AccessReport> {
       const doc = await check(env, file);
+      if (file.kind === 'pdf') {
+        const alt = await readJson<PdfAlt>(env, fileKeys.alt(file), {});
+        const reviewed = Object.keys(alt).length;
+        doc.issues = doc.issues.flatMap((issue) => {
+          if (issue.code !== 'pdf_images_no_alt') return [issue];
+          const remaining = Math.max(0, issue.count - reviewed);
+          if (!remaining) return [];
+          const next = doc.elements.find((element) => !(String(element.index) in alt));
+          return [{ ...issue, count: remaining, description: `${remaining} image(s) have no matching Figure alt text or reviewed accessible-version alt text.`, location: { ...issue.location, page: next?.page, element: next?.index } }];
+        });
+      }
       return { ...summarize(doc.issues, new Date().toISOString()), target: { kind: 'file', fileId: file.id, version: file.version }, issues: doc.issues, document: doc.document };
     },
 
     async fix(file, fix) {
       if (!SCANNABLE.has(file.kind)) throw new ApiError('unsupported', 'Only PDF, Word, and PowerPoint files can be fixed.');
       let fixed: ArrayBuffer;
-      if (fix.kind === 'ocr') {
+      if (fix.kind === 'alt-text' && file.kind === 'pdf') {
+        const source = await bytesOf(env, file.key);
+        const doc = await checkDocument('pdf', source);
+        if (!doc.elements.some((element) => element.index === fix.element && element.kind === 'image')) throw new ApiError('invalid', 'That PDF image does not exist.');
+        fixed = source.slice(0);
+      } else if (fix.kind === 'ocr') {
         if (file.kind !== 'pdf') throw new ApiError('invalid', 'OCR is for scanned PDFs.');
         fixed = (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), fix.language, ocrInstances(env))).pdf;
       } else try {
@@ -206,7 +264,14 @@ export function createDocumentEngine(env: EngineEnv): DocumentEngine {
       const version = file.version + 1;
       const key = fileKeys.version(file, version);
       await env.FILES.put(key, fixed, { httpMetadata: { contentType: file.mime } });
-      return { ...file, key, version, size: fixed.byteLength, scan: null };
+      const updated = { ...file, key, version, size: fixed.byteLength, scan: null };
+      if (file.kind === 'pdf') {
+        const alt = await readJson<PdfAlt>(env, fileKeys.alt(file), {});
+        if (fix.kind === 'alt-text') alt[String(fix.element)] = { alt: fix.alt, decorative: fix.decorative };
+        if (Object.keys(alt).length) await env.FILES.put(fileKeys.alt(updated), JSON.stringify(alt));
+        if (fix.kind === 'ocr' || await env.FILES.get(fileKeys.ocrSource(file))) await env.FILES.put(fileKeys.ocrSource(updated), JSON.stringify(true));
+      }
+      return updated;
     },
 
     async suggest(target, ctx) {
@@ -231,35 +296,81 @@ export function createDocumentEngine(env: EngineEnv): DocumentEngine {
       const f = target.file;
       const source = { id: f.id, name: f.name };
       if (target.kind !== 'alt-text') throw new ApiError('unsupported', 'For files, Tessera suggests alt text; rewrite the text in the original document.');
-      const image = await extractImage(f.kind, await bytesOf(env, f.key), target.element);
-      if (!image) throw new ApiError('unsupported', f.kind === 'pdf' ? 'Tessera can\'t extract images from PDFs yet; describe this image from the page.' : 'That image wasn\'t found in the file.');
+      if (f.kind === 'pdf' && !env.OCR) throw new ApiError('unsupported', 'Tessera can\'t extract images from PDFs yet; describe this image from the page.');
+      const bytes = await bytesOf(env, f.key);
+      const extracted = f.kind === 'pdf' ? await extractPdfImages(env.OCR, f.id, bytes, ocrInstances(env)) : null;
+      const matched = extracted?.images.find((entry) => entry.index === target.element);
+      const image = matched ? { mime: 'image/png', bytes: Uint8Array.from(pngBytes(matched.png)).buffer } : await extractImage(f.kind, bytes, target.element);
+      if (!image) throw new ApiError('unsupported', 'That image wasn\'t found in the file.');
       const out = await describeImage(env, image, `${target.courseTitle} · ${f.name}`);
       return { suggestion: out.text, provenance: provenance(out.model, 'alt-text', `Alt text suggested for image ${target.element + 1} in ${f.name}`, source, now) };
     },
 
-    async generateFormat(file, format) {
+    async generateFormat(file, format, allowAi = true) {
       const key = fileKeys.format(file, format);
       const meta = { httpMetadata: { contentType: FORMAT_FILES[format].mime } };
       if (format === 'ocr') {
         if (file.kind !== 'pdf') throw new ApiError('unsupported', 'OCR is for scanned PDFs.');
-        await env.FILES.put(key, (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), undefined, ocrInstances(env))).pdf, meta);
+        const original = await bytesOf(env, file.key);
+        await env.FILES.put(key, (await runOcr(env.OCR, file.id, original, undefined, ocrInstances(env))).pdf, meta);
+        if (allowAi) await secondPass(env, file, original);
         return key;
       }
       let doc = await check(env, file);
+      if (file.kind === 'pdf' && allowAi && (format === 'reading' || format === 'epub') && await env.FILES.get(fileKeys.ocrSource(file))) {
+        await secondPass(env, file, await bytesOf(env, file.key));
+      }
       if (!doc.document?.hasText && file.kind === 'pdf') {
         // A scan: use its OCR text, running OCR first if it hasn't been.
         const ocrKey = fileKeys.format(file, 'ocr');
         let ocr = await env.FILES.get(ocrKey);
         if (!ocr) { await env.FILES.put(ocrKey, (await runOcr(env.OCR, file.id, await bytesOf(env, file.key), undefined, ocrInstances(env))).pdf, { httpMetadata: { contentType: FORMAT_FILES.ocr.mime } }); ocr = await env.FILES.get(ocrKey); }
         doc = await checkDocument('pdf', await ocr!.arrayBuffer());
+        if (allowAi) await secondPass(env, file, await bytesOf(env, file.key));
       }
       if (!doc.document?.hasText) throw new ApiError('unsupported', 'This file has no text to convert, even after OCR.');
       const language = 'en';
-      const { title, html, text } = documentBody(file, doc);
+      const kept = new Map((await readJson<PageTranscription[]>(env, fileKeys.transcriptions(file), [])).filter((entry) => entry.state === 'kept').map((entry) => [entry.page, entry]));
+      const extra = new Map<number, string[]>();
+      const epubImages: { path: string; bytes: Uint8Array }[] = [];
+      if (file.kind === 'pdf' && env.OCR && (format === 'reading' || format === 'epub')) {
+        const alt = await readJson<PdfAlt>(env, fileKeys.alt(file), {});
+        if (Object.keys(alt).length) {
+          const extracted = await extractPdfImages(env.OCR, file.id, await bytesOf(env, file.key), ocrInstances(env));
+          for (const image of extracted.images) {
+            const saved = alt[String(image.index)];
+            if (!saved) continue;
+            const path = `images/image-${image.index}.png`;
+            const src = format === 'reading' ? `data:image/png;base64,${image.png}` : path;
+            const tags = extra.get(image.page) ?? [];
+            tags.push(`<p><img src="${src}" alt="${escapeHtml(saved.decorative ? '' : saved.alt)}" /></p>`);
+            extra.set(image.page, tags);
+            if (format === 'epub') epubImages.push({ path, bytes: pngBytes(image.png) });
+          }
+        }
+      }
+      const { title, html, text } = documentBody(file, doc, kept, extra);
       if (format === 'reading') await env.FILES.put(key, readingHtml(title, html, language), meta);
-      else if (format === 'epub') await env.FILES.put(key, await buildEpub(title, html, language, `${file.id}-v${file.version}`), meta);
+      else if (format === 'epub') await env.FILES.put(key, await buildEpub(title, html, language, `${file.id}-v${file.version}`, epubImages), meta);
       else await env.FILES.put(key, await speak(env, text), meta);
       return key;
+    },
+
+    async listTranscriptions(file) { return readJson<PageTranscription[]>(env, fileKeys.transcriptions(file), []); },
+    async reviewTranscription(file, page, decision, reviewer: User, now) {
+      const all = await readJson<PageTranscription[]>(env, fileKeys.transcriptions(file), []);
+      const current = all.find((entry) => entry.page === page);
+      if (!current) throw new ApiError('not-found', 'Transcription not found for this file version.');
+      if (current.state !== 'pending') throw new ApiError('conflict', 'This transcription was already reviewed.');
+      current.state = decision === 'keep' ? 'kept' : 'discarded';
+      current.reviewedBy = reviewer.id; current.reviewedByName = reviewer.name; current.reviewedAt = now;
+      await env.FILES.put(fileKeys.transcriptions(file), JSON.stringify(all));
+      return all;
+    },
+    async pageImage(file, page) {
+      const doc = await check(env, file);
+      if (page > (doc.document?.pages ?? 0)) throw new ApiError('not-found', 'Page not found.');
+      return renderPdfPage(env.OCR, file.id, await bytesOf(env, file.key), page, ocrInstances(env));
     },
 
     async remove(file) {

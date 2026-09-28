@@ -67,3 +67,22 @@ export async function describeImage(env: VisionEnv, image: ImageInput, context: 
 
   return { text: `A figure${context ? ` for ${context.slice(0, 80)}` : ''}. Describe what it shows and the point it makes.`, model: 'fixture' };
 }
+
+/** A page transcription is a draft until a course instructor keeps it. No model fallback. */
+export async function transcribePage(env: VisionEnv, png: ArrayBuffer, page: number, fetchImpl: typeof fetch = fetch): Promise<{ text: string; model: string } | null> {
+  if (!env.WRITER_API_KEY) return null;
+  const res = await fetchImpl(env.AI_GATEWAY_URL || WRITER_DIRECT, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.WRITER_API_KEY}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: VISION_MODEL, temperature: 0, max_tokens: 4000, messages: [{ role: 'user', content: [
+      { type: 'text', text: `Transcribe page ${page} as plain text in reading order. Copy only visible text. Do not invent or complete unclear content. Write [illegible] wherever you cannot read the text. Return only the transcription.` },
+      { type: 'image_url', image_url: { url: `data:image/png;base64,${base64(png)}` } },
+    ] }] }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new ApiError('ai-failed', `The transcription model returned ${res.status}.`);
+  const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const text = body.choices?.[0]?.message?.content?.trim() ?? '';
+  if (!text) throw new ApiError('ai-failed', 'The transcription model returned no text.');
+  return { text, model: VISION_MODEL };
+}

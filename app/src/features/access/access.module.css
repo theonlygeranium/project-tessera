@@ -18,3 +18,6 @@
 .checkbox input { width: 20px; height: 20px; }
 
 .page input[type='file'] { max-width: 100%; }
+.comparison { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; align-items: start; }
+.comparison img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); }
+.transcriptionText { white-space: pre-wrap; overflow-wrap: anywhere; }
