@@ -805,6 +805,42 @@ await journey('Journey 16 · Managers: the employee opts in, the manager sees co
   });
 });
 
+await journey('Journey 18 · An instructor completes assigned required training through My training', async (page) => {
+  await step('Administrator assigns OPS 101 to Dr. Amara Okafor', async () => {
+    await page.goto(`${BASE}app/?data=mock&as=u-admin`);
+    await page.getByRole('button', { name: 'Finish setup' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor();
+    await page.getByRole('navigation', { name: 'Administrator navigation' }).getByRole('link', { name: 'Required training' }).click();
+    await page.getByRole('combobox', { name: 'Course or program' }).selectOption({ label: 'Course · Lockout/tagout essentials' });
+    await page.getByRole('radio', { name: 'Chosen people' }).check();
+    await page.getByRole('checkbox', { name: /^Dr. Amara Okafor/ }).check();
+    await page.getByRole('button', { name: 'Assign training' }).click();
+    await waitForIncludes(page.locator('main'), 'Required training assigned.');
+  });
+  await step('Dr. Okafor starts the course from My training', async () => {
+    await switchTo(page, 'Dr. Amara Okafor');
+    await page.getByRole('navigation').getByRole('link', { name: 'My training' }).click();
+    await waitForIncludes(page.locator('main'), 'Lockout/tagout essentials');
+    await page.getByRole('link', { name: 'Take the course' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Lockout/tagout essentials' }).waitFor();
+    if (!page.url().includes('/training/courses/c-ops101')) throw new Error(`Course opened outside training: ${page.url()}`);
+    await page.getByRole('link', { name: 'Start lesson' }).click();
+  });
+  await step('Dr. Okafor completes all published lessons and opens the certificate', async () => {
+    for (let i=0;i<3;i++) {
+      await page.getByRole('button', { name: 'Mark lesson complete' }).click();
+      await page.getByText('Lesson complete.').waitFor();
+      if (i<2) await page.getByRole('link', { name: 'Next lesson', exact: true }).click();
+    }
+    await page.getByRole('link', { name: 'Back to course' }).click();
+    await waitForIncludes(page.locator('main'), "You've completed every published lesson.");
+    await page.getByRole('link', { name: 'Training' }).first().click();
+    await page.getByRole('link', { name: 'View certificate' }).first().click();
+    await waitForIncludes(page.locator('main'), 'Dr. Amara Okafor');
+    await waitForIncludes(page.locator('main'), 'Lockout/tagout essentials');
+  });
+});
+
 // ---- summary --------------------------------------------------------------------------
 await browser.close();
 server.close();

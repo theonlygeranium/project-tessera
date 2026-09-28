@@ -67,7 +67,8 @@ export interface ApiSpec {
    * `skipTemplate` is set (D-024).
    */
   createCourse: { input: { code: string; title: string; term: string; description?: string; programId?: Id | null; skipTemplate?: boolean }; output: Course };
-  getCourseOutline: { input: { courseId: Id }; output: CourseOutline };
+  /** Learner view: published lessons with the viewer's progress; for staff, only when the course is required training for them. */
+  getCourseOutline: { input: { courseId: Id; asLearner?: boolean }; output: CourseOutline };
   updateCourse: {
     input: { courseId: Id } & Partial<Pick<Course, 'code' | 'title' | 'term' | 'description' | 'welcome' | 'outcomes'>>;
     output: Course;
@@ -406,9 +407,9 @@ export const ROUTES: { [K in Operation]: Route } = {
 
   saveProfile: { method: 'PUT', path: '/me/profile', access: STUDENT, scope: null },
   getToday: { method: 'GET', path: '/me/today', access: STUDENT, scope: null },
-  getStudentLesson: { method: 'GET', path: '/me/lessons/:lessonId', access: STUDENT, scope: null },
-  answerCheck: { method: 'POST', path: '/me/lessons/:lessonId/checks/:blockId', access: STUDENT, scope: null },
-  setLessonProgress: { method: 'POST', path: '/me/lessons/:lessonId/progress', access: STUDENT, scope: null },
+  getStudentLesson: { method: 'GET', path: '/me/lessons/:lessonId', access: 'signed-in', scope: null, browserOnly: true },
+  answerCheck: { method: 'POST', path: '/me/lessons/:lessonId/checks/:blockId', access: 'signed-in', scope: null, browserOnly: true },
+  setLessonProgress: { method: 'POST', path: '/me/lessons/:lessonId/progress', access: 'signed-in', scope: null, browserOnly: true },
 
   listAnnouncements: { method: 'GET', path: '/announcements', access: 'signed-in', scope: 'courses:read' },
   createAnnouncement: { method: 'POST', path: '/courses/:courseId/announcements', access: INSTRUCTOR, scope: 'courses:write' },

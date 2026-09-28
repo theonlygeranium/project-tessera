@@ -122,6 +122,30 @@ APP.push(
   { name: 'App · Administrator · Templates', url: 'app/admin/setup?data=mock&as=u-admin', steps: p => adminNight3(p, 'Templates') },
   { name: 'App · Administrator · Template editor', url: 'app/admin/setup?data=mock&as=u-admin', steps: async p => { await adminNight3(p, 'Templates'); await p.getByLabel('Name').fill('Meridian standard'); await p.getByRole('button', { name: 'Create template' }).click(); await p.getByRole('heading', { name: 'Details' }).waitFor(); } },
 );
+const staffTraining = async (p, destination) => {
+  await p.getByRole('button', { name: 'Finish setup' }).click();
+  await p.getByRole('heading', { level: 1, name: 'Overview' }).waitFor();
+  // Navigate directly: at 320px the rail scrolls horizontally and the link may be off screen.
+  await p.evaluate(() => { history.pushState({}, '', '/app/admin/training?data=mock&as=u-admin'); dispatchEvent(new PopStateEvent('popstate')); });
+  await p.getByRole('combobox', { name: 'Course or program' }).selectOption({ label: 'Course · Lockout/tagout essentials' });
+  await p.getByRole('radio', { name: 'Chosen people' }).check();
+  await p.getByRole('checkbox', { name: /^Dr. Amara Okafor/ }).check();
+  await p.getByRole('button', { name: 'Assign training' }).click();
+  await p.getByText('Required training assigned.').waitFor();
+  await p.getByRole('button', { name: 'Switch persona' }).click();
+  await p.getByRole('button', { name: /^Sign in as Dr. Amara Okafor,/ }).click();
+  await p.getByRole('navigation').getByRole('link', { name: 'My training' }).click();
+  if (destination === 'test-out') await p.getByRole('link', { name: 'Take the test-out' }).click();
+  else {
+    await p.getByRole('link', { name: 'Take the course' }).click();
+    if (destination === 'lesson') await p.getByRole('link', { name: 'Start lesson' }).click();
+  }
+};
+for (const destination of ['course', 'lesson', 'test-out']) APP.push({
+  name: `App · Instructor required training · ${destination}`,
+  url: 'app/admin/setup?data=mock&as=u-admin',
+  steps: p => staffTraining(p, destination),
+});
 for (const a of APP) targets.push({ ...a, settle: 900 });
 for (const s of screens) {
   const styles = AI_SCREENS.has(s.slug) ? STYLES : ['marginalia'];
@@ -174,6 +198,7 @@ for (const t of targets) {
 // ---- reflow: WCAG 1.4.10 (content usable at 320 CSS px without horizontal scrolling) ----
 // Screens under docs/screens/ are fixed-size design artboards and are exempt; site pages and the prototype are not.
 const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/sign-in?data=mock', 'app/?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-3?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor', { url: 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor', steps: async (p) => { await p.getByRole('button', { name: 'Create plain-language version' }).click(); await p.getByRole('link', { name: 'Compare with master' }).click(); await p.getByRole('link', { name: 'Compare', exact: true }).click(); } }, 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor', 'app/today?data=mock&as=u-marcus', 'app/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-marcus', 'app/teach/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-okafor', 'app/onboarding?data=mock&as=u-priya', 'app/team?data=mock&as=u-sam', 'app/sharing?data=mock&as=u-dana', { url: 'app/admin/setup?data=mock&as=u-admin', steps: async (p) => { await p.getByRole('button', { name: 'Finish setup' }).click(); await p.getByRole('heading', { name: 'Overview', level: 1 }).waitFor(); await p.evaluate(() => { history.pushState({}, '', '/app/admin/reporting-lines?data=mock&as=u-admin'); dispatchEvent(new PopStateEvent('popstate')); }); await p.getByRole('heading', { name: 'Reporting lines', level: 1 }).waitFor(); } }, 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
+for (const destination of ['course', 'lesson', 'test-out']) REFLOW.push({ url: 'app/admin/setup?data=mock&as=u-admin', steps: p => staffTraining(p, destination) });
 for (const target of REFLOW) {
   const u = typeof target === 'string' ? target : target.url;
   const page = await browser.newPage({ viewport: { width: 320, height: 256 } });

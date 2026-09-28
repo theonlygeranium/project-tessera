@@ -341,6 +341,11 @@ describe('API tokens and browser-only routes', () => {
     expect((await call(env, '/api/v1/demo/users', { headers: auth })).status).toBe(403);
     expect((await call(env, '/api/v1/session', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ userId: 'u-admin' }) })).status).toBe(403);
     expect((await call(env, '/api/v1/courses', { headers: auth })).status).toBe(200);
+    expect((await call(env, '/api/v1/me/lessons/l-ops-1', { headers: auth })).status).toBe(403);
+    expect((await call(env, '/api/v1/me/lessons/l-ops-1')).status).toBe(401);
+    expect((await call(env, '/api/v1/me/lessons/l-ops-2/checks/b-o2-3', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ optionId: 'a' }) })).status).toBe(403);
+    expect((await call(env, '/api/v1/me/lessons/l-ops-1/progress', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ state: 'completed' }) })).status).toBe(403);
+    expect((await call(env, '/api/v1/courses/c-ops101?asLearner=true', { headers: auth })).status).toBe(403);
   });
 });
 

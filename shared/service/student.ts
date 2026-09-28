@@ -1,7 +1,8 @@
 import { ApiError } from '../api';
 import type { Block, LessonProgress, StudentBlock, TaskItem } from '../domain';
 import type { Service, ServiceContext } from './context';
-import { canReachCourse, fail, moduleFor, studentLesson, user, content } from './helpers';
+import { fail, moduleFor, user, content } from './helpers';
+import { learnerCourse, learnerLesson } from './learner';
 import { courses } from './courses';
 import { announcements } from './announcements';
 import { training, onLessonProgress } from './training';
@@ -49,15 +50,15 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
     return { required, doNext: tasks, announcements: recent, unreadCount, courses: summaries, week: { minutesGoal: u.profile?.weeklyMinutes ?? 120, minutesDone } };
   },
   getStudentLesson: async (ctx, { lessonId, version = 'auto' }) => {
-    const requested = await studentLesson(ctx, lessonId);
-    const master = requested.variantOf ? await studentLesson(ctx, requested.variantOf.lessonId) : requested;
+    const requested = await learnerLesson(ctx, lessonId);
+    const master = requested.variantOf ? await learnerLesson(ctx, requested.variantOf.lessonId) : requested;
     const profile = (await ctx.repo.getUser(user(ctx).id))?.profile;
     const variants = (await ctx.repo.listVariantLessons(master.id)).filter(v => v.status === 'published');
     const matched = profile?.readingLevel === 'plain' ? variants.find(v => v.variantOf?.audience === 'plain') : undefined;
     const available = matched ?? (profile?.sessionMinutes !== undefined && profile.sessionMinutes <= 15 ? variants.find(v => v.variantOf?.audience === 'micro') : undefined);
     const chosen = version === 'full' ? master : requested.variantOf ? requested : available ?? master;
     const why = (audience: 'plain' | 'micro') => audience === 'plain' ? 'Shown in plain language because your profile asks for plain reading.' : 'Shown as a 15-minute version because your sessions are 15 minutes or less.';
-    const c = await canReachCourse(ctx, master.courseId), m = await moduleFor(ctx, chosen.moduleId);
+    const c = await learnerCourse(ctx, master.courseId), m = await moduleFor(ctx, chosen.moduleId);
     const blocks: StudentBlock[] = (await ctx.repo.listBlocks(chosen.id)).filter(visible).map(b => {
       const meta = { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance };
       const c = content(b);
@@ -73,9 +74,9 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
       variantAvailable: chosen.variantOf || !available ? null : { audience: available.variantOf!.audience, lessonId: available.id, why: why(available.variantOf!.audience) } };
   },
   answerCheck: async (ctx, { lessonId, blockId, optionId }) => {
-    const lesson = await studentLesson(ctx, lessonId);
+    const lesson = await learnerLesson(ctx, lessonId);
     const progressId = lesson.variantOf?.lessonId ?? lessonId;
-    if (lesson.variantOf) await studentLesson(ctx, progressId);
+    if (lesson.variantOf) await learnerLesson(ctx, progressId);
     const b = (await ctx.repo.listBlocks(lessonId)).find(x => x.id === blockId && visible(x));
     if (!b || b.type !== 'check' || !b.options.some(x => x.id === optionId)) throw new ApiError('invalid', 'Invalid check or option.');
     const u = user(ctx), p = await ctx.repo.getProgress(u.id, progressId) ?? { ...defaultProgress(progressId), userId: u.id };
@@ -84,9 +85,9 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
     await ctx.repo.putProgress(p); return { correct, feedback: correct ? b.feedbackCorrect : b.feedbackIncorrect, attempts };
   },
   setLessonProgress: async (ctx, { lessonId, state }) => {
-    const lesson = await studentLesson(ctx, lessonId);
+    const lesson = await learnerLesson(ctx, lessonId);
     const progressId = lesson.variantOf?.lessonId ?? lessonId;
-    if (lesson.variantOf) await studentLesson(ctx, progressId);
+    if (lesson.variantOf) await learnerLesson(ctx, progressId);
     if (state !== 'in-progress' && state !== 'completed') fail('invalid', 'Invalid progress state.');
     const u = user(ctx), p = await ctx.repo.getProgress(u.id, progressId) ?? { ...defaultProgress(progressId), userId: u.id };
     if (p.state !== 'completed' || state === 'completed') p.state = state;

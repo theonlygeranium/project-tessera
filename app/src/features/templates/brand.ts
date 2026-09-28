@@ -3,9 +3,9 @@ import { useApiQuery } from '../../data/hooks';
 import { useSession } from '../../shell/session';
 
 /** Applies the course's program accent (D-024) on any course page, for every role; returns the course and its program. */
-export function useCourseBrand(courseId: string) {
+export function useCourseBrand(courseId: string, asLearner = false) {
   const { institution } = useSession();
-  const outline = useApiQuery('getCourseOutline', { courseId }, { enabled: !!courseId });
+  const outline = useApiQuery('getCourseOutline', { courseId, ...(asLearner ? { asLearner: true } : {}) }, { enabled: !!courseId });
   const program = outline.data?.course.program ?? undefined;
   const accent = program?.accent ?? institution.accent;
   useEffect(() => {

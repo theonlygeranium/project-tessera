@@ -1,16 +1,18 @@
 import type { Course, CourseSummary, LessonSummary, RosterEntry } from '../domain';
 import type { Service, ServiceContext } from './context';
 import { canReachCourse, canTeach, course, fail, lessonFor, minutes, moduleFor, move, renumberLessons, renumberModules, required, user } from './helpers';
+import { learnerCourse } from './learner';
 import { applyTemplatePlan, effectiveTemplate } from './templates';
 import { saveCourseOutcomes } from './outcomes';
 
-export async function summary(ctx: ServiceContext, c: Course): Promise<CourseSummary> {
+export async function summary(ctx: ServiceContext, c: Course, asLearner = false): Promise<CourseSummary> {
   const [modules, lessons, enrollments] = await Promise.all([ctx.repo.listModules(c.id), ctx.repo.listLessons({ courseId: c.id }), ctx.repo.listEnrollments({ courseId: c.id })]);
   const names = await Promise.all(c.instructorIds.map(id => ctx.repo.getUser(id)));
   const u = user(ctx), published = lessons.filter(x => x.status === 'published');
-  const progress = u.role === 'student' ? await ctx.repo.listProgress({ userId: u.id, lessonIds: published.map(x => x.id) }) : [];
+  const learnerView = asLearner || u.role === 'student';
+  const progress = learnerView ? await ctx.repo.listProgress({ userId: u.id, lessonIds: published.map(x => x.id) }) : [];
   const p = c.programId ? await ctx.repo.getProgram(c.programId) : null;
-  return { ...c, ...(p ? { program: { id: p.id, name: p.name, accent: p.brand.accent } } : {}), instructorNames: names.filter(x => x !== null).map(x => x.name), moduleCount: modules.length, lessonCount: u.role === 'student' ? published.length : lessons.length, publishedLessonCount: published.length, studentCount: enrollments.length, progress: u.role === 'student' ? (published.length ? progress.filter(x => x.state === 'completed').length / published.length : 0) : null, startedLessonCount: u.role === 'student' ? progress.filter(x => x.state !== 'not-started').length : null };
+  return { ...c, ...(p ? { program: { id: p.id, name: p.name, accent: p.brand.accent } } : {}), instructorNames: names.filter(x => x !== null).map(x => x.name), moduleCount: modules.length, lessonCount: learnerView ? published.length : lessons.length, publishedLessonCount: published.length, studentCount: enrollments.length, progress: learnerView ? (published.length ? progress.filter(x => x.state === 'completed').length / published.length : 0) : null, startedLessonCount: learnerView ? progress.filter(x => x.state !== 'not-started').length : null };
 }
 
 export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseOutline' | 'updateCourse' | 'setCourseInstructors' | 'getCourseEnrollments' | 'setCourseEnrollments' | 'getRoster' | 'createModule' | 'updateModule' | 'deleteModule' | 'createLesson' | 'updateLesson' | 'deleteLesson'> = {
@@ -29,22 +31,23 @@ export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseO
     if (template) await applyTemplatePlan(ctx, c, template, { course: { id: c.id }, modules: [], lessons: [], blocks: {} });
     return c;
   },
-  getCourseOutline: async (ctx, { courseId }) => {
-    const c = await canReachCourse(ctx, courseId), u = user(ctx), modules = await ctx.repo.listModules(courseId);
+  getCourseOutline: async (ctx, { courseId, asLearner = false }) => {
+    const c = asLearner ? await learnerCourse(ctx, courseId) : await canReachCourse(ctx, courseId);
+    const u = user(ctx), learnerView = asLearner || u.role === 'student', modules = await ctx.repo.listModules(courseId);
     const out = [];
     for (const m of modules) {
       const lessons = await ctx.repo.listLessons({ moduleId: m.id });
-      const visible = u.role === 'student' ? lessons.filter(l => l.status === 'published') : lessons;
-      if (u.role === 'student' && !visible.length) continue;
+      const visible = learnerView ? lessons.filter(l => l.status === 'published') : lessons;
+      if (learnerView && !visible.length) continue;
       const summaries: LessonSummary[] = [];
       for (const l of visible) {
-        const progress = u.role === 'student' ? await ctx.repo.getProgress(u.id, l.id) : null;
-        const blocks = u.role === 'student' ? [] : await ctx.repo.listBlocks(l.id);
-        summaries.push({ ...l, progress: u.role === 'student' ? progress?.state ?? 'not-started' : null, draftBlockCount: u.role === 'student' ? null : blocks.filter(b => b.origin === 'ai' && b.aiState !== 'kept').length });
+        const progress = learnerView ? await ctx.repo.getProgress(u.id, l.id) : null;
+        const blocks = learnerView ? [] : await ctx.repo.listBlocks(l.id);
+        summaries.push({ ...l, progress: learnerView ? progress?.state ?? 'not-started' : null, draftBlockCount: learnerView ? null : blocks.filter(b => b.origin === 'ai' && b.aiState !== 'kept').length });
       }
       out.push({ ...m, lessons: summaries });
     }
-    return { course: await summary(ctx, c), modules: out };
+    return { course: await summary(ctx, c, asLearner), modules: out };
   },
   updateCourse: async (ctx, input) => {
     const c = await canReachCourse(ctx, input.courseId);

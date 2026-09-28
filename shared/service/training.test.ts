@@ -10,6 +10,75 @@ const courseId='c-ops101';
 const answers=[{itemId:'q1',optionId:'a'},{itemId:'q2',optionId:'a'},{itemId:'q3',optionId:'b'},{itemId:'q4',optionId:'a'}];
 
 describe('required training',()=>{
+  it('lets assigned staff learn OPS 101 and records completion without exposing a check key',async()=>{
+    const repo=new MemoryRepo(seedData()),admin=await ctx(repo,'u-admin');
+    await dispatch(service,admin,'createRequirement',{target:{kind:'course',courseId},audience:{kind:'users',userIds:['u-okafor']}});
+    const teacher=await ctx(repo,'u-okafor');
+    expect((await dispatch(service,teacher,'getMyTestOut',{courseId}))?.items).toHaveLength(4);
+    const outline=await dispatch(service,teacher,'getCourseOutline',{courseId,asLearner:true});
+    expect(outline.course).toMatchObject({lessonCount:3,progress:0,startedLessonCount:0});
+    expect(outline.modules.flatMap(m=>m.lessons).map(l=>l.progress)).toEqual(['not-started','not-started','not-started']);
+    const lesson=await dispatch(service,teacher,'getStudentLesson',{lessonId:'l-ops-2'});
+    expect(JSON.stringify(lesson)).not.toContain('correctOptionId');
+    const answer=await dispatch(service,teacher,'answerCheck',{lessonId:'l-ops-2',blockId:'b-o2-3',optionId:'a'});
+    expect(answer).toMatchObject({correct:true,attempts:1});
+    expect(JSON.stringify(answer)).not.toContain('correctOptionId');
+    expect((await dispatch(service,teacher,'setLessonProgress',{lessonId:'l-ops-2',state:'in-progress'})).state).toBe('in-progress');
+    for(const lessonId of ['l-ops-1','l-ops-2','l-ops-3'])await dispatch(service,teacher,'setLessonProgress',{lessonId,state:'completed'});
+    expect((await dispatch(service,teacher,'getCourseOutline',{courseId,asLearner:true})).course.progress).toBe(1);
+    expect((await dispatch(service,teacher,'listMyTraining',undefined))[0]).toMatchObject({status:'completed',certificateId:expect.any(String)});
+    expect(await repo.listCertificates({userId:'u-okafor',courseId})).toHaveLength(1);
+    expect((await repo.listCompletionEvents({userId:'u-okafor',courseId})).filter(e=>e.kind==='completed')).toHaveLength(1);
+  });
+  it('refuses unassigned staff learner access even when they teach or are enrolled, while students retain learner access',async()=>{
+    const repo=new MemoryRepo(seedData()),teacher=await ctx(repo,'u-okafor'),admin=await ctx(repo,'u-admin'),student=await ctx(repo,'u-dana');
+    const denied=[
+      () => dispatch(service,teacher,'getStudentLesson',{lessonId:'l-ops-1'}),
+      () => dispatch(service,teacher,'answerCheck',{lessonId:'l-ops-2',blockId:'b-o2-3',optionId:'a'}),
+      () => dispatch(service,teacher,'setLessonProgress',{lessonId:'l-ops-1',state:'completed'}),
+      () => dispatch(service,teacher,'getCourseOutline',{courseId,asLearner:true}),
+      () => dispatch(service,teacher,'getStudentLesson',{lessonId:'l-stat-1'}),
+      () => dispatch(service,admin,'getStudentLesson',{lessonId:'l-ops-1'}),
+      () => dispatch(service,admin,'getCourseOutline',{courseId,asLearner:true}),
+    ];
+    await repo.addEnrollment(courseId,'u-okafor');
+    for(const operation of denied)await expect(operation()).rejects.toMatchObject({code:'forbidden',message:"This course isn't required training for you."});
+    expect((await dispatch(service,teacher,'getCourseOutline',{courseId:'c-stat110'})).modules.flatMap(m=>m.lessons).map(l=>l.id)).toContain('l-stat-3');
+    expect((await dispatch(service,student,'getStudentLesson',{lessonId:'l-ops-1'})).lesson.id).toBe('l-ops-1');
+    expect((await dispatch(service,student,'getCourseOutline',{courseId,asLearner:true})).course.progress).toBe(0);
+  });
+  it('hides draft lessons and draft-only modules in a staff learner outline',async()=>{
+    const repo=new MemoryRepo(seedData()),admin=await ctx(repo,'u-admin');
+    await dispatch(service,admin,'createRequirement',{target:{kind:'course',courseId:'c-stat110'},audience:{kind:'users',userIds:['u-okafor']}});
+    const teacher=await ctx(repo,'u-okafor');
+    const outline=await dispatch(service,teacher,'getCourseOutline',{courseId:'c-stat110',asLearner:true});
+    expect(outline.modules.map(m=>m.id)).toEqual(['m-stat-1']);
+    expect(outline.modules[0].lessons.map(l=>l.id)).toEqual(['l-stat-1','l-stat-2']);
+    expect(outline.modules[0].lessons.every(l=>l.draftBlockCount===null)).toBe(true);
+    expect(outline.course).toMatchObject({lessonCount:2,progress:0,startedLessonCount:0});
+    await expect(dispatch(service,teacher,'getStudentLesson',{lessonId:'l-stat-3'})).rejects.toMatchObject({code:'not-found'});
+  });
+  it('stores staff variant checks and completion under the master lesson',async()=>{
+    const repo=new MemoryRepo(seedData()),admin=await ctx(repo,'u-admin');
+    await dispatch(service,admin,'createRequirement',{target:{kind:'course',courseId},audience:{kind:'users',userIds:['u-okafor']}});
+    const master=(await repo.getLesson('l-ops-2'))!;
+    await repo.putLesson({...master,id:'l-ops-2-plain',title:'The six lockout steps (plain language)',variantOf:{lessonId:master.id,audience:'plain',syncedAt:SEED_NOW}});
+    const check=(await repo.getBlock('b-o2-3'))!;
+    await repo.putBlock({...check,id:'b-o2-3-plain',lessonId:'l-ops-2-plain'});
+    const teacher=await ctx(repo,'u-okafor');
+    expect((await dispatch(service,teacher,'getStudentLesson',{lessonId:'l-ops-2-plain'})).progress.lessonId).toBe(master.id);
+    await dispatch(service,teacher,'answerCheck',{lessonId:'l-ops-2-plain',blockId:'b-o2-3-plain',optionId:'a'});
+    expect((await dispatch(service,teacher,'setLessonProgress',{lessonId:'l-ops-2-plain',state:'completed'})).lessonId).toBe(master.id);
+    expect((await repo.getProgress('u-okafor',master.id))?.checks['b-o2-3-plain']).toMatchObject({correct:true,attempts:1});
+    expect(await repo.getProgress('u-okafor','l-ops-2-plain')).toBeNull();
+  });
+  it('lets an assigned administrator take the learner path',async()=>{
+    const repo=new MemoryRepo(seedData()),admin=await ctx(repo,'u-admin');
+    await dispatch(service,admin,'createRequirement',{target:{kind:'course',courseId},audience:{kind:'users',userIds:['u-admin']}});
+    expect((await dispatch(service,admin,'getCourseOutline',{courseId,asLearner:true})).course.progress).toBe(0);
+    expect((await dispatch(service,admin,'getStudentLesson',{lessonId:'l-ops-1'})).lesson.id).toBe('l-ops-1');
+    expect((await dispatch(service,admin,'setLessonProgress',{lessonId:'l-ops-1',state:'completed'})).state).toBe('completed');
+  });
   it('adds concurrent eligible learners without removing enrollments or duplicating assigned events',async()=>{
     const repo=new MemoryRepo(seedData()),admin=await ctx(repo,'u-admin');
     const r=await dispatch(service,admin,'createRequirement',{target:{kind:'course',courseId},audience:{kind:'role',role:'student'}});

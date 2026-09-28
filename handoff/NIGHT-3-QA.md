@@ -38,7 +38,9 @@ Branch `night3`, 2026-09-27. Preview: https://night3-project-tessera.jeff-f69.wo
 
 Residual risk: Cloudflare's Access API has no compare-and-set, so two environments writing the group in the same instant can still, rarely, drop one email; the grant now verifies and retries, and an invitation that ends without access shows "Access pending" with Try again.
 
-## Known limits
+## Fixed after release
 
-- Required training assigned to staff appears in their list but can't be completed through the student lesson flow.
+- Required training assigned to staff can now be completed from their Training page through the learner lesson or test-out flow.
+
+## Known limits
 - Background generation on Workflows runs only in production (previews can't run their own Workflow code); previews and demo mode use the poll-driven path. Verify after release.

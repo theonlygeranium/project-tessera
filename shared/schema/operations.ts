@@ -25,7 +25,7 @@ export const OPERATIONS: { [K in Operation]: { input: z.ZodType<Input<K>>; outpu
  importUsers:{input:z.object({csv:required}),output:z.object({created:z.array(S.UserSchema),errors:z.array(z.object({line:integer.min(1),message:string}))})},
  updateUser:{input:z.object({userId:id,name:required.optional(),role:S.RoleSchema.optional()}),output:S.UserSchema},
  listCourses:{input:z.void(),output:z.array(S.CourseSummarySchema)},createCourse:{input:courseInput.extend({programId:id.nullable().optional(),skipTemplate:z.boolean().optional()}),output:S.CourseSchema},
- getCourseOutline:{input:by('courseId'),output:S.CourseOutlineSchema},
+ getCourseOutline:{input:by('courseId').extend({asLearner:z.boolean().optional()}),output:S.CourseOutlineSchema},
  updateCourse:{input:z.object({courseId:id,code:required.optional(),title:required.optional(),term:required.optional(),description:string.optional(),welcome:string.optional(),outcomes:z.array(required).optional()}),output:S.CourseSchema},
  setCourseInstructors:{input:z.object({courseId:id,userIds:z.array(id)}),output:S.CourseSchema},
  getCourseEnrollments:{input:by('courseId'),output:z.object({userIds:z.array(id)})},setCourseEnrollments:{input:z.object({courseId:id,userIds:z.array(id)}),output:z.object({userIds:z.array(id)})},

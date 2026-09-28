@@ -67,6 +67,9 @@ export const paths = {
   /** Night 3: pages for any signed-in person (required training can apply to anyone; a manager is a relationship, not a role). */
   me: {
     training: '/training',
+    trainingCourse: (courseId: string) => `/training/courses/${courseId}`,
+    trainingLesson: (courseId: string, lessonId: string) => `/training/courses/${courseId}/lessons/${lessonId}`,
+    trainingTestOut: (courseId: string) => `/training/courses/${courseId}/test-out`,
     certificate: (certificateId: string) => `/certificates/${certificateId}`,
     sharing: '/sharing',
     team: '/team',
