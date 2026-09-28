@@ -41,6 +41,9 @@ export function AppShell() {
   const signOut = useApiMutation('signOut', { onSuccess: () => navigate(paths.signIn) });
   const who = useApiQuery('whoAmI', undefined);
   const stopViewing = useApiMutation('viewAs');
+  // Night 3: show Team and Sharing only to people with reports or a manager. Hooks stay above the early returns below.
+  const visibility = useApiQuery('getMyVisibility', undefined);
+  const team = useApiQuery('getManagerView', undefined);
   useAccent(institution);
 
   // Move focus to the page on client-side navigation so screen readers start at the new content.
@@ -56,8 +59,6 @@ export function AppShell() {
     return <Navigate to={paths.student.onboarding} replace />;
   }
 
-  const visibility = useApiQuery('getMyVisibility', undefined);
-  const team = useApiQuery('getManagerView', undefined);
   const hasManager = (visibility.data?.managers.length ?? 0) > 0;
   const hasReports = (team.data?.rows.length ?? 0) + (team.data?.notSharingCount ?? 0) > 0;
   const items = navFor(user.role, { courseId: courseMatch?.params.courseId, unread: today.data?.unreadCount, hasManager, hasReports });
