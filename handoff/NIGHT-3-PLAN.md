@@ -119,4 +119,17 @@ Rules from Night 2 stand, plus: briefs name the exact files a lane may edit (sha
 
 ## 9. Status
 
-Proposed. Milestone "Night 3" with the decisions issue #50 and lane issues #51–#57 created for review; no build has started.
+**Wave 0 done (2026-09-27, branch `night3`).** Built by Claude except the storage lane (Codex Sol):
+- Contract: Night 3 types, zod schemas with type-equality checks, 57 operations with routes and scopes, OpenAPI regenerated.
+- Migration `0006_night3.sql` (applied locally and to the preview database, not production): every Night 3 table, the new columns, an outcomes backfill, and triggers that make the audit trail append-only, certificates immutable, and a removed reporting line clear its consent.
+- Rules modules with tests: `shared/quality/` (Tessera standard, OSCQR 4.0 verbatim under CC BY 4.0, 13 automatic checks, scoring where AI findings never pass an item on their own), `shared/templates/model.ts` (deviations, change set with hash, apply plan), `shared/managers/policy.ts` (opt-in per manager, completion-only projection, forbidden-field guard).
+- AI tasks `readiness-item` and `variant` (fixture and Palmyra prompts).
+- App scaffolding: every Night 3 path and an empty route module per lane, mounted.
+- Storage (Codex Sol): MemoryRepo and D1Repo for every new method, with contract tests on both.
+- Seed: Dana Whitfield (employee, required OPS 101 due 15 Oct), Sam Ortiz (Dana's manager, no sharing yet), and OPS 101 with a test-out.
+- Manager view artboard (`design/canvas/ManagerView.dc.html`, screen `manager-view`) **waiting for the owner's privacy review** before lane D2 builds it. Canvas mirror synced.
+- Checks: typecheck clean, 307 unit tests, 177/177 accessibility, all journeys pass.
+
+Changes from §4: one migration for all lanes instead of one per lane (lanes never touch migrations); a template's structure is one JSON document instead of a `template_items` table (it's always read and written whole; deviations are found by template keys); program logos are deferred (brand is the accent in Night 3).
+
+**Wave 1 running:** lanes A, B, C, D (Codex Sol, parallel worktrees). D2 waits for the artboard review; E (carry-overs) follows.
