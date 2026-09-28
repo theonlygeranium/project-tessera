@@ -15,8 +15,9 @@ export function navFor(role: Role, options: { courseId?: string; unread?: number
       { id: 'courses', label: 'Courses', href: paths.admin.courses, icon: icons.courses },
       { id: 'programs', label: 'Programs', href: paths.admin.programs, icon: icons.courses },
       { id: 'templates', label: 'Templates', href: paths.admin.templates, icon: icons.workspace },
-      { id: 'policy', label: 'AI policy', href: paths.admin.policy, icon: icons.policy },
+      { id: 'policy', label: 'Policy', href: paths.admin.policy, icon: icons.policy },
       { id: 'access', label: 'Accessibility', href: paths.admin.access, icon: icons.access },
+      { id: 'rubrics', label: 'Rubrics', href: paths.admin.rubrics, icon: icons.policy },
     ];
   }
   if (role === 'instructor') {
@@ -28,6 +29,8 @@ export function navFor(role: Role, options: { courseId?: string; unread?: number
         { id: 'build', label: 'Build with AI', href: paths.teach.build(c), icon: icons.build },
         { id: 'files', label: 'Files', href: paths.teach.files(c), icon: icons.files },
         { id: 'access', label: 'Accessibility', href: paths.teach.access(c), icon: icons.access },
+        { id: 'readiness', label: 'Readiness', href: paths.teach.readiness(c), icon: icons.policy },
+        { id: 'outcomes', label: 'Outcomes', href: paths.teach.outcomes(c), icon: icons.courses },
         { id: 'grades', label: 'Grades', href: paths.teach.gradebook(c), icon: icons.grades },
         { id: 'tutor', label: 'Tutor', href: paths.teach.tutor(c), icon: icons.tutor },
         { id: 'announcements', label: 'Announcements', href: paths.teach.announcements(c), icon: icons.announcements },

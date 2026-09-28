@@ -16,11 +16,13 @@ import { tutor } from './tutor';
 import { invitations } from './invitations';
 import { variants } from './variants';
 import { templates } from './templates';
+import { readiness } from './readiness';
+import { outcomes } from './outcomes';
 
 import { ApiError, ROUTES, type Operation } from '../api';
 import type { Handler } from './context';
 
-const implemented = { ...session, ...admin, ...courses, ...contentHandlers, ...student, ...announcements, ...builder, ...tokens, ...access, ...files, ...grading, ...generation, ...adaptations, ...tutor, ...invitations, ...variants, ...templates };
+const implemented = { ...session, ...admin, ...courses, ...contentHandlers, ...student, ...announcements, ...builder, ...tokens, ...access, ...files, ...grading, ...generation, ...adaptations, ...tutor, ...invitations, ...variants, ...templates, ...readiness, ...outcomes };
 // Night 2 lanes replace these stubs as they land (a 501-style error until then).
 const pending = Object.fromEntries(
   (Object.keys(ROUTES) as Operation[]).filter((op) => !(op in implemented)).map((op) => [op, (async () => { throw new ApiError('conflict', `${op} is not available yet`); }) as Handler<Operation>]),

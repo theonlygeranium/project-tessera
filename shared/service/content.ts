@@ -8,6 +8,7 @@ import type { Service, ServiceContext } from './context';
 import { agentProvenance, aiEnabled, aiFailed, canReachCourse, content, fail, lessonFor, moduleFor, provenance, teachLesson, user } from './helpers';
 import { validateBlockContent } from './validate';
 import { effectiveTemplate } from './templates';
+import { readiness } from './readiness';
 
 async function detail(ctx: ServiceContext, lessonId: string): Promise<LessonDetail> {
   const lesson = await lessonFor(ctx, lessonId), module = await moduleFor(ctx, lesson.moduleId), course = await canReachCourse(ctx, lesson.courseId);
@@ -88,8 +89,13 @@ export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBl
       const index = reasons.indexOf(scoreReason);
       if (index >= 0) reasons[index] = `The accessibility score is ${access.score}; your course template requires at least ${floor}.`;
     }
-    if (!report.ready || reasons.length) {
-      throw new ApiError('not-ready', ["This lesson isn't ready to publish.", ...reasons].join(' '), reasons.length ? { ...report, ready: false, accessPolicy: { score: access.score, reasons } } : report);
+    // The readiness policy's minimum (D-029): advisory unless a minimum is set.
+    const policy = institution.readinessPolicy;
+    const rubricResult = !policy || policy.minimumPercent === null ? null : await readiness.getCourseReadiness(ctx, { courseId: l.courseId });
+    const rubric = rubricResult?.blocksPublishing ? { rubricName: rubricResult.rubricName, percent: rubricResult.percent, minimum: policy!.minimumPercent! } : undefined;
+    if (!report.ready || reasons.length || rubric) {
+      const rubricReason = rubric ? [`The course meets ${rubric.percent}% of the ${rubric.rubricName}; publishing needs ${rubric.minimum}%.`] : [];
+      throw new ApiError('not-ready', ["This lesson isn't ready to publish.", ...reasons, ...rubricReason].join(' '), { ...report, ready: false, ...(reasons.length ? { accessPolicy: { score: access.score, reasons } } : {}), ...(rubric ? { rubric } : {}) });
     }
     l.status = 'published'; l.publishedAt = ctx.now(); await ctx.repo.putLesson(l); return l;
   },

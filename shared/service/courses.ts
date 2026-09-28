@@ -2,6 +2,7 @@ import type { Course, CourseSummary, LessonSummary, RosterEntry } from '../domai
 import type { Service, ServiceContext } from './context';
 import { canReachCourse, canTeach, course, fail, lessonFor, minutes, moduleFor, move, renumberLessons, renumberModules, required, user } from './helpers';
 import { applyTemplatePlan, effectiveTemplate } from './templates';
+import { saveCourseOutcomes } from './outcomes';
 
 export async function summary(ctx: ServiceContext, c: Course): Promise<CourseSummary> {
   const [modules, lessons, enrollments] = await Promise.all([ctx.repo.listModules(c.id), ctx.repo.listLessons({ courseId: c.id }), ctx.repo.listEnrollments({ courseId: c.id })]);
@@ -51,8 +52,13 @@ export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseO
     for (const key of ['code', 'title', 'term'] as const) if (input[key] !== undefined) c[key] = required(input[key], key);
     if (input.description !== undefined) c.description = input.description.trim();
     if (input.welcome !== undefined) c.welcome = input.welcome.trim();
-    if (input.outcomes !== undefined) c.outcomes = input.outcomes.map(x => x.trim()).filter(Boolean);
-    await ctx.repo.putCourse(c); return c;
+    if (input.outcomes !== undefined && (input.outcomes.length > 30 || input.outcomes.some(x => typeof x !== 'string' || !x.trim() || x.trim().length > 500))) fail('invalid', 'Outcomes must have 1–500 characters, at most 30.');
+    await ctx.repo.putCourse(c);
+    if (input.outcomes !== undefined) {
+      const old = await ctx.repo.listOutcomes(c.id);
+      await saveCourseOutcomes(ctx, c.id, input.outcomes.map((text, position) => ({ id: old[position]?.id, text })));
+    }
+    return (await ctx.repo.getCourse(c.id))!;
   },
   setCourseInstructors: async (ctx, input) => {
     const c = await course(ctx, input.courseId);
