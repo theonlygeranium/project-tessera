@@ -74,6 +74,26 @@ describe('palmyraClient', () => {
     expect((await ai.run('syllabus-extract', input)).output.schedule).toHaveLength(14);
     expect(calls).toEqual({ syllabus_extract_course: 1, syllabus_extract_schedule: 2, syllabus_extract_policies: 1 });
   });
+  it('reads the analysis in two parallel parts and leaves the matrix to the service', async () => {
+    const input = { sourceKind: 'syllabus' as const, name: seed.name, sections: seed.sections };
+    const extraction = { ...(await fixtureAi.run('syllabus-extract', input)).output, problems: [], provenance: { model: 'fixture', task: 'syllabus-extract' as const, generatedAt: '', sources: [], summary: '' } };
+    const analyzeInput = { extraction, profileAnswers: {}, rates: { readingPagesPerHour: 34, problemSetHours: 2, writingHoursPerPage: 1, projectHours: 30, quizMinutes: 20, discussionMinutes: 45 }, rubricRefsAllowed: ['tessera', 'oscqr'] as ('tessera' | 'oscqr')[], sourceKind: 'syllabus' as const, sections: seed.sections };
+    const read = (await fixtureAi.run('syllabus-analyze', analyzeInput)).output;
+    const seen: string[] = [];
+    const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async (_url, options) => {
+      const body = JSON.parse(String(options?.body));
+      const name = body.response_format.json_schema.name as string;
+      seen.push(name);
+      expect(body.messages[1].content).toContain('Source:\n[p. 1]');
+      if (name === 'syllabus_analyze_audit') { expect(body.messages[0].content).toContain('assessedBy'); return reply(JSON.stringify({ outcomeAudits: read.outcomeAudits })); }
+      return reply(JSON.stringify({ summary: read.summary, cites: read.cites, learnerCenteredness: read.learnerCenteredness, deficiencies: read.deficiencies }));
+    } });
+    const output = (await ai.run('syllabus-analyze', analyzeInput)).output;
+    expect(seen.sort()).toEqual(['syllabus_analyze_audit', 'syllabus_analyze_review']);
+    expect(output.outcomeAudits).toHaveLength(6);
+    expect(output.alignment).toEqual([]);
+    expect(output.summary).toBe(read.summary);
+  });
   it('caps only the syllabus source block at 60,000 characters', async () => {
     const long = 'X'.repeat(60_000) + 'SHOULD_NOT_APPEAR';
     const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async (_url, options) => {

@@ -154,14 +154,16 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
   const ctx: ServiceContext = { repo, ai: client, user: await repo.getUser('u-okafor'), now: () => new Date().toISOString(), newId: prefix => `${prefix}-${++n}`, documents };
   const t0 = Date.now();
   let session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', fileId: file.id, consent: { syllabusOnly: true, rememberProfile: false } });
+  let extractedAt = 0;
   while (Date.now() - t0 < 600_000) {
     session = await service.getDesignSession(ctx, { sessionId: session.id });
+    if (!extractedAt && session.extraction) extractedAt = Date.now();
     if (session.stage !== 'start' || session.provisioning?.error) break;
   }
   const seconds = Math.round((Date.now() - t0) / 1000);
   const error = session.provisioning?.error ?? null;
   const checks = score(session, key);
-  checks.push({ id: 'E10', pass: !error && session.stage === 'read' && seconds <= 180, detail: `${session.stage} in ${seconds} s${error ? `; error: ${error}` : ''}` });
+  checks.push({ id: 'E10', pass: !error && session.stage === 'read' && seconds <= 180, detail: `${session.stage} in ${seconds} s${extractedAt ? ` (extraction ${Math.round((extractedAt - t0) / 1000)} s, read ${Math.round((Date.now() - extractedAt) / 1000)} s)` : ''}${error ? `; error: ${error}` : ''}` });
   return { file: basename(path), run, ok: !error, seconds, stage: session.stage, error, checks, ...(keepSessions ? { session } : {}) };
 }
 

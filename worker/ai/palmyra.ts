@@ -185,6 +185,27 @@ const extractMessages = (part: ExtractPart, input: AiTasks['syllabus-extract']['
 
 const auditSchema = obj({ outcomeId: str, measurable: { type: 'boolean' }, verb: nullable(str), bloom: nullable({ type: 'string', enum: ['remember','understand','apply','analyze','evaluate','create'] }), fink: nullable({ type: 'string', enum: ['foundational','application','integration','human','caring','learning-how'] }), mager: nullable(obj({ performance: { type: 'boolean' }, condition: { type: 'boolean' }, criterion: { type: 'boolean' } })), assessedBy: array(obj({ assessmentId: str, fit: { type: 'string', enum: ['assessed','verb-mismatch'] } })), suggestion: nullable(obj({ text: str, why: str })) });
 const analysisSchema = obj({ summary: str, cites: array(span), outcomeAudits: array(auditSchema), alignment: array(obj({ outcomeId: str, assessmentId: str, state: { type: 'string', enum: ['assessed','verb-mismatch','none'] } })), learnerCenteredness: nullable(obj({ palmer: obj({ score: number, max: { type: 'integer', enum: [46] }, band: { type: 'string', enum: ['content-focused','transitional','learning-focused'] }, components: array(obj({ name: str, score: number, max: number, evidence: nullable(span) })) }), cullenHarris: obj({ community: number, powerAndControl: number, evaluation: number, evidence: array(obj({ factor: str, quote: span })) }) })), deficiencies: array(obj({ code: str, message: str, rubricRefs: array(obj({ rubric: { type: 'string', enum: ['tessera','oscqr','qm'] }, item: str })), spans: array(span) })) });
+/**
+ * The read also runs as two parallel parts: in one large request the model skipped the
+ * outcome-by-assessment judgment (every pair "none"), so the audit gets a request of its own.
+ */
+const ANALYZE_PARTS = {
+  audit: {
+    schema: obj({ outcomeAudits: array(auditSchema) }),
+    focus: `Return one audit per outcome, in order. For each outcome: its observable verb (or null), Bloom level, Fink category, whether it is measurable, and assessedBy: every graded assessment that gives evidence of the outcome, judged from the assessment titles and formats and from how the Source describes each assignment, project, exam or discussion. Most outcomes are assessed by at least one assessment; leave assessedBy empty only when nothing in the syllabus could show the outcome. Use fit verb-mismatch when the assessment can't reach the outcome's level (for example multiple choice for create or evaluate). suggestion is null (the service asks for rewrites separately).`,
+    maxTokens: 12000,
+  },
+  review: {
+    schema: obj({ summary: str, cites: array(span), learnerCenteredness: (analysisSchema.properties as Record<string, unknown>).learnerCenteredness, deficiencies: (analysisSchema.properties as Record<string, unknown>).deficiencies }),
+    focus: `Return the summary, its cites, learner-centeredness, and deficiencies (gaps a reviewer would raise: unclear outcomes, missing policies, workload, alignment, accessibility, feedback). The outcome audits are done separately.`,
+    maxTokens: 12000,
+  },
+} as const;
+type AnalyzePart = keyof typeof ANALYZE_PARTS;
+const analyzeMessages = (part: AnalyzePart, input: AiTasks['syllabus-analyze']['input']): Messages => {
+  const [system, user] = PROMPTS['syllabus-analyze'](input);
+  return [{ role: 'system', content: `${system.content}\n${ANALYZE_PARTS[part].focus}` }, user];
+};
 const BLOCK = obj({
   type: { type: 'string', enum: ['heading', 'text', 'callout', 'check'] },
   level: { type: 'integer', enum: [2, 3] },
@@ -413,16 +434,29 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
   }
 
   async function extract(input: AiTasks['syllabus-extract']['input'], deadline: number): Promise<AiTasks['syllabus-extract']['output']> {
+    // Weights that add up to almost nothing mean the grading table was cut short: try again.
+    const plausible = (output: any, attempt: number) => attempt >= 2 || !output?.assessments?.length || (() => { const total = output.assessments.reduce((sum: number, item: { weightPercent: number | null }) => sum + (item.weightPercent ?? 0), 0); return total === 0 || (total >= 50 && total <= 150); })();
     const part = <P extends ExtractPart>(name: P) => withRetries(options.timeoutMs ?? 120_000, deadline, timeoutMs =>
-      request({ name: `syllabus_extract_${name}`, messages: extractMessages(name, input), schema: EXTRACT_PARTS[name].schema, maxTokens: EXTRACT_PARTS[name].maxTokens, reasoningEffort: 'low' }, timeoutMs)) as Promise<any>;
-    const [course, schedule, policies] = await Promise.all([part('course'), part('schedule'), part('policies')]);
+      request({ name: `syllabus_extract_${name}`, messages: extractMessages(name, input), schema: EXTRACT_PARTS[name].schema, maxTokens: EXTRACT_PARTS[name].maxTokens, reasoningEffort: 'low' }, timeoutMs), name === 'course' ? plausible : undefined) as Promise<any>;
+    // Policies and materials are the least essential part: if they can't be read, the read goes on without them.
+    const missing = { value: null, origin: 'missing', confidence: 0, spans: [] };
+    const [course, schedule, policies] = await Promise.all([part('course'), part('schedule'), part('policies').catch(error => { console.warn('syllabus-extract policies part failed:', String(error?.details?.cause ?? error)); return { materials: missing, policies: [] }; })]);
     return MAP['syllabus-extract']({ profile: { ...course.profile, materials: policies.materials }, outcomes: course.outcomes, assessments: course.assessments, schedule: schedule.schedule, policies: policies.policies }, input);
+  }
+
+  async function analyze(input: AiTasks['syllabus-analyze']['input'], deadline: number): Promise<AiTasks['syllabus-analyze']['output']> {
+    const part = <P extends AnalyzePart>(name: P) => withRetries(options.timeoutMs ?? 120_000, deadline, timeoutMs =>
+      request({ name: `syllabus_analyze_${name}`, messages: analyzeMessages(name, input), schema: ANALYZE_PARTS[name].schema, maxTokens: ANALYZE_PARTS[name].maxTokens, reasoningEffort: 'low' }, timeoutMs)) as Promise<any>;
+    const [audit, review] = await Promise.all([part('audit'), part('review')]);
+    // The service builds the alignment matrix from the audits (repairRead).
+    return MAP['syllabus-analyze']({ ...review, outcomeAudits: audit.outcomeAudits, alignment: [] }, input);
   }
 
   return {
     async run(task, input) {
       const deadline = Date.now() + RUN_DEADLINE_MS;
       if (task === 'syllabus-extract') return { output: await extract(input as AiTasks['syllabus-extract']['input'], deadline) as never, model };
+      if (task === 'syllabus-analyze') return { output: await analyze(input as AiTasks['syllabus-analyze']['input'], deadline) as never, model };
       const perAttempt = options.timeoutMs ?? TASK_OPTIONS[task]?.timeoutMs ?? 90_000;
       // Retry a lesson without a usable knowledge check (principle #4), except on the last try.
       const accept = task === 'lesson-draft' ? (output: unknown, attempt: number) => attempt >= 2 || hasUsableCheck(output as AiTasks['lesson-draft']['output']) : undefined;

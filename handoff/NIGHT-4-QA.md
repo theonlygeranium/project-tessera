@@ -29,3 +29,14 @@ Findings:
 - **Rule bug (real model only):** `due-outside-term` compared due dates as text, so Palmyra's "Weekly" and "Oct 15" read as outside an ISO term and produced four false questions on the PDF, crowding out useful ones. The fixture AI returns ISO dates, so unit tests missed it. Fix after M3: compare real dates only (resolve month-day with the term year), ignore recurring or unparseable values, and merge date problems into one question.
 - **DOCX contact:** Palmyra didn't return the instructor's email from the DOCX. To look at with the real syllabi.
 - Real syllabi (at least five, different departments, one scanned) are still needed from the owner; analysis accuracy is measured after M3.
+
+## Real-syllabus evaluation (goal in NIGHT-4-PLAN.md §5.1)
+
+Test set: 15 syllabi. The two committed STAT 110 fixtures, 6 fictional syllabi from the owner (one PDF, five DOCX), and 7 real syllabi from different authors (named generically here: real A–G; 2 PDF, 5 DOCX, one converted from `.doc`). Answer keys by Claude Sonnet subagents, checked by Claude; real syllabi and keys are in the gitignored `tests/fixtures/syllabus/private/`. Scored with `tools/syllabus_eval.mjs` against `handoff/SYLLABUS-EVAL-RUBRIC.md` on real Palmyra-X6.
+
+| Round | Change before it | Extraction pass | Main failures |
+|---|---|---|---|
+| Baseline (9 syllabi) | M2 as built | 0/9 | Date rule compared strings (false questions everywhere); DOCX citations had no anchor; instructor dropped when parts were missing; one 9-page syllabus timed out |
+| 2 (15) | Fresh seed per request (WRITER cached identical requests, so retries replayed failures); low reasoning effort and larger budgets; extraction split into 3 parallel parts; prompt rules for code, instructor, ISO dates, calendars, outcomes, points | 1/15 | Code, term, instructor, modality, outcomes, and weights passed on 11 of the 12 syllabi that extracted; M3's read validation threw on repairable output and discarded the extraction |
+| 3 | DOCX grouped by heading; spans grounded to page or section; PDF glyph joins and running-footer removal; date rule on real dates; read repaired instead of rejected; roster filter fixed (it deleted schedule rows after any line with "student"); same-week rows merged; small caps joined | 7/15 | PDF quotes without a page failed validation; alignment empty; false week-count questions on grouped schedules; harness scored readings as missing |
+| 4 | Unanchored quotes keep no page; grouped schedules don't trigger week-count questions; field lines aren't headings; prompts cite the source and infer modality | 9/15 | Alignment prompt made the model mark every pair "none"; dates-only rows numbered by row order; a catalog description taken as an outcome |
