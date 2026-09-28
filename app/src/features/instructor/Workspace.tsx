@@ -24,7 +24,7 @@ export function Workspace() {
   const closeRename = (id: string) => { setRenaming(null); requestAnimationFrame(() => document.getElementById(`rename-${id}`)?.focus()); };
   const modules = q.data?.modules ?? [];
   return <><CourseBar title={q.data?.course.title ?? 'Course'} courseId={courseId} courseTitle={q.data?.course.title} />
-    {q.isPending ? <Loading /> : q.error ? <ErrorNotice error={q.error} onRetry={() => void q.refetch()} /> : <div className={styles.stack}><Message text={message} /><Message text={error} error />
+    {q.isPending ? <Loading /> : q.error ? <ErrorNotice error={q.error} onRetry={() => void q.refetch()} /> : <div className={styles.stack}><p><Link to={paths.teach.template(courseId)}>Template</Link></p><Message text={message} /><Message text={error} error />
       <section><h2>Course home</h2><form className={styles.inlineForm} onSubmit={(e: FormEvent) => { e.preventDefault(); void run(() => updateCourse.mutateAsync({ courseId, welcome, outcomes }), 'Course home saved.'); }}>
         <Field label="Welcome message" value={welcome} onChange={setWelcome} multiline />
         <div><h3>Outcomes</h3><ul className={styles.list}>{outcomes.map((value, i) => <li key={i} className={styles.fieldRow}><Field label={`Outcome ${i + 1}`} value={value} onChange={v => setOutcomes(outcomes.map((x, index) => index === i ? v : x))} /><Button density="compact" onClick={() => setOutcomes(outcomes.filter((_, index) => index !== i))}>Remove</Button></li>)}</ul><Button density="compact" onClick={() => setOutcomes([...outcomes, ''])}>Add outcome</Button></div><SaveButton pending={updateCourse.isPending}>Save course home</SaveButton></form></section>

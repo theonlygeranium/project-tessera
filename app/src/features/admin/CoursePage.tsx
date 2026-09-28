@@ -35,6 +35,10 @@ export function CoursePage() {
   const enrollments = useApiQuery('getCourseEnrollments', { courseId }, { enabled: ready });
   const instructors = useApiQuery('listUsers', { role: 'instructor' });
   const students = useApiQuery('listUsers', { role: 'student' });
+  const programs = useApiQuery('listPrograms', undefined);
+  const saveProgram = useApiMutation('setCourseProgram');
+  const [programError, setProgramError] = useState('');
+  const [programSaved, setProgramSaved] = useState(false);
   const saveInstructors = useApiMutation('setCourseInstructors');
   const saveStudents = useApiMutation('setCourseEnrollments');
   const [instructorIds, setInstructorIds] = useServerSelection(outline.data?.course.instructorIds, saveInstructors.isPending);
@@ -59,7 +63,7 @@ export function CoursePage() {
     <div className={styles.page}>
       <TopBar
         title={title}
-        eyebrow={course?.code}
+        eyebrow={[course?.code, programs.data?.find(program => program.id === course?.programId)?.name].filter(Boolean).join(' · ') || undefined}
         breadcrumbs={[{ label: 'Courses', href: paths.admin.courses }, { label: title }]}
         renderLink={renderRouterLink}
       />
@@ -89,6 +93,15 @@ export function CoursePage() {
             {`. ${countPhrase(course.studentCount, 'student')}.`}
           </p>
           {course.description && <p className={styles.note}>{course.description}</p>}
+
+          <section className={styles.section}>
+            <h2>Program</h2>
+            {programSaved && <StatusNotice tone="success" live="polite">Program saved.</StatusNotice>}
+            {programError && <StatusNotice tone="error">{programError}</StatusNotice>}
+            <label className={styles.form}>Program for this course
+              <select value={course.programId ?? ''} disabled={saveProgram.isPending || programs.isPending} onChange={event => { setProgramError(''); setProgramSaved(false); saveProgram.mutate({ courseId, programId: event.target.value || null }, { onSuccess: () => setProgramSaved(true), onError: caught => setProgramError(caught.message) }); }}><option value="">No program</option>{programs.data?.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}</select>
+            </label>
+          </section>
 
           <section className={styles.section}>
             <h2>Instructors</h2>

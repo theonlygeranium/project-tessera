@@ -13,6 +13,8 @@ export function navFor(role: Role, options: { courseId?: string; unread?: number
       { id: 'setup', label: 'Setup', href: paths.admin.setup, icon: icons.setup },
       { id: 'people', label: 'People', href: paths.admin.people, icon: icons.people },
       { id: 'courses', label: 'Courses', href: paths.admin.courses, icon: icons.courses },
+      { id: 'programs', label: 'Programs', href: paths.admin.programs, icon: icons.courses },
+      { id: 'templates', label: 'Templates', href: paths.admin.templates, icon: icons.workspace },
       { id: 'policy', label: 'AI policy', href: paths.admin.policy, icon: icons.policy },
       { id: 'access', label: 'Accessibility', href: paths.admin.access, icon: icons.access },
     ];

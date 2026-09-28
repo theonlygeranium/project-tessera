@@ -82,7 +82,20 @@ const APP = [
   { name: 'App · Student · Announcements', url: 'app/announcements?data=mock&as=u-marcus' },
   { name: 'App · Instructor · Tutor summaries', url: 'app/teach/courses/c-stat110/tutor?data=mock&as=u-okafor' },
   { name: 'App · Student · Profile', url: 'app/profile?data=mock&as=u-marcus' },
+  { name: 'App · Instructor · Course template', url: 'app/teach/courses/c-stat110/template?data=mock&as=u-okafor' },
 ];
+const adminNight3 = async (page, destination) => {
+  await page.getByRole('button', { name: 'Finish setup' }).click();
+  await page.waitForURL(/\/app\/admin(?:\?|$)/);
+  await page.getByRole('link', { name: destination }).click();
+  await page.getByRole('heading', { name: destination, level: 1 }).waitFor();
+};
+APP.push(
+  { name: 'App · Administrator · Programs', url: 'app/admin/setup?data=mock&as=u-admin', steps: p => adminNight3(p, 'Programs') },
+  { name: 'App · Administrator · Program editor', url: 'app/admin/setup?data=mock&as=u-admin', steps: async p => { await adminNight3(p, 'Programs'); await p.getByLabel('Name').fill('Public Policy'); await p.getByRole('button', { name: 'Create program' }).click(); await p.getByRole('heading', { name: 'Edit program' }).waitFor(); } },
+  { name: 'App · Administrator · Templates', url: 'app/admin/setup?data=mock&as=u-admin', steps: p => adminNight3(p, 'Templates') },
+  { name: 'App · Administrator · Template editor', url: 'app/admin/setup?data=mock&as=u-admin', steps: async p => { await adminNight3(p, 'Templates'); await p.getByLabel('Name').fill('Meridian standard'); await p.getByRole('button', { name: 'Create template' }).click(); await p.getByRole('heading', { name: 'Details' }).waitFor(); } },
+);
 for (const a of APP) targets.push({ ...a, settle: 900 });
 for (const s of screens) {
   const styles = AI_SCREENS.has(s.slug) ? STYLES : ['marginalia'];
