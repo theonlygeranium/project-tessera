@@ -16,5 +16,5 @@ export function normalizeDesignSession(session: DesignSession): DesignSession {
     });
   });
   session.plan?.outcomes.forEach((outcome, index) => { if (created.outcomeIds[index]) outcomes[outcome.code] = created.outcomeIds[index]; });
-  return { ...session, applyRevision: session.applyRevision ?? `legacy-${session.id}`, planIds: { modules, lessons, assignments, outcomes, ...session.planIds }, createdBlocks: session.createdBlocks ?? {}, undoKept: session.undoKept ?? [], confirmedPoints: session.confirmedPoints ?? {}, outcomeCodeMap: session.outcomeCodeMap ?? {} };
+  return { ...session, legacyApply: !session.applyRevision || session.legacyApply === true, applyRevision: session.applyRevision ?? `legacy-${session.id}`, planIds: { modules, lessons, assignments, outcomes, ...session.planIds }, createdBlocks: session.createdBlocks ?? {}, undoKept: session.undoKept ?? [], confirmedPoints: session.confirmedPoints ?? {}, outcomeCodeMap: session.outcomeCodeMap ?? {} };
 }

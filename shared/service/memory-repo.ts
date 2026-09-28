@@ -149,8 +149,9 @@ export class MemoryRepo implements Repo {
   async revertDesignPreview(id: string) { const s = this.data.designSessions!.find(x => x.id === id); if (s?.stage !== 'preview') return false; s.stage = 'approaches'; s.selection = null; s.plan = null; return true; }
   async saveDesignPoints(id: string, values: Record<string, number>) { const s = this.data.designSessions!.find(x => x.id === id); if (s?.stage !== 'preview') return false; s.confirmedPoints = copy(values); s.plan = null; return true; }
   async saveDesignPreview(id: string, expectedPoints: Record<string, number>, plan: DesignSession['plan'], updatedAt: string) { const s = this.data.designSessions!.find(x => x.id === id); if (s?.stage !== 'preview' || JSON.stringify(s.confirmedPoints ?? {}) !== JSON.stringify(expectedPoints)) return false; s.plan = copy(plan); s.record.plan = copy(plan); s.updatedAt = updatedAt; return true; }
-  async claimDesignApply(value: DesignSession) { const current = this.data.designSessions!.find(x => x.id === value.id); if (current?.stage !== 'preview') return false; this.upsert(this.data.designSessions!, value); return true; }
+  async claimDesignApply(value: DesignSession) { const current = this.data.designSessions!.find(x => x.id === value.id); if (current?.stage !== 'preview' || !current.plan?.hash || current.plan.hash !== value.plan?.hash || JSON.stringify(current.confirmedPoints ?? {}) !== JSON.stringify(value.confirmedPoints ?? {})) return false; this.upsert(this.data.designSessions!, value); return true; }
   private activeDesign(id: string, revision: string) { const s = this.data.designSessions!.find(x => x.id === id); return s?.stage === 'provisioning' && s.applyRevision === revision ? s : null; }
+  private undoOwns(sessionId: string, revision: string, collection: keyof DesignSession['created'], id: string) { const s = this.data.designSessions!.find(x => x.id === sessionId); return s?.stage === 'undoing' && s.applyRevision === revision && s.created[collection].includes(id); }
   async putDesignModule(id: string, revision: string, key: string, value: Module) {
     const s = this.activeDesign(id, revision); if (!s || s.courseId !== value.courseId || !this.data.courses.some(c => c.id === value.courseId) || this.data.modules.some(m => m.id === value.id)) return false;
     const position = Math.max(-1, ...this.data.modules.filter(m => m.courseId === value.courseId).map(m => m.position)) + 1;
@@ -182,12 +183,17 @@ export class MemoryRepo implements Repo {
     return copy(inserted);
   }
   async resetDesignCapacityFailure(id: string, revision: string, message: string) { const s = this.activeDesign(id,revision); if (!s || s.created.outcomeIds.length || s.created.moduleIds.length || !s.provisioning) return false; s.stage = 'preview'; s.provisioning.error = message; return true; }
-  async saveDesignAppliedPlan(id: string, revision: string, plan: DesignSession['plan'], codeMap: Record<string, string>) { const s = this.activeDesign(id, revision); if (!s) return false; s.plan = copy(plan); s.record.plan = copy(plan); s.outcomeCodeMap = copy(codeMap); s.planIds!.outcomes = Object.fromEntries(Object.entries(s.planIds!.outcomes).map(([code, oid]) => [codeMap[code] ?? code, oid])); return true; }
+  async saveDesignAppliedPlan(id: string, revision: string, plan: DesignSession['plan'], codeMap: Record<string, string>, outcomeIdsByCode: Record<string, string>) { const s = this.activeDesign(id, revision); if (!s || Object.values(outcomeIdsByCode).some(oid => !s.created.outcomeIds.includes(oid))) return false; s.plan = copy(plan); s.record.plan = copy(plan); s.outcomeCodeMap = copy(codeMap); s.planIds!.outcomes = copy(outcomeIdsByCode); return true; }
   async cancelDesignApply(id: string, revision: string, nextRevision: string) {
     const s = this.data.designSessions!.find(x => x.id === id && (x.stage === 'provisioning' || x.stage === 'review') && (x.applyRevision ?? `legacy-${x.id}`) === revision); if (!s) return false;
-    s.applyRevision = nextRevision; s.stage = 'undoing';
+    s.legacyApply = !s.applyRevision || s.legacyApply === true; s.applyRevision = nextRevision; s.stage = 'undoing';
     const job = this.data.generationJobs.find(j => j.id === s.provisioning?.jobId); if (job?.state === 'running') { job.state = 'failed'; job.error = 'Provisioning was undone.'; }
     return true;
+  }
+  async stopLegacyDesignJob(id: string, jobId: string, message: string) {
+    const s = this.data.designSessions!.find(x => x.id === id), job = this.data.generationJobs.find(j => j.id === jobId);
+    if (!s || s.stage !== 'provisioning' || s.applyRevision || s.provisioning?.jobId !== jobId || !job || job.state !== 'running') return false;
+    s.legacyApply = true; s.provisioning.error = message; job.state = 'failed'; job.error = message; return true;
   }
   async startDesignJob(id: string, revision: string, job: GenerationJob) { if (!this.activeDesign(id,revision) || this.data.generationJobs.some(j => j.id === job.id)) return false; this.upsert(this.data.generationJobs,job); return true; }
   async setDesignRunner(id: string, revision: string, jobId: string, runner: 'poll' | 'workflow') { const s = this.activeDesign(id,revision), j = this.data.generationJobs.find(x => x.id === jobId); if (!s || s.provisioning?.jobId !== jobId || !j || j.state !== 'running') return false; j.runner = runner; return true; }
@@ -213,31 +219,31 @@ export class MemoryRepo implements Repo {
     const inserted = blocks.map((b, i) => normalized({ ...b, position: position + i }));
     this.data.blocks.push(...inserted); s.created.blockIds.push(...blocks.map(b => b.id)); s.createdBlocks = { ...s.createdBlocks, ...Object.fromEntries(inserted.map(b => [b.id, copy(b)])) }; return true;
   }
-  async deleteDesignBlockIfDraft(expected: Block, expectedOutcomeIds: string[]) {
+  async deleteDesignBlockIfDraft(sessionId: string, revision: string, expected: Block, expectedOutcomeIds: string[]) {
     const b = this.data.blocks.find(x => x.id === expected.id);
     const links = this.data.outcomeLinks!.filter(x => x.targetKind === 'block' && x.targetId === expected.id).map(x => x.outcomeId).sort();
-    if (!b || b.aiState !== 'draft' || b.previous !== null || JSON.stringify(b) !== JSON.stringify(normalized(expected)) || JSON.stringify(links) !== JSON.stringify([...expectedOutcomeIds].sort())) return false;
+    if (!this.undoOwns(sessionId, revision, 'blockIds', expected.id) || !b || b.aiState !== 'draft' || b.previous !== null || JSON.stringify(b) !== JSON.stringify(normalized(expected)) || JSON.stringify(links) !== JSON.stringify([...expectedOutcomeIds].sort())) return false;
     this.data.blocks = this.data.blocks.filter(x => x.id !== b.id); this.data.outcomeLinks = this.data.outcomeLinks!.filter(x => x.targetKind !== 'block' || x.targetId !== b.id); return true;
   }
-  async deleteDesignAssignmentIfUnchanged(expected: Assignment, expectedOutcomeIds: string[]) {
+  async deleteDesignAssignmentIfUnchanged(sessionId: string, revision: string, expected: Assignment, expectedOutcomeIds: string[]) {
     const a = this.data.assignments.find(x => x.id === expected.id);
     const links = this.data.outcomeLinks!.filter(x => x.targetKind === 'assignment' && x.targetId === expected.id).map(x => x.outcomeId).sort();
-    if (!a || JSON.stringify(a) !== JSON.stringify(expected) || this.data.submissions.some(x => x.assignmentId === a.id) || JSON.stringify(links) !== JSON.stringify([...expectedOutcomeIds].sort())) return false;
+    if (!this.undoOwns(sessionId, revision, 'assignmentIds', expected.id) || !a || JSON.stringify(a) !== JSON.stringify(expected) || this.data.submissions.some(x => x.assignmentId === a.id) || JSON.stringify(links) !== JSON.stringify([...expectedOutcomeIds].sort())) return false;
     this.data.assignments = this.data.assignments.filter(x => x.id !== a.id); this.data.outcomeLinks = this.data.outcomeLinks!.filter(x => x.targetKind !== 'assignment' || x.targetId !== a.id); return true;
   }
-  async deleteDesignLessonIfUnchanged(expected: Lesson) {
+  async deleteDesignLessonIfUnchanged(sessionId: string, revision: string, expected: Lesson) {
     const l = this.data.lessons.find(x => x.id === expected.id);
-    if (!l || JSON.stringify(l) !== JSON.stringify(normalized(expected)) || this.data.blocks.some(x => x.lessonId === l.id) || this.data.lessons.some(x => x.variantOf?.lessonId === l.id) || this.data.progress.some(x => x.lessonId === l.id)) return false;
+    if (!this.undoOwns(sessionId, revision, 'lessonIds', expected.id) || !l || JSON.stringify(l) !== JSON.stringify(normalized(expected)) || this.data.blocks.some(x => x.lessonId === l.id) || this.data.lessons.some(x => x.variantOf?.lessonId === l.id) || this.data.progress.some(x => x.lessonId === l.id)) return false;
     this.data.lessons = this.data.lessons.filter(x => x.id !== l.id); return true;
   }
-  async deleteDesignModuleIfUnchanged(expected: Module) {
+  async deleteDesignModuleIfUnchanged(sessionId: string, revision: string, expected: Module) {
     const m = this.data.modules.find(x => x.id === expected.id);
-    if (!m || JSON.stringify(m) !== JSON.stringify(normalized(expected)) || this.data.lessons.some(x => x.moduleId === m.id) || this.data.assignments.some(x => x.moduleId === m.id)) return false;
+    if (!this.undoOwns(sessionId, revision, 'moduleIds', expected.id) || !m || JSON.stringify(m) !== JSON.stringify(normalized(expected)) || this.data.lessons.some(x => x.moduleId === m.id) || this.data.assignments.some(x => x.moduleId === m.id)) return false;
     this.data.modules = this.data.modules.filter(x => x.id !== m.id); return true;
   }
-  async deleteDesignOutcomeIfUnused(id: string, text: string) {
+  async deleteDesignOutcomeIfUnused(sessionId: string, revision: string, id: string, text: string) {
     const o = this.data.outcomes!.find(x => x.id === id), c = o && this.data.courses.find(x => x.id === o.courseId);
-    if (!o || !c || o.text !== text || this.data.outcomeLinks!.some(x => x.outcomeId === id)) return false;
+    if (!this.undoOwns(sessionId, revision, 'outcomeIds', id) || !o || !c || o.text !== text || this.data.outcomeLinks!.some(x => x.outcomeId === id)) return false;
     const mirrored = JSON.stringify(c.outcomes) === JSON.stringify(this.data.outcomes!.filter(x => x.courseId === o.courseId).sort(byPosition).map(x => x.text));
     this.data.outcomes = this.data.outcomes!.filter(x => x.id !== id);
     if (mirrored) c.outcomes = this.data.outcomes!.filter(x => x.courseId === o.courseId).sort(byPosition).map(x => x.text);

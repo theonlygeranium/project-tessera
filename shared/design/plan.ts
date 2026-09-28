@@ -23,13 +23,14 @@ export function statedCourseTotal(span: SourceSpan | null): number | null {
 export function explicitAssessmentPoints(span: SourceSpan | null, title = ''): number | null {
   if (!span) return null;
   const rows = span.text.split(/[\n\r]+|(?<=[.!?])\s+/);
-  const named = rows.filter(row => title && row.toLowerCase().includes(title.toLowerCase()));
-  const candidates = named.length ? named : rows.length === 1 && !title ? rows : [];
-  const ranked = candidates.flatMap(row => {
-    const nameAt = title ? row.toLowerCase().indexOf(title.toLowerCase()) : 0;
-    return [...row.matchAll(pointPattern)].filter(match => !/\b(?:(?:course|overall|grade)\s+total|total\s+points?)\s*:?\s*$/i.test(row.slice(0, match.index))).map(match => ({ value: numberOf(match[1]), distance: Math.abs(match.index - nameAt - title.length) }));
-  }).sort((a, b) => a.distance - b.distance);
-  return ranked.length && (ranked.length === 1 || ranked[0].distance < ranked[1].distance) ? ranked[0].value : null;
+  const titlePattern = title ? new RegExp(`(?:^|[.;!?:|•–—-])\\s*${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[:–—-]?\\s*$`, 'iu') : null;
+  const values = rows.flatMap(row => [...row.matchAll(pointPattern)]
+    .filter(match => {
+      const before = row.slice(0, match.index);
+      if (/\b(?:(?:course|overall|grade)\s+total|total\s+points?)\s*:?\s*$/i.test(before)) return false;
+      return titlePattern ? titlePattern.test(before) : rows.length === 1;
+    }).map(match => numberOf(match[1])));
+  return values.length === 1 ? values[0] : null;
 }
 const words = (s: string) => new Set((s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(w => w.length > 2).map(w => w.replace(/(ing|edly|ed|es|s)$/u, '').replace(/e$/u, '')));
 export function titleOverlap(a: string, b: string): boolean {

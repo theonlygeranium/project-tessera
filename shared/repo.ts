@@ -144,20 +144,22 @@ export interface Repo {
   appendDesignOutcome(sessionId: Id, revision: Id, outcome: Outcome): Promise<boolean>;
   appendDesignOutcomes(sessionId: Id, revision: Id, outcomes: Outcome[]): Promise<Outcome[] | null>;
   resetDesignCapacityFailure(sessionId: Id, revision: Id, message: string): Promise<boolean>;
-  saveDesignAppliedPlan(sessionId: Id, revision: Id, plan: DesignSession['plan'], codeMap: Record<string, string>): Promise<boolean>;
+  saveDesignAppliedPlan(sessionId: Id, revision: Id, plan: DesignSession['plan'], codeMap: Record<string, string>, outcomeIdsByCode: Record<string, Id>): Promise<boolean>;
   /** Changes the revision and stops the job in one operation. */
   cancelDesignApply(sessionId: Id, revision: Id, nextRevision: Id): Promise<boolean>;
+  /** Fail an old-shape provisioning job without attempting to scaffold it. */
+  stopLegacyDesignJob(sessionId: Id, jobId: Id, message: string): Promise<boolean>;
   startDesignJob(sessionId: Id, revision: Id, job: GenerationJob): Promise<boolean>;
   setDesignRunner(sessionId: Id, revision: Id, jobId: Id, runner: 'poll' | 'workflow'): Promise<boolean>;
   setDesignApplyError(sessionId: Id, revision: Id, message: string): Promise<boolean>;
   /** An owned, empty lesson gets blocks, links and progress in one operation. */
   commitDesignScaffold(sessionId: Id, revision: Id, expectedJob: GenerationJob, nextJob: GenerationJob, lesson: Lesson | null, blocks: Block[], outcomeIds: Id[], nextSession: DesignSession): Promise<boolean>;
   appendDesignAlternatives(sessionId: Id, revision: Id, lessonId: Id, blocks: Block[]): Promise<boolean>;
-  deleteDesignBlockIfDraft(expected: Block, expectedOutcomeIds: Id[]): Promise<boolean>;
-  deleteDesignAssignmentIfUnchanged(expected: Assignment, expectedOutcomeIds: Id[]): Promise<boolean>;
-  deleteDesignLessonIfUnchanged(expected: Lesson): Promise<boolean>;
-  deleteDesignModuleIfUnchanged(expected: Module): Promise<boolean>;
-  deleteDesignOutcomeIfUnused(id: Id, expectedText: string): Promise<boolean>;
+  deleteDesignBlockIfDraft(sessionId: Id, revision: Id, expected: Block, expectedOutcomeIds: Id[]): Promise<boolean>;
+  deleteDesignAssignmentIfUnchanged(sessionId: Id, revision: Id, expected: Assignment, expectedOutcomeIds: Id[]): Promise<boolean>;
+  deleteDesignLessonIfUnchanged(sessionId: Id, revision: Id, expected: Lesson): Promise<boolean>;
+  deleteDesignModuleIfUnchanged(sessionId: Id, revision: Id, expected: Module): Promise<boolean>;
+  deleteDesignOutcomeIfUnused(sessionId: Id, revision: Id, id: Id, expectedText: string): Promise<boolean>;
   /** Newest by createdAt, then id. */
   listDesignSessions(courseId: Id): Promise<DesignSession[]>;
   getInstructorProfile(userId: Id): Promise<InstructorProfile | null>;

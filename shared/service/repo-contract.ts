@@ -12,7 +12,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       const at = '2026-09-28T12:00:00Z';
       const session = { id: 'ds-cas', courseId: 'c-stat110', mode: 'syllabus', stage: 'preview', createdBy: 'u-okafor', createdAt: at, updatedAt: at,
         source: { kind: 'syllabus', fileId: null, version: null, name: 'Fictional', sections: [], chars: 0, ocr: false }, consent: { syllabusOnly: true, at, rememberProfile: false },
-        extraction: null, read: null, questions: [], confirmedOutcomes: null, teachingNote: '', options: null, selection: null, plan: null,
+        extraction: null, read: null, questions: [], confirmedOutcomes: null, teachingNote: '', options: null, selection: null, plan: { hash: 'contract-preview', modules: [{ key: 'module-key', position: 90, lessons: [], assignments: [], assignment: null }], outcomes: [] } as unknown as DesignSession['plan'],
         provisioning: null, created: { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] },
         record: { sessionId: 'ds-cas', source: { name: 'Fictional', kind: 'syllabus', chars: 0 }, extraction: null, read: null, questions: [], confirmedOutcomes: [], optionsShown: [], selection: null, plan: null, appliedAt: null, undoneAt: null, decisions: [] },
       } as DesignSession;
@@ -30,13 +30,14 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect((await repo.listOutcomes('c-stat110')).some(o => o.id === outcome.id)).toBe(true);
       expect(await repo.cancelDesignApply(session.id, 'rev-1', 'rev-2')).toBe(true);
       expect(await repo.putDesignModule(session.id, 'rev-1', 'late', { ...module, id: 'm-late' })).toBe(false);
-      expect(await repo.deleteDesignLessonIfUnchanged({ ...lesson, title: 'Stale title' })).toBe(false);
-      expect(await repo.deleteDesignLessonIfUnchanged(lesson)).toBe(true);
-      expect(await repo.deleteDesignModuleIfUnchanged((await repo.getModule(module.id))!)).toBe(true);
+      expect(await repo.deleteDesignLessonIfUnchanged(session.id, 'rev-1', lesson)).toBe(false);
+      expect(await repo.deleteDesignLessonIfUnchanged(session.id, 'rev-2', { ...lesson, title: 'Stale title' })).toBe(false);
+      expect(await repo.deleteDesignLessonIfUnchanged(session.id, 'rev-2', lesson)).toBe(true);
+      expect(await repo.deleteDesignModuleIfUnchanged(session.id, 'rev-2', (await repo.getModule(module.id))!)).toBe(true);
       await repo.setOutcomeLinks('block', 'b-s1-1', [outcome.id]);
-      expect(await repo.deleteDesignOutcomeIfUnused(outcome.id, outcome.text)).toBe(false);
+      expect(await repo.deleteDesignOutcomeIfUnused(session.id, 'rev-2', outcome.id, outcome.text)).toBe(false);
       await repo.setOutcomeLinks('block', 'b-s1-1', []);
-      expect(await repo.deleteDesignOutcomeIfUnused(outcome.id, outcome.text)).toBe(true);
+      expect(await repo.deleteDesignOutcomeIfUnused(session.id, 'rev-2', outcome.id, outcome.text)).toBe(true);
     });
     it('stores Night 4 design sessions and instructor profiles with copy isolation, ordering, and reset', async () => {
       const repo = await makeRepo();
@@ -52,7 +53,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect((await repo.getDesignSession('ds-b'))?.source.name).toBe('Fictional syllabus');
       await repo.putDesignSession({ ...(await repo.getDesignSession('ds-b'))!, stage: 'read', updatedAt: '2026-09-28T13:00:00Z' });
       expect((await repo.getDesignSession('ds-b'))?.stage).toBe('read');
-      const preview = { ...(await repo.getDesignSession('ds-b'))!, stage: 'preview' as const };
+      const preview = { ...(await repo.getDesignSession('ds-b'))!, stage: 'preview' as const, plan: { hash: 'contract-preview', modules: [], outcomes: [] } as unknown as DesignSession['plan'] };
       await repo.putDesignSession(preview);
       const claimed = { ...preview, stage: 'provisioning' as const };
       expect(await Promise.all([repo.claimDesignApply(claimed), repo.claimDesignApply(claimed)])).toEqual([true, false]);

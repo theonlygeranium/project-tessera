@@ -208,11 +208,15 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
     const oldOutcomes = await ctx.repo.listOutcomes(session.courseId);
     if (oldOutcomes.length + plan.outcomes.length > 30) fail('invalid', 'The course would exceed 30 outcomes.');
     const jobId = ctx.newId('gj'), revision = ctx.newId('rev');
-    const claimed: DesignSession = { ...session, applyRevision: revision, planIds: { modules: {}, lessons: {}, assignments: {}, outcomes: {} }, createdBlocks: {}, undoKept: [],
+    const claimed: DesignSession = { ...session, applyRevision: revision, legacyApply: false, outcomeCodeMap: {}, planIds: { modules: {}, lessons: {}, assignments: {}, outcomes: {} }, createdBlocks: {}, undoKept: [],
       created: { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] }, plan, stage: 'provisioning',
       provisioning: { jobId, done: 0, total: plan.counts.lessons, error: null, modules: plan.modules.map(module => ({ key: module.key, done: 0, total: module.lessons.length })) },
       record: { ...session.record, plan, appliedAt: ctx.now() }, updatedAt: ctx.now() };
-    if (!await ctx.repo.claimDesignApply(claimed)) return sessionFor(ctx, sessionId);
+    if (!await ctx.repo.claimDesignApply(claimed)) {
+      const latest = await sessionFor(ctx, sessionId);
+      if ((latest.stage === 'provisioning' || latest.stage === 'review') && latest.plan?.hash === hash) return latest;
+      fail('conflict', STALE);
+    }
     const outcomeIds = new Map<string, string>();
     try {
       for (const [index, item] of plan.outcomes.entries()) {
@@ -226,8 +230,9 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
         return await interruptedApply(ctx, sessionId);
       }
       const codeMap = Object.fromEntries(plan.outcomes.map((item, index) => [item.code, allocated[index].code]));
+      const outcomeIdsByCode = Object.fromEntries(allocated.map(item => [item.code, item.id]));
       const appliedPlan: ProvisionPlan = { ...plan, outcomes: plan.outcomes.map(o => ({ ...o, code: codeMap[o.code] })), modules: plan.modules.map(m => ({ ...m, outcomeCodes: m.outcomeCodes.map(c => codeMap[c] ?? c), assignments: m.assignments?.map(a => ({ ...a, outcomeCodes: a.outcomeCodes.map(c => codeMap[c] ?? c) })) ?? [], assignment: m.assignment ? { ...m.assignment, outcomeCodes: m.assignment.outcomeCodes.map(c => codeMap[c] ?? c) } : null })) };
-      if (!await ctx.repo.saveDesignAppliedPlan(session.id, revision, appliedPlan, codeMap)) return await interruptedApply(ctx, sessionId);
+      if (!await ctx.repo.saveDesignAppliedPlan(session.id, revision, appliedPlan, codeMap, outcomeIdsByCode)) return await interruptedApply(ctx, sessionId);
       const lessonMap = new Map<string, string>();
       for (const planned of appliedPlan.modules) {
         const id = ctx.newId('m');
@@ -247,7 +252,7 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
           if (!await ctx.repo.putDesignAssignment(session.id, revision, item.key, assignment, ids)) return await interruptedApply(ctx, sessionId);
         }
       }
-      if (!await ctx.repo.saveDesignAppliedPlan(session.id, revision, appliedPlan, codeMap)) return await interruptedApply(ctx, sessionId);
+      if (!await ctx.repo.saveDesignAppliedPlan(session.id, revision, appliedPlan, codeMap, outcomeIdsByCode)) return await interruptedApply(ctx, sessionId);
       const work = appliedPlan.modules.flatMap(m => m.lessons.map(l => ({ lessonId: lessonMap.get(l.key)!, type: 'text' as const })));
       const job: GenerationJob = { id: jobId, courseId: session.courseId, requestedBy: user(ctx).id, kind: 'scaffold', sessionId, state: 'running', done: 0, total: work.length, lessonIds: [], error: null, work, instruction: leastSureModuleKey ?? '', failures: [], createdAt: ctx.now(), updatedAt: ctx.now() };
       if (!await ctx.repo.startDesignJob(session.id, revision, job)) return await interruptedApply(ctx, sessionId);
@@ -264,17 +269,20 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
   undoProvisionPlan: async (ctx, { sessionId }) => {
     let session = await sessionFor(ctx, sessionId);
     if (session.stage === 'preview') { if (!await ctx.repo.revertDesignPreview(session.id)) fail('conflict', 'The plan changed while returning to approaches.'); return { session: await sessionFor(ctx, sessionId), kept: [] }; }
-    if (session.stage !== 'provisioning' && session.stage !== 'review') fail('invalid', 'There is no applied plan to undo.');
-    const undoRevision = ctx.newId('rev');
-    if (!session.applyRevision || !await ctx.repo.cancelDesignApply(session.id, session.applyRevision, undoRevision)) fail('conflict', 'The plan changed while undo was starting.');
-    session = await sessionFor(ctx, sessionId);
+    if (session.stage !== 'provisioning' && session.stage !== 'review' && session.stage !== 'undoing') fail('invalid', 'There is no applied plan to undo.');
+    let undoRevision = session.applyRevision!;
+    if (session.stage !== 'undoing') {
+      undoRevision = ctx.newId('rev');
+      if (!session.applyRevision || !await ctx.repo.cancelDesignApply(session.id, session.applyRevision, undoRevision)) fail('conflict', 'The plan changed while undo was starting.');
+      session = await sessionFor(ctx, sessionId);
+    }
     const kept: Awaited<ReturnType<Service['undoProvisionPlan']>>['kept'] = [];
     const planned = session.plan;
     for (const id of session.created.blockIds) {
       const b = await ctx.repo.getBlock(id);
       if (!b) continue;
-      const expected = session.createdBlocks?.[id] ?? (session.applyRevision === undoRevision && b.origin === 'ai' && b.aiState === 'draft' && b.previous === null && b.updatedAt === b.provenance?.generatedAt ? b : null);
-      if (!expected || !await ctx.repo.deleteDesignBlockIfDraft(expected, plannedLinks(session, 'block', id))) kept.push({ kind: 'block', id, title: b.type === 'document' ? b.title : b.type });
+      const expected = session.createdBlocks?.[id];
+      if (!expected || !await ctx.repo.deleteDesignBlockIfDraft(session.id, undoRevision, expected, plannedLinks(session, 'block', id))) kept.push({ kind: 'block', id, title: b.type === 'document' ? b.title : b.type });
     }
     const plannedAssignments = planned?.modules.flatMap(m => planAssignments(m).map(a => ({ assignment: a, module: m }))) ?? [];
     for (const [index, id] of session.created.assignmentIds.entries()) {
@@ -285,7 +293,7 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
       const expectedModuleId = entry ? session.created.moduleIds[planned!.modules.indexOf(entry.module)] : null;
       const expectedRubric = entry ? rubricFor(id, entry.module.objective, planned!.outcomes.filter(o => original!.outcomeCodes.includes(o.code)).map(o => o.text), original!.points) : [];
       const expectedTexts = entry ? tiltTexts(entry.module.objective, original!.title) : [];
-      if (a.status === 'draft' && original && a.moduleId === expectedModuleId && a.title === original.title && a.position === plannedAssignments.slice(0, index).filter(row => row.module === entry.module).length && a.points === original.points && a.dueAt === original.dueAt && a.submissionType === 'text' && JSON.stringify(a.rubric) === JSON.stringify(expectedRubric) && a.instructions.length === 3 && a.instructions.every((b, i) => b.type === 'text' && b.text === expectedTexts[i] && b.aiState === 'draft' && b.previous === null)) { if (!await ctx.repo.deleteDesignAssignmentIfUnchanged(a, plannedLinks(session, 'assignment', id))) kept.push({ kind: 'assignment', id, title: a.title }); }
+      if (!session.legacyApply && a.status === 'draft' && original && a.moduleId === expectedModuleId && a.title === original.title && a.position === plannedAssignments.slice(0, index).filter(row => row.module === entry.module).length && a.points === original.points && a.dueAt === original.dueAt && a.submissionType === 'text' && JSON.stringify(a.rubric) === JSON.stringify(expectedRubric) && a.instructions.length === 3 && a.instructions.every((b, i) => b.type === 'text' && b.text === expectedTexts[i] && b.aiState === 'draft' && b.previous === null)) { if (!await ctx.repo.deleteDesignAssignmentIfUnchanged(session.id, undoRevision, a, plannedLinks(session, 'assignment', id))) kept.push({ kind: 'assignment', id, title: a.title }); }
       else kept.push({ kind: 'assignment', id, title: a.title });
     }
     const plannedLessons = planned?.modules.flatMap(m => m.lessons.map((l, position) => ({ lesson: l, module: m, position }))) ?? [];
@@ -295,22 +303,22 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
       const entry = plannedLessons[index];
       const original = entry?.lesson;
       const expectedModuleId = entry ? session.created.moduleIds[planned!.modules.indexOf(entry.module)] : null;
-      if (l.status === 'draft' && original && l.moduleId === expectedModuleId && l.title === original.title && l.objective === original.objective && l.minutes === original.minutes && l.position === entry.position && !(await ctx.repo.listBlocks(id)).length && await ctx.repo.deleteDesignLessonIfUnchanged(l)) { /* removed */ }
+      if (l.status === 'draft' && original && l.moduleId === expectedModuleId && l.title === original.title && l.objective === original.objective && l.minutes === original.minutes && l.position === entry.position && !(await ctx.repo.listBlocks(id)).length && await ctx.repo.deleteDesignLessonIfUnchanged(session.id, undoRevision, l)) { /* removed */ }
       else kept.push({ kind: 'lesson', id, title: l.title });
     }
     for (const [index, id] of session.created.moduleIds.entries()) {
       const m = await ctx.repo.getModule(id);
       if (!m) continue;
       const original = planned?.modules[index];
-      if (original && m.title === original.title && m.position === original.position && m.objective === original.objective && (m.templateKey ?? null) === original.templateKey && !(await ctx.repo.listLessons({ moduleId: id })).length && !(await ctx.repo.listAssignments({ moduleId: id })).length && await ctx.repo.deleteDesignModuleIfUnchanged(m)) { /* removed */ }
+      if (original && m.title === original.title && m.position === original.position && m.objective === original.objective && (m.templateKey ?? null) === original.templateKey && !(await ctx.repo.listLessons({ moduleId: id })).length && !(await ctx.repo.listAssignments({ moduleId: id })).length && await ctx.repo.deleteDesignModuleIfUnchanged(session.id, undoRevision, m)) { /* removed */ }
       else kept.push({ kind: 'module', id, title: m.title });
     }
     for (const [index, id] of session.created.outcomeIds.entries()) {
       const outcome = await ctx.repo.listOutcomes(session.courseId).then(rows => rows.find(row => row.id === id));
-      if (outcome && !await ctx.repo.deleteDesignOutcomeIfUnused(id, planned?.outcomes[index]?.text ?? '')) kept.push({ kind: 'outcome', id, title: outcome.text });
+      if (outcome && (session.legacyApply || !await ctx.repo.deleteDesignOutcomeIfUnused(session.id, undoRevision, id, planned?.outcomes[index]?.text ?? ''))) kept.push({ kind: 'outcome', id, title: outcome.text });
     }
     session.record.undoneAt = ctx.now(); session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `Undid the provision plan; kept ${kept.length} edited or kept items.` });
-    session.undoKept = kept; session.selection = null; session.plan = null; session.provisioning = null; session.planIds = { modules: {}, lessons: {}, assignments: {}, outcomes: {} }; session.createdBlocks = {}; session.created = { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] }; session.stage = 'approaches'; session.updatedAt = ctx.now();
+    session.undoKept = kept; session.selection = null; session.plan = null; session.provisioning = null; session.planIds = { modules: {}, lessons: {}, assignments: {}, outcomes: {} }; session.createdBlocks = {}; session.created = { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] }; session.stage = 'approaches'; session.legacyApply = false; session.updatedAt = ctx.now();
     if (!await ctx.repo.finishDesignUndo(session.id, undoRevision, session)) fail('conflict', 'The plan changed while undo was finishing.');
     return { session, kept };
   },

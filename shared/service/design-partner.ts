@@ -14,7 +14,7 @@ import { normalizeExtraction } from './normalize-extraction';
 import { WORKFLOW_STALL_MS } from './generation';
 import { selectCandidates } from '../design/candidates';
 import { combinationNote, finalizeOptions, validateSuggestions } from '../design/options';
-import { advanceScaffoldJob } from './design-plan';
+import { advanceScaffoldJob, designPlan } from './design-plan';
 
 type Problem = SyllabusExtraction['problems'][number];
 const MAX_CHARS = 60_000;
@@ -277,7 +277,15 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
   },
   getDesignSession: async (ctx, { sessionId }) => {
     const session = await sessionFor(ctx, sessionId);
+    if (session.stage === 'undoing') {
+      await designPlan.undoProvisionPlan(ctx, { sessionId });
+      return sessionFor(ctx, sessionId);
+    }
     const jobId = session.provisioning?.jobId;
+    if (session.stage === 'provisioning' && session.legacyApply && jobId) {
+      await ctx.repo.stopLegacyDesignJob(session.id, jobId, 'This draft was created by an earlier version. Undo it and apply again.');
+      return sessionFor(ctx, sessionId);
+    }
     if ((session.stage !== 'start' && !(session.stage === 'approaches' && !session.options) && session.stage !== 'provisioning') || !jobId || (session.stage !== 'provisioning' && session.provisioning?.error)) return session;
     const job = await ctx.repo.getGenerationJob(jobId);
     if (!job || job.state !== 'running' || (job.kind !== 'extract' && job.kind !== 'scaffold')) return session;

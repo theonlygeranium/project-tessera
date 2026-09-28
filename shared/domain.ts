@@ -571,6 +571,8 @@ export interface DesignSession {
   created: { outcomeIds: Id[]; moduleIds: Id[]; lessonIds: Id[]; blockIds: Id[]; assignmentIds: Id[]; linkKeys: string[] };
   /** Changes on every apply and undo. In-flight work may only write for this revision. */
   applyRevision?: Id | null;
+  /** The applied session predates the revision and block snapshot ledger. */
+  legacyApply?: boolean;
   /** Stable plan keys, recorded with creation rather than recovered from titles or positions. */
   planIds?: { modules: Record<string, Id>; lessons: Record<string, Id>; assignments: Record<string, Id>; outcomes: Record<string, Id> };
   /** Original generated block rows, for exact conditional undo. */
