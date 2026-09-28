@@ -32,6 +32,12 @@ Branch `night3`, 2026-09-27. Preview: https://night3-project-tessera.jeff-f69.wo
 - Reviewed AI findings showed the reviewer's id (lane B gap): findings now store the reviewer's name.
 - Three accessibility-audit steps from the lanes were wrong (not the pages); fixed.
 
+## Integration review (Codex `gpt-6-astra`)
+
+12 findings, all reproduced and all fixed (by Codex Sol, verified by Claude): variants copying unkept AI blocks as human content; readiness checks counting unkept AI blocks; a Workflow takeover race that could overwrite a kept block; a roster race that could drop an enrollment; non-atomic certificate issuance and replacement; cross-environment Access writes; hard-coded colors on the verification page; partial resync hiding new master blocks; deleted assessments counting toward coverage; `updateModule` ignoring objectives; non-Latin-1 names breaking the PDF (now Noto Sans; scripts it can't draw get a clear message and Print or save as PDF); malformed verification codes crashing the Worker. After the fixes: typecheck clean, 388 tests, 208/208 accessibility, all journeys pass, preview deployed.
+
+Residual risk: Cloudflare's Access API has no compare-and-set, so two environments writing the group in the same instant can still, rarely, drop one email; the grant now verifies and retries, and an invitation that ends without access shows "Access pending" with Try again.
+
 ## Known limits
 
 - Required training assigned to staff appears in their list but can't be completed through the student lesson flow.
