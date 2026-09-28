@@ -17,6 +17,12 @@ import { AUTOMATIC_CHECKS, type CheckOutcome } from './checks';
 import type { CourseSnapshot } from './snapshot';
 
 type Stored = Pick<StoredReadinessItem, 'itemId' | 'finding' | 'attestation'>;
+/** The same draft visibility used for every automatic readiness check. */
+export function automaticCheck(snapshot: CourseSnapshot, check: keyof typeof AUTOMATIC_CHECKS): CheckOutcome {
+  if (check === 'ai-drafts-kept') return AUTOMATIC_CHECKS[check](snapshot);
+  const content: CourseSnapshot = { ...snapshot, blocks: Object.fromEntries(Object.entries(snapshot.blocks).map(([id, blocks]) => [id, blocks.filter(block => block.origin !== 'ai' || block.aiState === 'kept')])) };
+  return AUTOMATIC_CHECKS[check](content);
+}
 
 /** Whether a reviewer may record this attestation on this item. */
 export function canAttest(item: Pick<RubricItem, 'kind'>, status: Attestation['status']): boolean {
@@ -47,10 +53,9 @@ export function evaluateReadiness(
 ): ReadinessResult {
   const byItem = new Map(stored.map((s) => [s.itemId, s]));
   const cache = new Map<string, CheckOutcome>();
-  const contentSnapshot: CourseSnapshot = { ...snapshot, blocks: Object.fromEntries(Object.entries(snapshot.blocks).map(([lessonId, blocks]) => [lessonId, blocks.filter((block) => block.origin !== 'ai' || block.aiState === 'kept')])) };
   const run = (item: RubricItem): CheckOutcome | null => {
     if (item.kind !== 'automatic' || !item.check) return null;
-    if (!cache.has(item.check)) cache.set(item.check, AUTOMATIC_CHECKS[item.check](item.check === 'ai-drafts-kept' ? snapshot : contentSnapshot));
+    if (!cache.has(item.check)) cache.set(item.check, automaticCheck(snapshot, item.check));
     return cache.get(item.check)!;
   };
 

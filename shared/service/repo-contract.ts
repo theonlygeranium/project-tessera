@@ -7,6 +7,37 @@ import type { StoredReadinessItem } from '../repo';
 /** Shared behavioral contract for MemoryRepo and the Worker's D1Repo. */
 export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>) {
   describe(name, () => {
+    it('commits design creations and exact conditional undo under a session revision', async () => {
+      const repo = await makeRepo();
+      const at = '2026-09-28T12:00:00Z';
+      const session = { id: 'ds-cas', courseId: 'c-stat110', mode: 'syllabus', stage: 'preview', createdBy: 'u-okafor', createdAt: at, updatedAt: at,
+        source: { kind: 'syllabus', fileId: null, version: null, name: 'Fictional', sections: [], chars: 0, ocr: false }, consent: { syllabusOnly: true, at, rememberProfile: false },
+        extraction: null, read: null, questions: [], confirmedOutcomes: null, teachingNote: '', options: null, selection: null, plan: null,
+        provisioning: null, created: { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] },
+        record: { sessionId: 'ds-cas', source: { name: 'Fictional', kind: 'syllabus', chars: 0 }, extraction: null, read: null, questions: [], confirmedOutcomes: [], optionsShown: [], selection: null, plan: null, appliedAt: null, undoneAt: null, decisions: [] },
+      } as DesignSession;
+      await repo.putDesignSession(session);
+      const claimed = { ...session, stage: 'provisioning' as const, applyRevision: 'rev-1', planIds: { modules: {}, lessons: {}, assignments: {}, outcomes: {} }, createdBlocks: {}, provisioning: { jobId: 'job-cas', done: 0, total: 1, error: null } };
+      expect(await repo.claimDesignApply(claimed)).toBe(true);
+      const module = { id: 'm-cas', courseId: 'c-stat110', title: 'Draft', objective: 'Learn', templateKey: null, position: 90 };
+      expect(await repo.putDesignModule(session.id, 'wrong', 'module-key', module)).toBe(false);
+      expect(await repo.putDesignModule(session.id, 'rev-1', 'module-key', module)).toBe(true);
+      const lesson = { id: 'l-cas', courseId: 'c-stat110', moduleId: module.id, title: 'Draft lesson', objective: 'Learn', minutes: 30, position: 0, status: 'draft' as const, publishedAt: null, templateKey: null };
+      expect(await repo.putDesignLesson(session.id, 'rev-1', 'lesson-key', lesson)).toBe(true);
+      const outcome = { id: 'o-cas', courseId: 'c-stat110', code: 'O99', text: 'A new outcome', position: 99 };
+      expect(await repo.appendDesignOutcome(session.id, 'rev-1', outcome)).toBe(true);
+      expect((await repo.getDesignSession(session.id))?.planIds?.lessons['lesson-key']).toBe(lesson.id);
+      expect((await repo.listOutcomes('c-stat110')).some(o => o.id === outcome.id)).toBe(true);
+      expect(await repo.cancelDesignApply(session.id, 'rev-1', 'rev-2')).toBe(true);
+      expect(await repo.putDesignModule(session.id, 'rev-1', 'late', { ...module, id: 'm-late' })).toBe(false);
+      expect(await repo.deleteDesignLessonIfUnchanged({ ...lesson, title: 'Stale title' })).toBe(false);
+      expect(await repo.deleteDesignLessonIfUnchanged(lesson)).toBe(true);
+      expect(await repo.deleteDesignModuleIfUnchanged(module)).toBe(true);
+      await repo.setOutcomeLinks('block', 'b-s1-1', [outcome.id]);
+      expect(await repo.deleteDesignOutcomeIfUnused(outcome.id, outcome.text)).toBe(false);
+      await repo.setOutcomeLinks('block', 'b-s1-1', []);
+      expect(await repo.deleteDesignOutcomeIfUnused(outcome.id, outcome.text)).toBe(true);
+    });
     it('stores Night 4 design sessions and instructor profiles with copy isolation, ordering, and reset', async () => {
       const repo = await makeRepo();
       const at = '2026-09-28T12:00:00Z';

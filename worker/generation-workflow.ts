@@ -31,6 +31,15 @@ export class GenerationWorkflow extends WorkflowEntrypoint<Env, GenerationParams
       });
       if (state !== 'running') return state;
     }
+    await step.do('continue generation', async () => {
+      const env = this.env as Env;
+      const repo = new D1Repo(env.DB);
+      const job = await repo.getGenerationJob(jobId);
+      if (!job || job.state !== 'running' || job.runner !== 'workflow') return;
+      const user = await repo.getUser(job.requestedBy);
+      if (!user) return;
+      await serviceContextFor(env, repo, user).background?.startGeneration(jobId);
+    });
     return 'running';
   }
 }

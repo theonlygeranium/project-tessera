@@ -132,6 +132,24 @@ export interface Repo {
   putDesignSession(session: DesignSession): Promise<void>;
   /** Atomically claims a preview for one apply; false when another request claimed it. */
   claimDesignApply(session: DesignSession): Promise<boolean>;
+  /** Commit one created item and its ledger entry only while this apply revision is current. */
+  putDesignModule(sessionId: Id, revision: Id, key: string, module: Module): Promise<boolean>;
+  putDesignLesson(sessionId: Id, revision: Id, key: string, lesson: Lesson): Promise<boolean>;
+  putDesignAssignment(sessionId: Id, revision: Id, key: string, assignment: Assignment, outcomeIds: Id[]): Promise<boolean>;
+  appendDesignOutcome(sessionId: Id, revision: Id, outcome: Outcome): Promise<boolean>;
+  /** Changes the revision and stops the job in one operation. */
+  cancelDesignApply(sessionId: Id, revision: Id, nextRevision: Id): Promise<boolean>;
+  startDesignJob(sessionId: Id, revision: Id, job: GenerationJob): Promise<boolean>;
+  setDesignRunner(sessionId: Id, revision: Id, jobId: Id, runner: 'poll' | 'workflow'): Promise<boolean>;
+  setDesignApplyError(sessionId: Id, revision: Id, message: string): Promise<boolean>;
+  /** An owned, empty lesson gets blocks, links and progress in one operation. */
+  commitDesignScaffold(sessionId: Id, revision: Id, expectedJob: GenerationJob, nextJob: GenerationJob, lesson: Lesson | null, blocks: Block[], outcomeIds: Id[], nextSession: DesignSession): Promise<boolean>;
+  appendDesignAlternatives(sessionId: Id, revision: Id, lessonId: Id, blocks: Block[]): Promise<boolean>;
+  deleteDesignBlockIfDraft(expected: Block, expectedOutcomeIds: Id[]): Promise<boolean>;
+  deleteDesignAssignmentIfUnchanged(expected: Assignment, expectedOutcomeIds: Id[]): Promise<boolean>;
+  deleteDesignLessonIfUnchanged(expected: Lesson): Promise<boolean>;
+  deleteDesignModuleIfUnchanged(expected: Module): Promise<boolean>;
+  deleteDesignOutcomeIfUnused(id: Id, expectedText: string): Promise<boolean>;
   /** Newest by createdAt, then id. */
   listDesignSessions(courseId: Id): Promise<DesignSession[]>;
   getInstructorProfile(userId: Id): Promise<InstructorProfile | null>;

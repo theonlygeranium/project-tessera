@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fixtureAi } from '../ai';
-import { AUTOMATIC_CHECKS } from '../quality';
+import { automaticCheck } from '../quality/evaluate';
 import { seedData } from '../seed';
 import type { ServiceContext } from './context';
 import { courseSnapshot } from './readiness';
@@ -72,7 +72,7 @@ describe('syllabus provision plan', () => {
       expect(blocks.filter(b => b.type === 'text').every(b => b.type === 'text' && /\[Your\s+/.test(b.text))).toBe(true);
       expect(blocks.every(b => b.aiState === 'draft')).toBe(true);
     }
-    expect(plan.readinessForecast).toEqual(plan.readinessForecast.map(f => ({ ...f, expected: AUTOMATIC_CHECKS[f.check](snapshot).status === 'met' ? 'met' : 'not-met' })));
+    expect(plan.readinessForecast).toEqual(plan.readinessForecast.map(f => ({ ...f, expected: automaticCheck(snapshot, f.check).status === 'met' ? 'met' : 'not-met' })));
     const again = await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
     expect(again.created.moduleIds).toEqual(done.created.moduleIds);
   });
@@ -82,7 +82,7 @@ describe('syllabus provision plan', () => {
     await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
     await finish(ctx, sessionId);
     const snapshot = await courseSnapshot(ctx, 'c-plan-empty');
-    expect(plan.readinessForecast).toEqual(plan.readinessForecast.map(f => ({ ...f, expected: AUTOMATIC_CHECKS[f.check](snapshot).status === 'met' ? 'met' : 'not-met' })));
+    expect(plan.readinessForecast).toEqual(plan.readinessForecast.map(f => ({ ...f, expected: automaticCheck(snapshot, f.check).status === 'met' ? 'met' : 'not-met' })));
   });
   it('keeps the forecast in sync with teaching-presence and choice slots', async () => {
     const { ctx, sessionId } = await setup(true);
@@ -93,7 +93,44 @@ describe('syllabus provision plan', () => {
     await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
     await finish(ctx, sessionId);
     const snapshot = await courseSnapshot(ctx, 'c-plan-empty');
-    expect(plan.readinessForecast).toEqual(plan.readinessForecast.map(f => ({ ...f, expected: AUTOMATIC_CHECKS[f.check](snapshot).status === 'met' ? 'met' : 'not-met' })));
+    expect(plan.readinessForecast).toEqual(plan.readinessForecast.map(f => ({ ...f, expected: automaticCheck(snapshot, f.check).status === 'met' ? 'met' : 'not-met' })));
+  });
+  it('matches the real readiness service for draft-only navigation before and after scaffolding', async () => {
+    const { ctx, sessionId } = await setup(true);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    for (const stage of ['applied', 'scaffolded']) {
+      if (stage === 'scaffolded') await finish(ctx, sessionId);
+      const report = await service.getCourseReadiness(ctx, { courseId: 'c-plan-empty' });
+      const rubric = await service.getRubric(ctx, { rubricId: report.rubricId });
+      for (const check of ['navigation-instructions', 'instructor-contact'] as const) {
+        const itemId = rubric.standards.flatMap(s => s.items).find(i => i.check === check)!.id;
+        expect(plan.readinessForecast.find(f => f.check === check)?.expected).toBe(report.standards.flatMap(s => s.items).find(i => i.itemId === itemId)?.status);
+      }
+    }
+  });
+  it('repairs a model response to the promised single check and complete scaffold', async () => {
+    const { ctx, sessionId } = await setup();
+    const source = (await ctx.repo.getDesignSession(sessionId))!.source;
+    const check = { type: 'check' as const, question: 'What fits?', options: [{ id: 'a', text: 'Explain the topic.' }, { id: 'b', text: 'Skip it.' }, { id: 'c', text: 'Guess.' }], correctOptionId: 'a', feedbackCorrect: 'Yes.', feedbackIncorrect: 'Retry.' };
+    const result = scaffoldBlocks({ blocks: [{ type: 'heading', level: 2, text: 'Lesson' }, check, check] }, 'Explain the topic.', source);
+    expect(result.map(b => b.type)).toEqual(['heading', 'callout', 'text', 'check']);
+    expect(result.filter(b => b.type === 'check')).toHaveLength(1);
+    expect(result.find(b => b.type === 'text')).toMatchObject({ text: expect.stringContaining('[Your ') });
+  });
+  it('preserves explicit assessment points and computes the stated-total weight', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    session.extraction!.assessments = [{ id: 'project', title: 'Final project', weightPercent: null, dueAt: null, format: 'project', span: { page: 3, text: 'Final project: 200 points. Course total: 1000 points.' } }];
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const assignment = plan.modules.flatMap(m => m.assignments ?? []).find(a => a.replaces === 'Final project')!;
+    expect(assignment.points).toBe(200);
+    expect(assignment.weightPercent).toBe(20);
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const saved = (await ctx.repo.listAssignments({ courseId: 'c-stat110' })).find(a => a.title === 'Final project')!;
+    expect(saved.points).toBe(200);
+    expect(saved.rubric[0].levels[0].points).toBeGreaterThan(0);
   });
   it('undoes unedited drafts but preserves an edited block, lesson and module', async () => {
     const { ctx, sessionId } = await setup();
@@ -117,9 +154,9 @@ describe('syllabus provision plan', () => {
     const check = { type: 'check' as const, question: 'What should you do?', options: [{ id: 'a', text: 'Explain the topic.' }, { id: 'b', text: 'Guess.' }, { id: 'c', text: 'Skip it.' }], correctOptionId: 'a', feedbackCorrect: 'Yes.', feedbackIncorrect: 'Try again.' };
     const value = { blocks: [{ type: 'heading', level: 2, text: 'Opening' }, { type: 'text', text: 'A short starter.' }, { type: 'link', href: 'https://example.org/invented', text: 'Reading', description: '' }, check] };
     const repaired = scaffoldBlocks(value, 'Explain the topic.', source);
-    expect(repaired[1]).toMatchObject({ type: 'text', text: expect.stringContaining('[Your example from class]') });
-    expect(repaired[2]).toMatchObject({ type: 'callout', text: '[Reading to select]' });
-    expect(repaired[3]).toMatchObject({ type: 'check', question: expect.stringContaining('Explain the topic.') });
+    expect(repaired[2]).toMatchObject({ type: 'text', text: expect.stringContaining('[Your example from class]') });
+    expect(repaired[3]).toMatchObject({ type: 'callout', text: '[Reading to select]' });
+    expect(repaired[4]).toMatchObject({ type: 'check', question: expect.stringContaining('Explain the topic.') });
     expect(() => scaffoldBlocks({ blocks: value.blocks.map(x => x === check ? { ...check, options: [] } : x) }, 'Explain the topic.', source)).toThrow();
   });
   it('leaves a failed lesson empty and reports it in provisioning', async () => {
@@ -169,7 +206,15 @@ describe('syllabus provision plan', () => {
     await ctx.repo.putDesignSession(session);
     const plan = await service.previewProvisionPlan(ctx, { sessionId });
     expect(plan.modules.find(m => m.key === 'module-1')?.lessons.map(l => l.week)).toEqual([1, 2, 3]);
-    expect(plan.readings).toHaveLength(1);
+    expect(plan.readings.filter(r => r.moduleKey === 'module-1').map(r => r.week)).toEqual([1, 2, 3]);
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const done = await finish(ctx, sessionId);
+    for (const item of plan.modules.find(m => m.key === 'module-1')!.lessons) {
+      const id = done.planIds!.lessons[item.key];
+      const blocks = await ctx.repo.listBlocks(id);
+      expect(blocks.some(b => b.type === 'callout' && b.text.includes('Chapter 1'))).toBe(true);
+      expect(blocks.some(b => b.provenance?.sources.some(source => source.span?.page === 4))).toBe(true);
+    }
   });
   it('adds two draft alternative openings for the selected least-sure module', async () => {
     const { ctx, sessionId } = await setup();
@@ -183,7 +228,7 @@ describe('syllabus provision plan', () => {
     expect(alternatives).toHaveLength(2);
     expect(alternatives.every(b => b.aiState === 'draft' && done.created.blockIds.includes(b.id))).toBe(true);
     const snapshot = await courseSnapshot(ctx, 'c-stat110');
-    expect(plan.readinessForecast).toEqual(plan.readinessForecast.map(f => ({ ...f, expected: AUTOMATIC_CHECKS[f.check](snapshot).status === 'met' ? 'met' : 'not-met' })));
+    expect(plan.readinessForecast).toEqual(plan.readinessForecast.map(f => ({ ...f, expected: automaticCheck(snapshot, f.check).status === 'met' ? 'met' : 'not-met' })));
   });
   it('keeps a draft assignment when the instructor edits only its rubric', async () => {
     const { ctx, sessionId } = await setup();

@@ -1,4 +1,5 @@
 import type { DesignQuestion, ExtractionProblemCode, InstructorProfile, SourceSpan, SyllabusExtraction, InstructionalRead } from '../domain';
+import { explicitAssessmentPoints } from '../design/plan';
 
 type Problem = SyllabusExtraction['problems'][number];
 type TermInfo = { start: string; end: string; holidays: string[] } | undefined;
@@ -68,6 +69,10 @@ export function questionsFrom(problems: Problem[], extraction: SyllabusExtractio
   const rank: Record<ExtractionProblemCode, number> = { 'week-count-mismatch': 0, 'empty-week': 0, 'weights-not-100': 1, 'due-outside-term': 3, 'missing-field': 4, 'objective-no-verb': 5 };
   const questions: DesignQuestion[] = [];
   if (!extraction.outcomes.length) questions.push({ id: 'question-missing-outcomes', text: "Your syllabus doesn't list course outcomes. Should I suggest some from your schedule and assignments?", spans: [], kind: 'choice', options: [choice('suggest', 'Suggest outcomes'), choice('write', "I'll write them")], required: false, answer: null, fromProblem: null });
+  for (const assessment of extraction.assessments.filter(item => item.weightPercent === null && explicitAssessmentPoints(item.span) === null)) {
+    if (questions.length >= 5) break;
+    questions.push({ id: `question-assessment-points-${assessment.id}`, text: `How many points is ${assessment.title} worth?`, spans: assessment.span ? [assessment.span] : [], kind: 'number', options: [], required: false, answer: null, fromProblem: null });
+  }
   for (const [index, problem] of [...problems].sort((a, b) => rank[a.code] - rank[b.code]).entries()) {
     if (questions.length >= 5) break;
     let text = '', kind: DesignQuestion['kind'] = 'choice', options: DesignQuestion['options'] = [];

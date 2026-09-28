@@ -283,8 +283,10 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     if (!job || job.state !== 'running' || (job.kind !== 'extract' && job.kind !== 'scaffold')) return session;
     if (job.runner === 'workflow') {
       if (Date.parse(ctx.now()) - Date.parse(job.updatedAt) < WORKFLOW_STALL_MS) return session;
+      if (job.kind === 'scaffold') {
+        if (!session.applyRevision || !await ctx.repo.setDesignRunner(session.id, session.applyRevision, job.id, 'poll')) return sessionFor(ctx, sessionId);
+      } else await ctx.repo.putGenerationJob({ ...job, runner: 'poll' });
       job.runner = 'poll';
-      await ctx.repo.putGenerationJob(job);
     }
     await aiEnabled(ctx);
     if (job.kind === 'scaffold') await advanceScaffoldJob(ctx, job);

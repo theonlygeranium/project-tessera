@@ -1,12 +1,23 @@
 import type { Assignment, Block, DesignSession, InstructorProfile, Lesson, Module, Outcome, OutcomeLink, ProvisionPlan, SourceSpan, StructureOption } from '../domain';
 import type { CourseSnapshot } from '../quality';
 import { AUTOMATIC_CHECKS } from '../quality';
+import { automaticCheck } from '../quality/evaluate';
 import { stableHash } from '../hash';
 import { moduleScaffoldFixture } from '../ai';
 import { DEFAULT_AI_DISCLOSURE } from '../policy';
 
 type PlanModule = ProvisionPlan['modules'][number];
 type PlanAssignment = NonNullable<PlanModule['assignment']>;
+export function coveredWeeks(row: { week: number; dates: string }): number[] {
+  const range = /\bweeks?\s*(\d+)\s*[–—-]\s*(\d+)\b/i.exec(row.dates);
+  if (!range) return [row.week];
+  const first = Number(range[1]), last = Number(range[2]);
+  return last >= first && last - first < 53 ? Array.from({ length: last - first + 1 }, (_, i) => first + i) : [row.week];
+}
+export function explicitAssessmentPoints(span: SourceSpan | null): number | null {
+  const match = span?.text.match(/\b(\d+(?:\.\d+)?)\s*(?:points?|pts?)\b/i);
+  return match ? Number(match[1]) : null;
+}
 const words = (s: string) => new Set((s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(w => w.length > 2).map(w => w.replace(/(ing|edly|ed|es|s)$/u, '').replace(/e$/u, '')));
 export function titleOverlap(a: string, b: string): boolean {
   const aa = words(a), bb = words(b);
@@ -37,7 +48,7 @@ function assignmentWeek(session: DesignSession, title: string, dueAt: string | n
   return match?.week ?? Math.max(...modules.flatMap(m => m.lessons.map(l => l.week ?? 0)), 1);
 }
 function sourceSpans(session: DesignSession, module: PlanModule): SourceSpan[] {
-  return (session.extraction?.schedule ?? []).filter(row => row.span && module.lessons.some(lesson => lesson.week === row.week)).map(row => row.span!);
+  return (session.extraction?.schedule ?? []).filter(row => row.span && module.lessons.some(lesson => lesson.week !== null && coveredWeeks(row).includes(lesson.week))).map(row => row.span!);
 }
 export function previewProvisionPlan(session: DesignSession, snapshot: CourseSnapshot, instructorProfile: InstructorProfile | null = null): ProvisionPlan {
   if (!session.selection || !session.options || !session.confirmedOutcomes || !session.extraction) throw Error('Choose an approach and confirm outcomes first.');
@@ -54,11 +65,11 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
   const patternNote = selected.slice(1).map(option => patternNotes[option.id]).join(' ');
   const modules: PlanModule[] = spine.modules.map((item, index) => {
     const weeks = [...new Set(item.weeks)].sort((a, b) => a - b);
-    const rows = session.extraction!.schedule.filter(row => weeks.includes(row.week) && !row.empty);
+    const rows = session.extraction!.schedule.filter(row => weeks.some(week => coveredWeeks(row).includes(week)) && !row.empty);
     const lessonCount = Math.max(1, Math.round(item.lessons));
     const lessons = Array.from({ length: lessonCount }, (_, n) => {
       const week = weeks[Math.min(n, weeks.length - 1)] ?? rows[n]?.week ?? null;
-      const row = rows.find(candidate => candidate.week === week) ?? rows[Math.min(n, rows.length - 1)];
+      const row = rows.find(candidate => week !== null && coveredWeeks(candidate).includes(week)) ?? rows[Math.min(n, rows.length - 1)];
       const topic = row?.topic?.trim() || item.title;
       return { key: `module-${index + 1}/lesson-${n + 1}`, title: lessonCount === 1 ? topic : `${topic}${n >= rows.length ? ` · part ${n + 1}` : ''}`, objective: item.objective || session.confirmedOutcomes![0]?.text || topic, minutes: Math.max(1, Math.round(item.lessonMinutes)), week, skeleton, ...(patternNote ? { patternNote } : {}), resurface: session.selection!.overlays.includes('spaced-review'), announcementSlot: session.selection!.overlays.includes('teaching-presence') && (n === 0 || week !== weeks[Math.min(n - 1, weeks.length - 1)]), alternativeFormatSlot: session.selection!.overlays.includes('udl-choice') } as PlanModule['lessons'][number];
     });
@@ -88,7 +99,13 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
     if (!target) continue;
     const week = target.lessons.map(l => l.week ?? 0).find(w => w >= dueWeek && !breakWeeks.has(w)) ?? target.lessons.map(l => l.week ?? 0).find(w => !breakWeeks.has(w)) ?? instructional.flatMap(m => m.lessons.map(l => l.week ?? 0)).find(w => w > 0 && !breakWeeks.has(w)) ?? 0;
     const dueAt = week ? dueDate(session, week, usedDates) : null;
-    const assignment: PlanAssignment = { key: `${target.key}/assessment-${index + 1}`, title: item.title, points: Math.max(0, item.weightPercent ?? 0), dueAt, outcomeCodes: target.outcomeCodes, replaces: item.title };
+    const answered = session.questions.find(q => q.id === `question-assessment-points-${item.id}`)?.answer?.value;
+    const points = item.weightPercent ?? explicitAssessmentPoints(item.span) ?? (answered && Number(answered) > 0 ? Number(answered) : null);
+    if (points === null) throw Error(`Confirm the points for ${item.title} before applying this plan.`);
+    const statedTotal = item.span?.text.match(/\b(?:course|overall|grade)\s+total\s*:?\s*(\d+(?:\.\d+)?)\s*points?\b/i);
+    const total = statedTotal ? Number(statedTotal[1]) : null;
+    const weightPercent = item.weightPercent ?? (total && total > 0 ? Math.round(points / total * 10000) / 100 : null);
+    const assignment: PlanAssignment = { key: `${target.key}/assessment-${index + 1}`, title: item.title, points: Math.max(0, points), weightPercent, dueAt, outcomeCodes: target.outcomeCodes, replaces: item.title };
     target.assignments!.push(assignment);
     target.assignment ??= assignment;
   }
@@ -102,8 +119,8 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
     module.assignments!.push(practice);
     module.assignment = practice;
   }
-  const readings = modules.flatMap(m => sourceSpans(session, m).flatMap(span => session.extraction!.schedule.filter(row => row.span === span && row.reading.trim()).map(row => ({ title: row.reading.trim(), span, moduleKey: m.key }))));
-  const placeholders = modules.reduce((sum, m) => sum + m.lessons.filter(l => l.skeleton !== 'start-here' && !readings.some(r => r.moduleKey === m.key && session.extraction!.schedule.some(row => row.span === r.span && row.week === l.week))).length, 0);
+  const readings = modules.filter(m => m.key.startsWith('module-')).flatMap(m => session.extraction!.schedule.filter(row => row.span && row.reading.trim()).flatMap(row => m.lessons.filter(l => l.week !== null && coveredWeeks(row).includes(l.week)).map(l => ({ title: row.reading.trim(), span: row.span!, moduleKey: m.key, week: l.week }))));
+  const placeholders = modules.reduce((sum, m) => sum + m.lessons.filter(l => l.skeleton !== 'start-here' && !readings.some(r => r.moduleKey === m.key && r.week === l.week)).length, 0);
   const citedCount = (module: PlanModule) => new Set([
     ...sourceSpans(session, module),
     ...session.extraction!.assessments.filter(a => module.assignments?.some(item => item.replaces === a.title)).map(a => a.span).filter((span): span is SourceSpan => !!span),
@@ -137,7 +154,7 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
   for (const module of modules) for (const lesson of module.lessons) for (const block of planned.blocks[lesson.key] ?? []) {
     if (block.type === 'check' || block.type === 'scenario') planned.outcomeLinks.push(...module.outcomeCodes.map(code => ({ outcomeId: code, targetKind: 'block' as const, targetId: block.id })));
   }
-  const readinessForecast = (Object.keys(AUTOMATIC_CHECKS) as (keyof typeof AUTOMATIC_CHECKS)[]).map(check => ({ check, expected: AUTOMATIC_CHECKS[check](planned).status === 'met' ? 'met' as const : 'not-met' as const }));
+  const readinessForecast = (Object.keys(AUTOMATIC_CHECKS) as (keyof typeof AUTOMATIC_CHECKS)[]).map(check => ({ check, expected: automaticCheck(planned, check).status === 'met' ? 'met' as const : 'not-met' as const }));
   const plan = { sessionId: session.id, courseId: session.courseId, outcomes, modules, readings, placeholders, counts, summary, template: template ? { name: template.name, satisfied, missing } : null, readinessForecast };
   return { ...plan, hash: stableHash({ plan, instructorDisclosure: instructorProfile?.disclosureText ?? DEFAULT_AI_DISCLOSURE, existing: { course: snapshot.course, modules: snapshot.modules, lessons: snapshot.lessons, blocks: snapshot.blocks, assignments: snapshot.assignments, outcomes: snapshot.outcomes, links: snapshot.outcomeLinks, access: snapshot.access, template: snapshot.template?.updatedAt } }) };
 }

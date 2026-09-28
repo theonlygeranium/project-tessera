@@ -533,11 +533,11 @@ export interface ProvisionPlan {
   modules: { key: string; title: string; objective: string; position: number; outcomeCodes: string[]; templateKey: string | null;
     overlaps: { moduleId: Id; title: string } | null;
     lessons: { key: string; title: string; objective: string; minutes: number; week: number | null; skeleton: LessonSkeleton; patternNote?: string; resurface?: boolean; announcementSlot?: boolean; alternativeFormatSlot?: boolean }[];
-    assignment: { key: string; title: string; points: number; dueAt: string | null; outcomeCodes: string[]; replaces: string | null } | null;
+    assignment: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null } | null;
     /** Additional distinct graded components due in the same module. */
-    assignments?: { key: string; title: string; points: number; dueAt: string | null; outcomeCodes: string[]; replaces: string | null }[];
+    assignments?: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null }[];
     hours: number; leastSure: boolean }[];
-  readings: { title: string; span: SourceSpan; moduleKey: string }[];       // only readings with a span
+  readings: { title: string; span: SourceSpan; moduleKey: string; week?: number | null }[];       // only readings with a span
   placeholders: number;                                                     // "[Reading to select]" count
   counts: { modules: number; lessons: number; checks: number; assignments: number; outcomes: number; links: number };
   summary: string;                                                          // "Adds … Renames nothing. Removes nothing."
@@ -569,6 +569,13 @@ export interface DesignSession {
   plan: ProvisionPlan | null; provisioning: { jobId: Id | null; done: number; total: number; error: string | null; modules?: { key: string; done: number; total: number }[] } | null;
   /** Everything the plan created, for undo. */
   created: { outcomeIds: Id[]; moduleIds: Id[]; lessonIds: Id[]; blockIds: Id[]; assignmentIds: Id[]; linkKeys: string[] };
+  /** Changes on every apply and undo. In-flight work may only write for this revision. */
+  applyRevision?: Id | null;
+  /** Stable plan keys, recorded with creation rather than recovered from titles or positions. */
+  planIds?: { modules: Record<string, Id>; lessons: Record<string, Id>; assignments: Record<string, Id>; outcomes: Record<string, Id> };
+  /** Original generated block rows, for exact conditional undo. */
+  createdBlocks?: Record<Id, Block>;
+  undoKept?: { kind: 'block' | 'assignment' | 'lesson' | 'module' | 'outcome'; id: Id; title: string }[];
   record: DesignRecord;
 }
 

@@ -176,7 +176,7 @@ function createServiceContext(env: Env, repo: Repo, principal: Awaited<ReturnTyp
         : createAccessDirectory({ token: env.CF_ACCESS_API_TOKEN, accountId: env.CLOUDFLARE_ACCOUNT_ID, groupId: env.ACCESS_GROUP_ID })
       : null,
     background: env.GENERATION
-      ? { startGeneration: async (jobId) => { await env.GENERATION!.create({ id: jobId, params: { jobId } }); } }
+      ? { startGeneration: async (jobId) => { await env.GENERATION!.create({ id: `${jobId}-${crypto.randomUUID()}`, params: { jobId } }); } }
       : null,
   };
 }
