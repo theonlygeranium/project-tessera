@@ -201,7 +201,7 @@ const ANALYZE_PARTS = {
   audit: {
     schema: obj({ outcomeAudits: array(auditSchema) }),
     focus: `Return one audit per outcome, in order. For each outcome: its observable verb (or null), Bloom level, Fink category, whether it is measurable, and assessedBy: every graded assessment that gives evidence of the outcome, judged from the assessment titles and formats and from how the Source describes each assignment, project, exam or discussion. Most outcomes are assessed by at least one assessment; leave assessedBy empty only when nothing in the syllabus could show the outcome. fit is assessed by default; use verb-mismatch only when the assessment's format clearly can't show the outcome's level (for example a multiple-choice quiz for create or evaluate). suggestion is null (the service asks for rewrites separately).`,
-    maxTokens: 12000,
+    maxTokens: 20000,
   },
   review: {
     schema: obj({ summary: str, cites: array(span), learnerCenteredness: (analysisSchema.properties as Record<string, unknown>).learnerCenteredness, deficiencies: (analysisSchema.properties as Record<string, unknown>).deficiencies }),
