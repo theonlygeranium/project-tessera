@@ -73,7 +73,7 @@ export const builder: Pick<Service, 'listBuilderSessions' | 'createBuilderSessio
       await ctx.repo.putModule({ id: moduleId, courseId: c.id, title: item.module.title, position: modulePosition++ });
       for (const [position, itemLesson] of item.lessons.entries()) {
         const lessonId = ctx.newId('l'); lessonIds.push(lessonId);
-        await ctx.repo.putLesson({ id: lessonId, moduleId, courseId: c.id, title: itemLesson.spec.title, minutes: itemLesson.spec.minutes, position, status: 'draft', publishedAt: null });
+        await ctx.repo.putLesson({ id: lessonId, moduleId, courseId: c.id, title: itemLesson.spec.title, objective: itemLesson.spec.objective, minutes: itemLesson.spec.minutes, position, status: 'draft', publishedAt: null });
         const sourceRefs = session.sources.map(x => ({ id: x.id, name: x.name }));
         const summary = `Drafted from the course brief and ${sourceRefs.length} sources`;
         const blocks: Block[] = itemLesson.blocks.map((value, blockPosition) => ({ ...value, id: ctx.newId('b'), lessonId, position: blockPosition, origin: 'ai', aiState: 'draft', previous: null, provenance: provenance(ctx, itemLesson.model, 'lesson-draft', summary, sourceRefs), updatedAt: ctx.now() } as Block));

@@ -60,6 +60,8 @@ export interface AiPolicy {
   aiAuthoring: boolean;
   /** Tutor modes instructors may choose, by activity kind. */
   tutorModes: { graded: TutorMode[]; practice: TutorMode[] };
+  workloadRates?: WorkloadRates;
+  designPartner?: { enabled: boolean; allowedArchitectures: ArchitectureId[] | null };
 }
 
 /** Brand accents an institution can pick. Each maps to a contrast-checked token set. */
@@ -139,6 +141,8 @@ export interface Lesson {
   position: number;
   status: LessonStatus;
   publishedAt: Timestamp | null;
+  /** D-033: the intended outcome for this lesson. */
+  objective?: string | null;
   /** Night 3: the template item this lesson came from. */
   templateKey?: string | null;
   /**
@@ -167,11 +171,13 @@ export interface ModuleWithLessons extends Module {
 export interface CourseOutline {
   course: CourseSummary;
   modules: ModuleWithLessons[];
+  /** Staff only: the current syllabus design session. */
+  designSession?: { id: Id; stage: DesignStage } | null;
 }
 
 // ---- Blocks and AI provenance (D-003, D-006) --------------------------------------------
 
-export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback' | 'alt-text' | 'rewrite' | 'link-text' | 'element' | 'tutor' | 'tutor-summary' | 'agent' | 'readiness-item' | 'variant';
+export type AiTask = 'brief' | 'outline' | 'lesson-draft' | 'block-regenerate' | 'announcement' | 'feedback' | 'alt-text' | 'rewrite' | 'link-text' | 'element' | 'tutor' | 'tutor-summary' | 'agent' | 'readiness-item' | 'variant' | 'syllabus-extract' | 'syllabus-analyze' | 'structure-options' | 'module-scaffold' | 'objective-rewrite';
 
 /** Where AI output came from. Shown next to every AI block ("names what it is and its source"). */
 export interface Provenance {
@@ -179,7 +185,7 @@ export interface Provenance {
   model: string;
   task: AiTask;
   generatedAt: Timestamp;
-  sources: { id: Id; name: string }[];
+  sources: { id: Id; name: string; span?: SourceSpan }[];
   /** One line saying what was asked, shown in the block's source line. */
   summary: string;
 }
@@ -262,6 +268,8 @@ export interface LessonDetail {
   courseTitle: string;
   blocks: Block[];
   readiness: ReadinessReport;
+  /** Staff review guidance derived from the design plan. */
+  design?: { moduleWhy: { text: string; cites: SourceSpan[]; frameworks: string[] }; nextSteps: { text: string; action: 'choose-reading' | 'add-example' | 'move-lesson' | 'confirm-weight' | 'set-tutor' | null; target?: FixTarget }[] };
 }
 
 /** A published lesson as a student sees it. */
@@ -422,6 +430,149 @@ export interface BuilderSession {
   lessonIds: Id[];
   provenance: Provenance | null;
   createdAt: Timestamp;
+}
+
+// ---- Night 4 · Syllabus design partner (D-030 to D-036) ----
+export type FieldOrigin = 'extracted' | 'inferred' | 'user_supplied' | 'missing';
+export interface SourceSpan { page: number | null; text: string }            // page null for pasted text
+export interface Extracted<T> { value: T | null; origin: FieldOrigin; confidence: number; spans: SourceSpan[] }
+
+export type DesignSourceKind = 'syllabus' | 'brief';                           // D-035
+export interface DesignSource {
+  kind: DesignSourceKind;
+  fileId: Id | null;                      // FileRecord when uploaded or chosen; null when pasted
+  version: number | null;
+  name: string;
+  /** Section text with anchors; from checkDocument() for files, one section for a paste. */
+  sections: { page: number | null; heading: string; level: number; text: string; lines: string[] }[];
+  chars: number;
+  ocr: boolean;
+}
+
+export interface CourseProfile {
+  code: Extracted<string>; title: Extracted<string>; credits: Extracted<number>;
+  termWeeks: Extracted<number>; termStart: Extracted<string>; termEnd: Extracted<string>;   // ISO dates
+  meeting: Extracted<{ days: string[]; minutes: number }>;
+  modality: Extracted<'in-person' | 'online-async' | 'online-sync' | 'hybrid' | 'hyflex'>;
+  level: Extracted<string>; prerequisites: Extracted<string[]>; enrolment: Extracted<number>;
+  instructor: Extracted<{ name: string; email: string; officeHours: string }>;
+  description: Extracted<string>; materials: Extracted<{ title: string; kind: 'textbook' | 'reading' | 'tool'; span: SourceSpan }[]>;
+  /** Industry brief only (D-035). */
+  business: Extracted<{ goal: string; metric: string; audienceRole: string }>;
+  weeklyHoursBudget: number;              // computed: credits × 3 (34 CFR 600.2), or the brief's seat time
+}
+
+export interface ExtractedOutcome { id: string; text: string; span: SourceSpan | null; origin: FieldOrigin }
+export interface ExtractedAssessment { id: string; title: string; weightPercent: number | null; dueAt: string | null; format: string; span: SourceSpan | null }
+export interface ScheduleRow { week: number; dates: string; topic: string; reading: string; due: string; span: SourceSpan | null; empty: boolean }
+export interface PolicyItem { kind: 'attendance' | 'late-work' | 'integrity' | 'ai-use' | 'accommodations' | 'other'; text: string; span: SourceSpan }
+
+export interface SyllabusExtraction {
+  profile: CourseProfile; outcomes: ExtractedOutcome[]; assessments: ExtractedAssessment[];
+  schedule: ScheduleRow[]; policies: PolicyItem[];
+  /** Rule failures, each becoming a question (§6.2). */
+  problems: { code: ExtractionProblemCode; message: string; spans: SourceSpan[] }[];
+  provenance: Provenance;
+}
+export type ExtractionProblemCode = 'weights-not-100' | 'week-count-mismatch' | 'empty-week' | 'due-outside-term' | 'objective-no-verb' | 'missing-field';
+
+export type BloomLevel = 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
+export type FinkCategory = 'foundational' | 'application' | 'integration' | 'human' | 'caring' | 'learning-how';
+export interface OutcomeAudit {
+  outcomeId: string; measurable: boolean; verb: string | null; bloom: BloomLevel | null; fink: FinkCategory | null;
+  /** Industry: Mager parts present (D-035). */
+  mager: { performance: boolean; condition: boolean; criterion: boolean } | null;
+  assessedBy: { assessmentId: string; fit: 'assessed' | 'verb-mismatch' }[];
+  suggestion: { text: string; why: string } | null;   // labelled alternative; original text is never replaced
+}
+export interface WorkloadEstimate {
+  weeklyBudgetHours: number; averageHours: number;
+  weeks: { week: number; hours: number; overBudget: boolean; drivers: string[] }[];
+  rates: WorkloadRates; assumptions: string[];
+}
+export interface WorkloadRates { readingPagesPerHour: number; problemSetHours: number; writingHoursPerPage: number; projectHours: number; quizMinutes: number; discussionMinutes: number }
+export interface LearnerCenteredness {
+  palmer: { score: number; max: 46; band: 'content-focused' | 'transitional' | 'learning-focused'; components: { name: string; score: number; max: number; evidence: SourceSpan | null }[] };
+  cullenHarris: { community: number; powerAndControl: number; evaluation: number; evidence: { factor: string; quote: SourceSpan }[] };
+}
+export interface Deficiency { code: string; message: string; rubricRefs: { rubric: 'tessera' | 'oscqr' | 'qm'; item: string }[]; spans: SourceSpan[] }
+
+export interface InstructionalRead {
+  summary: string;                          // the .ai--note paragraph; must cite spans via `cites`
+  cites: SourceSpan[];
+  outcomeAudits: OutcomeAudit[];
+  alignment: { outcomeId: string; assessmentId: string; state: 'assessed' | 'verb-mismatch' | 'none' }[];
+  workload: WorkloadEstimate;
+  learnerCenteredness: LearnerCenteredness | null;   // null for industry briefs
+  deficiencies: Deficiency[];
+  provenance: Provenance;
+}
+
+export interface DesignQuestion {
+  id: string; text: string; spans: SourceSpan[]; kind: 'choice' | 'number' | 'text';
+  options: { id: string; text: string }[]; required: false;                   // every question is skippable
+  answer: { optionId: string | null; value: string | null; skipped: boolean } | null;
+  fromProblem: ExtractionProblemCode | null;
+}
+
+export type ArchitectureId = 'weekly' | 'thematic' | 'case' | 'project' | 'competency' | 'flipped' | 'scaffolded' | 'performance' | 'micro' | 'hyflex';
+export type OverlayId = 'bookends' | 'spaced-review' | 'udl-choice' | 'teaching-presence';
+export interface StructureOption {
+  id: ArchitectureId; label: string; tag: string;                             // "Closest to your syllabus"
+  description: string; fits: { text: string; span: SourceSpan | null }[]; changes: string; tradeoffs: string; evidence: string;
+  frameworks: string[];                                                       // "Tessera standard 2.2", "OSCQR 44", "backward design"
+  modules: { title: string; objective: string; outcomeIds: string[]; weeks: number[]; lessons: number; lessonMinutes: number; assessment: string; hours: number }[];
+  workload: { averageHours: number; peakHours: number; peakModule: number };
+}
+export interface ApproachSelection { optionIds: ArchitectureId[]; overlays: OverlayId[]; rationale: string; combinationNote: string | null }
+
+/** The change set (D-003, principle #11). Same discipline as TemplateChangeSet. */
+export interface ProvisionPlan {
+  sessionId: Id; courseId: Id;
+  outcomes: { code: string; text: string; source: 'confirmed' | 'rewritten' }[];
+  modules: { key: string; title: string; objective: string; position: number; outcomeCodes: string[]; templateKey: string | null;
+    overlaps: { moduleId: Id; title: string } | null;
+    lessons: { key: string; title: string; objective: string; minutes: number; week: number | null; skeleton: LessonSkeleton }[];
+    assignment: { key: string; title: string; points: number; dueAt: string | null; outcomeCodes: string[]; replaces: string | null } | null;
+    hours: number; leastSure: boolean }[];
+  readings: { title: string; span: SourceSpan; moduleKey: string }[];       // only readings with a span
+  placeholders: number;                                                     // "[Reading to select]" count
+  counts: { modules: number; lessons: number; checks: number; assignments: number; outcomes: number; links: number };
+  summary: string;                                                          // "Adds … Renames nothing. Removes nothing."
+  template: { name: string; satisfied: string[]; missing: string[] } | null;
+  readinessForecast: { check: AutomaticCheck; expected: 'met' | 'not-met' }[];
+  hash: string;
+}
+export type LessonSkeleton = 'gagne' | 'merrill' | 'case' | 'milestone' | 'start-here' | 'wrap-up';
+
+export interface DesignRecord {
+  sessionId: Id; source: Pick<DesignSource, 'name' | 'kind' | 'chars'>;
+  extraction: SyllabusExtraction | null; read: InstructionalRead | null; questions: DesignQuestion[];
+  confirmedOutcomes: { code: string; text: string; originalText: string }[];
+  optionsShown: StructureOption[]; selection: ApproachSelection | null;
+  plan: ProvisionPlan | null; appliedAt: Timestamp | null; undoneAt: Timestamp | null;
+  decisions: { at: Timestamp; who: Id; what: string }[];                     // per-item keep/revert etc. summarised
+}
+
+export type DesignStage = 'start' | 'read' | 'confirm' | 'approaches' | 'preview' | 'provisioning' | 'review';
+export interface DesignSession {
+  id: Id; courseId: Id; mode: 'syllabus'; stage: DesignStage; createdBy: Id; createdAt: Timestamp; updatedAt: Timestamp;
+  source: DesignSource; consent: { syllabusOnly: true; at: Timestamp; rememberProfile: boolean };
+  extraction: SyllabusExtraction | null; read: InstructionalRead | null; questions: DesignQuestion[];
+  confirmedOutcomes: { code: string; text: string; originalText: string }[] | null; teachingNote: string;
+  options: StructureOption[] | null; selection: ApproachSelection | null;
+  plan: ProvisionPlan | null; provisioning: { jobId: Id | null; done: number; total: number; error: string | null } | null;
+  /** Everything the plan created, for undo. */
+  created: { outcomeIds: Id[]; moduleIds: Id[]; lessonIds: Id[]; blockIds: Id[]; assignmentIds: Id[]; linkKeys: string[] };
+  record: DesignRecord;
+}
+
+/** D-033: persisted on the instructor, editable, visible. */
+export interface InstructorProfile {
+  userId: Id; teachingApproach: string; voice: string;
+  assessmentPreferences: { formativeEveryModule: boolean; prefers: ('project' | 'exam' | 'case' | 'discussion' | 'quiz')[] };
+  disclosureText: string;                   // the AI-use statement drafted into "Start here"
+  updatedAt: Timestamp;
 }
 
 // ---- Files and documents (D-019, D-022) -------------------------------------------------

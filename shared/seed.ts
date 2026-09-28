@@ -2,7 +2,7 @@
 // the D1 database (on first request, and on "Reset demo data"). Deterministic: no
 // random ids or clocks, so tests and screenshots are stable.
 import type {
-  Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Certificate, CompletionEvent, Course, CourseTemplate, FileRecord, Id, Institution, Invitation, Lesson, LessonProgress, ManagerConsent, Module, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, Submission, TestOut, Timestamp, TutorSetting, User,
+  Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Certificate, CompletionEvent, Course, CourseTemplate, FileRecord, Id, Institution, Invitation, Lesson, LessonProgress, ManagerConsent, Module, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, Submission, TestOut, Timestamp, TutorSetting, User, DesignSession, InstructorProfile,
 } from './domain';
 import type { FileVersion, GenerationJob, StoredFormat, StoredScan, StoredTutorSession, TestOutAttempt } from './repo';
 
@@ -24,6 +24,8 @@ export interface SeedData {
   progress: (LessonProgress & { userId: Id })[];
   adaptations: Adaptation[];
   builderSessions: BuilderSession[];
+  designSessions?: DesignSession[];
+  instructorProfiles?: InstructorProfile[];
   generationJobs: GenerationJob[];
   apiTokens: (ApiToken & { hash: string })[];
   invitations: Invitation[];

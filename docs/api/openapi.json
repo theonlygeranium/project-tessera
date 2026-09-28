@@ -11,6 +11,1606 @@
     }
   ],
   "paths": {
+    "/api/v1/courses/{courseId}/design": {
+      "post": {
+        "operationId": "createDesignSession",
+        "tags": [
+          "courses"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "ai:run",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceKind": {
+                    "$ref": "#/components/schemas/DesignSourceKind"
+                  },
+                  "fileId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "consent": {
+                    "type": "object",
+                    "properties": {
+                      "syllabusOnly": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "rememberProfile": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "syllabusOnly",
+                      "rememberProfile"
+                    ]
+                  }
+                },
+                "required": [
+                  "sourceKind",
+                  "consent"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listDesignSessions",
+        "tags": [
+          "courses"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DesignSession"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/design/{sessionId}": {
+      "get": {
+        "operationId": "getDesignSession",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/design/{sessionId}/answers": {
+      "patch": {
+        "operationId": "answerDesignQuestions",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "answers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "questionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "optionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "skipped": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "questionId",
+                        "skipped"
+                      ]
+                    }
+                  },
+                  "teachingNote": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "answers",
+                  "teachingNote"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/outcomes": {
+      "post": {
+        "operationId": "confirmOutcomes",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "ai:run",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "outcomes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "text": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "originalText": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "text",
+                        "originalText"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "outcomes"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/approach": {
+      "post": {
+        "operationId": "selectApproach",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "optionIds": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ArchitectureId"
+                    }
+                  },
+                  "overlays": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/OverlayId"
+                    }
+                  },
+                  "rationale": {
+                    "type": "string",
+                    "minLength": 12
+                  }
+                },
+                "required": [
+                  "optionIds",
+                  "overlays",
+                  "rationale"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/plan": {
+      "post": {
+        "operationId": "previewProvisionPlan",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvisionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/apply": {
+      "post": {
+        "operationId": "applyProvisionPlan",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "ai:run",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hash": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "leastSureModuleKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "hash"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/undo": {
+      "post": {
+        "operationId": "undoProvisionPlan",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "session": {
+                      "$ref": "#/components/schemas/DesignSession"
+                    },
+                    "kept": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "block",
+                              "lesson",
+                              "module",
+                              "assignment",
+                              "outcome"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "title"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "session",
+                    "kept"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/record": {
+      "get": {
+        "operationId": "exportDesignRecord",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "format": {
+                      "type": "string",
+                      "enum": [
+                        "json",
+                        "csv"
+                      ]
+                    },
+                    "content": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "format",
+                    "content"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/instructor-profile": {
+      "get": {
+        "operationId": "getInstructorProfile",
+        "tags": [
+          "session"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InstructorProfile"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateInstructorProfile",
+        "tags": [
+          "session"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstructorProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "teachingApproach": {
+                    "type": "string"
+                  },
+                  "voice": {
+                    "type": "string"
+                  },
+                  "assessmentPreferences": {
+                    "type": "object",
+                    "properties": {
+                      "formativeEveryModule": {
+                        "type": "boolean"
+                      },
+                      "prefers": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "project",
+                            "exam",
+                            "case",
+                            "discussion",
+                            "quiz"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "formativeEveryModule",
+                      "prefers"
+                    ]
+                  },
+                  "disclosureText": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "teachingApproach",
+                  "voice",
+                  "assessmentPreferences",
+                  "disclosureText"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/alternatives": {
+      "post": {
+        "operationId": "flagLessonAlternatives",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "ai:run",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lessonId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "lessonId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/session": {
       "get": {
         "operationId": "getSession",
@@ -18977,7 +20577,12 @@
               "tutor-summary",
               "agent",
               "readiness-item",
-              "variant"
+              "variant",
+              "syllabus-extract",
+              "syllabus-analyze",
+              "structure-options",
+              "module-scaffold",
+              "objective-rewrite"
             ]
           },
           "generatedAt": {
@@ -18996,6 +20601,9 @@
                 "name": {
                   "type": "string",
                   "minLength": 1
+                },
+                "span": {
+                  "$ref": "#/components/schemas/SourceSpan"
                 }
               },
               "required": [
@@ -19015,6 +20623,31 @@
           "generatedAt",
           "sources",
           "summary"
+        ],
+        "additionalProperties": false
+      },
+      "SourceSpan": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "page",
+          "text"
         ],
         "additionalProperties": false
       },
@@ -19045,6 +20678,35 @@
               "practice"
             ],
             "additionalProperties": false
+          },
+          "workloadRates": {
+            "$ref": "#/components/schemas/WorkloadRates"
+          },
+          "designPartner": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "allowedArchitectures": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/ArchitectureId"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "enabled",
+              "allowedArchitectures"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -19060,6 +20722,59 @@
           "hints",
           "explain",
           "open"
+        ]
+      },
+      "WorkloadRates": {
+        "type": "object",
+        "properties": {
+          "readingPagesPerHour": {
+            "type": "number",
+            "minimum": 0
+          },
+          "problemSetHours": {
+            "type": "number",
+            "minimum": 0
+          },
+          "writingHoursPerPage": {
+            "type": "number",
+            "minimum": 0
+          },
+          "projectHours": {
+            "type": "number",
+            "minimum": 0
+          },
+          "quizMinutes": {
+            "type": "number",
+            "minimum": 0
+          },
+          "discussionMinutes": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "readingPagesPerHour",
+          "problemSetHours",
+          "writingHoursPerPage",
+          "projectHours",
+          "quizMinutes",
+          "discussionMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "ArchitectureId": {
+        "type": "string",
+        "enum": [
+          "weekly",
+          "thematic",
+          "case",
+          "project",
+          "competency",
+          "flipped",
+          "scaffolded",
+          "performance",
+          "micro",
+          "hyflex"
         ]
       },
       "AlignableKind": {
@@ -19273,6 +20988,48 @@
           "grades:read",
           "grades:write",
           "ai:run"
+        ]
+      },
+      "ApproachSelection": {
+        "type": "object",
+        "properties": {
+          "optionIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchitectureId"
+            }
+          },
+          "overlays": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverlayId"
+            }
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "combinationNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "optionIds",
+          "overlays",
+          "rationale",
+          "combinationNote"
+        ],
+        "additionalProperties": false
+      },
+      "OverlayId": {
+        "type": "string",
+        "enum": [
+          "bookends",
+          "spaced-review",
+          "udl-choice",
+          "teaching-presence"
         ]
       },
       "Assignment": {
@@ -21915,6 +23672,17 @@
           }
         ]
       },
+      "BloomLevel": {
+        "type": "string",
+        "enum": [
+          "remember",
+          "understand",
+          "apply",
+          "analyze",
+          "evaluate",
+          "create"
+        ]
+      },
       "Brand": {
         "type": "object",
         "properties": {
@@ -22684,6 +24452,30 @@
             "items": {
               "$ref": "#/components/schemas/ModuleWithLessons"
             }
+          },
+          "designSession": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "stage": {
+                    "$ref": "#/components/schemas/DesignStage"
+                  }
+                },
+                "required": [
+                  "id",
+                  "stage"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -22947,6 +24739,12 @@
               }
             ]
           },
+          "objective": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "templateKey": {
             "type": [
               "string",
@@ -23028,6 +24826,613 @@
         "enum": [
           "plain",
           "micro"
+        ]
+      },
+      "DesignStage": {
+        "type": "string",
+        "enum": [
+          "start",
+          "read",
+          "confirm",
+          "approaches",
+          "preview",
+          "provisioning",
+          "review"
+        ]
+      },
+      "CourseProfile": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "title": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "credits": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "termWeeks": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "termStart": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "termEnd": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "meeting": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "days": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "minutes": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "days",
+                      "minutes"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "modality": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "in-person",
+                      "online-async",
+                      "online-sync",
+                      "hybrid",
+                      "hyflex"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "level": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "prerequisites": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "enrolment": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "instructor": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "officeHours": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "email",
+                      "officeHours"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "description": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "materials": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "textbook",
+                            "reading",
+                            "tool"
+                          ]
+                        },
+                        "span": {
+                          "$ref": "#/components/schemas/SourceSpan"
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "kind",
+                        "span"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "goal": {
+                        "type": "string"
+                      },
+                      "metric": {
+                        "type": "string"
+                      },
+                      "audienceRole": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "goal",
+                      "metric",
+                      "audienceRole"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "origin": {
+                "$ref": "#/components/schemas/FieldOrigin"
+              },
+              "confidence": {
+                "type": "number"
+              },
+              "spans": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                }
+              }
+            },
+            "required": [
+              "value",
+              "origin",
+              "confidence",
+              "spans"
+            ],
+            "additionalProperties": false
+          },
+          "weeklyHoursBudget": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "title",
+          "credits",
+          "termWeeks",
+          "termStart",
+          "termEnd",
+          "meeting",
+          "modality",
+          "level",
+          "prerequisites",
+          "enrolment",
+          "instructor",
+          "description",
+          "materials",
+          "business",
+          "weeklyHoursBudget"
+        ],
+        "additionalProperties": false
+      },
+      "FieldOrigin": {
+        "type": "string",
+        "enum": [
+          "extracted",
+          "inferred",
+          "user_supplied",
+          "missing"
         ]
       },
       "Course": {
@@ -23302,6 +25707,1797 @@
           "key",
           "label",
           "content"
+        ],
+        "additionalProperties": false
+      },
+      "Deficiency": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rubricRefs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rubric": {
+                  "type": "string",
+                  "enum": [
+                    "tessera",
+                    "oscqr",
+                    "qm"
+                  ]
+                },
+                "item": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "rubric",
+                "item"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "spans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceSpan"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "rubricRefs",
+          "spans"
+        ],
+        "additionalProperties": false
+      },
+      "DesignQuestion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "spans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceSpan"
+            }
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "choice",
+              "number",
+              "text"
+            ]
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": {
+            "type": "boolean",
+            "const": false
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "optionId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "value": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "skipped": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "optionId",
+                  "value",
+                  "skipped"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fromProblem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExtractionProblemCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "spans",
+          "kind",
+          "options",
+          "required",
+          "answer",
+          "fromProblem"
+        ],
+        "additionalProperties": false
+      },
+      "ExtractionProblemCode": {
+        "type": "string",
+        "enum": [
+          "weights-not-100",
+          "week-count-mismatch",
+          "empty-week",
+          "due-outside-term",
+          "objective-no-verb",
+          "missing-field"
+        ]
+      },
+      "DesignRecord": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "$ref": "#/components/schemas/DesignSourceKind"
+              },
+              "chars": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "name",
+              "kind",
+              "chars"
+            ],
+            "additionalProperties": false
+          },
+          "extraction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyllabusExtraction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "read": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstructionalRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesignQuestion"
+            }
+          },
+          "confirmedOutcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "originalText": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "text",
+                "originalText"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "optionsShown": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StructureOption"
+            }
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApproachSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProvisionPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appliedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "undoneAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "who": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "what": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "at",
+                "who",
+                "what"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "sessionId",
+          "source",
+          "extraction",
+          "read",
+          "questions",
+          "confirmedOutcomes",
+          "optionsShown",
+          "selection",
+          "plan",
+          "appliedAt",
+          "undoneAt",
+          "decisions"
+        ],
+        "additionalProperties": false
+      },
+      "DesignSourceKind": {
+        "type": "string",
+        "enum": [
+          "syllabus",
+          "brief"
+        ]
+      },
+      "SyllabusExtraction": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/CourseProfile"
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtractedOutcome"
+            }
+          },
+          "assessments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtractedAssessment"
+            }
+          },
+          "schedule": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScheduleRow"
+            }
+          },
+          "policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolicyItem"
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "$ref": "#/components/schemas/ExtractionProblemCode"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "spans": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceSpan"
+                  }
+                }
+              },
+              "required": [
+                "code",
+                "message",
+                "spans"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          }
+        },
+        "required": [
+          "profile",
+          "outcomes",
+          "assessments",
+          "schedule",
+          "policies",
+          "problems",
+          "provenance"
+        ],
+        "additionalProperties": false
+      },
+      "ExtractedOutcome": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "span": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceSpan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "origin": {
+            "$ref": "#/components/schemas/FieldOrigin"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "span",
+          "origin"
+        ],
+        "additionalProperties": false
+      },
+      "ExtractedAssessment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "weightPercent": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "dueAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "format": {
+            "type": "string"
+          },
+          "span": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceSpan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "weightPercent",
+          "dueAt",
+          "format",
+          "span"
+        ],
+        "additionalProperties": false
+      },
+      "ScheduleRow": {
+        "type": "object",
+        "properties": {
+          "week": {
+            "type": "number"
+          },
+          "dates": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "reading": {
+            "type": "string"
+          },
+          "due": {
+            "type": "string"
+          },
+          "span": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceSpan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "empty": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "week",
+          "dates",
+          "topic",
+          "reading",
+          "due",
+          "span",
+          "empty"
+        ],
+        "additionalProperties": false
+      },
+      "PolicyItem": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "attendance",
+              "late-work",
+              "integrity",
+              "ai-use",
+              "accommodations",
+              "other"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "span": {
+            "$ref": "#/components/schemas/SourceSpan"
+          }
+        },
+        "required": [
+          "kind",
+          "text",
+          "span"
+        ],
+        "additionalProperties": false
+      },
+      "InstructionalRead": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "cites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceSpan"
+            }
+          },
+          "outcomeAudits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutcomeAudit"
+            }
+          },
+          "alignment": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "outcomeId": {
+                  "type": "string"
+                },
+                "assessmentId": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "assessed",
+                    "verb-mismatch",
+                    "none"
+                  ]
+                }
+              },
+              "required": [
+                "outcomeId",
+                "assessmentId",
+                "state"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "workload": {
+            "$ref": "#/components/schemas/WorkloadEstimate"
+          },
+          "learnerCenteredness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LearnerCenteredness"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deficiencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Deficiency"
+            }
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          }
+        },
+        "required": [
+          "summary",
+          "cites",
+          "outcomeAudits",
+          "alignment",
+          "workload",
+          "learnerCenteredness",
+          "deficiencies",
+          "provenance"
+        ],
+        "additionalProperties": false
+      },
+      "OutcomeAudit": {
+        "type": "object",
+        "properties": {
+          "outcomeId": {
+            "type": "string"
+          },
+          "measurable": {
+            "type": "boolean"
+          },
+          "verb": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bloom": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BloomLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fink": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinkCategory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mager": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "performance": {
+                    "type": "boolean"
+                  },
+                  "condition": {
+                    "type": "boolean"
+                  },
+                  "criterion": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "performance",
+                  "condition",
+                  "criterion"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assessedBy": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "assessmentId": {
+                  "type": "string"
+                },
+                "fit": {
+                  "type": "string",
+                  "enum": [
+                    "assessed",
+                    "verb-mismatch"
+                  ]
+                }
+              },
+              "required": [
+                "assessmentId",
+                "fit"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "why": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text",
+                  "why"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "outcomeId",
+          "measurable",
+          "verb",
+          "bloom",
+          "fink",
+          "mager",
+          "assessedBy",
+          "suggestion"
+        ],
+        "additionalProperties": false
+      },
+      "FinkCategory": {
+        "type": "string",
+        "enum": [
+          "foundational",
+          "application",
+          "integration",
+          "human",
+          "caring",
+          "learning-how"
+        ]
+      },
+      "WorkloadEstimate": {
+        "type": "object",
+        "properties": {
+          "weeklyBudgetHours": {
+            "type": "number"
+          },
+          "averageHours": {
+            "type": "number"
+          },
+          "weeks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "week": {
+                  "type": "number"
+                },
+                "hours": {
+                  "type": "number"
+                },
+                "overBudget": {
+                  "type": "boolean"
+                },
+                "drivers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "week",
+                "hours",
+                "overBudget",
+                "drivers"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rates": {
+            "$ref": "#/components/schemas/WorkloadRates"
+          },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "weeklyBudgetHours",
+          "averageHours",
+          "weeks",
+          "rates",
+          "assumptions"
+        ],
+        "additionalProperties": false
+      },
+      "LearnerCenteredness": {
+        "type": "object",
+        "properties": {
+          "palmer": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number",
+                "const": 46
+              },
+              "band": {
+                "type": "string",
+                "enum": [
+                  "content-focused",
+                  "transitional",
+                  "learning-focused"
+                ]
+              },
+              "components": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "number"
+                    },
+                    "max": {
+                      "type": "number"
+                    },
+                    "evidence": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/SourceSpan"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "score",
+                    "max",
+                    "evidence"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "score",
+              "max",
+              "band",
+              "components"
+            ],
+            "additionalProperties": false
+          },
+          "cullenHarris": {
+            "type": "object",
+            "properties": {
+              "community": {
+                "type": "number"
+              },
+              "powerAndControl": {
+                "type": "number"
+              },
+              "evaluation": {
+                "type": "number"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "factor": {
+                      "type": "string"
+                    },
+                    "quote": {
+                      "$ref": "#/components/schemas/SourceSpan"
+                    }
+                  },
+                  "required": [
+                    "factor",
+                    "quote"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "community",
+              "powerAndControl",
+              "evaluation",
+              "evidence"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "palmer",
+          "cullenHarris"
+        ],
+        "additionalProperties": false
+      },
+      "StructureOption": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ArchitectureId"
+          },
+          "label": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "fits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "span": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SourceSpan"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "text",
+                "span"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "changes": {
+            "type": "string"
+          },
+          "tradeoffs": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "frameworks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "objective": {
+                  "type": "string"
+                },
+                "outcomeIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "weeks": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "lessons": {
+                  "type": "number"
+                },
+                "lessonMinutes": {
+                  "type": "number"
+                },
+                "assessment": {
+                  "type": "string"
+                },
+                "hours": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "title",
+                "objective",
+                "outcomeIds",
+                "weeks",
+                "lessons",
+                "lessonMinutes",
+                "assessment",
+                "hours"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "workload": {
+            "type": "object",
+            "properties": {
+              "averageHours": {
+                "type": "number"
+              },
+              "peakHours": {
+                "type": "number"
+              },
+              "peakModule": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "averageHours",
+              "peakHours",
+              "peakModule"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "tag",
+          "description",
+          "fits",
+          "changes",
+          "tradeoffs",
+          "evidence",
+          "frameworks",
+          "modules",
+          "workload"
+        ],
+        "additionalProperties": false
+      },
+      "ProvisionPlan": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "courseId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "confirmed",
+                    "rewritten"
+                  ]
+                }
+              },
+              "required": [
+                "code",
+                "text",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "objective": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "number"
+                },
+                "outcomeCodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "templateKey": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "overlaps": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "moduleId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "moduleId",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "lessons": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "objective": {
+                        "type": "string"
+                      },
+                      "minutes": {
+                        "type": "number"
+                      },
+                      "week": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "skeleton": {
+                        "$ref": "#/components/schemas/LessonSkeleton"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "title",
+                      "objective",
+                      "minutes",
+                      "week",
+                      "skeleton"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "assignment": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "points": {
+                          "type": "number"
+                        },
+                        "dueAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "outcomeCodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "replaces": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "title",
+                        "points",
+                        "dueAt",
+                        "outcomeCodes",
+                        "replaces"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "hours": {
+                  "type": "number"
+                },
+                "leastSure": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key",
+                "title",
+                "objective",
+                "position",
+                "outcomeCodes",
+                "templateKey",
+                "overlaps",
+                "lessons",
+                "assignment",
+                "hours",
+                "leastSure"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "readings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "span": {
+                  "$ref": "#/components/schemas/SourceSpan"
+                },
+                "moduleKey": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "span",
+                "moduleKey"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "placeholders": {
+            "type": "number"
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "modules": {
+                "type": "number"
+              },
+              "lessons": {
+                "type": "number"
+              },
+              "checks": {
+                "type": "number"
+              },
+              "assignments": {
+                "type": "number"
+              },
+              "outcomes": {
+                "type": "number"
+              },
+              "links": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "modules",
+              "lessons",
+              "checks",
+              "assignments",
+              "outcomes",
+              "links"
+            ],
+            "additionalProperties": false
+          },
+          "summary": {
+            "type": "string"
+          },
+          "template": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "satisfied": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "missing": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "satisfied",
+                  "missing"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "readinessForecast": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "check": {
+                  "$ref": "#/components/schemas/AutomaticCheck"
+                },
+                "expected": {
+                  "type": "string",
+                  "enum": [
+                    "met",
+                    "not-met"
+                  ]
+                }
+              },
+              "required": [
+                "check",
+                "expected"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "courseId",
+          "outcomes",
+          "modules",
+          "readings",
+          "placeholders",
+          "counts",
+          "summary",
+          "template",
+          "readinessForecast",
+          "hash"
+        ],
+        "additionalProperties": false
+      },
+      "LessonSkeleton": {
+        "type": "string",
+        "enum": [
+          "gagne",
+          "merrill",
+          "case",
+          "milestone",
+          "start-here",
+          "wrap-up"
+        ]
+      },
+      "DesignSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "courseId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mode": {
+            "type": "string",
+            "const": "syllabus"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/DesignStage"
+          },
+          "createdBy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "updatedAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "$ref": "#/components/schemas/DesignSource"
+          },
+          "consent": {
+            "type": "object",
+            "properties": {
+              "syllabusOnly": {
+                "type": "boolean",
+                "const": true
+              },
+              "at": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rememberProfile": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "syllabusOnly",
+              "at",
+              "rememberProfile"
+            ],
+            "additionalProperties": false
+          },
+          "extraction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyllabusExtraction"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "read": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InstructionalRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesignQuestion"
+            }
+          },
+          "confirmedOutcomes": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "originalText": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "text",
+                    "originalText"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "teachingNote": {
+            "type": "string"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/StructureOption"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApproachSelection"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProvisionPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provisioning": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "jobId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "done": {
+                    "type": "number"
+                  },
+                  "total": {
+                    "type": "number"
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "jobId",
+                  "done",
+                  "total",
+                  "error"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created": {
+            "type": "object",
+            "properties": {
+              "outcomeIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "moduleIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "lessonIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "blockIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "assignmentIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "linkKeys": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "outcomeIds",
+              "moduleIds",
+              "lessonIds",
+              "blockIds",
+              "assignmentIds",
+              "linkKeys"
+            ],
+            "additionalProperties": false
+          },
+          "record": {
+            "$ref": "#/components/schemas/DesignRecord"
+          }
+        },
+        "required": [
+          "id",
+          "courseId",
+          "mode",
+          "stage",
+          "createdBy",
+          "createdAt",
+          "updatedAt",
+          "source",
+          "consent",
+          "extraction",
+          "read",
+          "questions",
+          "confirmedOutcomes",
+          "teachingNote",
+          "options",
+          "selection",
+          "plan",
+          "provisioning",
+          "created",
+          "record"
+        ],
+        "additionalProperties": false
+      },
+      "DesignSource": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/DesignSourceKind"
+          },
+          "fileId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "heading": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "text": {
+                  "type": "string"
+                },
+                "lines": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "page",
+                "heading",
+                "level",
+                "text",
+                "lines"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "chars": {
+            "type": "number",
+            "minimum": 0
+          },
+          "ocr": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "fileId",
+          "version",
+          "name",
+          "sections",
+          "chars",
+          "ocr"
         ],
         "additionalProperties": false
       },
@@ -23991,6 +28187,63 @@
         ],
         "additionalProperties": false
       },
+      "InstructorProfile": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "teachingApproach": {
+            "type": "string"
+          },
+          "voice": {
+            "type": "string"
+          },
+          "assessmentPreferences": {
+            "type": "object",
+            "properties": {
+              "formativeEveryModule": {
+                "type": "boolean"
+              },
+              "prefers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "project",
+                    "exam",
+                    "case",
+                    "discussion",
+                    "quiz"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "formativeEveryModule",
+              "prefers"
+            ],
+            "additionalProperties": false
+          },
+          "disclosureText": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "userId",
+          "teachingApproach",
+          "voice",
+          "assessmentPreferences",
+          "disclosureText",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
       "Invitation": {
         "type": "object",
         "properties": {
@@ -24239,6 +28492,78 @@
           },
           "readiness": {
             "$ref": "#/components/schemas/ReadinessReport"
+          },
+          "design": {
+            "type": "object",
+            "properties": {
+              "moduleWhy": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "cites": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SourceSpan"
+                    }
+                  },
+                  "frameworks": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "text",
+                  "cites",
+                  "frameworks"
+                ],
+                "additionalProperties": false
+              },
+              "nextSteps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "choose-reading",
+                            "add-example",
+                            "move-lesson",
+                            "confirm-weight",
+                            "set-tutor"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "target": {
+                      "$ref": "#/components/schemas/FixTarget"
+                    }
+                  },
+                  "required": [
+                    "text",
+                    "action"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "moduleWhy",
+              "nextSteps"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -24295,6 +28620,12 @@
               {
                 "type": "null"
               }
+            ]
+          },
+          "objective": {
+            "type": [
+              "string",
+              "null"
             ]
           },
           "templateKey": {

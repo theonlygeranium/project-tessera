@@ -5,7 +5,7 @@
 // stable order: by `position` where the entity has one, otherwise as documented.
 import type {
   AccessibleFormat, AccessReport, ActivityKind, Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Invitation, Lesson, LessonProgress, Module, Role, Submission, Timestamp, TutorMessage, TutorMode, TutorSetting, User,
-  AiFinding, AlignableKind, Attestation, Certificate, CompletionEvent, CourseTemplate, ManagerConsent, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, TestOut,
+  AiFinding, AlignableKind, Attestation, Certificate, CompletionEvent, CourseTemplate, ManagerConsent, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, TestOut, DesignSession, InstructorProfile,
 } from './domain';
 import type { SeedData } from './seed';
 
@@ -19,6 +19,8 @@ export interface GenerationJob {
   createdAt: Timestamp; updatedAt: Timestamp;
   /** Night 3: who advances the job. Absent means 'poll' (each status poll advances it). */
   runner?: 'poll' | 'workflow';
+  kind?: 'generate' | 'extract' | 'scaffold';
+  sessionId?: Id | null;
 }
 
 export type StoredAnnouncement = Omit<Announcement, 'courseTitle' | 'authorName' | 'authorInitials' | 'read'>;
@@ -125,6 +127,13 @@ export interface Repo {
   /** Newest first. */
   listBuilderSessions(courseId: Id): Promise<BuilderSession[]>;
   putBuilderSession(session: BuilderSession): Promise<void>;
+
+  getDesignSession(id: Id): Promise<DesignSession | null>;
+  putDesignSession(session: DesignSession): Promise<void>;
+  /** Newest by createdAt, then id. */
+  listDesignSessions(courseId: Id): Promise<DesignSession[]>;
+  getInstructorProfile(userId: Id): Promise<InstructorProfile | null>;
+  putInstructorProfile(profile: InstructorProfile): Promise<void>;
 
   getGenerationJob(id: Id): Promise<GenerationJob | null>;
   putGenerationJob(job: GenerationJob): Promise<void>;

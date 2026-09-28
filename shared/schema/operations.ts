@@ -15,6 +15,19 @@ const rubricInput=z.object({name:required,version:required.optional(),attributio
 const rubricRef={courseId:id,itemId:id,rubricId:id.optional()};
 const activity=z.object({activityKind:z.enum(['lesson','assignment']),activityId:id});
 export const OPERATIONS: { [K in Operation]: { input: z.ZodType<Input<K>>; output: z.ZodType<Output<K>> } } = {
+ createDesignSession:{input:z.object({courseId:id,sourceKind:S.DesignSourceKindSchema,fileId:id.optional(),text:required.optional(),name:string.optional(),consent:z.object({syllabusOnly:z.literal(true),rememberProfile:z.boolean()})}).superRefine((v,ctx)=>{if (Boolean(v.fileId) === Boolean(v.text)) ctx.addIssue({code:'custom',path:['sourceKind'],message:'Provide exactly one of fileId or text.'});}),output:S.DesignSessionSchema},
+ listDesignSessions:{input:by('courseId'),output:z.array(S.DesignSessionSchema)},
+ getDesignSession:{input:by('sessionId'),output:S.DesignSessionSchema},
+ answerDesignQuestions:{input:z.object({sessionId:id,answers:z.array(z.object({questionId:id,optionId:id.optional(),value:string.optional(),skipped:z.boolean()})),teachingNote:string}),output:S.DesignSessionSchema},
+ confirmOutcomes:{input:z.object({sessionId:id,outcomes:z.array(z.object({code:required,text:required,originalText:required}))}),output:S.DesignSessionSchema},
+ selectApproach:{input:z.object({sessionId:id,optionIds:z.array(S.ArchitectureIdSchema).min(1).refine(v=>new Set(v).size===v.length,'Choose each approach once.'),overlays:z.array(S.OverlayIdSchema).refine(v=>new Set(v).size===v.length,'Choose each overlay once.'),rationale:required.min(12)}),output:S.DesignSessionSchema},
+ previewProvisionPlan:{input:by('sessionId'),output:S.ProvisionPlanSchema},
+ applyProvisionPlan:{input:z.object({sessionId:id,hash:required,leastSureModuleKey:required.optional()}),output:S.DesignSessionSchema},
+ undoProvisionPlan:{input:by('sessionId'),output:z.object({session:S.DesignSessionSchema,kept:z.array(z.object({kind:z.enum(['block','lesson','module','assignment','outcome']),id,title:string}))})},
+ exportDesignRecord:{input:z.object({sessionId:id,format:z.enum(['json','csv'])}),output:z.object({format:z.enum(['json','csv']),content:string})},
+ getInstructorProfile:{input:z.void(),output:S.InstructorProfileSchema.nullable()},
+ updateInstructorProfile:{input:S.InstructorProfileSchema.omit({userId:true,updatedAt:true}),output:S.InstructorProfileSchema},
+ flagLessonAlternatives:{input:z.object({sessionId:id,lessonId:id}),output:S.LessonDetailSchema},
  getSession:{input:z.void(),output:z.object({user:S.UserSchema.nullable(),institution:S.InstitutionSchema})},
  signIn:{input:by('userId'),output:z.object({user:S.UserSchema.nullable(),institution:S.InstitutionSchema})},
  signOut:{input:z.void(),output:ok},listDemoUsers:{input:z.void(),output:z.array(S.UserSchema)},resetDemo:{input:z.void(),output:ok},

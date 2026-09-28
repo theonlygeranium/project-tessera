@@ -1,12 +1,66 @@
 import { describe, expect, it } from 'vitest';
 import type { Repo } from '../repo';
 import { seedData } from '../seed';
-import type { Certificate, CourseTemplate, Program, Requirement, Rubric } from '../domain';
+import type { Certificate, CourseTemplate, Program, Requirement, Rubric, DesignSession, InstructorProfile } from '../domain';
 import type { StoredReadinessItem } from '../repo';
 
 /** Shared behavioral contract for MemoryRepo and the Worker's D1Repo. */
 export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>) {
   describe(name, () => {
+    it('stores Night 4 design sessions and instructor profiles with copy isolation, ordering, and reset', async () => {
+      const repo = await makeRepo();
+      const at = '2026-09-28T12:00:00Z';
+      const source = { kind: 'syllabus' as const, fileId: null, version: null, name: 'Fictional syllabus', sections: [{ page: null, heading: '', level: 0, text: 'Sample', lines: ['Sample'] }], chars: 6, ocr: false };
+      const record = { sessionId: 'ds-b', source: { name: source.name, kind: source.kind, chars: source.chars }, extraction: null, read: null, questions: [], confirmedOutcomes: [], optionsShown: [], selection: null, plan: null, appliedAt: null, undoneAt: null, decisions: [] };
+      const session: DesignSession = { id: 'ds-b', courseId: 'c-stat110', mode: 'syllabus', stage: 'start', createdBy: 'u-okafor', createdAt: at, updatedAt: at, source, consent: { syllabusOnly: true, at, rememberProfile: false }, extraction: null, read: null, questions: [], confirmedOutcomes: null, teachingNote: '', options: null, selection: null, plan: null, provisioning: null, created: { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] }, record };
+      const profile: InstructorProfile = { userId: 'u-okafor', teachingApproach: 'Practice first', voice: 'Direct', assessmentPreferences: { formativeEveryModule: true, prefers: ['case'] }, disclosureText: 'Drafted from the syllabus and reviewed.', updatedAt: at };
+      expect(await repo.getDesignSession(session.id)).toBeNull();
+      expect(await repo.getInstructorProfile(profile.userId)).toBeNull();
+      await repo.putDesignSession(session);
+      session.source.name = 'Mutated';
+      expect((await repo.getDesignSession('ds-b'))?.source.name).toBe('Fictional syllabus');
+      await repo.putDesignSession({ ...(await repo.getDesignSession('ds-b'))!, stage: 'read', updatedAt: '2026-09-28T13:00:00Z' });
+      expect((await repo.getDesignSession('ds-b'))?.stage).toBe('read');
+      (await repo.getDesignSession('ds-b'))!.created.moduleIds.push('local');
+      expect((await repo.getDesignSession('ds-b'))?.created.moduleIds).toEqual([]);
+      const base = (await repo.getDesignSession('ds-b'))!;
+      await repo.putDesignSession({ ...base, id: 'ds-a', record: { ...base.record, sessionId: 'ds-a' } });
+      await repo.putDesignSession({ ...base, id: 'ds-c', createdAt: '2026-09-29T12:00:00Z', record: { ...base.record, sessionId: 'ds-c' } });
+      expect((await repo.listDesignSessions('c-stat110')).map(x => x.id)).toEqual(['ds-c', 'ds-a', 'ds-b']);
+      expect(await repo.listDesignSessions('c-comm120')).toEqual([]);
+      (await repo.listDesignSessions('c-stat110'))[0].record.decisions.push({ at, who: 'u-okafor', what: 'local' });
+      expect((await repo.getDesignSession('ds-c'))?.record.decisions).toEqual([]);
+      await repo.putInstructorProfile(profile);
+      profile.assessmentPreferences.prefers.push('quiz');
+      expect((await repo.getInstructorProfile(profile.userId))?.assessmentPreferences.prefers).toEqual(['case']);
+      (await repo.getInstructorProfile(profile.userId))!.voice = 'Changed locally';
+      expect((await repo.getInstructorProfile(profile.userId))?.voice).toBe('Direct');
+      await repo.putInstructorProfile({ ...profile, voice: 'Warm' });
+      expect((await repo.getInstructorProfile(profile.userId))?.voice).toBe('Warm');
+      const seeded = seedData(); seeded.designSessions = [base]; seeded.instructorProfiles = [{ ...profile, assessmentPreferences: { formativeEveryModule: true, prefers: ['case'] } }];
+      await repo.reset(seeded);
+      expect(await repo.getDesignSession('ds-b')).toEqual(base);
+      expect(await repo.getInstructorProfile(profile.userId)).toEqual(seeded.instructorProfiles[0]);
+      await repo.reset(seedData());
+      expect(await repo.listDesignSessions('c-stat110')).toEqual([]);
+      expect(await repo.getInstructorProfile(profile.userId)).toBeNull();
+    });
+    it('persists lesson objectives and generation kinds while omitting null/default fields', async () => {
+      const repo = await makeRepo();
+      const lesson = (await repo.getLesson('l-stat-1'))!;
+      await repo.putLesson({ ...lesson, objective: 'Interpret data.' });
+      expect((await repo.getLesson(lesson.id))?.objective).toBe('Interpret data.');
+      await repo.putLesson({ ...lesson, objective: null });
+      expect(await repo.getLesson(lesson.id)).not.toHaveProperty('objective');
+      const at = '2026-09-28T12:00:00Z';
+      const job = { id: 'gj-design', courseId: 'c-stat110', requestedBy: 'u-okafor', state: 'running' as const, done: 0, total: 1, lessonIds: [], error: null, work: [], instruction: '', failures: [], createdAt: at, updatedAt: at, kind: 'extract' as const, sessionId: 'ds-b' };
+      await repo.putGenerationJob(job);
+      expect(await repo.getGenerationJob(job.id)).toEqual(job);
+      await repo.putGenerationJob({ ...job, kind: 'generate', sessionId: null });
+      const stored = await repo.getGenerationJob(job.id);
+      expect(stored).not.toHaveProperty('kind');
+      expect(stored).not.toHaveProperty('sessionId');
+    });
     it('round trips entities and isolates both reads and writes', async () => {
       const repo = await makeRepo();
       const institution = await repo.getInstitution(); institution.name = 'Changed'; await repo.putInstitution(institution);

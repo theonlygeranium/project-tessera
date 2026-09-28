@@ -21,6 +21,7 @@ import type {
   MyVisibility, Outcome, PageTranscription, OutcomeLink, Program, ReadinessPolicy, ReadinessResult, RequiredTraining, Requirement,
   RequirementAudience, Rubric, RubricCheckKind, AutomaticCheck, StudentTestOut, TemplateChangeSet, TemplateModule,
   TestOut, LessonVariant, ReportingLine, TrainingStatus, VariantAudience, VariantDiff,
+  DesignSourceKind, DesignSession, ProvisionPlan, InstructorProfile, ArchitectureId, OverlayId,
 } from './domain';
 
 /** Every API route lives under this prefix (D-020). `/api` without a version is an alias during Night 2. */
@@ -42,6 +43,21 @@ export type Ok = { ok: true };
 
 /** Every operation: its input and output. */
 export interface ApiSpec {
+  // ---- Night 4 · Syllabus design partner (D-030 to D-036) ----
+  createDesignSession: { input: { courseId: Id; sourceKind: DesignSourceKind; fileId?: Id; text?: string; name?: string; consent: { syllabusOnly: true; rememberProfile: boolean } }; output: DesignSession };
+  listDesignSessions: { input: { courseId: Id }; output: DesignSession[] };
+  getDesignSession: { input: { sessionId: Id }; output: DesignSession };
+  answerDesignQuestions: { input: { sessionId: Id; answers: { questionId: Id; optionId?: Id; value?: string; skipped: boolean }[]; teachingNote: string }; output: DesignSession };
+  confirmOutcomes: { input: { sessionId: Id; outcomes: { code: string; text: string; originalText: string }[] }; output: DesignSession };
+  selectApproach: { input: { sessionId: Id; optionIds: ArchitectureId[]; overlays: OverlayId[]; rationale: string }; output: DesignSession };
+  previewProvisionPlan: { input: { sessionId: Id }; output: ProvisionPlan };
+  applyProvisionPlan: { input: { sessionId: Id; hash: string; leastSureModuleKey?: string }; output: DesignSession };
+  undoProvisionPlan: { input: { sessionId: Id }; output: { session: DesignSession; kept: { kind: 'block' | 'lesson' | 'module' | 'assignment' | 'outcome'; id: Id; title: string }[] } };
+  exportDesignRecord: { input: { sessionId: Id; format: 'json' | 'csv' }; output: { format: 'json' | 'csv'; content: string } };
+  getInstructorProfile: { input: void; output: InstructorProfile | null };
+  updateInstructorProfile: { input: Omit<InstructorProfile, 'userId' | 'updatedAt'>; output: InstructorProfile };
+  flagLessonAlternatives: { input: { sessionId: Id; lessonId: Id }; output: LessonDetail };
+
   // Session and demo sign-in (D-014: a persona picker behind Cloudflare Access)
   getSession: { input: void; output: SessionInfo };
   signIn: { input: { userId: Id }; output: SessionInfo };
@@ -368,6 +384,19 @@ const STUDENT: Role[] = ['student'];
 
 /** Permissions as data (D-011 foundations): the Worker and the mock adapter both enforce this table. */
 export const ROUTES: { [K in Operation]: Route } = {
+  createDesignSession: { method: 'POST', path: '/courses/:courseId/design', access: INSTRUCTOR, scope: 'ai:run' },
+  listDesignSessions: { method: 'GET', path: '/courses/:courseId/design', access: INSTRUCTOR, scope: 'content:read' },
+  getDesignSession: { method: 'GET', path: '/design/:sessionId', access: INSTRUCTOR, scope: 'content:read' },
+  answerDesignQuestions: { method: 'PATCH', path: '/design/:sessionId/answers', access: INSTRUCTOR, scope: 'content:write' },
+  confirmOutcomes: { method: 'POST', path: '/design/:sessionId/outcomes', access: INSTRUCTOR, scope: 'ai:run' },
+  selectApproach: { method: 'POST', path: '/design/:sessionId/approach', access: INSTRUCTOR, scope: 'content:write' },
+  previewProvisionPlan: { method: 'POST', path: '/design/:sessionId/plan', access: INSTRUCTOR, scope: 'content:read' },
+  applyProvisionPlan: { method: 'POST', path: '/design/:sessionId/apply', access: INSTRUCTOR, scope: 'ai:run' },
+  undoProvisionPlan: { method: 'POST', path: '/design/:sessionId/undo', access: INSTRUCTOR, scope: 'content:write' },
+  exportDesignRecord: { method: 'GET', path: '/design/:sessionId/record', access: INSTRUCTOR, scope: 'content:read' },
+  getInstructorProfile: { method: 'GET', path: '/me/instructor-profile', access: INSTRUCTOR, scope: 'content:read' },
+  updateInstructorProfile: { method: 'PUT', path: '/me/instructor-profile', access: INSTRUCTOR, scope: 'content:write' },
+  flagLessonAlternatives: { method: 'POST', path: '/design/:sessionId/alternatives', access: INSTRUCTOR, scope: 'ai:run' },
   getSession: { method: 'GET', path: '/session', access: 'public', scope: null },
   signIn: { method: 'POST', path: '/session', access: 'public', scope: null, browserOnly: true },
   signOut: { method: 'DELETE', path: '/session', access: 'public', scope: null, browserOnly: true },

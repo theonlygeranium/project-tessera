@@ -2,7 +2,7 @@
 // `put*` upserts. replaceBlocks, setEnrollments, deleteLesson, and reset each run
 // in one batch so a failure leaves the previous rows in place.
 import type {
-  AccessibleFormat, ActivityKind, Adaptation, AlignableKind, ApiToken, Assignment, Block, BlockContent, BuilderSession, Certificate, CompletionEvent, Course, CourseTemplate, FileRecord, Id, Institution, Invitation, Lesson, ManagerConsent, Module, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Role, Rubric, Submission, TestOut, TutorSetting, User,
+  AccessibleFormat, ActivityKind, Adaptation, AlignableKind, ApiToken, Assignment, Block, BlockContent, BuilderSession, Certificate, CompletionEvent, Course, CourseTemplate, FileRecord, Id, Institution, Invitation, Lesson, ManagerConsent, Module, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Role, Rubric, Submission, TestOut, TutorSetting, User, DesignSession, InstructorProfile,
 } from '../shared/domain';
 import type {
   AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt,
@@ -17,7 +17,7 @@ const DELETE_ORDER = [
   'completion_events', 'requirements', 'outcome_links', 'outcomes', 'readiness_items', 'rubrics', 'templates', 'programs',
   // Night 2 tables first (they reference users, courses, modules, files).
   'idempotency_keys', 'api_tokens', 'format_jobs', 'file_versions', 'access_scans', 'submissions', 'assignments',
-  'tutor_sessions', 'tutor_settings', 'adaptations', 'invitations', 'generation_jobs', 'files',
+  'tutor_sessions', 'tutor_settings', 'adaptations', 'invitations', 'generation_jobs', 'design_sessions', 'instructor_profiles', 'files',
   'announcement_reads',
   'progress',
   'blocks',
@@ -295,6 +295,25 @@ export class D1Repo implements Repo {
   async putBuilderSession(session: BuilderSession): Promise<void> {
     await this.builderStmt(session).run();
   }
+
+  async getDesignSession(id: Id): Promise<DesignSession | null> {
+    const row = await this.first<{ data: string }>('SELECT data FROM design_sessions WHERE id = ?', [id]);
+    return row ? parseJson<DesignSession>(row.data) : null;
+  }
+
+  async listDesignSessions(courseId: Id): Promise<DesignSession[]> {
+    const rows = await this.all<{ data: string }>('SELECT data FROM design_sessions WHERE course_id = ? ORDER BY created_at DESC, id', [courseId]);
+    return rows.map(row => parseJson<DesignSession>(row.data));
+  }
+
+  async putDesignSession(session: DesignSession): Promise<void> { await this.designSessionStmt(session).run(); }
+
+  async getInstructorProfile(userId: Id): Promise<InstructorProfile | null> {
+    const row = await this.first<{ data: string }>('SELECT data FROM instructor_profiles WHERE user_id = ?', [userId]);
+    return row ? parseJson<InstructorProfile>(row.data) : null;
+  }
+
+  async putInstructorProfile(profile: InstructorProfile): Promise<void> { await this.instructorProfileStmt(profile).run(); }
 
   async getGenerationJob(id: Id): Promise<GenerationJob | null> {
     const row = await this.first<GenerationRow>('SELECT * FROM generation_jobs WHERE id = ?', [id]);
@@ -586,6 +605,8 @@ export class D1Repo implements Repo {
       ...seed.progress.map((progress) => this.progressStmt(progress)),
       ...seed.adaptations.map((adaptation) => this.adaptationStmt(adaptation)),
       ...seed.builderSessions.map((session) => this.builderStmt(session)),
+      ...(seed.designSessions ?? []).map((session) => this.designSessionStmt(session)),
+      ...(seed.instructorProfiles ?? []).map((profile) => this.instructorProfileStmt(profile)),
       ...seed.generationJobs.map((job) => this.generationStmt(job)),
     ]);
   }
@@ -685,8 +706,8 @@ export class D1Repo implements Repo {
 
   private lessonStmt(lesson: Lesson): D1PreparedStatement {
     return this.db.prepare(
-      `INSERT INTO lessons (id, module_id, course_id, title, minutes, position, status, published_at, template_key, variant_of, variant_audience, variant_synced_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO lessons (id, module_id, course_id, title, minutes, position, status, published_at, template_key, variant_of, variant_audience, variant_synced_at, objective)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          module_id = excluded.module_id,
          course_id = excluded.course_id,
@@ -698,7 +719,8 @@ export class D1Repo implements Repo {
          template_key = excluded.template_key,
          variant_of = excluded.variant_of,
          variant_audience = excluded.variant_audience,
-         variant_synced_at = excluded.variant_synced_at`,
+         variant_synced_at = excluded.variant_synced_at,
+         objective = excluded.objective`,
     ).bind(
       lesson.id,
       lesson.moduleId,
@@ -712,6 +734,7 @@ export class D1Repo implements Repo {
       lesson.variantOf?.lessonId ?? null,
       lesson.variantOf?.audience ?? null,
       lesson.variantOf?.syncedAt ?? null,
+      lesson.objective ?? null,
     );
   }
 
@@ -826,16 +849,32 @@ export class D1Repo implements Repo {
     ).bind(session.id, session.courseId, JSON.stringify(session), session.createdAt);
   }
 
+  private designSessionStmt(session: DesignSession): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO design_sessions (id, course_id, data, stage, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET course_id = excluded.course_id, data = excluded.data,
+      stage = excluded.stage, created_by = excluded.created_by, created_at = excluded.created_at,
+      updated_at = excluded.updated_at`)
+      .bind(session.id, session.courseId, JSON.stringify(session), session.stage, session.createdBy, session.createdAt, session.updatedAt);
+  }
+
+  private instructorProfileStmt(profile: InstructorProfile): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO instructor_profiles (user_id, data, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`)
+      .bind(profile.userId, JSON.stringify(profile), profile.updatedAt);
+  }
+
   private generationStmt(job: GenerationJob): D1PreparedStatement {
     return this.db.prepare(`INSERT INTO generation_jobs
-      (id, course_id, requested_by, state, done, total, lesson_ids, error, created_at, updated_at, work, instruction, failures, runner)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, course_id, requested_by, state, done, total, lesson_ids, error, created_at, updated_at, work, instruction, failures, runner, kind, session_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET state = excluded.state, done = excluded.done,
       lesson_ids = excluded.lesson_ids, error = excluded.error, updated_at = excluded.updated_at,
-      work = excluded.work, instruction = excluded.instruction, failures = excluded.failures, runner = excluded.runner`)
+      work = excluded.work, instruction = excluded.instruction, failures = excluded.failures, runner = excluded.runner,
+      kind = excluded.kind, session_id = excluded.session_id`)
       .bind(job.id, job.courseId, job.requestedBy, job.state, job.done, job.total,
         JSON.stringify(job.lessonIds), job.error, job.createdAt, job.updatedAt,
-        JSON.stringify(job.work), job.instruction, JSON.stringify(job.failures), job.runner ?? 'poll');
+        JSON.stringify(job.work), job.instruction, JSON.stringify(job.failures), job.runner ?? 'poll', job.kind ?? 'generate', job.sessionId ?? null);
   }
 
   private adaptationStmt(value: Adaptation): D1PreparedStatement {
@@ -933,13 +972,16 @@ interface GenerationRow extends Record<string, unknown> {
   id: string; course_id: string; requested_by: string; state: GenerationJob['state'];
   done: number; total: number; lesson_ids: string; error: string | null;
   created_at: string; updated_at: string; work: string; instruction: string; failures: string; runner: 'poll' | 'workflow' | null;
+  kind: 'generate' | 'extract' | 'scaffold'; session_id: string | null;
 }
 function generationFromRow(row: GenerationRow): GenerationJob {
   return { id: row.id, courseId: row.course_id, requestedBy: row.requested_by,
     state: row.state, done: row.done, total: row.total, lessonIds: JSON.parse(row.lesson_ids),
     error: row.error, createdAt: row.created_at, updatedAt: row.updated_at,
     work: JSON.parse(row.work), instruction: row.instruction, failures: JSON.parse(row.failures),
-    ...(row.runner === 'workflow' ? { runner: 'workflow' as const } : {}) };
+    ...(row.runner === 'workflow' ? { runner: 'workflow' as const } : {}),
+    ...(row.kind !== 'generate' ? { kind: row.kind } : {}),
+    ...(row.session_id !== null ? { sessionId: row.session_id } : {}) };
 }
 
 function placeholders(count: number): string {
@@ -1076,6 +1118,7 @@ interface LessonRow extends Record<string, unknown> {
   status: Lesson['status'];
   published_at: string | null;
   template_key: string | null;
+  objective: string | null;
   variant_of: string | null;
   variant_synced_at: string | null; variant_audience: NonNullable<Lesson['variantOf']>['audience'] | null;
 }
@@ -1189,6 +1232,7 @@ function lessonFromRow(row: LessonRow): Lesson {
     status: row.status,
     publishedAt: row.published_at,
     ...(row.template_key !== null ? { templateKey: row.template_key } : {}),
+    ...(row.objective !== null ? { objective: row.objective } : {}),
     ...(row.variant_of !== null && row.variant_audience !== null ? { variantOf: { lessonId: row.variant_of, audience: row.variant_audience, syncedAt: row.variant_synced_at ?? '' } } : {}),
   };
 }

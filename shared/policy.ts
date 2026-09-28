@@ -1,6 +1,16 @@
 // Rules the server enforces and the app previews, written once (D-003, D-005, principle #12).
 import type { Access } from './api';
-import type { AccentId, Block, ReadinessIssue, ReadinessReport, Role, TutorMode, User } from './domain';
+import type { AccentId, AiPolicy, Block, ReadinessIssue, ReadinessReport, Role, TutorMode, User, WorkloadRates } from './domain';
+
+/** D-034: Rice CTE planning rates, editable through institution policy. */
+export const RICE_DEFAULTS: WorkloadRates = { readingPagesPerHour: 34, problemSetHours: 2, writingHoursPerPage: 1, projectHours: 30, quizMinutes: 20, discussionMinutes: 45 };
+export const DEFAULT_DESIGN_PARTNER: NonNullable<AiPolicy['designPartner']> = { enabled: true, allowedArchitectures: null };
+export const DEFAULT_AI_DISCLOSURE = 'Some starter content in this course was drafted with AI from the syllabus. I reviewed that content and am responsible for what appears in the course.';
+
+export function workloadRatesFor(policy: AiPolicy): WorkloadRates { return policy.workloadRates ?? RICE_DEFAULTS; }
+export function designPartnerPolicy(policy: AiPolicy): NonNullable<AiPolicy['designPartner']> {
+  return { ...(policy.designPartner ?? DEFAULT_DESIGN_PARTNER), enabled: policy.aiAuthoring && (policy.designPartner?.enabled ?? true) };
+}
 
 /** Can this user call a route with this access rule? */
 export function allows(access: Access, user: Pick<User, 'role'> | null): boolean {

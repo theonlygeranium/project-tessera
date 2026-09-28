@@ -1,4 +1,4 @@
-import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Invitation, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat, ActivityKind, TutorSetting, Program, CourseTemplate, Rubric, Outcome, OutcomeLink, AlignableKind, Requirement, CompletionEvent, TestOut, Certificate, ReportingLine, ManagerConsent } from '../domain';
+import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Invitation, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat, ActivityKind, TutorSetting, Program, CourseTemplate, Rubric, Outcome, OutcomeLink, AlignableKind, Requirement, CompletionEvent, TestOut, Certificate, ReportingLine, ManagerConsent, DesignSession, InstructorProfile } from '../domain';
 import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt } from '../repo';
 import type { SeedData } from '../seed';
 import { ApiError } from '../api';
@@ -9,7 +9,7 @@ const copy = <T>(value: T): T => structuredClone(value);
  * Night 3 optional fields are omitted when null, as D1 omits NULL columns, so both repos
  * return identical objects (including through `toEqual`).
  */
-const OPTIONAL_NIGHT3 = ['templateId', 'readinessPolicy', 'programId', 'objective', 'templateKey', 'variantOf', 'source'] as const;
+const OPTIONAL_NIGHT3 = ['templateId', 'readinessPolicy', 'programId', 'objective', 'templateKey', 'variantOf', 'source', 'sessionId'] as const;
 function normalized<T extends object>(value: T): T {
   const out = copy(value) as Record<string, unknown>;
   for (const key of OPTIONAL_NIGHT3) if (key in out && (out[key] === null || out[key] === undefined)) delete out[key];
@@ -141,8 +141,13 @@ export class MemoryRepo implements Repo {
   async getBuilderSession(id: string): Promise<BuilderSession | null> { return copy(this.data.builderSessions.find(x => x.id === id) ?? null); }
   async listBuilderSessions(courseId: string): Promise<BuilderSession[]> { return copy(this.data.builderSessions.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt))); }
   async putBuilderSession(value: BuilderSession) { this.upsert(this.data.builderSessions, value); }
+  async getDesignSession(id: string): Promise<DesignSession | null> { return copy(this.data.designSessions!.find(x => x.id === id) ?? null); }
+  async listDesignSessions(courseId: string): Promise<DesignSession[]> { return copy(this.data.designSessions!.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt) || cmp(a.id,b.id))); }
+  async putDesignSession(value: DesignSession) { this.upsert(this.data.designSessions!, value); }
+  async getInstructorProfile(userId: string): Promise<InstructorProfile | null> { return copy(this.data.instructorProfiles!.find(x => x.userId === userId) ?? null); }
+  async putInstructorProfile(value: InstructorProfile) { const rows = this.data.instructorProfiles!; const i = rows.findIndex(x => x.userId === value.userId); if (i < 0) rows.push(copy(value)); else rows[i] = copy(value); }
   async getGenerationJob(id: string): Promise<GenerationJob | null> { return copy(this.data.generationJobs.find(x => x.id === id) ?? null); }
-  async putGenerationJob(value: GenerationJob) { this.upsert(this.data.generationJobs, value); }
+  async putGenerationJob(value: GenerationJob) { const job = normalized(value); if (job.kind === 'generate') delete job.kind; this.upsert(this.data.generationJobs, job); }
   // Like D1Repo, a file's `scan` is derived from its latest stored scan.
   private withScan(f: FileRecord): FileRecord {
     const s = this.data.scans.filter(x => x.target.kind === 'file' && x.target.fileId === f.id).sort((a, b) => b.scannedAt.localeCompare(a.scannedAt))[0];
@@ -255,7 +260,7 @@ export class MemoryRepo implements Repo {
   async isEmpty(): Promise<boolean> { return this.data.users.length === 0; }
   async reset(seed: SeedData) { this.data = this.withNight3(seed); }
   private withNight3(seed: SeedData): SeedData & { readinessItems: StoredReadinessItem[] } {
-    return copy({ ...seed, programs: seed.programs ?? [], templates: seed.templates ?? [], rubrics: (seed.rubrics ?? []).map(r => ({ ...r, source: 'custom' as const, builtIn: false })), readinessItems: [],
+    return copy({ ...seed, designSessions: seed.designSessions ?? [], instructorProfiles: seed.instructorProfiles ?? [], generationJobs: seed.generationJobs.map(job => { const clean = normalized(job); if (clean.kind === 'generate') delete clean.kind; return clean; }), programs: seed.programs ?? [], templates: seed.templates ?? [], rubrics: (seed.rubrics ?? []).map(r => ({ ...r, source: 'custom' as const, builtIn: false })), readinessItems: [],
       outcomes: seed.outcomes ?? seed.courses.flatMap(course => course.outcomes.flatMap((value, i) => value.trim() ? [{ id: `${course.id}-o${i + 1}`, courseId: course.id, code: `O${i + 1}`, text: value, position: i }] : [])),
       outcomeLinks: seed.outcomeLinks ?? [], requirements: seed.requirements ?? [], completionEvents: seed.completionEvents ?? [], testOuts: seed.testOuts ?? [], testOutAttempts: seed.testOutAttempts ?? [], certificates: seed.certificates ?? [], reportingLines: seed.reportingLines ?? [], managerConsents: seed.managerConsents ?? [] });
   }

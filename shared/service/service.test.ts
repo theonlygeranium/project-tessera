@@ -45,6 +45,7 @@ describe('authoring and administration', () => {
     const created = await h.call('createBuilderSession', { courseId: 'c-stat110', prompt: 'Teach data reasoning', sources: [{ name: 'Notes', text: 'Variability matters.' }] });
     const outline = await h.call('generateOutline', { sessionId: created.id }); expect(outline.stage).toBe('outline');
     const drafted = await h.call('generateDrafts', { sessionId: created.id }); expect(drafted.stage).toBe('review'); expect(drafted.lessonIds).toHaveLength(4);
+    expect((await h.repo.getLesson(drafted.lessonIds[0]))?.objective).toBe(outline.outline!.modules[0].lessons[0].objective);
     const id = drafted.lessonIds[0], report = await code(h.call('publishLesson', { lessonId: id }), 'not-ready');
     expect(report.details).toMatchObject({ ready: false, aiBlocks: 4, keptAiBlocks: 0 });
     const blocks = (await h.call('getLesson', { lessonId: id })).blocks;
