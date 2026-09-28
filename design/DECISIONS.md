@@ -237,3 +237,21 @@ Approved 2026-09-27 (the owner chose option B of four: Browser Rendering + a vis
 - OCR is both a **fix** (`fixFileIssue { kind: 'ocr' }` saves a searchable PDF as a new version; the original stays, like every other fix) and an **accessible format** (`?format=ocr`). The reading version, e-book, and audio of a scan use its OCR text.
 - Languages installed: English, Spanish, French. Up to 3 instances in production and 1 per preview, each 1 vCPU / 3 GiB (Cloudflare requires at least 3 GiB per vCPU), OCR one page at a time, sleeping after 3 idle minutes; the Workers Paid allowance (25 GiB-hours of memory a month) covers about 8 running hours at this size.
 - Limits: Tesseract is weak on handwriting and complex layouts; a vision-model second pass (option A) can be added later for pages it reads poorly.
+
+### D-024 · Built-in quality rubrics
+Approved 2026-09-27 (Night 3, #50 D1). Tessera ships its own plain-language course-quality standard and SUNY's OSCQR (CC BY 4.0, with attribution) as built-in rubrics. The Quality Matters rubric is licensed and is never reproduced; an institution that subscribes to QM may load its items as a custom rubric.
+
+### D-025 · Night 3 builds in the app
+Approved 2026-09-27 (#50 D2). Night 3 features are built directly in the app, as in Night 2; screenshots reach the docs through docs-sync. Exception: the manager view gets a design artboard the owner reviews for privacy before it is built.
+
+### D-026 · Managers are a relationship, not a role
+Approved 2026-09-27 (#50 D3). An administrator records reporting lines between users of any role. A learner opts in per manager; a manager sees opted-in people's required training, due dates, completion, and certificates only, never scores, attempts, tutor chats, or adaptations. Opting out removes access immediately.
+
+### D-027 · Certificate verification
+Approved 2026-09-27 (#50 D4). Certificates are immutable (corrections issue a replacement). The public verification URL shows validity, course, and date only; the learner's name appears only on their own copy.
+
+### D-028 · Persona variants first
+Approved 2026-09-27 (#50 D5). Plain-language and micro-path (at most 15 minutes) variants ship first, derived from a master lesson as AI drafts and kept in sync by block lineage.
+
+### D-029 · Readiness and publishing
+Approved 2026-09-27 (#50 D6). The rubric result is advisory by default; an administrator can require a minimum result to publish, enforced by the server like the accessibility policy (D-022).

@@ -1,6 +1,6 @@
 # Night 3 plan: consistency, quality, and the industry learner
 
-**Status: proposed 2026-09-27; scope approved by the owner (option A + #22 + carry-overs); decisions in §6 await the owner.** Builds on Night 2 (tag `night-2`, D-019 to D-023).
+**Status: approved 2026-09-27 (scope and D1–D6, recorded as D-024 to D-029); Wave 0 in progress on branch `night3`.** Builds on Night 2 (tag `night-2`, D-019 to D-023).
 
 ## 1. Goals
 
