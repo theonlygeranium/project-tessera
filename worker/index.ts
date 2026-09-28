@@ -4,6 +4,7 @@ import { createAiClient } from './ai';
 import { createDocumentEngine } from './access/engine';
 import { RateLimiter, bearerToken, hasAccessCredential, readCookie, resolvePrincipal } from './api/auth';
 import { findFileRoute } from './api/files';
+import { handleMcp } from './mcp';
 import { D1Repo } from './d1-repo';
 import type { Env } from './env';
 import { API_PREFIX, ApiError, ROUTES, matchPath, type Operation, type SessionInfo } from '../shared/api';
@@ -39,6 +40,7 @@ function ensureSeeded(db: D1Database, repo: Repo): Promise<void> {
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === '/mcp') return handleMcp(request, env, { ensureSeeded, rateLimiter, createServiceContext });
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return handleApi(request, env);
     if (url.pathname === '/app' || url.pathname.startsWith('/app/')) return handleApp(request, env);
     return env.ASSETS.fetch(request);
@@ -79,15 +81,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       res.headers.set('retry-after', String(wait));
       return withId(res);
     }
-    const ctx: ServiceContext = {
-      repo,
-      ai: createAiClient(env),
-      user: principal.user,
-      token: principal.token,
-      now: () => new Date().toISOString(),
-      newId: (prefix) => prefix + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12),
-      documents: createDocumentEngine(env),
-    };
+    const ctx = createServiceContext(env, repo, principal);
 
     // Idempotent creates (D-020): the same key from the same principal replays the first response.
     const idempotencyKey = request.method === 'POST' ? request.headers.get('idempotency-key') : null;
@@ -142,6 +136,15 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     console.error(requestId, error);
     return withId(fail(500, 'internal', 'Something went wrong.'));
   }
+}
+
+function createServiceContext(env: Env, repo: Repo, principal: Awaited<ReturnType<typeof resolvePrincipal>>): ServiceContext {
+  return {
+    repo, ai: createAiClient(env), user: principal.user, token: principal.token,
+    now: () => new Date().toISOString(),
+    newId: (prefix) => prefix + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12),
+    documents: createDocumentEngine(env),
+  };
 }
 
 async function handleApp(request: Request, env: Env): Promise<Response> {

@@ -19,6 +19,8 @@ export interface ServiceContext {
   newId(prefix: string): Id;
   /** The document engine (D-022): parsers, fixers, format generation, AI suggestions. The Worker provides it; mock mode has none. */
   documents?: DocumentEngine | null;
+  /** Set when an assistant calls through the MCP server: content it writes is an AI draft a person keeps (D-003). */
+  agent?: { name: string } | null;
 }
 
 /** What the Worker's document engine offers the service (implemented in worker/access/engine.ts). */

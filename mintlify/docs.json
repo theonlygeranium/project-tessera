@@ -82,6 +82,8 @@
         "pages": [
           "build/architecture",
           "build/api",
+          "build/sdk",
+          "build/mcp",
           "build/decisions"
         ]
       },

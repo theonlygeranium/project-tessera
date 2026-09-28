@@ -12309,7 +12309,8 @@
               "link-text",
               "element",
               "tutor",
-              "tutor-summary"
+              "tutor-summary",
+              "agent"
             ]
           },
           "generatedAt": {

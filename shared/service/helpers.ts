@@ -44,3 +44,8 @@ export const move = (ids: string[], id: string, requested: number) => {
   const rest = ids.filter(x => x !== id); const pos = Number.isFinite(requested) ? Math.max(0, Math.min(rest.length, Math.trunc(requested))) : 0;
   rest.splice(pos, 0, id); return rest;
 };
+
+/** Provenance for content an assistant wrote through the MCP server (D-003: it stays a draft until a person keeps it). */
+export function agentProvenance(ctx: ServiceContext, summary: string): Provenance {
+  return { model: `Assistant via MCP (${ctx.agent?.name ?? 'API token'})`, task: 'agent', generatedAt: ctx.now(), sources: [], summary };
+}

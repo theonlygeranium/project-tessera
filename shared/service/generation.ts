@@ -2,7 +2,7 @@ import type { Block, BlockContent, BlockType, LessonDetail } from '../domain';
 import { lessonReadiness } from '../policy';
 import type { GenerationItem, GenerationJob } from '../repo';
 import type { Service, ServiceContext } from './context';
-import { aiEnabled, canReachCourse, canTeach, content, fail, lessonFor, minutes, provenance, required, user } from './helpers';
+import { agentProvenance, aiEnabled, canReachCourse, canTeach, content, fail, lessonFor, minutes, provenance, required, user } from './helpers';
 import { validateBlockContent } from './validate';
 import { courses } from './courses';
 
@@ -142,7 +142,7 @@ export const generation: Pick<Service, 'generateAtScope' | 'getGenerationJob' | 
       for (const [position, lesson] of module.lessons.entries()) {
         const lessonId = ctx.newId('l');
         await ctx.repo.putLesson({ id: lessonId, moduleId, courseId, title: lesson.title, minutes: lesson.minutes, position, status: 'draft', publishedAt: null });
-        await ctx.repo.replaceBlocks(lessonId, lesson.blocks.map((block, blockPosition) => ({ ...block, id: ctx.newId('b'), lessonId, position: blockPosition, origin: 'human', aiState: null, provenance: null, previous: null, updatedAt: ctx.now() } as Block)));
+        await ctx.repo.replaceBlocks(lessonId, lesson.blocks.map((block, blockPosition) => ({ ...block, id: ctx.newId('b'), lessonId, position: blockPosition, ...(ctx.agent ? { origin: 'ai', aiState: 'draft', provenance: agentProvenance(ctx, 'Imported by an assistant through the MCP server') } : { origin: 'human', aiState: null, provenance: null }), previous: null, updatedAt: ctx.now() } as Block)));
       }
     }
     return courses.getCourseOutline(ctx, { courseId });

@@ -1,0 +1,40 @@
+---
+title: "MCP server"
+description: "Connect an AI assistant to Tessera's scoped course tools."
+---
+
+Tessera serves a stateless MCP Streamable HTTP endpoint at `https://tessera.edstratumlabs.ai/mcp`. It lets an assistant inspect courses, create course structure, and draft content through the same role and scope checks as the API. Publishing stays with people.
+
+Create an API token in the app and choose the scopes needed for the tools you plan to use. For example, listing courses needs `courses:read`; importing a course needs `courses:write`; reading lessons needs `content:read`; creating lessons needs `content:write`; running AI drafting needs `ai:run`. The token owner must also have the required role and course access.
+
+In an MCP client that supports remote servers with bearer headers, configure:
+
+```json
+{
+  "mcpServers": {
+    "tessera": {
+      "url": "https://tessera.edstratumlabs.ai/mcp",
+      "headers": { "Authorization": "Bearer tsk_…" }
+    }
+  }
+}
+```
+
+## Available tools
+
+| Area | Tools |
+|---|---|
+| Courses | `list_courses`, `get_course_outline`, `import_course`, `create_course` |
+| Lessons | `create_module`, `create_lesson`, `get_lesson`, `save_blocks` |
+| Accessibility and files | `get_course_access`, `get_lesson_access`, `list_files`, `get_file_access` |
+| AI drafts | `generate_at_scope`, `get_generation_job`, `generate_element` |
+| Assignments | `list_assignments`, `get_assignment`, `create_assignment` |
+| Announcements | `list_announcements`, `create_announcement` |
+
+`create_announcement` always saves a draft, even if a caller asks to publish it. AI generated content remains a draft for a person to review.
+
+## What agents can't do and why
+
+Tessera does not expose tools for publishing or unpublishing lessons and assignments, keeping or reverting AI blocks, grading or releasing grades, deleting anything, managing tokens, people, or institution settings, or using the tutor. These are decisions a person must make; AI work stays reviewable before learners see it.
+
+Content an assistant writes through these tools arrives as an **AI draft**: lesson blocks it saves or changes, lessons it imports, and announcements it drafts are marked as written by "Assistant via MCP" with the token's name, and a lesson can't be published until a person has reviewed and kept each draft. List results come back in `structuredContent` as `{ "items": [...] }`.

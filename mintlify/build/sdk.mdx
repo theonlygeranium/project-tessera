@@ -1,0 +1,39 @@
+---
+title: "TypeScript SDK"
+description: "Use the typed Tessera API client from scripts and TypeScript applications."
+---
+
+The TypeScript SDK is available from the repository path. It is not published to npm yet. In a checkout containing `sdk/` and `shared/`, install it with `npm install ./sdk` and use a TypeScript-capable runtime or bundler.
+
+Create a token in the app with the scopes your calls need. This fictional example needs `courses:write` to import and `courses:read` to list:
+
+```ts
+import { createClient, paginate, TesseraError } from '@tessera/sdk';
+
+const api = createClient({
+  baseUrl: 'https://tessera.edstratumlabs.ai',
+  token: process.env.TESSERA_TOKEN!,
+});
+
+try {
+  const outline = await api.importCourse({
+    course: { code: 'EPI 110', title: 'Introduction to Epidemiology', term: 'Spring 2027' },
+    modules: [{ title: 'Counting cases', lessons: [{ title: 'Rates and ratios', blocks: [] }] }],
+  }, { idempotencyKey: 'epi-110-spring-2027' });
+  console.log(outline.course.id);
+  console.log(await api.listCourses());
+
+  // listFiles is cursor-paginated. paginate follows nextCursor automatically.
+  for await (const file of paginate(api.listFiles, { courseId: outline.course.id, limit: 20 })) {
+    console.log(file.name);
+  }
+} catch (error) {
+  if (error instanceof TesseraError) {
+    console.error(error.code, error.status, error.requestId, error.details);
+  }
+}
+```
+
+All methods are typed from the API contract. Methods that require an input take it first; every method accepts optional `{ signal, idempotencyKey }` call options. The SDK sends `Idempotency-Key` on POST requests and retries a `429` once after the server's `Retry-After` delay, capped at ten seconds. An API failure throws `TesseraError` with `code`, `message`, `details`, HTTP `status`, and `requestId` from `X-Request-Id`.
+
+Upload a file as multipart data with `await api.uploadFile(courseId, blob, 'handout.pdf')`. The helper returns a file record. `api.fileUrl(fileId)` returns the original content URL; `api.fileUrl(fileId, 'reading')` returns the URL for an accessible format. Fetch those URLs with the same bearer token.

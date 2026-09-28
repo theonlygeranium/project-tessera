@@ -2,7 +2,7 @@ import { logError } from './log';
 import type { Announcement, Provenance } from '../domain';
 import type { StoredAnnouncement } from '../repo';
 import type { Service, ServiceContext } from './context';
-import { aiEnabled, aiFailed, canReachCourse, canTeach, course, fail, provenance, required, user } from './helpers';
+import { agentProvenance, aiEnabled, aiFailed, canReachCourse, canTeach, course, fail, provenance, required, user } from './helpers';
 
 /**
  * NQ-03: an announcement's provenance is shown to students, so it never carries the
@@ -42,6 +42,8 @@ export const announcements: Pick<Service, 'listAnnouncements' | 'createAnnouncem
   createAnnouncement: async (ctx, input) => {
     await canTeach(ctx, input.courseId);
     const now = ctx.now();
+    // An assistant's announcement (MCP) is an AI draft a person reviews and publishes (D-003).
+    if (ctx.agent) input = { ...input, publish: false, aiDraft: input.aiDraft ?? agentProvenance(ctx, 'Drafted by an assistant through the MCP server') };
     const row: StoredAnnouncement = { id: ctx.newId('a'), courseId: input.courseId, authorId: user(ctx).id, title: required(input.title, 'title'), body: required(input.body, 'body'), pinned: input.pinned, status: input.publish ? 'published' : 'draft', origin: input.aiDraft ? 'ai' : 'human', aiState: input.aiDraft ? (input.publish ? 'kept' : 'draft') : null, provenance: input.aiDraft ? publicProvenance(input.aiDraft) : null, publishedAt: input.publish ? now : null, createdAt: now };
     await ctx.repo.putAnnouncement(row); return joined(ctx, row);
   },

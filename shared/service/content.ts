@@ -5,7 +5,7 @@ import { lessonReadiness } from '../policy';
 import { lessonAccessReport } from '../access/blocks';
 import { policyBlocks } from '../access/score';
 import type { Service, ServiceContext } from './context';
-import { aiEnabled, aiFailed, canReachCourse, content, fail, lessonFor, moduleFor, provenance, teachLesson, user } from './helpers';
+import { agentProvenance, aiEnabled, aiFailed, canReachCourse, content, fail, lessonFor, moduleFor, provenance, teachLesson, user } from './helpers';
 import { validateBlockContent } from './validate';
 
 async function detail(ctx: ServiceContext, lessonId: string): Promise<LessonDetail> {
@@ -38,8 +38,11 @@ export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBl
         if (!prior || seen.has(raw.id)) throw new ApiError('invalid', 'Block id is not in this lesson or is duplicated.');
         seen.add(raw.id);
         const contentChanged = JSON.stringify(content(prior)) !== JSON.stringify(value);
+        // An assistant's edit (MCP) turns the block into an AI draft a person reviews (D-003).
+        if (ctx.agent && contentChanged) return { ...metadata(prior), ...value, position, origin: 'ai', aiState: 'draft', provenance: agentProvenance(ctx, 'Edited by an assistant through the MCP server'), previous: content(prior), updatedAt: ctx.now() } as Block;
         return { ...metadata(prior), ...value, position, previous: contentChanged && prior.origin === 'ai' ? content(prior) : prior.previous, updatedAt: contentChanged || prior.position !== position ? ctx.now() : prior.updatedAt } as Block;
       }
+      if (ctx.agent) return { ...value, id: ctx.newId('b'), lessonId, position, origin: 'ai', aiState: 'draft', provenance: agentProvenance(ctx, 'Written by an assistant through the MCP server'), previous: null, updatedAt: ctx.now() } as Block;
       return { ...value, id: ctx.newId('b'), lessonId, position, origin: 'human', aiState: null, provenance: null, previous: null, updatedAt: ctx.now() } as Block;
     });
     await ctx.repo.replaceBlocks(lessonId, next); return detail(ctx, lessonId);

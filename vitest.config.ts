@@ -7,6 +7,6 @@ export default defineConfig({
   resolve: { alias: { 'cloudflare:workers': fileURLToPath(new URL('./worker/test/cloudflare-workers-stub.ts', import.meta.url)) } },
   test: {
     server: { deps: { inline: ['@cloudflare/containers'] } },
-    include: ['shared/**/*.test.ts', 'worker/**/*.test.ts', 'app/src/**/*.test.ts', 'tools/**/*.test.ts'],
+    include: ['shared/**/*.test.ts', 'worker/**/*.test.ts', 'app/src/**/*.test.ts', 'tools/**/*.test.ts', 'sdk/**/*.test.ts'],
   },
 });
