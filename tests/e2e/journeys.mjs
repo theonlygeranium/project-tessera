@@ -55,7 +55,9 @@ function slug(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+/** `ONLY="Journey 12" node tests/e2e/journeys.mjs` runs the journeys whose names contain the text. */
 async function journey(name, fn) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return;
   console.log(`\n${name}`);
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
@@ -572,6 +574,234 @@ await journey('Journey 11 · Administrator invites a person, views as a student,
   await step('Sign in as Taylor: a student with no profile lands on onboarding', async () => {
     await switchTo(page, 'Taylor Brooks');
     await page.getByRole('heading', { level: 1, name: 'Set up your learning profile' }).waitFor();
+  });
+});
+
+// ---- Night 3 (handoff/NIGHT-3-PLAN.md §7) ------------------------------------------------
+
+await journey('Journey 12 · Templates: a program template gives a new course its skeleton; a deleted required lesson shows in readiness', async (page) => {
+  await step('Administrator creates a template with a required "Start here" module', async () => {
+    await page.goto(`${BASE}app/?data=mock&as=u-admin`);
+    await page.getByRole('button', { name: 'Finish setup' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor();
+    await page.getByRole('navigation', { name: 'Administrator navigation' }).getByRole('link', { name: 'Templates' }).click();
+    await page.getByLabel('Name', { exact: true }).fill('Workforce standard');
+    await page.getByRole('button', { name: 'Create template' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Workforce standard' }).waitFor();
+    await page.getByLabel('New module title').fill('Start here');
+    await page.getByRole('button', { name: 'Add module' }).click();
+    await page.getByLabel('New lesson title').fill('How to get help');
+    await page.getByRole('button', { name: 'Add lesson' }).click();
+    await page.getByLabel('New required block label').fill('Instructor contact');
+    await page.getByRole('button', { name: 'Add block' }).click();
+    await page.getByRole('button', { name: 'Save template' }).click();
+    await waitForIncludes(page.locator('main'), 'saved');
+  });
+  await step('Administrator creates a program that uses it', async () => {
+    await page.getByRole('navigation', { name: 'Administrator navigation' }).getByRole('link', { name: 'Programs' }).click();
+    await page.getByRole('heading', { level: 2, name: 'Create program' }).waitFor();
+    await page.getByLabel('Name', { exact: true }).fill('Workforce safety');
+    await page.getByRole('combobox', { name: 'Template', exact: true }).selectOption({ label: 'Workforce standard' });
+    await page.getByRole('radio', { name: 'Blue' }).check();
+    await page.getByRole('button', { name: 'Create program' }).click();
+    await waitForIncludes(page.locator('main'), 'Workforce safety');
+  });
+  await runAxe(page, 'Journey 12 · Programs');
+  await step('Instructor creates a course in the program and gets the skeleton', async () => {
+    await switchTo(page, 'Dr. Amara Okafor');
+    await page.getByRole('heading', { level: 1, name: 'My courses' }).waitFor();
+    await page.getByLabel('Code').fill('OPS 210');
+    await page.getByLabel('Title').fill('Forklift safety');
+    await page.getByLabel('Term').fill('Ongoing');
+    await page.getByRole('combobox', { name: 'Program', exact: true }).selectOption({ label: 'Workforce safety' });
+    await page.getByRole('button', { name: 'Create course' }).click();
+    await waitForIncludes(page.locator('main'), 'How to get help');
+    await waitForIncludes(page.locator('main'), 'Start here');
+  });
+  await step('Deleting the required lesson shows up in the readiness report', async () => {
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('listitem').filter({ hasText: 'How to get help' }).getByRole('button', { name: 'Delete' }).click();
+    await waitForIncludes(page.locator('main'), 'Lesson deleted.');
+    await page.getByRole('link', { name: 'Readiness' }).first().click();
+    await waitForIncludes(page.locator('main'), 'The required lesson "How to get help" is missing.');
+  });
+  await runAxe(page, 'Journey 12 · Readiness with a template deviation');
+});
+
+await journey('Journey 13 · Readiness: fix link to a block, accept an AI finding, attest an item, and the standards update', async (page) => {
+  const standard = (n) => page.getByRole('heading', { level: 2, name: new RegExp(`^${n}\\. `) });
+  const item = (n) => page.getByRole('heading', { level: 3, name: new RegExp(`^${n.replace('.', '\\.')}\\. `) }).locator('xpath=..');
+  await step('Open the course readiness report', async () => {
+    await page.goto(`${BASE}app/teach/courses/c-stat110/readiness?data=mock&as=u-okafor`);
+    await page.getByRole('heading', { level: 1, name: 'Course readiness' }).waitFor();
+    await waitForIncludes(standard(6), '0 of 2 met');
+  });
+  await runAxe(page, 'Journey 13 · Readiness report');
+  await step('Follow the fix link to the exact block and keep the AI draft', async () => {
+    await page.getByRole('link', { name: 'Review the draft in "Center: mean and median"' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Center: mean and median' }).waitFor();
+    await page.waitForFunction(() => document.activeElement?.id?.startsWith('block-'), null, { timeout: 5000 });
+    await page.locator(':focus').getByRole('button', { name: 'Keep', exact: true }).click();
+    await waitForIncludes(page.locator('main'), '1 of 1 AI block reviewed');
+  });
+  await step('Back in the report, "AI drafts kept" is met and standard 6 updates', async () => {
+    await page.getByRole('link', { name: 'Full course report' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Course readiness' }).waitFor();
+    await waitForIncludes(standard(6), '1 of 2 met');
+  });
+  await step('Run AI-assisted items; findings are drafts until a person accepts one', async () => {
+    await page.getByRole('button', { name: 'Check AI-assisted items' }).click();
+    await item('1.3').getByRole('button', { name: 'Accept' }).waitFor();
+    await waitForIncludes(standard(1), 'of 3 met');
+    const before = (await standard(1).textContent()) ?? '';
+    await item('1.3').getByRole('button', { name: 'Accept' }).click();
+    await waitForIncludes(item('1.3'), 'Dr. Amara Okafor');
+    if ((await standard(1).textContent()) === before && !(await item('1.3').textContent()).includes('not met')) throw new Error('Accepting the finding changed nothing');
+  });
+  await step('A reviewer attests 4.1 with a note; standard 4 updates', async () => {
+    await waitForIncludes(standard(4), '2 of 4 met');
+    await item('4.1').getByRole('button', { name: 'Attest' }).click();
+    await page.getByLabel('Reviewer note').fill('Checked every reading against the outcomes this term.');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await waitForIncludes(standard(4), '3 of 4 met');
+    await waitForIncludes(item('4.1'), 'Attested by Dr. Amara Okafor');
+  });
+  await runAxe(page, 'Journey 13 · Report after review');
+});
+
+await journey('Journey 14 · Variants: create a plain-language version, edit the master, resync; a plain-reading student gets it with a why and a way back', async (page) => {
+  await step('Create a plain-language variant, keep its AI drafts, and publish it', async () => {
+    await page.goto(`${BASE}app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor`);
+    await page.getByRole('heading', { level: 1, name: 'Variants' }).waitFor();
+    await page.getByRole('button', { name: 'Create plain-language version' }).click();
+    await page.getByRole('heading', { level: 1, name: 'What makes a question statistical? (plain language)' }).waitFor();
+    await keepAllAiBlocks(page);
+    await waitForEnabled(page, 'Publish');
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await page.getByRole('button', { name: 'Unpublish' }).waitFor();
+  });
+  await step('Edit the master lesson', async () => {
+    await page.getByRole('link', { name: 'Compare with master' }).click();
+    await page.getByRole('link', { name: 'Back to master lesson' }).click();
+    await page.getByRole('heading', { level: 1, name: 'What makes a question statistical?' }).waitFor();
+    const block = page.locator('#block-b-s1-2');
+    await block.getByRole('button', { name: 'Edit', exact: true }).click();
+    await block.getByLabel('Text', { exact: false }).fill('A statistical question is answered with data that varies from case to case.');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await waitForIncludes(page.getByText('Blocks saved.', { exact: true }), 'Blocks saved.');
+  });
+  await step('The variant shows as diverged; compare and resync', async () => {
+    await page.getByRole('link', { name: 'Manage variants' }).click();
+    await waitForIncludes(page.locator('main'), '1 changed in the master');
+    await page.getByRole('link', { name: 'Compare', exact: true }).first().click();
+    await waitForIncludes(page.locator('main'), 'Master changed');
+  });
+  await runAxe(page, 'Journey 14 · Variant compare');
+  await step('Resync all brings the variant back in sync (as AI drafts to keep)', async () => {
+    await page.getByRole('button', { name: 'Resync all' }).click();
+    await page.waitForFunction(() => !document.querySelector('main')?.textContent?.includes('Master changed'), null, { timeout: 8000 });
+  });
+  await step('A student with plain reading gets the variant, a why, and a way back', async () => {
+    await switchTo(page, 'Marcus Bell');
+    await page.getByRole('navigation').getByRole('link', { name: 'Profile' }).first().click();
+    await page.getByRole('radio', { name: 'Plain language' }).check();
+    await page.getByRole('button', { name: 'Save profile' }).click();
+    await waitForIncludes(page.locator('main'), 'saved');
+    await page.getByRole('navigation').getByRole('link', { name: 'Courses' }).first().click();
+    await page.getByRole('link', { name: /Reasoning with Data/ }).first().click();
+    await page.getByRole('link', { name: 'What makes a question statistical?' }).first().click();
+    await waitForIncludes(page.locator('main'), 'plain-language version');
+    await waitForIncludes(page.locator('main'), 'because your profile asks for plain reading');
+  });
+  await runAxe(page, 'Journey 14 · Student reading the variant');
+  await step('Read the full lesson instead', async () => {
+    await page.getByRole('link', { name: 'Read the full lesson' }).click();
+    await page.waitForFunction(() => !document.querySelector('main')?.textContent?.includes("You're reading the plain-language version"), null, { timeout: 8000 });
+  });
+});
+
+await journey('Journey 15 · Required training: assign with a due date, the employee tests out and gets a certificate, the audit CSV shows it', async (page) => {
+  await step('Administrator assigns OPS 101 to Sam Ortiz, due 1 Nov', async () => {
+    await page.goto(`${BASE}app/?data=mock&as=u-admin`);
+    await page.getByRole('button', { name: 'Finish setup' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Overview' }).waitFor();
+    await page.getByRole('navigation', { name: 'Administrator navigation' }).getByRole('link', { name: 'Required training' }).click();
+    await page.getByRole('combobox', { name: 'Course or program' }).selectOption({ label: 'Course · Lockout/tagout essentials' });
+    await page.getByRole('radio', { name: 'Chosen people' }).check();
+    await page.getByRole('checkbox', { name: /^Sam Ortiz/ }).check();
+    const form = page.locator('form', { has: page.getByRole('button', { name: 'Assign training' }) });
+    await form.getByLabel('Due date').fill('2026-11-01');
+    await page.getByRole('button', { name: 'Assign training' }).click();
+    await page.waitForFunction(() => document.querySelectorAll('main h3').length >= 2, null, { timeout: 8000 });
+  });
+  await runAxe(page, 'Journey 15 · Required training admin');
+  await step('Sam sees it first on Today, with its due date', async () => {
+    await switchTo(page, 'Sam Ortiz');
+    await page.getByRole('heading', { level: 1, name: 'Today' }).waitFor();
+    const required = page.locator('section', { has: page.getByRole('heading', { name: 'Required training' }) }).first();
+    await waitForIncludes(required, 'Lockout/tagout essentials');
+    await waitForIncludes(required, 'Nov');
+  });
+  await runAxe(page, 'Journey 15 · Today with required training');
+  await step('Sam tests out and opens the certificate', async () => {
+    await page.getByRole('link', { name: /test-out/i }).first().click();
+    for (const [q, a] of [['q1', 'a'], ['q2', 'a'], ['q3', 'b'], ['q4', 'a']]) await page.locator(`input[name=question-${q}][value=${a}]`).check();
+    await page.getByRole('button', { name: 'Submit' }).click();
+    await waitForIncludes(page.locator('main'), 'You tested out');
+    await page.getByRole('link', { name: 'View certificate' }).click();
+    await waitForIncludes(page.locator('main'), 'Sam Ortiz');
+    await page.getByRole('link', { name: /Download PDF/ }).waitFor();
+    await page.getByRole('link', { name: /verif/i }).first().waitFor();
+  });
+  await runAxe(page, 'Journey 15 · Certificate');
+  await step('The audit CSV shows assigned, tested out, and certificate issued for Sam', async () => {
+    await switchTo(page, 'Alex Rivera');
+    await page.getByRole('navigation', { name: 'Administrator navigation' }).getByRole('link', { name: 'Compliance' }).click();
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export audit trail (CSV)' }).click()]);
+    const { readFile: read } = await import('node:fs/promises');
+    const csv = await read(await download.path(), 'utf8');
+    const sam = csv.split('\n').filter((line) => line.includes('Sam Ortiz'));
+    for (const kind of ['assigned', 'tested-out', 'certificate-issued']) if (!sam.some((line) => line.includes(kind))) throw new Error(`No ${kind} event for Sam in the CSV`);
+  });
+});
+
+await journey('Journey 16 · Managers: the employee opts in, the manager sees completion only, the employee opts out and the view empties', async (page) => {
+  /** The people table must show completion only (D-025): no scores, percentages, attempts, or email. */
+  const noPrivateData = async () => {
+    const text = (await page.locator('main table').first().textContent()) ?? '';
+    const found = /%|score|attempt|@|tutor/i.exec(text);
+    if (found) throw new Error(`The manager's table shows "${found[0]}"`);
+  };
+  await step('Before Dana opts in, Sam sees only a count', async () => {
+    await page.goto(`${BASE}app/team?data=mock&as=u-sam`);
+    await page.getByRole('heading', { level: 1, name: "Your team's required training" }).waitFor();
+    await waitForIncludes(page.locator('main'), 'chosen to share');
+    if (((await page.locator('main').textContent()) ?? '').includes('Dana')) throw new Error('Dana is named before opting in');
+  });
+  await step('Dana turns sharing on for Sam', async () => {
+    await switchTo(page, 'Dana Whitfield');
+    await page.getByRole('navigation').getByRole('link', { name: 'Sharing' }).first().click();
+    await page.getByRole('switch', { name: /Share with Sam Ortiz/ }).check();
+    await waitForIncludes(page.locator('main'), 'Sharing since');
+  });
+  await runAxe(page, 'Journey 16 · Sharing on');
+  await step('Sam sees Dana\'s required training and status, and nothing private', async () => {
+    await switchTo(page, 'Sam Ortiz');
+    await page.getByRole('navigation').getByRole('link', { name: 'Team' }).first().click();
+    await waitForIncludes(page.locator('main'), 'Dana Whitfield');
+    await waitForIncludes(page.locator('main'), 'Lockout/tagout essentials');
+    await noPrivateData();
+  });
+  await runAxe(page, 'Journey 16 · Team with a sharer');
+  await step('Dana turns sharing off; Sam\'s view empties', async () => {
+    await switchTo(page, 'Dana Whitfield');
+    await page.getByRole('navigation').getByRole('link', { name: 'Sharing' }).first().click();
+    await page.getByRole('switch', { name: /Share with Sam Ortiz/ }).uncheck();
+    await waitForIncludes(page.locator('main'), 'Not sharing');
+    await switchTo(page, 'Sam Ortiz');
+    await page.getByRole('navigation').getByRole('link', { name: 'Team' }).first().click();
+    await waitForIncludes(page.locator('main'), 'chosen to share');
+    if (((await page.locator('main').textContent()) ?? '').includes('Dana')) throw new Error('Dana still shown after opting out');
   });
 });
 
