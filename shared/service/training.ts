@@ -113,3 +113,6 @@ export const training: Pick<Service,'listRequirements'|'createRequirement'|'upda
   verifyCertificate:async(ctx,{code:value})=>{const c=await ctx.repo.getCertificateByCode(value);return {code:value,valid:!!c&&!c.replacedBy,courseTitle:c?.courseTitle??null,issuedAt:c?.issuedAt??null,replaced:!!c?.replacedBy};},
   reissueCertificate:async(ctx,{certificateId,learnerName})=>{const old=await ctx.repo.getCertificate(certificateId)??fail('not-found','Certificate not found.');if(old.replacedBy)fail('conflict','Certificate was already replaced.');const person=await ctx.repo.getUser(old.userId)??fail('not-found','Learner not found.');const cert=await issue(ctx,person,old.courseId,old.basis,old.id,learnerName===undefined?old.learnerName:required(learnerName,'Learner name'));await ctx.repo.markCertificateReplaced(old.id,cert.id);await event(ctx,'certificate-replaced',person.id,old.courseId,null,`Certificate ${old.code} replaced by ${cert.code}.`,user(ctx).id);await event(ctx,'certificate-issued',person.id,old.courseId,null,`Replacement certificate ${cert.code} issued.`,user(ctx).id);return cert;},
 };
+
+/** A person's required training (status per course), for other services such as the manager view. */
+export const requiredTrainingFor = rowsFor;
