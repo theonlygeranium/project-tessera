@@ -52,6 +52,7 @@ export default {
 // Durable Object classes must be exported from the main module.
 export { OcrContainer } from './ocr';
 export { AccessGroupLock } from './identity/access-lock';
+export { GenerationWorkflow } from './generation-workflow';
 
 /** Strips the version prefix (or the unversioned alias) from an API path. */
 export function apiRelativePath(pathname: string): string {
@@ -143,6 +144,11 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   }
 }
 
+/** A service context for background work, acting as one user (no token). */
+export function serviceContextFor(env: Env, repo: Repo, user: import("../shared/domain").User): ServiceContext {
+  return createServiceContext(env, repo, { user, token: null } as Awaited<ReturnType<typeof resolvePrincipal>>);
+}
+
 function createServiceContext(env: Env, repo: Repo, principal: Awaited<ReturnType<typeof resolvePrincipal>>): ServiceContext {
   return {
     repo, ai: createAiClient(env), user: principal.user, token: principal.token,
@@ -153,6 +159,9 @@ function createServiceContext(env: Env, repo: Repo, principal: Awaited<ReturnTyp
       ? env.ACCESS_LOCK
         ? lockedDirectory(env.ACCESS_LOCK, env.ACCESS_GROUP_ID)
         : createAccessDirectory({ token: env.CF_ACCESS_API_TOKEN, accountId: env.CLOUDFLARE_ACCOUNT_ID, groupId: env.ACCESS_GROUP_ID })
+      : null,
+    background: env.GENERATION
+      ? { startGeneration: async (jobId) => { await env.GENERATION!.create({ id: jobId, params: { jobId } }); } }
       : null,
   };
 }

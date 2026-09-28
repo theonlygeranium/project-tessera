@@ -17,6 +17,8 @@ export interface GenerationJob {
   done: number; total: number; lessonIds: Id[]; error: string | null;
   work: GenerationItem[]; instruction: string; failures: GenerationFailure[];
   createdAt: Timestamp; updatedAt: Timestamp;
+  /** Night 3: who advances the job. Absent means 'poll' (each status poll advances it). */
+  runner?: 'poll' | 'workflow';
 }
 
 export type StoredAnnouncement = Omit<Announcement, 'courseTitle' | 'authorName' | 'authorInitials' | 'read'>;

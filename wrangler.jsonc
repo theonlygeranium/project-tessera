@@ -48,6 +48,9 @@
   ],
   "durable_objects": { "bindings": [{ "name": "OCR", "class_name": "OcrContainer" }, { "name": "ACCESS_LOCK", "class_name": "AccessGroupLock" }] },
   // Durable Object classes. v2: Access group writes are serialized (Night 3 carry-over 1).
+  // Background generation (Night 3 carry-over 4). Production only: previews can't run their
+  // own Workflow code, so they keep the poll-driven path (no binding under "previews").
+  "workflows": [{ "name": "tessera-generation", "binding": "GENERATION", "class_name": "GenerationWorkflow" }],
   "migrations": [{ "tag": "v1-ocr", "new_sqlite_classes": ["OcrContainer"] }, { "tag": "v2-access-lock", "new_sqlite_classes": ["AccessGroupLock"] }],
   "vars": {
     "ENVIRONMENT": "production",

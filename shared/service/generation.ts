@@ -69,6 +69,32 @@ async function insert(ctx: ServiceContext, item: GenerationItem, generated: Awai
 function publicJob(job: GenerationJob) {
   return { jobId: job.id, state: job.state, done: job.done, total: job.total, lessonIds: job.lessonIds, error: job.error, failures: job.failures };
 }
+
+/** A running job untouched this long is taken over by polling (the background runner stalled). */
+export const WORKFLOW_STALL_MS = 120_000;
+
+/** Drafts the next batch (up to two elements) of a running job and saves it. Used by polling and by the background runner. */
+export async function advanceGenerationJob(ctx: ServiceContext, job: GenerationJob): Promise<GenerationJob> {
+    const batch = job.work.slice(0, 2);
+    const results = await Promise.allSettled(batch.map(item => draft(ctx, item, job.instruction)));
+    for (const [index, result] of results.entries()) {
+      const item = batch[index];
+      if (result.status === 'fulfilled') {
+        try {
+          await insert(ctx, item, result.value, undefined, `b-${job.id}-${job.done}`);
+          if (!job.lessonIds.includes(item.lessonId)) job.lessonIds.push(item.lessonId);
+        } catch (error) { job.failures.push({ ...item, message: error instanceof Error ? error.message : 'Could not save the draft.' }); }
+      } else job.failures.push({ ...item, message: result.reason instanceof Error ? result.reason.message : 'Could not create the draft.' });
+      job.done++;
+    }
+    job.work = job.work.slice(batch.length);
+    if (!job.work.length) job.state = job.failures.length === job.total ? 'failed' : 'done';
+    if (job.failures.length) job.error = `${job.failures.length} of ${job.total} elements couldn't be generated.`;
+    job.updatedAt = ctx.now();
+    await ctx.repo.putGenerationJob(job);
+    return job;
+}
+
 export const generation: Pick<Service, 'generateAtScope' | 'getGenerationJob' | 'generateElement' | 'importCourse'> = {
   generateAtScope: async (ctx, { courseId, scope, instruction }) => {
     await canTeach(ctx, courseId); await aiEnabled(ctx);
@@ -91,31 +117,30 @@ export const generation: Pick<Service, 'generateAtScope' | 'getGenerationJob' | 
     const job: GenerationJob = { id: ctx.newId('gj'), courseId, requestedBy: user(ctx).id, state: 'running', done: 0, total: work.length,
       lessonIds: [], error: null, work, instruction: instruction?.trim() ?? '', failures: [], createdAt: now, updatedAt: now };
     await ctx.repo.putGenerationJob(job);
+    if (ctx.background) {
+      // Hand the job to the background runner; if it can't start, polls advance it instead.
+      try {
+        job.runner = 'workflow';
+        await ctx.repo.putGenerationJob(job);
+        await ctx.background.startGeneration(job.id);
+      } catch {
+        job.runner = 'poll';
+        await ctx.repo.putGenerationJob(job);
+      }
+    }
     return { jobId: job.id };
   },
   getGenerationJob: async (ctx, { jobId }) => {
     const job = await ctx.repo.getGenerationJob(jobId) ?? fail('not-found', 'Generation job not found.');
     await canTeach(ctx, job.courseId);
     if (job.state !== 'running') return publicJob(job);
-    await aiEnabled(ctx);
-    const batch = job.work.slice(0, 2);
-    const results = await Promise.allSettled(batch.map(item => draft(ctx, item, job.instruction)));
-    for (const [index, result] of results.entries()) {
-      const item = batch[index];
-      if (result.status === 'fulfilled') {
-        try {
-          await insert(ctx, item, result.value, undefined, `b-${job.id}-${job.done}`);
-          if (!job.lessonIds.includes(item.lessonId)) job.lessonIds.push(item.lessonId);
-        } catch (error) { job.failures.push({ ...item, message: error instanceof Error ? error.message : 'Could not save the draft.' }); }
-      } else job.failures.push({ ...item, message: result.reason instanceof Error ? result.reason.message : 'Could not create the draft.' });
-      job.done++;
+    if (job.runner === 'workflow') {
+      // The background runner owns it, unless it has stalled; then polling takes over.
+      if (Date.parse(ctx.now()) - Date.parse(job.updatedAt) < WORKFLOW_STALL_MS) return publicJob(job);
+      job.runner = 'poll';
     }
-    job.work = job.work.slice(batch.length);
-    if (!job.work.length) job.state = job.failures.length === job.total ? 'failed' : 'done';
-    if (job.failures.length) job.error = `${job.failures.length} of ${job.total} elements couldn't be generated.`;
-    job.updatedAt = ctx.now();
-    await ctx.repo.putGenerationJob(job);
-    return publicJob(job);
+    await aiEnabled(ctx);
+    return publicJob(await advanceGenerationJob(ctx, job));
   },
   generateElement: async (ctx, { lessonId, type, instruction, position }) => {
     const lesson = await lessonFor(ctx, lessonId); await canTeach(ctx, lesson.courseId); await aiEnabled(ctx);

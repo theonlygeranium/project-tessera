@@ -825,14 +825,14 @@ export class D1Repo implements Repo {
 
   private generationStmt(job: GenerationJob): D1PreparedStatement {
     return this.db.prepare(`INSERT INTO generation_jobs
-      (id, course_id, requested_by, state, done, total, lesson_ids, error, created_at, updated_at, work, instruction, failures)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, course_id, requested_by, state, done, total, lesson_ids, error, created_at, updated_at, work, instruction, failures, runner)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET state = excluded.state, done = excluded.done,
       lesson_ids = excluded.lesson_ids, error = excluded.error, updated_at = excluded.updated_at,
-      work = excluded.work, instruction = excluded.instruction, failures = excluded.failures`)
+      work = excluded.work, instruction = excluded.instruction, failures = excluded.failures, runner = excluded.runner`)
       .bind(job.id, job.courseId, job.requestedBy, job.state, job.done, job.total,
         JSON.stringify(job.lessonIds), job.error, job.createdAt, job.updatedAt,
-        JSON.stringify(job.work), job.instruction, JSON.stringify(job.failures));
+        JSON.stringify(job.work), job.instruction, JSON.stringify(job.failures), job.runner ?? 'poll');
   }
 
   private adaptationStmt(value: Adaptation): D1PreparedStatement {
@@ -929,13 +929,14 @@ function adaptationFromRow(row: AdaptationRow): Adaptation {
 interface GenerationRow extends Record<string, unknown> {
   id: string; course_id: string; requested_by: string; state: GenerationJob['state'];
   done: number; total: number; lesson_ids: string; error: string | null;
-  created_at: string; updated_at: string; work: string; instruction: string; failures: string;
+  created_at: string; updated_at: string; work: string; instruction: string; failures: string; runner: 'poll' | 'workflow' | null;
 }
 function generationFromRow(row: GenerationRow): GenerationJob {
   return { id: row.id, courseId: row.course_id, requestedBy: row.requested_by,
     state: row.state, done: row.done, total: row.total, lessonIds: JSON.parse(row.lesson_ids),
     error: row.error, createdAt: row.created_at, updatedAt: row.updated_at,
-    work: JSON.parse(row.work), instruction: row.instruction, failures: JSON.parse(row.failures) };
+    work: JSON.parse(row.work), instruction: row.instruction, failures: JSON.parse(row.failures),
+    ...(row.runner === 'workflow' ? { runner: 'workflow' as const } : {}) };
 }
 
 function placeholders(count: number): string {

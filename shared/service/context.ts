@@ -21,6 +21,11 @@ export interface ServiceContext {
   documents?: DocumentEngine | null;
   /** Grants an email access to the application through its identity directory. */
   directory?: Directory | null;
+  /**
+   * Night 3: background work (Cloudflare Workflows in production). When absent, generation
+   * jobs advance on each status poll (previews, local, and demo mode).
+   */
+  background?: { startGeneration(jobId: Id): Promise<void> } | null;
   /** Set when an assistant calls through the MCP server: content it writes is an AI draft a person keeps (D-003). */
   agent?: { name: string } | null;
 }
