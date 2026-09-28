@@ -40,9 +40,10 @@ function sourcesBlock(sources: SourceDoc[]): string {
 
 type Messages = { role: 'system' | 'user'; content: string }[];
 
+
 const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } = {
   'syllabus-extract': ({ sourceKind, name, sections, institutionTerm }) => [
-    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nExtract only facts present in the source. Every extracted or inferred field has an origin and a verbatim source span with its page; use null pages for pasted text. Missing fields have origin missing, value null, confidence 0 and no spans. Keep each outcome's original wording. Return the course profile, outcomes, grading assessments, schedule rows and policies. An empty schedule row has empty true. The service will compute problems and questions.` },
+    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nYou are reading one part of a syllabus for a course designer. The service will compute problems and questions.` },
     { role: 'user', content: `Source kind: ${sourceKind}\nName: ${name}\nInstitution term: ${institutionTerm ? JSON.stringify(institutionTerm) : 'not supplied'}\nSource:\n${sections.map(section => `${section.page === null ? '[pasted]' : `[p. ${section.page}]`} ${(section.lines.length ? section.lines.join('\n') : section.text)}`).join('\n\n').slice(0, 60_000)}` },
   ],
   'syllabus-analyze': ({ extraction, profileAnswers, rates, rubricRefsAllowed, sourceKind }) => [
@@ -124,6 +125,49 @@ const extractionSchema = obj({
   schedule: array(obj({ week: integer, dates: str, topic: str, reading: str, due: str, span: nullable(span), empty: { type: 'boolean' } })),
   policies: array(obj({ kind: { type: 'string', enum: ['attendance','late-work','integrity','ai-use','accommodations','other'] }, text: str, span })),
 });
+
+/**
+ * Syllabus extraction runs as three smaller requests in parallel: one request for everything
+ * made a real 9-page syllabus slow (60–200 s) and often ran out of room before its JSON ended.
+ * Each part retries on its own; the client merges them into one `syllabus-extract` output.
+ */
+const materialSchema = obj({ title: str, kind: { type: 'string', enum: ['textbook','reading','tool'] }, span });
+const { materials: _materials, ...profileProps } = (extractionSchema.properties.profile as { properties: Record<string, unknown> }).properties;
+const EXTRACT_RULES = `Extract only facts present in the source; never invent. Every extracted or inferred field has an origin and verbatim source spans. A span's text is a short exact quote (at most 30 words) and its page is the page label it came from; use null pages for sources without pages. Missing fields have origin missing, value null, confidence 0 and no spans. Dates are ISO YYYY-MM-DD: resolve a month and day with the term's year; if there is no specific date, use null.`;
+const EXTRACT_PARTS = {
+  course: {
+    schema: obj({ profile: obj(profileProps), outcomes: extractionSchema.properties.outcomes, assessments: extractionSchema.properties.assessments }),
+    focus: `Return the course profile, the course learning outcomes, and the graded assessments.
+- code: the primary course code only, like "EPS 120" (no cross-listed codes, section numbers, or term).
+- instructor: the instructor of record, a person (never an AI assistant, tutor, or teaching assistant). Their name, email and office hours are often on separate lines or table rows; use "" for a part the syllabus doesn't give.
+- termWeeks: the number of weeks the syllabus states for the term; otherwise infer it from a dated schedule (origin inferred).
+- outcomes: only the COURSE learning outcomes or objectives, verbatim and in order, without numbering. Never institutional, program, general-education or standards outcomes, and never a later table that restates or groups them. Ids o1, o2, ….
+- assessments: each graded component in the grading table with its weight in percent. If the syllabus gives points, convert each component to percent of the sum of the components' points. A component that is described as not graded is not an assessment. dueAt is an ISO date only when one specific date is given; otherwise null. Ids a1, a2, ….
+- business is for industry training briefs; for a syllabus it is missing. weeklyHoursBudget is 0 (the service computes it); materials are handled separately.`,
+    maxTokens: 16000,
+  },
+  schedule: {
+    schema: obj({ schedule: extractionSchema.properties.schedule }),
+    focus: `Return the course schedule: one row per row of the syllabus's week-by-week or dated course calendar, in order.
+- If the syllabus has no such calendar, return an empty list. Never build rows from lists of assignment due dates.
+- week: the row's week (or module/unit) number; a row covering several weeks uses its first week; an orientation row labelled "0 / 1" is week 1.
+- topic: the row's topic text verbatim (not a summary and not the due items). reading and due: that row's readings and due items, "" when none.
+- empty is true only when the row has no topic or content at all (dates only, or a break with nothing else).`,
+    maxTokens: 12000,
+  },
+  policies: {
+    schema: obj({ materials: extracted(array(materialSchema)), policies: extractionSchema.properties.policies }),
+    focus: `Return the required materials (textbooks, readings, tools, each with its span) and the course policies: attendance, late work, academic integrity, AI use, accommodations, and other course-specific policies.
+- A policy's text is a one- or two-sentence summary in plain words; its span quotes the key sentence.`,
+    maxTokens: 12000,
+  },
+} as const;
+type ExtractPart = keyof typeof EXTRACT_PARTS;
+const extractMessages = (part: ExtractPart, input: AiTasks['syllabus-extract']['input']): Messages => {
+  const [system, user] = PROMPTS['syllabus-extract'](input);
+  return [{ role: 'system', content: `${system.content}\n${EXTRACT_RULES}\n${EXTRACT_PARTS[part].focus}` }, user];
+};
+
 const auditSchema = obj({ outcomeId: str, measurable: { type: 'boolean' }, verb: nullable(str), bloom: nullable({ type: 'string', enum: ['remember','understand','apply','analyze','evaluate','create'] }), fink: nullable({ type: 'string', enum: ['foundational','application','integration','human','caring','learning-how'] }), mager: nullable(obj({ performance: { type: 'boolean' }, condition: { type: 'boolean' }, criterion: { type: 'boolean' } })), assessedBy: array(obj({ assessmentId: str, fit: { type: 'string', enum: ['assessed','verb-mismatch'] } })), suggestion: nullable(obj({ text: str, why: str })) });
 const analysisSchema = obj({ summary: str, cites: array(span), outcomeAudits: array(auditSchema), alignment: array(obj({ outcomeId: str, assessmentId: str, state: { type: 'string', enum: ['assessed','verb-mismatch','none'] } })), learnerCenteredness: nullable(obj({ palmer: obj({ score: number, max: { type: 'integer', enum: [46] }, band: { type: 'string', enum: ['content-focused','transitional','learning-focused'] }, components: array(obj({ name: str, score: number, max: number, evidence: nullable(span) })) }), cullenHarris: obj({ community: number, powerAndControl: number, evaluation: number, evidence: array(obj({ factor: str, quote: span })) }) })), deficiencies: array(obj({ code: str, message: str, rubricRefs: array(obj({ rubric: { type: 'string', enum: ['tessera','oscqr','qm'] }, item: str })), spans: array(span) })) });
 const BLOCK = obj({
@@ -281,8 +325,8 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
   const model = options.model ?? 'palmyra-x6';
   const doFetch = options.fetchImpl ?? fetch;
 
-  async function once<K extends AiTaskName>(task: K, input: AiTasks[K]['input'], timeoutMs: number) {
-    const extra = TASK_OPTIONS[task];
+  interface Request { name: string; messages: Messages; schema: unknown; maxTokens: number; reasoningEffort?: 'low' | 'medium' | 'high'; salvage?: (content: string) => unknown }
+  async function request(req: Request, timeoutMs: number): Promise<unknown> {
     const res = await doFetch(options.url, {
       method: 'POST',
       headers: { authorization: `Bearer ${options.apiKey}`, 'content-type': 'application/json' },
@@ -294,11 +338,11 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
         // failed response.
         seed: Math.floor(Math.random() * 2 ** 31),
         // Palmyra-X6 counts reasoning tokens against max_tokens (D-015).
-        max_tokens: MAX_TOKENS[task],
-        ...(extra?.reasoningEffort ? { reasoning_effort: extra.reasoningEffort } : {}),
+        max_tokens: req.maxTokens,
+        ...(req.reasoningEffort ? { reasoning_effort: req.reasoningEffort } : {}),
         stop: RUNAWAY_STOP,
-        messages: PROMPTS[task](input as never),
-        response_format: { type: 'json_schema', json_schema: { name: task.replace(/-/g, '_'), strict: true, schema: task === 'element' ? elementSchema((input as AiTasks['element']['input']).type as keyof typeof elementSchemas) : SCHEMAS[task] } },
+        messages: req.messages,
+        response_format: { type: 'json_schema', json_schema: { name: req.name, strict: true, schema: req.schema } },
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -309,49 +353,66 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
     const body = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
     const choice = body.choices?.[0];
     const content = choice?.message?.content;
-    if (!content) throw new ApiError('ai-failed', 'The AI service returned an empty response.');
-    let raw: unknown;
+    if (!content) throw new Error(`The AI service returned an empty response (${req.name}${choice?.finish_reason === 'length' ? ', cut off' : ''}).`);
     try {
       if (choice?.finish_reason === 'length') throw new Error('cut off');
-      raw = JSON.parse(content);
+      return JSON.parse(content);
     } catch {
-      // Palmyra occasionally runs away mid-JSON. For a lesson, keep the complete blocks
-      // that came before the runaway if there are enough of them to be a lesson.
-      const blocks = task === 'lesson-draft' ? salvageBlocks(content) : [];
-      if (blocks.length >= 3) raw = { blocks };
-      else throw new Error(`The AI response was cut off or malformed (${task}, ${content.length} characters).`);
+      // Palmyra occasionally runs away mid-JSON; some tasks can keep what came before it.
+      const salvaged = req.salvage?.(content);
+      if (salvaged) return salvaged;
+      throw new Error(`The AI response was cut off or malformed (${req.name}, ${content.length} characters).`);
     }
-    const mapped = MAP[task](raw, input as never) as AiTasks[K]['output'];
-    if (task === 'element' && (mapped as AiTasks['element']['output']).block.type !== (input as AiTasks['element']['input']).type) throw new Error('Wrong element type.');
-    return mapped;
+  }
+
+  /** Up to three attempts for transient failures and malformed or runaway output, while there's time left for a real one. */
+  async function withRetries<T>(perAttempt: number, deadline: number, attemptOnce: (timeoutMs: number, attempt: number) => Promise<T>, accept?: (output: T, attempt: number) => boolean): Promise<T> {
+    let last: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const remaining = deadline - Date.now();
+      if (attempt > 0 && remaining < 30_000) break;
+      try {
+        const output = await attemptOnce(Math.min(perAttempt, remaining), attempt);
+        if (accept && !accept(output, attempt)) { last = new Error('the output was not usable'); continue; }
+        return output;
+      } catch (error) {
+        last = error;
+        const status = error instanceof ApiError ? (error.details as { status?: number } | undefined)?.status : undefined;
+        if (status && status < 500 && status !== 429) break; // a client error won't fix itself
+      }
+    }
+    if (last instanceof ApiError) throw last;
+    throw new ApiError('ai-failed', 'The AI draft could not be created. Try again.', { cause: String(last) });
+  }
+
+  function once<K extends AiTaskName>(task: K, input: AiTasks[K]['input'], timeoutMs: number): Promise<AiTasks[K]['output']> {
+    const extra = TASK_OPTIONS[task];
+    const schema = task === 'element' ? elementSchema((input as AiTasks['element']['input']).type as keyof typeof elementSchemas) : SCHEMAS[task];
+    // For a lesson, keep the complete blocks before a runaway if there are enough to be a lesson.
+    const salvage = task === 'lesson-draft' ? (content: string) => { const blocks = salvageBlocks(content); return blocks.length >= 3 ? { blocks } : null; } : undefined;
+    return request({ name: task.replace(/-/g, '_'), messages: PROMPTS[task](input as never), schema, maxTokens: MAX_TOKENS[task], reasoningEffort: extra?.reasoningEffort, salvage }, timeoutMs).then(raw => {
+      const mapped = MAP[task](raw, input as never) as AiTasks[K]['output'];
+      if (task === 'element' && (mapped as AiTasks['element']['output']).block.type !== (input as AiTasks['element']['input']).type) throw new Error('Wrong element type.');
+      return mapped;
+    });
+  }
+
+  async function extract(input: AiTasks['syllabus-extract']['input'], deadline: number): Promise<AiTasks['syllabus-extract']['output']> {
+    const part = <P extends ExtractPart>(name: P) => withRetries(options.timeoutMs ?? 120_000, deadline, timeoutMs =>
+      request({ name: `syllabus_extract_${name}`, messages: extractMessages(name, input), schema: EXTRACT_PARTS[name].schema, maxTokens: EXTRACT_PARTS[name].maxTokens, reasoningEffort: 'low' }, timeoutMs)) as Promise<any>;
+    const [course, schedule, policies] = await Promise.all([part('course'), part('schedule'), part('policies')]);
+    return MAP['syllabus-extract']({ profile: { ...course.profile, materials: policies.materials }, outcomes: course.outcomes, assessments: course.assessments, schedule: schedule.schedule, policies: policies.policies }, input);
   }
 
   return {
     async run(task, input) {
-      let last: unknown;
       const deadline = Date.now() + RUN_DEADLINE_MS;
+      if (task === 'syllabus-extract') return { output: await extract(input as AiTasks['syllabus-extract']['input'], deadline) as never, model };
       const perAttempt = options.timeoutMs ?? TASK_OPTIONS[task]?.timeoutMs ?? 90_000;
-      // Up to three attempts for transient failures and malformed or runaway output, while
-      // there's time left for a real one.
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const remaining = deadline - Date.now();
-        if (attempt > 0 && remaining < 30_000) break;
-        try {
-          const output = await once(task, input, Math.min(perAttempt, remaining));
-          // Retry a lesson without a usable knowledge check (principle #4), except on the last try.
-          if (attempt < 2 && task === 'lesson-draft' && !hasUsableCheck(output as AiTasks['lesson-draft']['output'])) {
-            last = new Error('lesson draft had no usable knowledge check');
-            continue;
-          }
-          return { output, model };
-        } catch (error) {
-          last = error;
-          const status = error instanceof ApiError ? (error.details as { status?: number } | undefined)?.status : undefined;
-          if (status && status < 500 && status !== 429) break; // a client error won't fix itself
-        }
-      }
-      if (last instanceof ApiError) throw last;
-      throw new ApiError('ai-failed', 'The AI draft could not be created. Try again.', { cause: String(last) });
+      // Retry a lesson without a usable knowledge check (principle #4), except on the last try.
+      const accept = task === 'lesson-draft' ? (output: unknown, attempt: number) => attempt >= 2 || hasUsableCheck(output as AiTasks['lesson-draft']['output']) : undefined;
+      const output = await withRetries(perAttempt, deadline, timeoutMs => once(task, input, timeoutMs), accept);
+      return { output, model };
     },
   };
 }

@@ -46,6 +46,10 @@ After milestone 6: Codex Astra reviews the whole branch, fixes land, the owner r
 
 On the `night4` preview with `WRITER_API_KEY`, run the real `syllabus-extract` and `syllabus-analyze` on the two fixtures and on **at least five real syllabi from the owner** (different departments, one scanned). Record in `handoff/NIGHT-4-QA.md`, per syllabus: field accuracy for outcomes, weights, schedule rows, contact, and credits; whether the empty-week and weights-sum rules fire; the number of questions asked; time per stage. If schedule-row accuracy on the real set is below 90%, write up Docling in the OCR container (cost, latency, what it fixes) instead of working around it. Real syllabi are used only for this check and are not committed (fictional content only in the repo).
 
+### 5.1 Goal: real syllabi pass (owner, 2026-09-28)
+
+The owner supplied 14 test syllabi (7 fictional from one author, 7 real from different authors, including a legacy `.doc`, a points-graded course with no calendar, a cross-listed undergraduate/graduate course, module-based terms from 7 to 16 weeks, and a "master" template). **Goal: each one passes the rubric in `handoff/SYLLABUS-EVAL-RUBRIC.md`**, stage by stage (extraction, then the read, then approaches and the applied course) on real Palmyra, so that a similar syllabus uploaded later is read correctly and becomes a draft course the instructor only has to review. `tools/syllabus_eval.mjs` scores every change against answer keys (built by subagents, checked by Claude); real syllabi and their keys stay in the gitignored `tests/fixtures/syllabus/private/`. Refine and patch until every syllabus passes, then a final QA pass and code review. Progress is logged in `NIGHT-4-QA.md`.
+
 ## 6. Risks
 
 - **Table reconstruction.** pdfjs flattens tables; the `lines` output and the rules are the mitigation, and D-032 measures it. Scanned syllabi go through OCR first, which may lower accuracy.
@@ -58,3 +62,4 @@ On the `night4` preview with `WRITER_API_KEY`, run the real `syllabus-extract` a
 ## 7. Status
 
 - 2026-09-28: plan written; D-030 to D-036 recorded in `design/DECISIONS.md`; branch `night4` created from `main` with the spec branch (PR #58) merged.
+- 2026-09-28: M1 and M2 merged; M3 (read and confirm) merged. First real-syllabus runs failed on reliability (reasoning filled the token budget; WRITER's upstream cache made retries identical), so extraction now uses a fresh seed per request, low reasoning effort, a runaway stop, and three parallel parts. Real-syllabus goal added (§5.1); source-quality fixes (DOCX sections, section citations, PDF small caps, date rule) in progress as `agent/design-source`.

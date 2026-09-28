@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { FileRecord } from '../../../../shared/domain';
+import { refusal } from './refusal';
 import { Button, FormField, StatusNotice } from '../../components';
 import { dataMode } from '../../data/client';
 import { uploadUrl } from './utils';
@@ -16,6 +17,8 @@ export function UploadFile({ courseId, onUploaded, accept = '.pdf,.docx,.pptx,.p
     const file = input.current?.files?.[0];
     if (!file) { setError('Choose a file first.'); return; }
     if (file.size > 25 * 1024 * 1024) { setError('Files can be up to 25 MB.'); return; }
+    const refused = refusal(file.name, accept);
+    if (refused) { setError(refused); return; }
     setBusy(true); setError(''); setMessage(`Uploading ${file.name}…`);
     try {
       const body = new FormData(); body.set('file', file);

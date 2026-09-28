@@ -278,3 +278,10 @@ Approved 2026-09-28. A training brief or competency list is accepted instead of 
 
 ### D-036 · Workflow, voice, provisioning, and governance
 Approved 2026-09-28. Everything else follows `research/syllabus-design-partner/recommendations.md` §5–§8, made normative in the spec: analysis before generation, questions instead of silent fixes, outcomes confirmed before structures, three options plus overlays, a required rationale, a hashed preview before apply, drafts only, and one-action undo.
+
+### D-037 · Suggested outcomes when a syllabus has none
+Approved 2026-09-28 (owner). When a syllabus lists no course outcomes, or the instructor asks, the Design partner can suggest 3–6 observable outcomes from the schedule and assessments (AI task `outcome-suggest`). Each suggestion is a labelled draft with a reason and is confirmed only by the instructor's click (**Use this · Edit · Skip**); instructors can also write their own. The record says which outcomes came from the syllabus, the instructor, or an accepted suggestion (D-003).
+
+### D-038 · Older Office formats are refused with a way forward
+Approved 2026-09-28 (owner). Word 97–2003 (`.doc`), PowerPoint 97–2003 (`.ppt`) and RTF files aren't read. Uploading one where Tessera needs to read it says what the file is and how to save it as DOCX, PPTX, or PDF, instead of failing later. Converting them on the server (LibreOffice in the container) is not planned.
+

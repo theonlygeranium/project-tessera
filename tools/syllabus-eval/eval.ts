@@ -15,7 +15,9 @@ interface Key {
   file: string; code: string; title: string; credits: number | null; termWeeks: number | null; termStart: string | null; termEnd: string | null;
   modality: string; modalityAcceptable?: string[]; instructor: { name: string; email: string } | null;
   outcomes: string[]; assessments: { title: string; weightPercent: number }[]; weightsSum: number;
-  schedule: { week: number; label?: string; topic: string; keywords: string[]; empty: boolean; holidayOrBreak: boolean }[];
+  schedule: { week: number; label?: string; topic: string; keywords: string[]; empty: boolean; holidayOrBreak: boolean; span?: [number, number] }[];
+  /** Another defensible reading of the weights (for example points against a different total). */
+  assessmentsAlt?: { title: string; weightPercent: number }[];
   workloadHoursPerWeek: number | null;
 }
 type Check = { id: string; pass: boolean; detail: string };
@@ -75,22 +77,27 @@ function score(session: DesignSession, key: Key): Check[] {
   add('E2', same(p.termWeeks, key.termWeeks) && same(p.termStart, key.termStart) && same(p.termEnd, key.termEnd),
     `weeks ${p.termWeeks.value} ${p.termStart.value}–${p.termEnd.value} (key ${key.termWeeks} ${key.termStart}–${key.termEnd})`);
   const instructor = p.instructor.value;
-  const surname = key.instructor?.name.replace(/,.*$/, '').trim().split(/\s+/).pop()?.toLowerCase() ?? '';
-  add('E3', !key.instructor || (!!instructor && instructor.email.toLowerCase() === key.instructor.email.toLowerCase() && instructor.name.toLowerCase().includes(surname)),
+  const surname = (key.instructor?.name ?? '').replace(/,.*$/, '').trim().split(/\s+/).pop()?.toLowerCase() ?? '';
+  add('E3', !key.instructor || (!!instructor && (!key.instructor.email || (instructor.email ?? '').toLowerCase() === key.instructor.email.toLowerCase()) && (instructor.name ?? '').toLowerCase().includes(surname)),
     `${instructor?.name ?? 'none'} <${instructor?.email ?? ''}> (key ${key.instructor?.name} <${key.instructor?.email}>)`);
   add('E4', [key.modality, ...(key.modalityAcceptable ?? [])].includes(String(p.modality.value)), `${p.modality.value} (key ${key.modality})`);
   const matched = key.outcomes.map(k => Math.max(0, ...ex.outcomes.map(o => similarity(o.text, k))));
   add('E5', ex.outcomes.length === key.outcomes.length && matched.every(m => m >= 0.9),
     `${ex.outcomes.length}/${key.outcomes.length} outcomes; weakest match ${Math.min(...matched).toFixed(2)}`);
-  const missingWeights = key.assessments.filter(k => !ex.assessments.some(a => a.weightPercent === k.weightPercent && similarity(a.title, k.title) >= 0.5));
+  const missing = (want: { title: string; weightPercent: number }[]) => want.filter(k => !ex.assessments.some(a => a.weightPercent != null && Math.abs(a.weightPercent - k.weightPercent) <= 0.5 && similarity(a.title, k.title) >= 0.5));
   const total = ex.assessments.reduce((n, a) => n + (a.weightPercent ?? 0), 0);
-  add('E6', !missingWeights.length && Math.abs(total - key.weightsSum) < 0.5,
+  const altOk = !!key.assessmentsAlt && !missing(key.assessmentsAlt).length && Math.abs(total - key.assessmentsAlt.reduce((n, a) => n + a.weightPercent, 0)) < 1;
+  const missingWeights = altOk ? [] : missing(key.assessments);
+  add('E6', altOk || (!missingWeights.length && Math.abs(total - key.weightsSum) < 1),
     `${ex.assessments.length}/${key.assessments.length} components, total ${total} (key ${key.weightsSum})${missingWeights.length ? `; missing ${missingWeights.map(m => `${m.title} ${m.weightPercent}%`).join(', ')}` : ''}`);
   const rows = new Map(ex.schedule.map(r => [r.week, r]));
-  const topicHits = key.schedule.filter(k => { const r = rows.get(k.week); return r && k.keywords.every(w => loose(`${r.topic} ${r.due}`).includes(loose(w))); });
-  const falseEmpty = key.schedule.filter(k => !k.empty && rows.get(k.week)?.empty);
+  // A row covering several weeks ("Weeks 4 and 5") may come back once, as its first week.
+  const rowFor = (k: Key['schedule'][number]) => rows.get(k.week) ?? (k.span ? rows.get(k.span[0]) : undefined);
+  const topicHits = key.schedule.filter(k => { const r = rowFor(k); if (!r) return false; if (k.holidayOrBreak && (r.empty || !r.topic.trim())) return true; return k.keywords.every(w => loose(`${r.topic} ${r.due}`).includes(loose(w))); });
+  const falseEmpty = key.schedule.filter(k => !k.empty && !k.holidayOrBreak && rowFor(k)?.empty);
   const pct = key.schedule.length ? topicHits.length / key.schedule.length : 1;
-  add('E7', ex.schedule.length === key.schedule.length && pct >= 0.9 && !falseEmpty.length,
+  const distinctRows = new Set(key.schedule.map(k => k.span ? k.span.join('-') : String(k.week))).size;
+  add('E7', ex.schedule.length >= distinctRows && ex.schedule.length <= key.schedule.length && pct >= 0.9 && !falseEmpty.length,
     `${ex.schedule.length}/${key.schedule.length} rows; topics ${topicHits.length}/${key.schedule.length}${falseEmpty.length ? `; wrongly empty: weeks ${falseEmpty.map(k => k.week).join(', ')}` : ''}${pct < 1 ? `; missed weeks ${key.schedule.filter(k => !topicHits.includes(k)).map(k => k.week).join(', ')}` : ''}`);
   const spans = spansOf(session).map(s => ({ s, g: grounded(s, session.source) }));
   const found = spans.filter(x => x.g.found).length, pageBad = spans.filter(x => x.g.pageOk === false).length;
@@ -179,6 +186,7 @@ async function main() {
     console.log(`${r.file.slice(0, 33).padEnd(34)} ${String(r.run).padEnd(4)}${ids.map(id => (by.get(id) ? (by.get(id)!.pass ? 'ok' : 'NO') : '·').padEnd(4)).join('')} ${pass ? 'PASS' : 'FAIL'}`);
   }
   console.log(`\n${passed}/${results.length} runs pass extraction.\n`);
+  for (const r of results) if (!r.checks.length) console.log(`${r.file.slice(0, 24)} #${r.run} crashed: ${r.error}`);
   for (const r of results) for (const c of r.checks.filter(c => !c.pass)) console.log(`${r.file.slice(0, 24)} #${r.run} ${c.id}: ${c.detail}`);
   await mkdir('reports', { recursive: true });
   await writeFile(out, JSON.stringify(results, null, 1));

@@ -22,22 +22,49 @@ describe('palmyraClient', () => {
   const reply = (content: string, finish = 'stop') =>
     new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: finish }] }), { status: 200 });
 
-  it('sends page-anchored syllabus lines with the design-partner prompt and 8,000 token limit', async () => {
+  it('reads a syllabus in three parallel parts with page-anchored lines, then merges them', async () => {
     const input = { sourceKind: 'syllabus' as const, name: seed.name, sections: seed.sections };
     const fixture = (await fixtureAi.run('syllabus-extract', input)).output;
+    const parts: Record<string, unknown> = {
+      syllabus_extract_course: { profile: { ...fixture.profile, materials: undefined }, outcomes: fixture.outcomes, assessments: fixture.assessments },
+      syllabus_extract_schedule: { schedule: fixture.schedule },
+      syllabus_extract_policies: { materials: fixture.profile.materials, policies: fixture.policies },
+    };
+    const seen: string[] = [];
     const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async (_url, options) => {
       const body = JSON.parse(String(options?.body));
-      expect(body.max_tokens).toBe(24000);
+      const name = body.response_format.json_schema.name as string;
+      seen.push(name);
       expect(body.reasoning_effort).toBe('low');
       expect(body.stop).toEqual(['\n\n\n']);
       expect(Number.isInteger(body.seed)).toBe(true);
-      expect(body.response_format).toMatchObject({ type: 'json_schema', json_schema: { strict: true, schema: { required: ['profile', 'outcomes', 'assessments', 'schedule', 'policies'] } } });
+      expect(body.response_format.json_schema.strict).toBe(true);
       expect(body.messages[0].content).toContain("You are Tessera's design partner. The instructor is the subject-matter expert and the instructor of record;");
       expect(body.messages[1].content).toContain('[p. 4] Course schedule\nWeek Dates Topic Reading Due');
       expect(body.messages[1].content).toContain('8 Oct 13–17\n9 Oct 20–24');
-      return reply(JSON.stringify(fixture));
+      if (name === 'syllabus_extract_course') expect(body.response_format.json_schema.schema.required).toEqual(['profile', 'outcomes', 'assessments']);
+      if (name === 'syllabus_extract_schedule') expect(body.messages[0].content).toContain('Never build rows from lists of assignment due dates');
+      return reply(JSON.stringify(parts[name]));
+    } });
+    const output = (await ai.run('syllabus-extract', input)).output;
+    expect(seen.sort()).toEqual(['syllabus_extract_course', 'syllabus_extract_policies', 'syllabus_extract_schedule']);
+    expect(output.schedule).toHaveLength(14);
+    expect(output.outcomes).toHaveLength(6);
+    expect(output.profile.materials).toEqual(fixture.profile.materials);
+    expect(output.policies).toEqual(fixture.policies);
+  });
+  it('retries one extraction part without repeating the others', async () => {
+    const input = { sourceKind: 'syllabus' as const, name: seed.name, sections: seed.sections };
+    const fixture = (await fixtureAi.run('syllabus-extract', input)).output;
+    const calls: Record<string, number> = {};
+    const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async (_url, options) => {
+      const name = JSON.parse(String(options?.body)).response_format.json_schema.name as string;
+      calls[name] = (calls[name] ?? 0) + 1;
+      if (name === 'syllabus_extract_schedule' && calls[name] === 1) return reply('{"schedule":[{"week":1', 'length');
+      return reply(JSON.stringify(name === 'syllabus_extract_course' ? { profile: fixture.profile, outcomes: fixture.outcomes, assessments: fixture.assessments } : name === 'syllabus_extract_schedule' ? { schedule: fixture.schedule } : { materials: fixture.profile.materials, policies: fixture.policies }));
     } });
     expect((await ai.run('syllabus-extract', input)).output.schedule).toHaveLength(14);
+    expect(calls).toEqual({ syllabus_extract_course: 1, syllabus_extract_schedule: 2, syllabus_extract_policies: 1 });
   });
   it('caps only the syllabus source block at 60,000 characters', async () => {
     const long = 'X'.repeat(60_000) + 'SHOULD_NOT_APPEAR';
