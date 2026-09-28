@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Three approaches</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="../../docs/assets/ai-voice.css">
+<script src="../../docs/assets/ai-voice.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+.btn{height:36px;padding:0 14px;border-radius:9px;border:1px solid #d5cfc4;background:#fff;font-family:inherit;font-size:13px;font-weight:500;color:#1c1b19;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-p{border:none;background:#0e6b63;color:#fff;font-weight:600}
+.btn-s{height:28px;padding:0 10px;font-size:12px;border-radius:7px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#ebe6dd;color:#5f5b54;white-space:nowrap}
+.chip-ok{background:#e4f2e8;color:#1f5a37}.chip-warn{background:#fbf1dc;color:#7a5310}.chip-err{background:#fbe7e4;color:#7a2a20}.chip-ai{background:#eeebf8;color:#3f3380}.chip-acc{background:#e3f0ee;color:#0a4f49}
+.card{background:#fff;border:1px solid #e3ded4;border-radius:12px}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5f5b54}
+.h2{font-family:'Fraunces',Georgia,serif;font-weight:500;font-size:19px;margin:0;line-height:1.2}
+.muted{color:#5f5b54}
+.cite{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;color:#5b4baf;background:#f7f5fc;border-radius:4px;padding:1px 5px;white-space:nowrap}
+.step{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:#5f5b54}
+.step .n{width:20px;height:20px;border-radius:50%;border:2px solid #d5cfc4;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:10px}
+.step.done{color:#0e6b63;font-weight:600}.step.done .n{border:none;background:#0e6b63}
+.step.cur{color:#1c1b19;font-weight:600}.step.cur .n{border-color:#0e6b63;background:#fff;color:#0e6b63}
+.bar{width:20px;height:2px;background:#d5cfc4;margin:0 6px}.bar.done{background:#0e6b63}
+.opt{display:flex;flex-direction:column;gap:10px;padding:16px 18px;flex:1 1 0;min-width:0}
+.opt.sel{border:2px solid #0e6b63;box-shadow:0 6px 18px rgba(28,27,25,.08)}
+.opt ul{margin:0;padding-left:16px;font-size:12.5px;color:#2a2825;display:flex;flex-direction:column;gap:4px}
+.mod{display:flex;gap:3px;align-items:flex-end;height:36px}
+.mod span{flex:1 1 0;background:#e3f0ee;border-radius:3px 3px 0 0;min-width:0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#0e6b63}
+.dot-o{display:inline-block;width:8px;height:8px;border-radius:50%;border:1.5px solid #c9c2b5;box-sizing:border-box}
+input[type=checkbox]{width:18px;height:18px;accent-color:#0e6b63;margin:0;flex-shrink:0}
+.tog{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:#fff;border:1px solid #e3ded4;border-radius:10px;flex:1 1 0;font-size:12.5px;cursor:pointer}
+</style>
+</helmet>
+<div data-ai-style="marginalia" style="width: 1440px; height: 1180px; box-sizing: border-box; display: flex; flex-direction: column; background: #f4f1eb; color: #1c1b19; font-size: 14px; line-height: 1.45; overflow: hidden">
+
+  <header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid #e3ded4; background: #faf8f4">
+    <a href="SyllabusRead.dc.html" aria-label="Back to confirm" style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; text-decoration: none; color: #5f5b54; white-space: nowrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Confirm</a>
+    <div style="width: 1px; height: 20px; background: #e3ded4"></div>
+    <div style="font-size: 15px; font-weight: 600; white-space: nowrap; flex-shrink: 0">STAT 110 · Reasoning with Data</div>
+    <span class="chip">6 outcomes · 4 answers</span>
+    <div style="flex-grow: 1"></div>
+    <ol aria-label="Design partner stages" style="list-style: none; margin: 0; padding: 0; display: flex; align-items: center">
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Start</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Read</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Confirm</li><li class="bar done"></li>
+      <li class="step cur" aria-current="step"><span class="n">4</span>Approaches</li><li class="bar"></li>
+      <li class="step"><span class="n">5</span>Preview</li><li class="bar"></li>
+      <li class="step"><span class="n">6</span>Review</li>
+    </ol>
+    <div style="flex-grow: 1"></div>
+    <button type="button" class="btn">Critique mine</button>
+  </header>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 20px 28px; min-height: 0; box-sizing: border-box">
+
+    <div class="ai ai--chat" style="max-width: 1100px">
+      <div class="ai-who">Design partner <span class="ai-src">· from your confirmed outcomes, the p. 4 schedule and your answers</span></div>
+      <div class="ai-body">Three ways to structure STAT 110. You said the project is the point and you want real data from week 1<sup class="ai-ref">1</sup>; the project is 40% and you chose milestones<sup class="ai-ref">2</sup>; 120 students makes auto-graded retrieval checks realistic and open discussion hard. Pick one, or combine: if you choose more than one I'll say how they fit together before you preview anything.</div>
+      <div class="ai-cites"><span class="ai-cite" data-n="1">Your answer to question 5</span><span class="ai-cite" data-n="2">Syllabus p. 3 · your answer to question 3</span></div>
+    </div>
+
+    <!-- Three options -->
+    <div style="display: flex; gap: 16px">
+
+      <!-- A -->
+      <section class="card opt" aria-labelledby="opt-a">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">
+          <div><span class="lbl">A · Closest to your syllabus</span><h2 id="opt-a" class="h2" style="margin-top: 4px">Weekly cadence, data first</h2></div>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer"><input type="checkbox" aria-label="Use approach A">Use</label>
+        </div>
+        <p style="margin: 0; font-size: 13px; color: #2a2825">13 weekly modules in your schedule's order, plus a Start-here and a Wrap-up. Each week opens with a short data lab, ends with a retrieval check, and the project runs alongside as four milestones.</p>
+        <div><span class="lbl">Fits because</span><ul><li>Your schedule already runs week by week with one chapter each <span class="cite">p. 4–5</span></li><li>Retrieval checks scale to 120 students without grading load</li><li>Keeps every topic where your students' textbook puts it</li></ul></div>
+        <div><span class="lbl">Changes versus your syllabus</span><div style="font-size: 12.5px; color: #2a2825">Adds a claim-critique task in weeks 6, 10 and 14 so O6 is assessed; moves the midterm off week 11.</div></div>
+        <div><span class="lbl">Trade-offs</span><div style="font-size: 12.5px; color: #2a2825">Can become chapter coverage; module objectives and a cumulative element in the final milestone guard against it.</div></div>
+        <div><span class="lbl">Evidence, in one line</span><div style="font-size: 12.5px; color: #2a2825">Weekly low-stakes quizzing with feedback: g ≈ 0.5 across 222 studies (Yang et al. 2021).</div></div>
+        <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px">
+          <div style="display: flex; justify-content: space-between; font-size: 11.5px" class="muted"><span>15 modules · avg 7.8 h/wk · peak 9.2 h</span><span>O1–O6 each assessed ≥ 2×</span></div>
+          <div class="mod" role="img" aria-label="Hours per module"><span style="height: 40%"></span><span style="height: 70%"></span><span style="height: 74%"></span><span style="height: 80%"></span><span style="height: 76%"></span><span style="height: 82%"></span><span style="height: 78%"></span><span style="height: 60%"></span><span style="height: 80%"></span><span style="height: 84%"></span><span style="height: 92%; background: #cfe3df"></span><span style="height: 78%"></span><span style="height: 74%"></span><span style="height: 86%"></span><span style="height: 50%"></span></div>
+          <div class="muted" style="font-size: 11.5px">Draws on: Tessera standard 2.2, 3.1 · OSCQR 44, 46 · retrieval and spaced practice</div>
+        </div>
+      </section>
+
+      <!-- B (selected) -->
+      <section class="card opt sel" aria-labelledby="opt-b">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">
+          <div><span class="lbl">B · Built around your 40% project</span><h2 id="opt-b" class="h2" style="margin-top: 4px">Project-driven units with milestones</h2></div>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer"><input type="checkbox" checked aria-label="Use approach B">Use</label>
+        </div>
+        <p style="margin: 0; font-size: 13px; color: #2a2825">Five units that follow the project's own stages: Ask → Collect → Describe → Compare → Communicate. Each unit ends in a milestone with rubric feedback; textbook topics arrive when the project needs them.</p>
+        <div><span class="lbl">Fits because</span><ul><li>"The project is the point of the course" <span class="cite">your answer, q. 5</span></li><li>O4 (design a study) and O5 (communicate) get authentic tasks instead of a multiple-choice midterm <span class="cite">p. 3</span></li><li>Milestones spread the week-11 spike across four dates</li></ul></div>
+        <div><span class="lbl">Changes versus your syllabus</span><div style="font-size: 12.5px; color: #2a2825">Chapters 3 and 4 swap (sampling before summaries); the midterm becomes milestone 2. Topics otherwise keep their order. <a href="#diff">See the sequence diff</a></div></div>
+        <div><span class="lbl">Trade-offs</span><div style="font-size: 12.5px; color: #2a2825">Four milestones × 120 students is real grading load; AI-drafted rubric feedback helps but you review each. Students new to open-ended work need scaffolding in unit 1.</div></div>
+        <div><span class="lbl">Evidence, in one line</span><div style="font-size: 12.5px; color: #2a2825">Project-based learning d ≈ 0.71 (Chen &amp; Yang 2019); weaker short-term recall in problem-centred designs, so weekly retrieval checks stay.</div></div>
+        <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px">
+          <div style="display: flex; justify-content: space-between; font-size: 11.5px" class="muted"><span>7 modules · avg 7.9 h/wk · peak 8.8 h</span><span>O1–O6 each assessed ≥ 2×</span></div>
+          <div class="mod" role="img" aria-label="Hours per module"><span style="height: 40%"></span><span style="height: 76%; background: #0e6b63"></span><span style="height: 84%; background: #0e6b63"></span><span style="height: 80%; background: #0e6b63"></span><span style="height: 86%; background: #0e6b63"></span><span style="height: 82%; background: #0e6b63"></span><span style="height: 52%"></span></div>
+          <div class="muted" style="font-size: 11.5px">Draws on: backward design · Tessera standard 2.4, 3.3 · OSCQR 45, 47 · TILT for each milestone</div>
+        </div>
+      </section>
+
+      <!-- C -->
+      <section class="card opt" aria-labelledby="opt-c">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px">
+          <div><span class="lbl">C · Makes O6 the through-line</span><h2 id="opt-c" class="h2" style="margin-top: 4px">Two-week cases, each a claim to test</h2></div>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer"><input type="checkbox" checked aria-label="Use approach C">Use</label>
+        </div>
+        <p style="margin: 0; font-size: 13px; color: #2a2825">Seven two-week cases. Each opens with a statistical claim from the news, teaches the tools needed to test it, and closes with a short written critique. The project becomes the final case.</p>
+        <div><span class="lbl">Fits because</span><ul><li>"Less lecture, more 'what does this number mean'" <span class="cite">your answer, q. 5</span></li><li>O6 is assessed every two weeks instead of never <span class="cite">p. 2–3</span></li><li>Real data from week 1, as you asked</li></ul></div>
+        <div><span class="lbl">Changes versus your syllabus</span><div style="font-size: 12.5px; color: #2a2825">Pairs your 13 topics into 7 cases; homework becomes the critique write-up; weights unchanged.</div></div>
+        <div><span class="lbl">Trade-offs</span><div style="font-size: 12.5px; color: #2a2825">Case discussion with 120 students needs sections or a structured online thread; more facilitation than A. You supply the claims: I leave a slot in each case, never an invented article.</div></div>
+        <div><span class="lbl">Evidence, in one line</span><div style="font-size: 12.5px; color: #2a2825">Problem-based designs favor long-term retention and skill over short-term recall (Strobel &amp; van Barneveld 2009); the GAISE College Report recommends real data and statistical thinking over procedures.</div></div>
+        <div style="margin-top: auto; display: flex; flex-direction: column; gap: 6px">
+          <div style="display: flex; justify-content: space-between; font-size: 11.5px" class="muted"><span>9 modules · avg 8.1 h/wk · peak 9.6 h</span><span>O6 assessed 7×</span></div>
+          <div class="mod" role="img" aria-label="Hours per module"><span style="height: 40%"></span><span style="height: 80%"></span><span style="height: 84%"></span><span style="height: 82%"></span><span style="height: 86%"></span><span style="height: 96%; background: #cfe3df"></span><span style="height: 84%"></span><span style="height: 88%"></span><span style="height: 50%"></span></div>
+          <div class="muted" style="font-size: 11.5px">Draws on: Merrill's first principles · Tessera standard 3.1 · OSCQR 29, 44</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Overlays -->
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span class="lbl">Overlays · apply to any approach</span>
+      <div style="display: flex; gap: 10px">
+        <label class="tog"><input type="checkbox" checked><span><strong>Bookends</strong><br><span class="muted">A Start-here module (purpose, how the course works, your contact, a baseline check) and a closing module that integrates and transfers.</span></span></label>
+        <label class="tog"><input type="checkbox" checked><span><strong>Spaced review</strong><br><span class="muted">Each module's check resurfaces two and five modules later, so nothing appears once and vanishes.</span></span></label>
+        <label class="tog"><input type="checkbox"><span><strong>UDL choice points</strong><br><span class="muted">Milestones accept a memo, a short talk or a poster; students choose once per unit.</span></span></label>
+        <label class="tog"><input type="checkbox"><span><strong>Teaching-presence plan</strong><br><span class="muted">Module overview drafts and facilitation prompts. Optional in person; I'd require it for online.</span></span></label>
+      </div>
+    </div>
+
+    <!-- Combination + rationale -->
+    <div style="display: flex; gap: 16px; align-items: stretch">
+      <div class="ai ai--note" style="flex: 1 1 0">
+        <div class="ai-who">How B and C combine <span class="ai-src">· your selection</span></div>
+        <div class="ai-body">B's five project units become the spine. C's claim-to-test opens each unit and its critique becomes that unit's homework, so O6 is assessed five times and the project stays the summative thread. Net: 7 modules, avg 8.0 h/wk, peak 9.0 h in unit 4.</div>
+      </div>
+      <div class="card" style="flex: 1 1 0; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+        <label for="why" style="font-size: 13px; font-weight: 600">Why does this fit your students? <span class="muted" style="font-weight: 400">One sentence, saved to your design record. Required.</span></label>
+        <div style="display: flex; gap: 10px">
+          <input id="why" type="text" style="flex-grow: 1; height: 36px; border: 1px solid #d5cfc4; border-radius: 9px; padding: 0 12px; font-family: inherit; font-size: 13px" value="Most of them are non-majors who will read statistics in the news far more often than they'll compute one; the project and the critiques give them that practice.">
+          <a href="SyllabusPreview.dc.html" class="btn btn-p" style="text-decoration: none; flex-shrink: 0">Preview what will be created</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#0e6b63","options":["#0e6b63","#1f4f9c","#7a3e8f","#a24f1f"]},"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#0e6b63' };
+  }
+}
+</script>
+</body>
+</html>

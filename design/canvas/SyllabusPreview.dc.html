@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Preview what will be created</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="../../docs/assets/ai-voice.css">
+<script src="../../docs/assets/ai-voice.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+.btn{height:36px;padding:0 14px;border-radius:9px;border:1px solid #d5cfc4;background:#fff;font-family:inherit;font-size:13px;font-weight:500;color:#1c1b19;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-p{border:none;background:#0e6b63;color:#fff;font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#ebe6dd;color:#5f5b54;white-space:nowrap}
+.chip-ok{background:#e4f2e8;color:#1f5a37}.chip-warn{background:#fbf1dc;color:#7a5310}.chip-err{background:#fbe7e4;color:#7a2a20}.chip-ai{background:#eeebf8;color:#3f3380}.chip-acc{background:#e3f0ee;color:#0a4f49}
+.card{background:#fff;border:1px solid #e3ded4;border-radius:12px}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5f5b54}
+.h1{font-family:'Fraunces',Georgia,serif;font-weight:500;font-size:22px;margin:0;line-height:1.15}
+.muted{color:#5f5b54}
+.cite{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;color:#5b4baf;background:#f7f5fc;border-radius:4px;padding:1px 5px;white-space:nowrap}
+.step{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:#5f5b54}
+.step .n{width:20px;height:20px;border-radius:50%;border:2px solid #d5cfc4;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:10px}
+.step.done{color:#0e6b63;font-weight:600}.step.done .n{border:none;background:#0e6b63}
+.step.cur{color:#1c1b19;font-weight:600}.step.cur .n{border-color:#0e6b63;background:#fff;color:#0e6b63}
+.bar{width:20px;height:2px;background:#d5cfc4;margin:0 6px}.bar.done{background:#0e6b63}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#5f5b54;padding:7px 8px;border-bottom:1px solid #e3ded4;background:#faf8f4}
+td{padding:7px 8px;border-bottom:1px solid #ede8df;vertical-align:top}
+.o{display:inline-block;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;color:#0a4f49;background:#e3f0ee;border-radius:4px;padding:1px 5px;margin-right:2px}
+.ok{display:flex;gap:8px;align-items:center;font-size:12.5px}
+select{height:34px;border:1px solid #d5cfc4;border-radius:8px;padding:0 10px;font-family:inherit;font-size:13px;background:#fff}
+</style>
+</helmet>
+<div data-ai-style="marginalia" style="width: 1440px; height: 1040px; box-sizing: border-box; display: flex; flex-direction: column; background: #f4f1eb; color: #1c1b19; font-size: 14px; line-height: 1.45; overflow: hidden">
+
+  <header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid #e3ded4; background: #faf8f4">
+    <a href="SyllabusApproaches.dc.html" aria-label="Back to approaches" style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; text-decoration: none; color: #5f5b54; white-space: nowrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Approaches</a>
+    <div style="width: 1px; height: 20px; background: #e3ded4"></div>
+    <div style="font-size: 15px; font-weight: 600; white-space: nowrap; flex-shrink: 0">STAT 110 · Reasoning with Data</div>
+    <span class="chip">B + C · Bookends · Spaced review</span>
+    <div style="flex-grow: 1"></div>
+    <ol aria-label="Design partner stages" style="list-style: none; margin: 0; padding: 0; display: flex; align-items: center">
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Start</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Read</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Confirm</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Approaches</li><li class="bar done"></li>
+      <li class="step cur" aria-current="step"><span class="n">5</span>Preview</li><li class="bar"></li>
+      <li class="step"><span class="n">6</span>Review</li>
+    </ol>
+    <div style="flex-grow: 1"></div>
+    <span class="muted" style="font-size: 12px; font-family: 'IBM Plex Mono', monospace">plan 7f3a91c2</span>
+  </header>
+
+  <div style="flex-grow: 1; display: flex; gap: 24px; padding: 22px 28px; min-height: 0; box-sizing: border-box">
+
+    <main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px">
+        <div>
+          <span class="lbl">Nothing is written until you apply</span>
+          <h1 class="h1" style="margin-top: 4px">Will add 7 modules, 16 lessons, 16 checks, 5 assignments, 6 outcomes and 24 alignment links.</h1>
+          <p style="margin: 6px 0 0; font-size: 14px; color: #3a3833">Renames nothing. Removes nothing. Your 2 existing modules and 3 lessons stay where they are; the new modules follow them, and two of them overlap by topic (marked below). Everything lands as a draft.</p>
+        </div>
+      </div>
+
+      <div class="card" style="overflow: hidden; display: flex; flex-direction: column; min-height: 0">
+        <table>
+          <thead><tr><th style="width: 24px">#</th><th style="width: 262px">Module · objective</th><th style="width: 76px">Outcomes</th><th style="width: 100px">Lessons</th><th style="width: 190px">Assessment</th><th>From</th><th style="width: 54px; text-align: right">Hours</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>0</td><td><strong>Start here</strong><br><span class="muted">How this course works, your contact, the outcomes, how AI was used, a 5-item baseline check</span></td><td>—</td><td>1 · 20 min</td><td>Baseline check (ungraded)</td><td>Bookend · <span class="cite">p. 1, 6</span></td><td style="text-align: right">0.3</td>
+            </tr>
+            <tr>
+              <td>1</td><td><strong>Ask: is this a statistical question?</strong><br><span class="muted">Frame a question a data set can answer and say what would count as evidence</span> <span class="chip chip-warn">overlaps your module "Asking statistical questions"</span></td><td><span class="o">O1</span><span class="o">O6</span></td><td>3 · wks 1–3<br>55 min each</td><td>Milestone 1: project proposal (TILT) · Claim critique 1</td><td><span class="cite">p. 4 wks 1–3</span> ch. 1</td><td style="text-align: right">22.5</td>
+            </tr>
+            <tr>
+              <td>2</td><td><strong>Collect: sampling and study design</strong><br><span class="muted">Design a simple study and name its sources of bias</span></td><td><span class="o">O4</span><span class="o">O6</span></td><td>3 · wks 4–6<br>55 min each</td><td>Milestone 2: data plan (replaces the midterm) · Claim critique 2</td><td><span class="cite">p. 4 wks 4–6</span> ch. 3, moved ahead of ch. 4</td><td style="text-align: right">24.0</td>
+            </tr>
+            <tr>
+              <td>3</td><td><strong>Describe: center, spread and shape</strong><br><span class="muted">Summarize a distribution and explain why two samples differ</span> <span class="chip chip-warn">overlaps your module "Describing distributions"</span></td><td><span class="o">O2</span><span class="o">O3</span><span class="o">O6</span></td><td>3 · wks 7–9<br>55 min each</td><td>Milestone 3: descriptive report · Claim critique 3</td><td><span class="cite">p. 4–5 wks 7–9</span> ch. 4</td><td style="text-align: right">25.5</td>
+            </tr>
+            <tr>
+              <td>4</td><td><strong>Compare: two groups, honestly</strong><br><span class="muted">Compare groups and decide whether a difference could be chance</span></td><td><span class="o">O2</span><span class="o">O3</span><span class="o">O6</span></td><td>3 · wks 10–12<br>55 min each</td><td>Milestone 4: comparison draft · Claim critique 4</td><td><span class="cite">p. 5 wks 10–12</span> ch. 5</td><td style="text-align: right">27.0</td>
+            </tr>
+            <tr>
+              <td>5</td><td><strong>Communicate: findings for a non-technical reader</strong><br><span class="muted">Present a result so a reader without statistics can act on it</span></td><td><span class="o">O5</span><span class="o">O6</span></td><td>2 · wks 13–14<br>55 min each</td><td>Final project, due Dec 4 <span class="cite">p. 3</span> · Claim critique 5</td><td><span class="cite">p. 5 wks 13–14</span></td><td style="text-align: right">30.0</td>
+            </tr>
+            <tr>
+              <td>6</td><td><strong>Wrap-up: what changed in how you read a number</strong><br><span class="muted">Revisit the baseline check and the week-1 claim</span></td><td><span class="o">O1</span><span class="o">O6</span></td><td>1 · wk 15 · 30 min</td><td>Cumulative check · reflection (ungraded)</td><td>Bookend · spaced review</td><td style="text-align: right">3.5</td>
+            </tr>
+            <tr style="background: #faf8f4">
+              <td></td><td><strong>Total</strong></td><td></td><td>16 lessons</td><td>5 assignments · 16 checks · weights unchanged (15 · 20 · 20 · 40 · 5)</td><td></td><td style="text-align: right"><strong>132.8</strong> of 135</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; gap: 14px; font-size: 12.5px; color: #3a3833">
+        <div class="card" style="flex: 1 1 0; padding: 10px 12px"><strong>Readings:</strong> 9 chapter readings from your syllabus <span class="cite">p. 2, 4–5</span> are linked. 5 claim articles are left as <em>[Article to select]</em> placeholders; I don't invent sources.</div>
+        <div class="card" style="flex: 1 1 0; padding: 10px 12px"><strong>Existing content:</strong> your 3 lessons aren't moved. During review, "What makes a question statistical?" and "Cases and variables" can be pulled into Unit 1 with one action.</div>
+        <div class="card" style="flex: 1 1 0; padding: 10px 12px"><strong>Dates:</strong> milestone due dates fall on your Thursdays, none in week 8 (exam week, your answer) and none within 3 days of another graded item.</div>
+      </div>
+    </main>
+
+    <aside class="card" aria-labelledby="before-h" style="width: 380px; flex-shrink: 0; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px">
+      <h2 id="before-h" class="lbl" style="margin: 0">Before you apply</h2>
+
+      <div style="display: flex; flex-direction: column; gap: 7px">
+        <span class="lbl" style="color: #3a3833">Meridian State course template</span>
+        <div class="ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>Start-here module with instructor contact (from p. 1)</div>
+        <div class="ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>Module objective on every module</div>
+        <div class="ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>Accessibility floor 85 · drafts are born accessible</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 7px; border-top: 1px solid #ede8df; padding-top: 12px">
+        <span class="lbl" style="color: #3a3833">Readiness after apply · Tessera standard</span>
+        <div class="ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>Outcomes present, measurable (6)</div>
+        <div class="ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>Every assessment aligned · every outcome assessed (24 links)</div>
+        <div class="ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>Time estimates on every lesson · 132.8 of 135 h</div>
+        <div class="ok"><span style="width: 16px; height: 16px; border-radius: 50%; border: 2px solid #9a6a12; box-sizing: border-box; flex-shrink: 0"></span><span><strong>AI drafts kept: 0 of 58.</strong> That part is yours; publishing stays blocked until you've reviewed them.</span></div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #ede8df; padding-top: 12px">
+        <label for="unsure" style="font-size: 13px; font-weight: 600">Which module are you least sure about?</label>
+        <span class="muted" style="font-size: 12px">I'll flag it for extra review and draft two alternatives for its first lesson.</span>
+        <select id="unsure"><option>Unit 2 · Collect: sampling and study design</option><option>None</option><option>Unit 1 · Ask</option><option>Unit 3 · Describe</option><option>Unit 4 · Compare</option><option>Unit 5 · Communicate</option></select>
+      </div>
+
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px">
+        <div class="muted" style="font-size: 12px">About 2 minutes. Runs in the background; you can leave this page. One action removes everything this plan adds, at any time.</div>
+        <div style="display: flex; gap: 10px">
+          <a href="SyllabusReview.dc.html" class="btn btn-p" style="text-decoration: none">Apply as drafts</a>
+          <a href="SyllabusApproaches.dc.html" class="btn" style="text-decoration: none">Change approach</a>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#0e6b63","options":["#0e6b63","#1f4f9c","#7a3e8f","#a24f1f"]},"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#0e6b63' };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Review module by module</title>
+<link rel="stylesheet" href="../assets/ai-voice.css">
+<script src="../assets/ai-voice.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+.btn{height:34px;padding:0 12px;border-radius:9px;border:1px solid #d5cfc4;background:#fff;font-family:inherit;font-size:13px;font-weight:500;color:#1c1b19;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-p{border:none;background:#0e6b63;color:#fff;font-weight:600}
+.btn-s{height:28px;padding:0 10px;font-size:12px;border-radius:7px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#ebe6dd;color:#5f5b54;white-space:nowrap}
+.chip-ok{background:#e4f2e8;color:#1f5a37}.chip-warn{background:#fbf1dc;color:#7a5310}.chip-err{background:#fbe7e4;color:#7a2a20}.chip-ai{background:#eeebf8;color:#3f3380}.chip-acc{background:#e3f0ee;color:#0a4f49}
+.card{background:#fff;border:1px solid #e3ded4;border-radius:12px}
+.lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5f5b54}
+.muted{color:#5f5b54}
+.cite{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;color:#5b4baf;background:#f7f5fc;border-radius:4px;padding:1px 5px;white-space:nowrap}
+.slot{font-style:italic;background:#fbf1dc;color:#7a5310;border-radius:4px;padding:1px 5px}
+.step{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:#5f5b54}
+.step .n{width:20px;height:20px;border-radius:50%;border:2px solid #d5cfc4;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:10px}
+.step.done{color:#0e6b63;font-weight:600}.step.done .n{border:none;background:#0e6b63}
+.step.cur{color:#1c1b19;font-weight:600}.step.cur .n{border-color:#0e6b63;background:#fff;color:#0e6b63}
+.bar{width:20px;height:2px;background:#d5cfc4;margin:0 6px}.bar.done{background:#0e6b63}
+.mods{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:13px}
+.mods li{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px}
+.mods li.cur{background:#fff;border:1px solid #e3ded4;font-weight:600}
+.d{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sub{padding-left:26px;font-size:12.5px;display:flex;flex-direction:column;gap:2px}
+.sub a{color:#1c1b19;text-decoration:none;padding:4px 8px;border-radius:6px}
+.sub a.cur{background:#e3f0ee;font-weight:600}
+.tag{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#5f5b54}
+.next{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:8px 0;border-bottom:1px solid #ede8df}
+.next .k{width:18px;height:18px;border-radius:50%;background:#ebe6dd;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;flex-shrink:0}
+.qa{height:28px;padding:0 10px;border-radius:999px;border:1px solid #d5cfc4;background:#fff;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer}
+</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e6b63%22/%3E%3Cpath d=%22M9 11h14M9 16h9M9 21h14%22 stroke=%22white%22 stroke-width=%222.4%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<style>
+html,body{margin:0;background:#e9e5dd}
+.tessera-stage{display:flex;justify-content:center;padding:24px 16px 48px;box-sizing:border-box;min-height:100vh}
+.tessera-frame{transform-origin:top left;box-shadow:0 18px 50px rgba(28,27,25,.18);border-radius:16px;overflow:hidden;background:#f4f1eb}
+.tessera-bar{position:fixed;left:0;right:0;bottom:0;height:40px;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:rgba(28,27,25,.92);color:#f4f1eb;font:500 13px/1 'IBM Plex Sans',system-ui,sans-serif;z-index:10}
+.tessera-bar a{color:#9fd8cf;text-decoration:none}.tessera-bar a:hover{text-decoration:underline}
+.tessera-bar span{opacity:.75}
+body.tessera-embed{background:transparent}
+body.tessera-embed .tessera-stage{padding:0;min-height:0;display:block}
+body.tessera-embed .tessera-frame{box-shadow:none;border-radius:0}
+body.tessera-embed .tessera-bar{display:none}
+</style>
+</head>
+<body>
+<div class="tessera-stage"><div><div class="tessera-frame" data-w="1440" data-h="1120">
+<div data-ai-style="marginalia" style="width: 1440px; height: 1120px; box-sizing: border-box; display: flex; flex-direction: column; background: #f4f1eb; color: #1c1b19; font-size: 14px; line-height: 1.45; overflow: hidden">
+
+  <header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid #e3ded4; background: #faf8f4">
+    <a href="#course" aria-label="Back to course" style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; text-decoration: none; color: #5f5b54; white-space: nowrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Course</a>
+    <div style="width: 1px; height: 20px; background: #e3ded4"></div>
+    <div style="font-size: 15px; font-weight: 600; white-space: nowrap; flex-shrink: 0">STAT 110 · Reasoning with Data</div>
+    <span class="chip chip-ai">58 drafts · 11 kept</span>
+    <div style="flex-grow: 1"></div>
+    <ol aria-label="Design partner stages" style="list-style: none; margin: 0; padding: 0; display: flex; align-items: center">
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Start</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Read</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Confirm</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Approaches</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Preview</li><li class="bar done"></li>
+      <li class="step cur" aria-current="step"><span class="n">6</span>Review</li>
+    </ol>
+    <div style="flex-grow: 1"></div>
+    <button type="button" class="btn">Undo plan</button>
+    <button type="button" class="btn">Preview</button>
+  </header>
+
+  <div style="flex-grow: 1; display: flex; min-height: 0">
+
+    <!-- Outline -->
+    <aside aria-label="Course outline" style="width: 264px; flex-shrink: 0; box-sizing: border-box; border-right: 1px solid #e3ded4; background: #faf8f4; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px"><span class="lbl">Modules</span><span class="muted" style="font-size: 11.5px">drag to reorder</span></div>
+      <ol class="mods">
+        <li><span class="d" style="background: #2e7d4f"></span>Asking statistical questions <span class="chip" style="margin-left: auto">yours</span></li>
+        <li><span class="d" style="background: #2e7d4f"></span>Describing distributions <span class="chip" style="margin-left: auto">yours</span></li>
+        <li><span class="d" style="background: #2e7d4f"></span>0 · Start here <span class="chip chip-ok" style="margin-left: auto">kept</span></li>
+        <li><span class="d" style="background: #9a6a12"></span>1 · Ask <span class="muted" style="margin-left: auto; font-size: 11.5px">7 of 9 kept</span></li>
+        <li class="cur"><span class="d" style="background: #9a6a12"></span>2 · Collect <span class="chip chip-warn" style="margin-left: auto">flagged</span></li>
+      </ol>
+      <div class="sub">
+        <a href="#l21" class="cur">2.1 Why a sample can lie · 55 min</a>
+        <a href="#l22">2.2 Random, stratified, convenient · 55 min</a>
+        <a href="#l23">2.3 Reading a study design · 55 min</a>
+        <a href="#m2">Milestone 2 · Data plan</a>
+      </div>
+      <ol class="mods">
+        <li><span class="d" style="background: #d5cfc4"></span>3 · Describe</li>
+        <li><span class="d" style="background: #d5cfc4"></span>4 · Compare</li>
+        <li><span class="d" style="background: #d5cfc4"></span>5 · Communicate</li>
+        <li><span class="d" style="background: #d5cfc4"></span>6 · Wrap-up</li>
+      </ol>
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; padding: 0 4px" class="muted">
+        <span style="display: flex; align-items: center; gap: 6px"><span class="d" style="background: #2e7d4f"></span>Reviewed</span>
+        <span style="display: flex; align-items: center; gap: 6px"><span class="d" style="background: #9a6a12"></span>Drafts need review</span>
+        <span style="display: flex; align-items: center; gap: 6px"><span class="d" style="background: #d5cfc4"></span>Not started</span>
+      </div>
+    </aside>
+
+    <!-- Module page -->
+    <main style="flex-grow: 1; min-width: 0; padding: 18px 24px; display: flex; flex-direction: column; gap: 12px; overflow: hidden">
+      <div style="display: flex; align-items: baseline; gap: 12px">
+        <h1 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 22px; white-space: nowrap">2 · Collect: sampling and study design</h1>
+        <span class="muted" style="font-size: 12.5px">3 lessons · Milestone 2 · 24 h · O4, O6</span>
+        <span class="chip chip-warn">You were least sure about this unit</span>
+      </div>
+
+      <div class="ai ai--note">
+        <div class="ai-who">Why this module <span class="ai-src">· Design partner, from your syllabus and your answers</span></div>
+        <div class="ai-body" style="font-size: 14px">O4 asks students to design a study, but the syllabus assessed it only with a multiple-choice midterm<sup class="ai-ref">1</sup>. This unit moves sampling (ch. 3) ahead of summaries so the data plan can be written before any data exists, and replaces the midterm with Milestone 2. Backward design: the task comes first, the tools arrive when needed. Retrieval checks stay weekly because problem-centred units are weaker on short-term recall.</div>
+        <div class="ai-cites"><span class="ai-cite" data-n="1">Syllabus p. 2 (O4), p. 3 (midterm 20%), p. 4 (weeks 4–6)</span></div>
+      </div>
+
+      <div class="ai ai--block" data-state="kept">
+        <div class="ai-who">Module objective <span class="ai-src">· drafted from O4 and O6 · edited by Dr. Okafor</span></div>
+        <div class="ai-body" style="font-size: 15px">Design a simple study to answer a question your group chose, and name two ways its sample could mislead you.</div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px">
+        <h2 id="l21" style="margin: 0; font-size: 16px; font-weight: 600">2.1 Why a sample can lie</h2>
+        <span class="muted" style="font-size: 12.5px">55 min · 4 drafts · tutor: Hints</span>
+        <a href="#alt" style="font-size: 12.5px; margin-left: auto">Show the two alternative openings I drafted</a>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+        <div class="ai ai--block" data-state="draft">
+          <div class="ai-who">Callout · the claim to test <span class="ai-src">· starter, not reviewed · pattern from approach C</span></div>
+          <div class="ai-body" style="font-size: 14.5px"><strong>Before we start:</strong> <span class="slot">[Article to select: a recent news claim built on a survey or poll. You supply it; I don't invent sources.]</span> Read it, then write one sentence: who was asked, and who wasn't?</div>
+          <div class="ai-actions"><button type="button" class="btn btn-s btn-p">Keep</button><button type="button" class="btn btn-s">Edit</button><button type="button" class="btn btn-s">Regenerate</button><a href="#why-1" style="font-size: 12px; margin-left: 4px">Why this block?</a></div>
+        </div>
+
+        <div class="ai ai--block" data-state="draft">
+          <div class="ai-who">Text · sampling variability in plain words <span class="ai-src">· starter, not reviewed · from ch. 3 topics on p. 4</span></div>
+          <div class="ai-body" style="font-size: 14.5px">Two honest samples from the same population will not agree. The question is never "is there a difference?" but "is this difference bigger than samples usually disagree by?" <span class="slot">[Your worked example: a data set your students have already met, with two samples side by side]</span> Keep the example small enough to recompute by hand.</div>
+          <div class="ai-actions"><button type="button" class="btn btn-s btn-p">Keep</button><button type="button" class="btn btn-s">Edit</button><button type="button" class="btn btn-s">Revert</button><button type="button" class="btn btn-s">Regenerate</button><a href="#why-2" style="font-size: 12px; margin-left: 4px">Why this block?</a></div>
+        </div>
+
+        <div class="ai ai--block" data-state="draft">
+          <div class="ai-who">Check · retrieval <span class="ai-src">· starter, not reviewed · aligned to O4 · resurfaces in units 4 and 6</span></div>
+          <div class="ai-body" style="font-size: 14.5px">A campus survey about dining is posted only in the dining hall. Which is the best description of its sample? <span class="muted" style="font-size: 12.5px">(3 options · 1 correct · feedback drafted)</span></div>
+          <div class="ai-actions"><button type="button" class="btn btn-s btn-p">Keep</button><button type="button" class="btn btn-s">Edit</button><button type="button" class="btn btn-s">Regenerate</button><a href="#why-3" style="font-size: 12px; margin-left: 4px">Why this block?</a></div>
+        </div>
+
+        <div class="ai ai--block" data-state="draft">
+          <div class="ai-who">Assignment · Milestone 2: data plan <span class="ai-src">· starter, not reviewed · purpose / task / criteria · rubric drafted · due Thu Oct 8</span></div>
+          <div class="ai-body" style="font-size: 14px; display: flex; flex-direction: column; gap: 4px">
+            <span><span class="tag">Purpose</span> Practice O4 before any data exists, so the final project can't be undone by a sample you chose badly.</span>
+            <span><span class="tag">Task</span> In one page: your question, who you will ask, how you will choose them, and two ways this sample could mislead you.</span>
+            <span><span class="tag">Criteria</span> Question is statistical (O1) · sampling method is named and feasible · two sources of bias are specific to this plan · <span class="slot">[Your criterion]</span></span>
+          </div>
+          <div class="ai-actions"><button type="button" class="btn btn-s btn-p">Keep</button><button type="button" class="btn btn-s">Edit</button><button type="button" class="btn btn-s">Regenerate</button><a href="#why-4" style="font-size: 12px; margin-left: 4px">Why this block?</a></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Design partner panel -->
+    <aside aria-label="Design partner" style="width: 332px; flex-shrink: 0; box-sizing: border-box; border-left: 1px solid #e3ded4; background: #faf8f4; padding: 16px 16px; display: flex; flex-direction: column; gap: 12px; overflow: hidden">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <span style="font-size: 14px; font-weight: 600">Design partner</span>
+        <span class="chip chip-ai">drafts only</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px">
+        <div style="display: flex; justify-content: space-between; font-size: 12.5px"><span>Review progress</span><span class="muted">2 of 7 modules · 11 of 58 drafts kept</span></div>
+        <div role="progressbar" aria-label="Drafts kept" aria-valuenow="19" aria-valuemin="0" aria-valuemax="100" style="height: 8px; border-radius: 999px; background: #ece8e0; overflow: hidden"><div style="width: 19%; height: 8px; background: #5b4baf"></div></div>
+      </div>
+
+      <div style="display: flex; flex-direction: column">
+        <span class="lbl" style="padding-bottom: 4px">Next for this module</span>
+        <div class="next"><span class="k">1</span><span>Choose the claim article for 2.1. I left a placeholder rather than invent one.</span></div>
+        <div class="next"><span class="k">2</span><span>Add your worked example to 2.1. It's the one thing here only you can write.</span></div>
+        <div class="next"><span class="k">3</span><span>Your lesson "Cases and variables" fits 2.2 by topic. <a href="#move">Move it in</a> · it stays yours, unchanged.</span></div>
+        <div class="next" style="border-bottom: none"><span class="k">4</span><span>Milestone 2 replaces your midterm. Confirm the weight stays 20% <span class="cite">p. 3</span>, or <a href="#weights">edit weights</a>.</span></div>
+      </div>
+
+      <div class="ai ai--chat">
+        <div class="ai-who">Design partner <span class="ai-src">· because you flagged this unit</span></div>
+        <div class="ai-body" style="font-size: 14px">I drafted two other ways to open 2.1: from a worked example first, or from the claim first. Both keep the check and the milestone. Compare them side by side, or tell me what worries you about this unit.</div>
+        <div class="ai-actions"><button type="button" class="btn btn-s">Compare openings</button></div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: auto">
+        <span class="lbl">Add with AI · lands as a draft</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <button type="button" class="qa">Draft a scenario for 2.3</button>
+          <button type="button" class="qa">Draft a worked example</button>
+          <button type="button" class="qa">15-minute variant of 2.1</button>
+          <button type="button" class="qa">Plain-language variant</button>
+        </div>
+        <div style="display: flex; gap: 6px">
+          <input type="text" aria-label="Describe a change or ask a question" placeholder="Describe a change or ask a question" style="flex-grow: 1; height: 36px; border: 1px solid #d5cfc4; border-radius: 9px; padding: 0 12px; font-family: inherit; font-size: 13px; background: #fff">
+          <button type="button" class="btn btn-p" aria-label="Send" style="width: 36px; padding: 0; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Readiness bar -->
+  <footer style="height: 52px; flex-shrink: 0; box-sizing: border-box; padding: 0 20px; border-top: 1px solid #e3ded4; background: #faf8f4; display: flex; align-items: center; gap: 22px; font-size: 12.5px">
+    <span class="lbl">Publish readiness</span>
+    <div style="display: flex; align-items: center; gap: 8px"><span class="d" style="background: #2e7d4f"></span><span><strong>Alignment</strong> · 6 of 6 outcomes assessed · 24 links</span></div>
+    <div style="display: flex; align-items: center; gap: 8px"><span class="d" style="background: #9a6a12"></span><span><strong>Accessibility</strong> · 1 table needs a header row · WCAG 2.2 AA</span></div>
+    <div style="display: flex; align-items: center; gap: 8px"><span class="d" style="background: #2e7d4f"></span><span><strong>Time</strong> · 132.8 of 135 h · all lessons under 60 min</span></div>
+    <div style="display: flex; align-items: center; gap: 8px"><span class="d" style="background: #2e7d4f"></span><span><strong>Start here</strong> · contact, navigation, AI disclosure present</span></div>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 10px">
+      <span><strong>Review coverage</strong> · 19% of AI drafts kept by a person</span>
+      <div style="width: 140px; height: 8px; border-radius: 999px; background: #e8e3da; overflow: hidden"><div style="width: 19%; height: 8px; background: #5b4baf"></div></div>
+    </div>
+  </footer>
+</div>
+</div></div></div>
+<nav class="tessera-bar" aria-label="Site"><a href="../index.html">← All screens</a><span>G · Review module by module</span><span>1440×1120</span></nav>
+<script>
+(function(){
+  var frame=document.querySelector('.tessera-frame');
+  var w=parseInt(frame.dataset.w,10), h=parseInt(frame.dataset.h,10);
+  var stage=document.querySelector('.tessera-stage');
+  var embed=/[?&]embed=1/.test(location.search);
+  if(embed){document.body.classList.add('tessera-embed');}
+  function fit(){
+    if(embed){frame.style.transform='none';frame.style.width=w+'px';frame.style.height=h+'px';return;}
+    var avail=stage.clientWidth-32;
+    var s=Math.min(1,avail/w);
+    frame.style.transform='scale('+s+')';
+    frame.style.width=w+'px';
+    frame.style.height=h+'px';
+    frame.parentElement.style.width=(w*s)+'px';
+    frame.parentElement.style.height=(h*s)+'px';
+  }
+  window.addEventListener('resize',fit);fit();
+})();
+</script>
+</body>
+</html>
