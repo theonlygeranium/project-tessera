@@ -1,7 +1,7 @@
 import type { Assignment, Block, BlockContent, DesignSession, Lesson, Module, ProvisionPlan, RubricCriterion, SourceSpan } from '../domain';
 import type { GenerationJob } from '../repo';
 import type { Service, ServiceContext } from './context';
-import { coveredWeeks, previewProvisionPlan as buildPlan } from '../design/plan';
+import { coveredWeeks, explicitAssessmentPoints, previewProvisionPlan as buildPlan } from '../design/plan';
 import { courseSnapshot } from './readiness';
 import { aiEnabled, canTeach, fail, provenance, user } from './helpers';
 import { validateBlockContent } from './validate';
@@ -60,7 +60,7 @@ export function scaffoldBlocks(raw: unknown, objective: string, source: DesignSe
   validateNoLearningStyles(complete);
   return complete;
 }
-const block = (ctx: ServiceContext, lessonId: string, id: string, position: number, value: BlockContent, model: string, sources: SourceSpan[], sourceName: string, week: number | null): Block => ({ ...value, id, lessonId, position, origin: 'ai', aiState: 'draft', previous: null, updatedAt: ctx.now(), provenance: provenance(ctx, model, 'module-scaffold', `Drafted from your syllabus (${sources[0]?.page ? `p. ${sources[0].page}` : sources[0]?.section ? `§ ${sources[0].section}` : 'source'}${week ? `, Week ${week}` : ''}) and your answers`, sources.map((span, i) => ({ id: `${lessonId}-source-${i + 1}`, name: `${sourceName}${span.page ? ` p. ${span.page}` : span.section ? ` § ${span.section}` : ''}`, span }))) } as Block);
+const block = (ctx: ServiceContext, lessonId: string, id: string, position: number, value: BlockContent, model: string, sources: SourceSpan[], sourceName: string, week: number | null): Block => ({ ...value, id, lessonId, position, origin: 'ai', aiState: 'draft', previous: null, updatedAt: ctx.now(), provenance: provenance(ctx, model, 'module-scaffold', `${model === 'rule-based starter' ? 'Rule-based starter because the AI draft did not validate. ' : ''}Drafted from your syllabus (${sources[0]?.page ? `p. ${sources[0].page}` : sources[0]?.section ? `§ ${sources[0].section}` : 'source'}${week ? `, Week ${week}` : ''}) and your answers`, sources.map((span, i) => ({ id: `${lessonId}-source-${i + 1}`, name: `${sourceName}${span.page ? ` p. ${span.page}` : span.section ? ` § ${span.section}` : ''}`, span }))) } as Block);
 function rubricFor(id: string, objective: string, outcomes: string[], points: number): RubricCriterion[] {
   const descriptions = [objective, outcomes.join('; ') || objective, `Explain how the submitted work demonstrates ${objective.toLowerCase()}`];
   return ['Objective', 'Outcome evidence', 'Explanation'].map((title, i) => ({ id: `${id}-criterion-${i + 1}`, title, description: descriptions[i], levels: [{ id: 'met', title: 'Meets criterion', points: Math.round(points / 3 * 100) / 100, description: descriptions[i] }, { id: 'developing', title: 'Developing', points: Math.round(points / 6 * 100) / 100, description: `Partly demonstrates: ${descriptions[i]}` }, { id: 'not-yet', title: 'Not yet', points: 0, description: `Does not yet demonstrate: ${descriptions[i]}` }] }));
@@ -96,6 +96,7 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
   const unchanged = !!lesson && !!planLesson && !!module && module.title === planModule!.title && module.objective === planModule!.objective && module.position === planModule!.position && lesson.moduleId === session.planIds?.modules[planModule!.key] && lesson.title === planLesson.title && lesson.objective === planLesson.objective && lesson.minutes === planLesson.minutes && lesson.status === 'draft' && lesson.publishedAt === null && lesson.position === planModule!.lessons.indexOf(planLesson);
   let drafted: BlockContent[] = [];
   let model = 'fixture';
+  let fallbackNote: string | null = null;
   let error: string | null = unchanged ? null : 'Lesson was edited, moved, or deleted before scaffolding.';
   if (unchanged && planModule && planLesson) try {
     if (planLesson.skeleton === 'start-here') {
@@ -115,7 +116,12 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
       for (let attempt = 0; attempt < 2; attempt++) {
         const result = await ctx.ai.run('module-scaffold', input);
         try { drafted = scaffoldBlocks(result.output, planLesson.objective, session.source, readingSpans, planLesson.skeleton); model = result.model; break; }
-        catch (cause) { if (attempt === 1) throw cause; }
+        catch (cause) { if (attempt === 1) {
+          const starter = await fixtureAi.run('module-scaffold', input);
+          drafted = scaffoldBlocks(starter.output, planLesson.objective, session.source, readingSpans, planLesson.skeleton);
+          model = 'rule-based starter';
+          fallbackNote = 'The AI draft did not validate after two attempts; a rule-based starter was used.';
+        } }
       }
       const reading = session.plan.readings.find(r => r.moduleKey === planModule.key && r.week === planLesson.week);
       const callout = drafted.find(b => b.type === 'callout');
@@ -135,7 +141,7 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
   const current = await ctx.repo.getGenerationJob(job.id);
   const latest = await ctx.repo.getDesignSession(job.sessionId);
   if (!current || current.done !== job.done || current.state !== 'running' || (current.runner ?? 'poll') !== (job.runner ?? 'poll') || latest?.stage !== 'provisioning' || latest.applyRevision !== session.applyRevision) return current ?? job;
-  const next: GenerationJob = { ...current, work: current.work.slice(1), done: current.done + 1, lessonIds: [...current.lessonIds], failures: [...current.failures], updatedAt: ctx.now() };
+  const next: GenerationJob = { ...current, work: current.work.slice(1), done: current.done + 1, lessonIds: [...current.lessonIds], failures: [...current.failures], ...(fallbackNote ? { notes: [...(current.notes ?? []), { lessonId: item.lessonId, message: fallbackNote }] } : {}), updatedAt: ctx.now() };
   let blocks: Block[] = [];
   if (!error && lesson && planLesson && planModule) {
     blocks = drafted.map((value, i) => ({ ...block(ctx, lesson.id, `b-${job.id}-${job.done}-${i}`, i, value, model, spans, session.source.name, planLesson.week), templateKey: value.type === 'check' && planLesson.resurface ? 'spaced-review' : value.type === 'callout' && value.title === 'Weekly announcement draft slot' ? 'weekly-announcement' : value.type === 'callout' && value.title === 'Alternative format slot' ? 'alternative-format' : null } as Block));
@@ -170,13 +176,21 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
   return next;
 }
 
-export const designPlan: Pick<Service, 'previewProvisionPlan' | 'applyProvisionPlan' | 'undoProvisionPlan' | 'flagLessonAlternatives'> = {
+export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPoints' | 'applyProvisionPlan' | 'undoProvisionPlan' | 'flagLessonAlternatives'> = {
+  confirmDesignPoints: async (ctx, { sessionId, points }) => {
+    const session = await sessionFor(ctx, sessionId);
+    if (session.stage !== 'preview' || !session.extraction) fail('conflict', STALE);
+    const missing = session.extraction!.assessments.filter(a => a.weightPercent === null && explicitAssessmentPoints(a.span, a.title) === null);
+    const ids = new Set(missing.map(a => a.id));
+    if (Object.keys(points).some(id => !ids.has(id)) || missing.some(a => !Number.isFinite(points[a.id]) || points[a.id] <= 0)) fail('invalid', 'Confirm a positive points value for every unresolved assessment.');
+    if (!await ctx.repo.saveDesignPoints(sessionId, points)) fail('conflict', STALE);
+    return sessionFor(ctx, sessionId);
+  },
   previewProvisionPlan: async (ctx, { sessionId }) => {
     const session = await sessionFor(ctx, sessionId);
     if (session.stage !== 'preview') fail('invalid', 'Choose an approach first.');
     const plan = buildPlan(session, await courseSnapshot(ctx, session.courseId), await ctx.repo.getInstructorProfile(session.createdBy));
-    session.plan = plan; session.record.plan = plan; session.updatedAt = ctx.now();
-    await ctx.repo.putDesignSession(session);
+    if (!await ctx.repo.saveDesignPreview(session.id, session.confirmedPoints ?? {}, plan, ctx.now())) fail('conflict', STALE);
     return plan;
   },
   applyProvisionPlan: async (ctx, { sessionId, hash, leastSureModuleKey }) => {
@@ -203,30 +217,40 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'applyProvisionP
     try {
       for (const [index, item] of plan.outcomes.entries()) {
         const id = ctx.newId('o');
-        if (!await ctx.repo.appendDesignOutcome(session.id, revision, { id, courseId: session.courseId, code: item.code, text: item.text, position: oldOutcomes.length + index })) return interruptedApply(ctx, sessionId);
         outcomeIds.set(item.code, id);
       }
+      const allocated = await ctx.repo.appendDesignOutcomes(session.id, revision, plan.outcomes.map((item, index) => ({ id: outcomeIds.get(item.code)!, courseId: session.courseId, code: item.code, text: item.text, position: oldOutcomes.length + index })));
+      if (!allocated) {
+        const message = `This plan needs ${plan.outcomes.length} outcome slots, but the course no longer has room for all of them. Review the plan again.`;
+        if (await ctx.repo.resetDesignCapacityFailure(session.id, revision, message)) fail('conflict', message);
+        return await interruptedApply(ctx, sessionId);
+      }
+      const codeMap = Object.fromEntries(plan.outcomes.map((item, index) => [item.code, allocated[index].code]));
+      const appliedPlan: ProvisionPlan = { ...plan, outcomes: plan.outcomes.map(o => ({ ...o, code: codeMap[o.code] })), modules: plan.modules.map(m => ({ ...m, outcomeCodes: m.outcomeCodes.map(c => codeMap[c] ?? c), assignments: m.assignments?.map(a => ({ ...a, outcomeCodes: a.outcomeCodes.map(c => codeMap[c] ?? c) })) ?? [], assignment: m.assignment ? { ...m.assignment, outcomeCodes: m.assignment.outcomeCodes.map(c => codeMap[c] ?? c) } : null })) };
+      if (!await ctx.repo.saveDesignAppliedPlan(session.id, revision, appliedPlan, codeMap)) return await interruptedApply(ctx, sessionId);
       const lessonMap = new Map<string, string>();
-      for (const planned of plan.modules) {
+      for (const planned of appliedPlan.modules) {
         const id = ctx.newId('m');
         const module: Module = { id, courseId: session.courseId, title: planned.title, objective: planned.objective, templateKey: planned.templateKey, position: planned.position };
-        if (!await ctx.repo.putDesignModule(session.id, revision, planned.key, module)) return interruptedApply(ctx, sessionId);
+        if (!await ctx.repo.putDesignModule(session.id, revision, planned.key, module)) return await interruptedApply(ctx, sessionId);
+        planned.position = (await ctx.repo.getModule(id))!.position;
         for (const [position, item] of planned.lessons.entries()) {
           const lid = ctx.newId('l'); lessonMap.set(item.key, lid);
           const lesson: Lesson = { id: lid, courseId: session.courseId, moduleId: id, title: item.title, objective: item.objective, minutes: item.minutes, position, status: 'draft', publishedAt: null, templateKey: item.skeleton === 'start-here' ? 'start-here' : null };
-          if (!await ctx.repo.putDesignLesson(session.id, revision, item.key, lesson)) return interruptedApply(ctx, sessionId);
+          if (!await ctx.repo.putDesignLesson(session.id, revision, item.key, lesson)) return await interruptedApply(ctx, sessionId);
         }
         for (const [position, item] of planAssignments(planned).entries()) {
           const aid = ctx.newId('asg');
           const instructions = tiltTexts(planned.objective, item.title).map((text, i) => block(ctx, aid, ctx.newId('b'), i, { type: 'text', text }, 'fixture', [], session.source.name, null));
-          const assignment: Assignment = { id: aid, courseId: session.courseId, moduleId: id, title: item.title, position, status: 'draft', publishedAt: null, dueAt: item.dueAt, points: item.points, submissionType: 'text', instructions, rubric: rubricFor(aid, planned.objective, plan.outcomes.filter(o => item.outcomeCodes.includes(o.code)).map(o => o.text), item.points) };
-          const ids = item.outcomeCodes.map(code => outcomeIds.get(code)).filter((v): v is string => !!v);
-          if (!await ctx.repo.putDesignAssignment(session.id, revision, item.key, assignment, ids)) return interruptedApply(ctx, sessionId);
+          const assignment: Assignment = { id: aid, courseId: session.courseId, moduleId: id, title: item.title, position, status: 'draft', publishedAt: null, dueAt: item.dueAt, points: item.points, submissionType: 'text', instructions, rubric: rubricFor(aid, planned.objective, appliedPlan.outcomes.filter(o => item.outcomeCodes.includes(o.code)).map(o => o.text), item.points) };
+          const ids = item.outcomeCodes.map(code => outcomeIds.get(Object.keys(codeMap).find(old => codeMap[old] === code) ?? code)).filter((v): v is string => !!v);
+          if (!await ctx.repo.putDesignAssignment(session.id, revision, item.key, assignment, ids)) return await interruptedApply(ctx, sessionId);
         }
       }
-      const work = plan.modules.flatMap(m => m.lessons.map(l => ({ lessonId: lessonMap.get(l.key)!, type: 'text' as const })));
+      if (!await ctx.repo.saveDesignAppliedPlan(session.id, revision, appliedPlan, codeMap)) return await interruptedApply(ctx, sessionId);
+      const work = appliedPlan.modules.flatMap(m => m.lessons.map(l => ({ lessonId: lessonMap.get(l.key)!, type: 'text' as const })));
       const job: GenerationJob = { id: jobId, courseId: session.courseId, requestedBy: user(ctx).id, kind: 'scaffold', sessionId, state: 'running', done: 0, total: work.length, lessonIds: [], error: null, work, instruction: leastSureModuleKey ?? '', failures: [], createdAt: ctx.now(), updatedAt: ctx.now() };
-      if (!await ctx.repo.startDesignJob(session.id, revision, job)) return interruptedApply(ctx, sessionId);
+      if (!await ctx.repo.startDesignJob(session.id, revision, job)) return await interruptedApply(ctx, sessionId);
       if (ctx.background && await ctx.repo.setDesignRunner(session.id, revision, job.id, 'workflow')) {
         try { await ctx.background.startGeneration(job.id); }
         catch { await ctx.repo.setDesignRunner(session.id, revision, job.id, 'poll'); }
@@ -239,16 +263,18 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'applyProvisionP
   },
   undoProvisionPlan: async (ctx, { sessionId }) => {
     let session = await sessionFor(ctx, sessionId);
-    if (session.stage === 'preview') { session.stage = 'approaches'; session.selection = null; session.plan = null; await ctx.repo.putDesignSession(session); return { session, kept: [] }; }
+    if (session.stage === 'preview') { if (!await ctx.repo.revertDesignPreview(session.id)) fail('conflict', 'The plan changed while returning to approaches.'); return { session: await sessionFor(ctx, sessionId), kept: [] }; }
     if (session.stage !== 'provisioning' && session.stage !== 'review') fail('invalid', 'There is no applied plan to undo.');
-    if (!session.applyRevision || !await ctx.repo.cancelDesignApply(session.id, session.applyRevision, ctx.newId('rev'))) fail('conflict', 'The plan changed while undo was starting.');
+    const undoRevision = ctx.newId('rev');
+    if (!session.applyRevision || !await ctx.repo.cancelDesignApply(session.id, session.applyRevision, undoRevision)) fail('conflict', 'The plan changed while undo was starting.');
     session = await sessionFor(ctx, sessionId);
     const kept: Awaited<ReturnType<Service['undoProvisionPlan']>>['kept'] = [];
     const planned = session.plan;
     for (const id of session.created.blockIds) {
       const b = await ctx.repo.getBlock(id);
       if (!b) continue;
-      if (!session.createdBlocks?.[id] || !await ctx.repo.deleteDesignBlockIfDraft(session.createdBlocks[id], plannedLinks(session, 'block', id))) kept.push({ kind: 'block', id, title: b.type === 'document' ? b.title : b.type });
+      const expected = session.createdBlocks?.[id] ?? (session.applyRevision === undoRevision && b.origin === 'ai' && b.aiState === 'draft' && b.previous === null && b.updatedAt === b.provenance?.generatedAt ? b : null);
+      if (!expected || !await ctx.repo.deleteDesignBlockIfDraft(expected, plannedLinks(session, 'block', id))) kept.push({ kind: 'block', id, title: b.type === 'document' ? b.title : b.type });
     }
     const plannedAssignments = planned?.modules.flatMap(m => planAssignments(m).map(a => ({ assignment: a, module: m }))) ?? [];
     for (const [index, id] of session.created.assignmentIds.entries()) {
@@ -284,8 +310,8 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'applyProvisionP
       if (outcome && !await ctx.repo.deleteDesignOutcomeIfUnused(id, planned?.outcomes[index]?.text ?? '')) kept.push({ kind: 'outcome', id, title: outcome.text });
     }
     session.record.undoneAt = ctx.now(); session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `Undid the provision plan; kept ${kept.length} edited or kept items.` });
-    session.undoKept = kept; session.selection = null; session.plan = null; session.provisioning = null; session.planIds = { modules: {}, lessons: {}, assignments: {}, outcomes: {} }; session.createdBlocks = {}; session.created = { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] }; session.updatedAt = ctx.now();
-    await ctx.repo.putDesignSession(session);
+    session.undoKept = kept; session.selection = null; session.plan = null; session.provisioning = null; session.planIds = { modules: {}, lessons: {}, assignments: {}, outcomes: {} }; session.createdBlocks = {}; session.created = { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] }; session.stage = 'approaches'; session.updatedAt = ctx.now();
+    if (!await ctx.repo.finishDesignUndo(session.id, undoRevision, session)) fail('conflict', 'The plan changed while undo was finishing.');
     return { session, kept };
   },
   flagLessonAlternatives: async (ctx, { sessionId, lessonId }) => {

@@ -32,7 +32,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect(await repo.putDesignModule(session.id, 'rev-1', 'late', { ...module, id: 'm-late' })).toBe(false);
       expect(await repo.deleteDesignLessonIfUnchanged({ ...lesson, title: 'Stale title' })).toBe(false);
       expect(await repo.deleteDesignLessonIfUnchanged(lesson)).toBe(true);
-      expect(await repo.deleteDesignModuleIfUnchanged(module)).toBe(true);
+      expect(await repo.deleteDesignModuleIfUnchanged((await repo.getModule(module.id))!)).toBe(true);
       await repo.setOutcomeLinks('block', 'b-s1-1', [outcome.id]);
       expect(await repo.deleteDesignOutcomeIfUnused(outcome.id, outcome.text)).toBe(false);
       await repo.setOutcomeLinks('block', 'b-s1-1', []);

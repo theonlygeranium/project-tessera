@@ -14,9 +14,22 @@ export function coveredWeeks(row: { week: number; dates: string }): number[] {
   const first = Number(range[1]), last = Number(range[2]);
   return last >= first && last - first < 53 ? Array.from({ length: last - first + 1 }, (_, i) => first + i) : [row.week];
 }
-export function explicitAssessmentPoints(span: SourceSpan | null): number | null {
-  const match = span?.text.match(/\b(\d+(?:\.\d+)?)\s*(?:points?|pts?)\b/i);
-  return match ? Number(match[1]) : null;
+const pointPattern = /\b(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:points?|pts?)\b/gi;
+const numberOf = (value: string) => Number(value.replaceAll(',', ''));
+export function statedCourseTotal(span: SourceSpan | null): number | null {
+  const match = span?.text.match(/\b(?:(?:course|overall|grade)\s+total|total\s+points?)\s*:?\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:points?|pts?)?\b/i);
+  return match ? numberOf(match[1]) : null;
+}
+export function explicitAssessmentPoints(span: SourceSpan | null, title = ''): number | null {
+  if (!span) return null;
+  const rows = span.text.split(/[\n\r]+|(?<=[.!?])\s+/);
+  const named = rows.filter(row => title && row.toLowerCase().includes(title.toLowerCase()));
+  const candidates = named.length ? named : rows.length === 1 && !title ? rows : [];
+  const ranked = candidates.flatMap(row => {
+    const nameAt = title ? row.toLowerCase().indexOf(title.toLowerCase()) : 0;
+    return [...row.matchAll(pointPattern)].filter(match => !/\b(?:(?:course|overall|grade)\s+total|total\s+points?)\s*:?\s*$/i.test(row.slice(0, match.index))).map(match => ({ value: numberOf(match[1]), distance: Math.abs(match.index - nameAt - title.length) }));
+  }).sort((a, b) => a.distance - b.distance);
+  return ranked.length && (ranked.length === 1 || ranked[0].distance < ranked[1].distance) ? ranked[0].value : null;
 }
 const words = (s: string) => new Set((s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(w => w.length > 2).map(w => w.replace(/(ing|edly|ed|es|s)$/u, '').replace(/e$/u, '')));
 export function titleOverlap(a: string, b: string): boolean {
@@ -99,11 +112,10 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
     if (!target) continue;
     const week = target.lessons.map(l => l.week ?? 0).find(w => w >= dueWeek && !breakWeeks.has(w)) ?? target.lessons.map(l => l.week ?? 0).find(w => !breakWeeks.has(w)) ?? instructional.flatMap(m => m.lessons.map(l => l.week ?? 0)).find(w => w > 0 && !breakWeeks.has(w)) ?? 0;
     const dueAt = week ? dueDate(session, week, usedDates) : null;
-    const answered = session.questions.find(q => q.id === `question-assessment-points-${item.id}`)?.answer?.value;
-    const points = item.weightPercent ?? explicitAssessmentPoints(item.span) ?? (answered && Number(answered) > 0 ? Number(answered) : null);
+    const answered = session.confirmedPoints?.[item.id] ?? Number(session.questions.find(q => q.id === `question-assessment-points-${item.id}`)?.answer?.value);
+    const points = item.weightPercent ?? explicitAssessmentPoints(item.span, item.title) ?? (Number.isFinite(answered) && answered > 0 ? answered : null);
     if (points === null) throw Error(`Confirm the points for ${item.title} before applying this plan.`);
-    const statedTotal = item.span?.text.match(/\b(?:course|overall|grade)\s+total\s*:?\s*(\d+(?:\.\d+)?)\s*points?\b/i);
-    const total = statedTotal ? Number(statedTotal[1]) : null;
+    const total = statedCourseTotal(item.span);
     const weightPercent = item.weightPercent ?? (total && total > 0 ? Math.round(points / total * 10000) / 100 : null);
     const assignment: PlanAssignment = { key: `${target.key}/assessment-${index + 1}`, title: item.title, points: Math.max(0, points), weightPercent, dueAt, outcomeCodes: target.outcomeCodes, replaces: item.title };
     target.assignments!.push(assignment);
@@ -156,5 +168,5 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
   }
   const readinessForecast = (Object.keys(AUTOMATIC_CHECKS) as (keyof typeof AUTOMATIC_CHECKS)[]).map(check => ({ check, expected: automaticCheck(planned, check).status === 'met' ? 'met' as const : 'not-met' as const }));
   const plan = { sessionId: session.id, courseId: session.courseId, outcomes, modules, readings, placeholders, counts, summary, template: template ? { name: template.name, satisfied, missing } : null, readinessForecast };
-  return { ...plan, hash: stableHash({ plan, instructorDisclosure: instructorProfile?.disclosureText ?? DEFAULT_AI_DISCLOSURE, existing: { course: snapshot.course, modules: snapshot.modules, lessons: snapshot.lessons, blocks: snapshot.blocks, assignments: snapshot.assignments, outcomes: snapshot.outcomes, links: snapshot.outcomeLinks, access: snapshot.access, template: snapshot.template?.updatedAt } }) };
+  return { ...plan, hash: stableHash({ plan, confirmedPoints: session.confirmedPoints ?? {}, instructorDisclosure: instructorProfile?.disclosureText ?? DEFAULT_AI_DISCLOSURE, existing: { course: snapshot.course, modules: snapshot.modules, lessons: snapshot.lessons, blocks: snapshot.blocks, assignments: snapshot.assignments, outcomes: snapshot.outcomes, links: snapshot.outcomeLinks, access: snapshot.access, template: snapshot.template?.updatedAt } }) };
 }

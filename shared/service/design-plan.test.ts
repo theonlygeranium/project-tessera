@@ -159,16 +159,21 @@ describe('syllabus provision plan', () => {
     expect(repaired[4]).toMatchObject({ type: 'check', question: expect.stringContaining('Explain the topic.') });
     expect(() => scaffoldBlocks({ blocks: value.blocks.map(x => x === check ? { ...check, options: [] } : x) }, 'Explain the topic.', source)).toThrow();
   });
-  it('leaves a failed lesson empty and reports it in provisioning', async () => {
+  it('uses a cited rule-based starter when both AI scaffold drafts fail validation', async () => {
     const { ctx, sessionId } = await setup();
     const plan = await service.previewProvisionPlan(ctx, { sessionId });
     const broken = { ...ctx, ai: { run: async (task: never, input: never) => task === 'module-scaffold' ? { model: 'broken', output: { blocks: [{ type: 'text', text: 'too few' }] } } : fixtureAi.run(task, input) } as ServiceContext['ai'] };
     await service.applyProvisionPlan(broken, { sessionId, hash: plan.hash });
     const done = await finish(broken, sessionId);
-    expect(done.provisioning?.error).toContain('scaffold');
-    const failed = (await ctx.repo.getGenerationJob(done.provisioning!.jobId!))!.failures;
-    expect(failed.length).toBeGreaterThan(0);
-    for (const item of failed) expect(await ctx.repo.listBlocks(item.lessonId)).toEqual([]);
+    expect(done.provisioning?.error).toBeNull();
+    const job = (await ctx.repo.getGenerationJob(done.provisioning!.jobId!))!;
+    expect(job.failures).toEqual([]);
+    expect(job.notes?.length).toBeGreaterThan(0);
+    for (const note of job.notes ?? []) {
+      const blocks = await ctx.repo.listBlocks(note.lessonId);
+      expect(blocks.some(block => block.type === 'check')).toBe(true);
+      expect(blocks.every(block => block.aiState === 'draft' && block.provenance?.summary.includes('Rule-based starter'))).toBe(true);
+    }
   });
   it('retries an invalid scaffold once before writing the lesson', async () => {
     const { ctx, sessionId } = await setup();

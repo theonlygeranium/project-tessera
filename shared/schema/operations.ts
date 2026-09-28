@@ -26,6 +26,7 @@ export const OPERATIONS: { [K in Operation]: { input: z.ZodType<Input<K>>; outpu
  retryDesignOptions:{input:by('sessionId'),output:S.DesignSessionSchema},
  selectApproach:{input:z.object({sessionId:id,optionIds:z.array(S.ArchitectureIdSchema).min(1).refine(v=>new Set(v).size===v.length,'Choose each approach once.'),overlays:z.array(S.OverlayIdSchema).refine(v=>new Set(v).size===v.length,'Choose each overlay once.'),rationale:required.min(12)}),output:S.DesignSessionSchema},
  previewProvisionPlan:{input:by('sessionId'),output:S.ProvisionPlanSchema},
+ confirmDesignPoints:{input:z.object({sessionId:id,points:z.record(id,z.number().positive().finite())}),output:S.DesignSessionSchema},
  applyProvisionPlan:{input:z.object({sessionId:id,hash:required,leastSureModuleKey:required.optional()}),output:S.DesignSessionSchema},
  undoProvisionPlan:{input:by('sessionId'),output:z.object({session:S.DesignSessionSchema,kept:z.array(z.object({kind:z.enum(['block','lesson','module','assignment','outcome']),id,title:string}))})},
  exportDesignRecord:{input:z.object({sessionId:id,format:z.enum(['json','csv'])}),output:z.object({format:z.enum(['json','csv']),content:string})},

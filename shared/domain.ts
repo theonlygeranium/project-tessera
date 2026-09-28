@@ -556,7 +556,7 @@ export interface DesignRecord {
   decisions: { at: Timestamp; who: Id; what: string }[];                     // per-item keep/revert etc. summarised
 }
 
-export type DesignStage = 'start' | 'read' | 'confirm' | 'approaches' | 'preview' | 'provisioning' | 'review';
+export type DesignStage = 'start' | 'read' | 'confirm' | 'approaches' | 'preview' | 'provisioning' | 'review' | 'undoing';
 export interface DesignSession {
   id: Id; courseId: Id; mode: 'syllabus'; stage: DesignStage; createdBy: Id; createdAt: Timestamp; updatedAt: Timestamp;
   source: DesignSource; consent: { syllabusOnly: true; at: Timestamp; rememberProfile: boolean };
@@ -575,6 +575,10 @@ export interface DesignSession {
   planIds?: { modules: Record<string, Id>; lessons: Record<string, Id>; assignments: Record<string, Id>; outcomes: Record<string, Id> };
   /** Original generated block rows, for exact conditional undo. */
   createdBlocks?: Record<Id, Block>;
+  /** Instructor-confirmed points for assessments without an unambiguous source value. */
+  confirmedPoints?: Record<Id, number>;
+  /** Planned outcome code to the code allocated by the course at apply time. */
+  outcomeCodeMap?: Record<string, string>;
   undoKept?: { kind: 'block' | 'assignment' | 'lesson' | 'module' | 'outcome'; id: Id; title: string }[];
   record: DesignRecord;
 }

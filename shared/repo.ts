@@ -16,6 +16,7 @@ export interface GenerationJob {
   id: Id; courseId: Id; requestedBy: Id; state: 'running' | 'done' | 'failed';
   done: number; total: number; lessonIds: Id[]; error: string | null;
   work: GenerationItem[]; instruction: string; failures: GenerationFailure[];
+  notes?: { lessonId: Id; message: string }[];
   createdAt: Timestamp; updatedAt: Timestamp;
   /** Night 3: who advances the job. Absent means 'poll' (each status poll advances it). */
   runner?: 'poll' | 'workflow';
@@ -130,6 +131,10 @@ export interface Repo {
 
   getDesignSession(id: Id): Promise<DesignSession | null>;
   putDesignSession(session: DesignSession): Promise<void>;
+  finishDesignUndo(sessionId: Id, revision: Id, session: DesignSession): Promise<boolean>;
+  revertDesignPreview(sessionId: Id): Promise<boolean>;
+  saveDesignPoints(sessionId: Id, values: Record<Id, number>): Promise<boolean>;
+  saveDesignPreview(sessionId: Id, expectedPoints: Record<Id, number>, plan: DesignSession['plan'], updatedAt: string): Promise<boolean>;
   /** Atomically claims a preview for one apply; false when another request claimed it. */
   claimDesignApply(session: DesignSession): Promise<boolean>;
   /** Commit one created item and its ledger entry only while this apply revision is current. */
@@ -137,6 +142,9 @@ export interface Repo {
   putDesignLesson(sessionId: Id, revision: Id, key: string, lesson: Lesson): Promise<boolean>;
   putDesignAssignment(sessionId: Id, revision: Id, key: string, assignment: Assignment, outcomeIds: Id[]): Promise<boolean>;
   appendDesignOutcome(sessionId: Id, revision: Id, outcome: Outcome): Promise<boolean>;
+  appendDesignOutcomes(sessionId: Id, revision: Id, outcomes: Outcome[]): Promise<Outcome[] | null>;
+  resetDesignCapacityFailure(sessionId: Id, revision: Id, message: string): Promise<boolean>;
+  saveDesignAppliedPlan(sessionId: Id, revision: Id, plan: DesignSession['plan'], codeMap: Record<string, string>): Promise<boolean>;
   /** Changes the revision and stops the job in one operation. */
   cancelDesignApply(sessionId: Id, revision: Id, nextRevision: Id): Promise<boolean>;
   startDesignJob(sessionId: Id, revision: Id, job: GenerationJob): Promise<boolean>;

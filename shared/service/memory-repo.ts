@@ -1,4 +1,5 @@
 import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Invitation, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat, ActivityKind, TutorSetting, Program, CourseTemplate, Rubric, Outcome, OutcomeLink, AlignableKind, Requirement, CompletionEvent, TestOut, Certificate, ReportingLine, ManagerConsent, DesignSession, InstructorProfile } from '../domain';
+import { normalizeDesignSession } from './design-session-shape';
 import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt } from '../repo';
 import type { SeedData } from '../seed';
 import { ApiError } from '../api';
@@ -141,21 +142,27 @@ export class MemoryRepo implements Repo {
   async getBuilderSession(id: string): Promise<BuilderSession | null> { return copy(this.data.builderSessions.find(x => x.id === id) ?? null); }
   async listBuilderSessions(courseId: string): Promise<BuilderSession[]> { return copy(this.data.builderSessions.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt))); }
   async putBuilderSession(value: BuilderSession) { this.upsert(this.data.builderSessions, value); }
-  async getDesignSession(id: string): Promise<DesignSession | null> { return copy(this.data.designSessions!.find(x => x.id === id) ?? null); }
-  async listDesignSessions(courseId: string): Promise<DesignSession[]> { return copy(this.data.designSessions!.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt) || cmp(a.id,b.id))); }
+  async getDesignSession(id: string): Promise<DesignSession | null> { const row = copy(this.data.designSessions!.find(x => x.id === id) ?? null); return row && normalizeDesignSession(row); }
+  async listDesignSessions(courseId: string): Promise<DesignSession[]> { return copy(this.data.designSessions!.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt) || cmp(a.id,b.id))).map(normalizeDesignSession); }
   async putDesignSession(value: DesignSession) { this.upsert(this.data.designSessions!, value); }
+  async finishDesignUndo(id: string, revision: string, value: DesignSession) { const current = this.data.designSessions!.find(x => x.id === id); if (current?.stage !== 'undoing' || current.applyRevision !== revision) return false; this.upsert(this.data.designSessions!, value); return true; }
+  async revertDesignPreview(id: string) { const s = this.data.designSessions!.find(x => x.id === id); if (s?.stage !== 'preview') return false; s.stage = 'approaches'; s.selection = null; s.plan = null; return true; }
+  async saveDesignPoints(id: string, values: Record<string, number>) { const s = this.data.designSessions!.find(x => x.id === id); if (s?.stage !== 'preview') return false; s.confirmedPoints = copy(values); s.plan = null; return true; }
+  async saveDesignPreview(id: string, expectedPoints: Record<string, number>, plan: DesignSession['plan'], updatedAt: string) { const s = this.data.designSessions!.find(x => x.id === id); if (s?.stage !== 'preview' || JSON.stringify(s.confirmedPoints ?? {}) !== JSON.stringify(expectedPoints)) return false; s.plan = copy(plan); s.record.plan = copy(plan); s.updatedAt = updatedAt; return true; }
   async claimDesignApply(value: DesignSession) { const current = this.data.designSessions!.find(x => x.id === value.id); if (current?.stage !== 'preview') return false; this.upsert(this.data.designSessions!, value); return true; }
   private activeDesign(id: string, revision: string) { const s = this.data.designSessions!.find(x => x.id === id); return s?.stage === 'provisioning' && s.applyRevision === revision ? s : null; }
   async putDesignModule(id: string, revision: string, key: string, value: Module) {
-    const s = this.activeDesign(id, revision); if (!s || this.data.modules.some(m => m.id === value.id)) return false;
-    this.upsert(this.data.modules, normalized(value)); s.created.moduleIds.push(value.id); s.planIds!.modules[key] = value.id; return true;
+    const s = this.activeDesign(id, revision); if (!s || s.courseId !== value.courseId || !this.data.courses.some(c => c.id === value.courseId) || this.data.modules.some(m => m.id === value.id)) return false;
+    const position = Math.max(-1, ...this.data.modules.filter(m => m.courseId === value.courseId).map(m => m.position)) + 1;
+    this.upsert(this.data.modules, normalized({ ...value, position })); s.created.moduleIds.push(value.id); s.planIds!.modules[key] = value.id; if (s.plan) { const planned = s.plan.modules.find(m => m.key === key); if (planned) planned.position = position; } return true;
   }
   async putDesignLesson(id: string, revision: string, key: string, value: Lesson) {
-    const s = this.activeDesign(id, revision); if (!s || this.data.lessons.some(l => l.id === value.id) || !this.data.modules.some(m => m.id === value.moduleId)) return false;
-    this.upsert(this.data.lessons, normalized(value)); s.created.lessonIds.push(value.id); s.planIds!.lessons[key] = value.id; return true;
+    const s = this.activeDesign(id, revision); if (!s || s.courseId !== value.courseId || this.data.lessons.some(l => l.id === value.id) || !this.data.modules.some(m => m.id === value.moduleId && m.courseId === value.courseId)) return false;
+    const position = Math.max(-1, ...this.data.lessons.filter(l => l.moduleId === value.moduleId).map(l => l.position)) + 1;
+    this.upsert(this.data.lessons, normalized({ ...value, position })); s.created.lessonIds.push(value.id); s.planIds!.lessons[key] = value.id; return true;
   }
   async putDesignAssignment(id: string, revision: string, key: string, value: Assignment, outcomeIds: string[]) {
-    const s = this.activeDesign(id, revision); if (!s || this.data.assignments.some(a => a.id === value.id) || !this.data.modules.some(m => m.id === value.moduleId)) return false;
+    const s = this.activeDesign(id, revision); if (!s || s.courseId !== value.courseId || this.data.assignments.some(a => a.id === value.id) || !this.data.modules.some(m => m.id === value.moduleId && m.courseId === value.courseId) || outcomeIds.some(oid => !this.data.outcomes!.some(o => o.id === oid && o.courseId === value.courseId)) || value.instructions.some(b => b.lessonId !== value.id || this.data.blocks.some(existing => existing.id === b.id))) return false;
     this.upsert(this.data.assignments, value); s.created.assignmentIds.push(value.id); s.created.blockIds.push(...value.instructions.map(b => b.id)); s.planIds!.assignments[key] = value.id;
     for (const outcomeId of outcomeIds) { this.data.outcomeLinks!.push({ targetKind: 'assignment', targetId: value.id, outcomeId }); s.created.linkKeys.push(`assignment:${value.id}:${outcomeId}`); }
     return true;
@@ -165,9 +172,20 @@ export class MemoryRepo implements Repo {
     const position = Math.max(-1, ...this.data.outcomes!.filter(o => o.courseId === value.courseId).map(o => o.position)) + 1;
     this.data.outcomes!.push({ ...copy(value), code: `O${position + 1}`, position }); c.outcomes.push(value.text); s.created.outcomeIds.push(value.id); s.planIds!.outcomes[value.code] = value.id; return true;
   }
+  async appendDesignOutcomes(id: string, revision: string, values: Outcome[]) {
+    const s = this.activeDesign(id, revision), c = s && this.data.courses.find(x => x.id === s.courseId);
+    if (!s || !c || new Set(values.map(v => v.id)).size !== values.length || values.some(v => v.courseId !== c.id || this.data.outcomes!.some(o => o.id === v.id)) || this.data.outcomes!.filter(o => o.courseId === c.id).length + values.length > 30) return null;
+    const start = Math.max(-1, ...this.data.outcomes!.filter(o => o.courseId === c.id).map(o => o.position)) + 1;
+    const inserted = values.map((v, i) => ({ ...copy(v), code: `O${start + i + 1}`, position: start + i }));
+    this.data.outcomes!.push(...inserted); c.outcomes.push(...inserted.map(v => v.text));
+    for (const [i, v] of values.entries()) { s.created.outcomeIds.push(v.id); s.planIds!.outcomes[v.code] = v.id; }
+    return copy(inserted);
+  }
+  async resetDesignCapacityFailure(id: string, revision: string, message: string) { const s = this.activeDesign(id,revision); if (!s || s.created.outcomeIds.length || s.created.moduleIds.length || !s.provisioning) return false; s.stage = 'preview'; s.provisioning.error = message; return true; }
+  async saveDesignAppliedPlan(id: string, revision: string, plan: DesignSession['plan'], codeMap: Record<string, string>) { const s = this.activeDesign(id, revision); if (!s) return false; s.plan = copy(plan); s.record.plan = copy(plan); s.outcomeCodeMap = copy(codeMap); s.planIds!.outcomes = Object.fromEntries(Object.entries(s.planIds!.outcomes).map(([code, oid]) => [codeMap[code] ?? code, oid])); return true; }
   async cancelDesignApply(id: string, revision: string, nextRevision: string) {
-    const s = this.data.designSessions!.find(x => x.id === id && (x.stage === 'provisioning' || x.stage === 'review') && x.applyRevision === revision); if (!s) return false;
-    s.applyRevision = nextRevision; s.stage = 'approaches';
+    const s = this.data.designSessions!.find(x => x.id === id && (x.stage === 'provisioning' || x.stage === 'review') && (x.applyRevision ?? `legacy-${x.id}`) === revision); if (!s) return false;
+    s.applyRevision = nextRevision; s.stage = 'undoing';
     const job = this.data.generationJobs.find(j => j.id === s.provisioning?.jobId); if (job?.state === 'running') { job.state = 'failed'; job.error = 'Provisioning was undone.'; }
     return true;
   }
@@ -176,7 +194,7 @@ export class MemoryRepo implements Repo {
   async setDesignApplyError(id: string, revision: string, message: string) { const s = this.activeDesign(id,revision); if (!s?.provisioning) return false; s.provisioning.error = message; return true; }
   async commitDesignScaffold(id: string, revision: string, expected: GenerationJob, next: GenerationJob, lesson: Lesson | null, blocks: Block[], outcomeIds: string[], nextSession: DesignSession) {
     const s = this.activeDesign(id, revision), job = this.data.generationJobs.find(j => j.id === expected.id);
-    if (!s || !job || job.done !== expected.done || (job.runner ?? 'poll') !== (expected.runner ?? 'poll') || job.state !== 'running' || s.provisioning?.jobId !== job.id) return false;
+    if (!s || !job || job.done !== expected.done || (job.runner ?? 'poll') !== (expected.runner ?? 'poll') || job.state !== 'running' || s.provisioning?.jobId !== job.id || outcomeIds.some(oid => !this.data.outcomes!.some(o => o.id === oid && o.courseId === s.courseId)) || blocks.some(b => !lesson || b.lessonId !== lesson.id)) return false;
     if (lesson) {
       const current = this.data.lessons.find(l => l.id === lesson.id);
       if (!current || JSON.stringify(current) !== JSON.stringify(normalized(lesson)) || this.data.blocks.some(b => b.lessonId === lesson.id || blocks.some(newBlock => newBlock.id === b.id)) || this.data.lessons.some(l => l.variantOf?.lessonId === lesson.id)) return false;

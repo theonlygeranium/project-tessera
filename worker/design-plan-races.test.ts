@@ -5,6 +5,7 @@ import type { Repo } from '../shared/repo';
 import type { ServiceContext } from '../shared/service/context';
 import { MemoryRepo, service } from '../shared/service';
 import { advanceScaffoldJob } from '../shared/service/design-plan';
+import { explicitAssessmentPoints } from '../shared/design/plan';
 import { D1Repo } from './d1-repo';
 import { createTestDb } from './test/d1-shim';
 
@@ -13,6 +14,10 @@ async function setup(kind: 'memory' | 'd1') {
   if (kind === 'd1') await (repo as D1Repo).reset(seedData());
   let n = 0;
   const ctx: ServiceContext = { repo, ai: fixtureAi, user: await repo.getUser('u-okafor'), now: () => '2026-09-28T12:00:00.000Z', newId: prefix => `${prefix}-${kind}-${++n}` };
+  const { sessionId, plan } = await prepare(ctx);
+  return { ctx, sessionId, plan };
+}
+async function prepare(ctx: ServiceContext) {
   const started = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', sample: true, consent: { syllabusOnly: true, rememberProfile: false } });
   await service.getDesignSession(ctx, { sessionId: started.id });
   const read = await service.getDesignSession(ctx, { sessionId: started.id });
@@ -20,7 +25,7 @@ async function setup(kind: 'memory' | 'd1') {
   const options = await service.getDesignSession(ctx, { sessionId: started.id });
   await service.selectApproach(ctx, { sessionId: started.id, optionIds: [options.options![0].id], overlays: ['bookends'], rationale: 'Repeated practice fits this group.' });
   const plan = await service.previewProvisionPlan(ctx, { sessionId: started.id });
-  return { ctx, sessionId: started.id, plan };
+  return { sessionId: started.id, plan };
 }
 async function finish(ctx: ServiceContext, sessionId: string) {
   let session = await ctx.repo.getDesignSession(sessionId);
@@ -45,6 +50,177 @@ function pauseOnce(repo: Repo, name: keyof Repo) {
   return { wrapped, reached, release };
 }
 for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety races`, () => {
+  it('preserves the winning scaffold ledger when a stale runner commits later', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const job = (await ctx.repo.getGenerationJob(session.provisioning!.jobId!))!;
+    const pause = pauseOnce(ctx.repo, 'commitDesignScaffold');
+    const losing = advanceScaffoldJob({ ...ctx, repo: pause.wrapped }, job);
+    await pause.reached;
+    await advanceScaffoldJob(ctx, job);
+    const winnerBlocks = await ctx.repo.listBlocks(job.work[0].lessonId);
+    pause.release(); await losing;
+    expect((await ctx.repo.getDesignSession(sessionId))!.created.blockIds).toEqual(expect.arrayContaining(winnerBlocks.map(b => b.id)));
+    await service.undoProvisionPlan(ctx, { sessionId });
+    expect(await ctx.repo.listBlocks(job.work[0].lessonId)).toEqual([]);
+  });
+  it('writes a rule-based starter and a job note after two invalid AI drafts', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    const broken = { ...ctx, ai: { run: async (task: never, input: never) => task === 'module-scaffold' ? { model: 'broken', output: { blocks: [{ type: 'text', text: 'No check' }] } } : fixtureAi.run(task, input) } as ServiceContext['ai'] };
+    await service.applyProvisionPlan(broken, { sessionId, hash: plan.hash });
+    const done = await finish(broken, sessionId);
+    const job = (await ctx.repo.getGenerationJob(done.provisioning!.jobId!))!;
+    expect(job.failures).toEqual([]);
+    expect(job.notes?.length).toBeGreaterThan(0);
+    const blocks = await ctx.repo.listBlocks(job.notes![0].lessonId);
+    expect(blocks.some(b => b.type === 'check')).toBe(true);
+    expect(blocks.every(b => b.aiState === 'draft' && b.provenance?.summary.includes('Rule-based starter because the AI draft did not validate'))).toBe(true);
+    expect(blocks.some(b => b.type === 'text' && b.text.includes('[Your '))).toBe(true);
+  });
+  it('holds the exclusive undo state until the revision-checked final write', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const pause = pauseOnce(ctx.repo, 'finishDesignUndo');
+    const undo = service.undoProvisionPlan({ ...ctx, repo: pause.wrapped }, { sessionId });
+    await pause.reached;
+    expect((await ctx.repo.getDesignSession(sessionId))?.stage).toBe('undoing');
+    await expect(service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(service.selectApproach(ctx, { sessionId, optionIds: ['weekly'], overlays: [], rationale: 'Try this again later.' })).rejects.toMatchObject({ code: 'invalid' });
+    pause.release(); await undo;
+    expect((await ctx.repo.getDesignSession(sessionId))?.stage).toBe('approaches');
+  });
+  it('does not let a stale undo finalization overwrite a newer revision', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const pause = pauseOnce(ctx.repo, 'finishDesignUndo');
+    const pending = service.undoProvisionPlan({ ...ctx, repo: pause.wrapped }, { sessionId });
+    await pause.reached;
+    const newer = (await ctx.repo.getDesignSession(sessionId))!;
+    await ctx.repo.putDesignSession({ ...newer, applyRevision: 'newer-revision' });
+    pause.release();
+    await expect(pending).rejects.toMatchObject({ code: 'conflict' });
+    expect((await ctx.repo.getDesignSession(sessionId))?.applyRevision).toBe('newer-revision');
+  });
+  it('normalizes an old-shape applied session and undoes its drafts', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const done = await finish(ctx, sessionId);
+    const old = { ...done } as Record<string, unknown>;
+    for (const key of ['applyRevision', 'planIds', 'createdBlocks', 'undoKept']) delete old[key];
+    await ctx.repo.putDesignSession(old as never);
+    const read = (await ctx.repo.getDesignSession(sessionId))!;
+    expect(read.planIds?.modules[plan.modules[0].key]).toBe(done.created.moduleIds[0]);
+    expect(read.createdBlocks).toEqual({});
+    await service.undoProvisionPlan(ctx, { sessionId });
+    expect((await ctx.repo.getDesignSession(sessionId))?.stage).toBe('approaches');
+    expect(await ctx.repo.getModule(done.created.moduleIds[0])).toBeNull();
+  });
+  it('rejects a missing outcome reference before an assignment write', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    const pause = pauseOnce(ctx.repo, 'putDesignAssignment');
+    const pending = service.applyProvisionPlan({ ...ctx, repo: pause.wrapped }, { sessionId, hash: plan.hash });
+    await pause.reached;
+    const created = (await ctx.repo.getDesignSession(sessionId))!.created.outcomeIds;
+    const rows = await ctx.repo.listOutcomes('c-stat110');
+    await service.saveOutcomes(ctx, { courseId: 'c-stat110', outcomes: rows.filter(row => !created.includes(row.id)).map(row => ({ id: row.id, text: row.text })) });
+    pause.release();
+    await expect(pending).rejects.toMatchObject({ code: 'conflict' });
+    expect((await ctx.repo.listOutcomeLinks({ targetKind: 'assignment' })).filter(link => created.includes(link.outcomeId))).toEqual([]);
+  });
+  it('rejects a missing scaffold outcome reference without blocks or ledger entries', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const job = (await ctx.repo.getGenerationJob(session.provisioning!.jobId!))!;
+    let first = true;
+    const wrapped = new Proxy(ctx.repo, { get(target, key) {
+      const method = Reflect.get(target, key);
+      if (key === 'commitDesignScaffold') return async (...args: unknown[]) => { if (first) { first = false; args[6] = ['missing-outcome']; } return method.apply(target, args); };
+      return typeof method === 'function' ? method.bind(target) : method;
+    } }) as Repo;
+    await advanceScaffoldJob({ ...ctx, repo: wrapped }, job);
+    expect(await ctx.repo.listBlocks(job.work[0].lessonId)).toEqual([]);
+    expect((await ctx.repo.getDesignSession(sessionId))!.created.blockIds.some(id => id.startsWith(`b-${job.id}-0-`))).toBe(false);
+    expect((await ctx.repo.getGenerationJob(job.id))!.failures[0].lessonId).toBe(job.work[0].lessonId);
+  });
+  it('rejects a whole outcome append when a concurrent addition fills the cap', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    const current = await ctx.repo.listOutcomes('c-stat110');
+    const target = 30 - plan.outcomes.length;
+    await service.saveOutcomes(ctx, { courseId: 'c-stat110', outcomes: [...current.map(row => ({ id: row.id, text: row.text })), ...Array.from({ length: target - current.length }, (_, i) => ({ text: `Instructor outcome ${i + 1}` }))] });
+    const refreshed = await service.previewProvisionPlan(ctx, { sessionId });
+    const pause = pauseOnce(ctx.repo, 'appendDesignOutcomes');
+    const pending = service.applyProvisionPlan({ ...ctx, repo: pause.wrapped }, { sessionId, hash: refreshed.hash });
+    await pause.reached;
+    const rows = await ctx.repo.listOutcomes('c-stat110');
+    await service.saveOutcomes(ctx, { courseId: 'c-stat110', outcomes: [...rows.map(row => ({ id: row.id, text: row.text })), { text: 'Last instructor slot' }] });
+    pause.release();
+    await expect(pending).rejects.toMatchObject({ code: 'conflict', message: expect.stringContaining('outcome slots') });
+    const after = (await ctx.repo.getDesignSession(sessionId))!;
+    expect(after.stage).toBe('preview');
+    expect(after.provisioning?.error).toContain('outcome slots');
+    expect(after.created.outcomeIds).toEqual([]);
+    expect(await ctx.repo.getGenerationJob(after.provisioning!.jobId!)).toBeNull();
+  });
+  it('stores actual outcome codes in the plan and Start-here draft', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    const pause = pauseOnce(ctx.repo, 'appendDesignOutcomes');
+    const pending = service.applyProvisionPlan({ ...ctx, repo: pause.wrapped }, { sessionId, hash: plan.hash });
+    await pause.reached;
+    const current = await ctx.repo.listOutcomes('c-stat110');
+    await service.saveOutcomes(ctx, { courseId: 'c-stat110', outcomes: [...current.map(row => ({ id: row.id, text: row.text })), { text: 'Instructor addition' }] });
+    pause.release(); await pending;
+    const done = await finish(ctx, sessionId);
+    const actual = (await ctx.repo.listOutcomes('c-stat110')).filter(row => done.created.outcomeIds.includes(row.id));
+    expect(done.plan?.outcomes.map(row => row.code)).toEqual(actual.map(row => row.code));
+    expect(done.outcomeCodeMap?.[plan.outcomes[0].code]).toBe(actual[0].code);
+    const startId = done.planIds!.lessons['start-here/lesson-1'];
+    const startText = (await ctx.repo.listBlocks(startId)).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    expect(startText).toContain(`${actual[0].code}: ${actual[0].text}`);
+    const check = (await ctx.repo.listBlocks(startId)).find(b => b.type === 'check')!;
+    expect(await ctx.repo.listOutcomeLinks({ targetKind: 'block', targetId: check.id })).toContainEqual({ targetKind: 'block', targetId: check.id, outcomeId: actual[0].id });
+  });
+  it('parses grouped points and never assigns a course total to the assessment', async () => {
+    const { ctx, sessionId } = await setup(kind);
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    session.extraction!.assessments = [
+      { id: 'project', title: 'Project', weightPercent: null, dueAt: null, format: 'project', span: { page: 2, text: 'Project: 1,000 points.' } },
+      { id: 'final', title: 'Final project', weightPercent: null, dueAt: null, format: 'project', span: { page: 3, text: 'Course total: 1000 points. Final project: 200 points.' } },
+    ];
+    await ctx.repo.putDesignSession(session);
+    expect(explicitAssessmentPoints(session.extraction!.assessments[0].span, 'Project')).toBe(1000);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const items = plan.modules.flatMap(m => m.assignments ?? []);
+    expect(items.find(a => a.replaces === 'Project')?.points).toBe(1000);
+    expect(items.find(a => a.replaces === 'Final project')).toMatchObject({ points: 200, weightPercent: 20 });
+  });
+  it('confirms every unresolved assessment on preview and hashes the values', async () => {
+    const { ctx, sessionId } = await setup(kind);
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    session.extraction!.assessments = Array.from({ length: 6 }, (_, i) => ({ id: `task-${i}`, title: `Task ${i}`, weightPercent: null, dueAt: null, format: 'project', span: { page: i + 1, text: `Task ${i}: points to be decided.` } }));
+    await ctx.repo.putDesignSession(session);
+    await expect(service.previewProvisionPlan(ctx, { sessionId })).rejects.toThrow('Confirm the points');
+    await expect(service.confirmDesignPoints(ctx, { sessionId, points: Object.fromEntries(session.extraction!.assessments.slice(0, 5).map(a => [a.id, 10])) })).rejects.toMatchObject({ code: 'invalid' });
+    await service.confirmDesignPoints(ctx, { sessionId, points: Object.fromEntries(session.extraction!.assessments.map(a => [a.id, 10])) });
+    const first = await service.previewProvisionPlan(ctx, { sessionId });
+    await service.confirmDesignPoints(ctx, { sessionId, points: Object.fromEntries(session.extraction!.assessments.map((a, i) => [a.id, i === 5 ? 20 : 10])) });
+    const second = await service.previewProvisionPlan(ctx, { sessionId });
+    expect(second.hash).not.toBe(first.hash);
+    await expect(service.applyProvisionPlan(ctx, { sessionId, hash: first.hash })).rejects.toMatchObject({ code: 'conflict' });
+    await service.applyProvisionPlan(ctx, { sessionId, hash: second.hash });
+  });
+  it('allocates different module positions for two concurrent sessions', async () => {
+    const { ctx, sessionId, plan } = await setup(kind);
+    const second = await prepare(ctx);
+    const a = pauseOnce(ctx.repo, 'claimDesignApply'), b = pauseOnce(ctx.repo, 'claimDesignApply');
+    const firstPending = service.applyProvisionPlan({ ...ctx, repo: a.wrapped }, { sessionId, hash: plan.hash });
+    const secondPending = service.applyProvisionPlan({ ...ctx, repo: b.wrapped }, { sessionId: second.sessionId, hash: second.plan.hash });
+    await Promise.all([a.reached, b.reached]); a.release(); b.release();
+    await Promise.all([firstPending, secondPending]);
+    const modules = (await ctx.repo.listModules('c-stat110')).filter(m => m.id.includes(kind));
+    expect(new Set(modules.map(m => m.position)).size).toBe(modules.length);
+  });
   it('matches actual readiness for draft-only content after apply and scaffolding', async () => {
     const { ctx, sessionId, plan } = await setup(kind);
     await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
@@ -103,7 +279,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
   });
   it('appends outcomes after an instructor edits and links one during apply', async () => {
     const { ctx, sessionId, plan } = await setup(kind);
-    const pause = pauseOnce(ctx.repo, 'appendDesignOutcome');
+    const pause = pauseOnce(ctx.repo, 'appendDesignOutcomes');
     const pending = service.applyProvisionPlan({ ...ctx, repo: pause.wrapped }, { sessionId, hash: plan.hash });
     await pause.reached;
     const prior = await ctx.repo.listOutcomes('c-stat110');

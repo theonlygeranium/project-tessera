@@ -9,8 +9,10 @@ import type {
 } from '../shared/repo';
 import type { SeedData } from '../shared/seed';
 import { ApiError } from '../shared/api';
+import { normalizeDesignSession } from '../shared/service/design-session-shape';
 
 type SqlBind = string | number | null;
+const jobNotes = (job: GenerationJob) => JSON.stringify(job.notes?.length ? { failures: job.failures, notes: job.notes } : job.failures);
 
 const DELETE_ORDER = [
   'manager_consents', 'reporting_lines', 'certificates', 'test_out_attempts', 'test_outs',
@@ -298,15 +300,19 @@ export class D1Repo implements Repo {
 
   async getDesignSession(id: Id): Promise<DesignSession | null> {
     const row = await this.first<{ data: string }>('SELECT data FROM design_sessions WHERE id = ?', [id]);
-    return row ? parseJson<DesignSession>(row.data) : null;
+    return row ? normalizeDesignSession(parseJson<DesignSession>(row.data)) : null;
   }
 
   async listDesignSessions(courseId: Id): Promise<DesignSession[]> {
     const rows = await this.all<{ data: string }>('SELECT data FROM design_sessions WHERE course_id = ? ORDER BY created_at DESC, id', [courseId]);
-    return rows.map(row => parseJson<DesignSession>(row.data));
+    return rows.map(row => normalizeDesignSession(parseJson<DesignSession>(row.data)));
   }
 
   async putDesignSession(session: DesignSession): Promise<void> { await this.designSessionStmt(session).run(); }
+  async finishDesignUndo(id: Id, revision: Id, session: DesignSession): Promise<boolean> { const result = await this.db.prepare("UPDATE design_sessions SET data = ?, stage = 'approaches', updated_at = ? WHERE id = ? AND stage = 'undoing' AND json_extract(data, '$.applyRevision') = ?").bind(JSON.stringify(session),session.updatedAt,id,revision).run(); return (result.meta.changes ?? 0) === 1; }
+  async revertDesignPreview(id: Id): Promise<boolean> { const result = await this.db.prepare("UPDATE design_sessions SET data = json_set(data, '$.stage', 'approaches', '$.selection', null, '$.plan', null), stage = 'approaches' WHERE id = ? AND stage = 'preview'").bind(id).run(); return (result.meta.changes ?? 0) === 1; }
+  async saveDesignPoints(id: Id, values: Record<string, number>): Promise<boolean> { const result = await this.db.prepare("UPDATE design_sessions SET data = json_set(data, '$.confirmedPoints', json(?), '$.plan', null) WHERE id = ? AND stage = 'preview'").bind(JSON.stringify(values),id).run(); return (result.meta.changes ?? 0) === 1; }
+  async saveDesignPreview(id: Id, expectedPoints: Record<string, number>, plan: DesignSession['plan'], updatedAt: string): Promise<boolean> { const result = await this.db.prepare("UPDATE design_sessions SET data = json_set(data, '$.plan', json(?), '$.record.plan', json(?), '$.updatedAt', ?), updated_at = ? WHERE id = ? AND stage = 'preview' AND COALESCE(json_extract(data, '$.confirmedPoints'), '{}') = ?").bind(JSON.stringify(plan),JSON.stringify(plan),updatedAt,updatedAt,id,JSON.stringify(expectedPoints)).run(); return (result.meta.changes ?? 0) === 1; }
   async claimDesignApply(session: DesignSession): Promise<boolean> {
     const result = await this.db.prepare("UPDATE design_sessions SET data = ?, stage = 'provisioning', updated_at = ? WHERE id = ? AND stage = 'preview'").bind(JSON.stringify(session), session.updatedAt, session.id).run();
     return (result.meta.changes ?? 0) === 1;
@@ -320,34 +326,34 @@ export class D1Repo implements Repo {
   async putDesignModule(sessionId: Id, revision: Id, key: string, m: Module): Promise<boolean> {
     return this.designInsert(sessionId, revision,
       this.db.prepare(`INSERT INTO modules (id,course_id,title,position,objective,template_key)
-        SELECT ?,?,?,?,?,? WHERE ${this.designGuard}`)
-        .bind(m.id,m.courseId,m.title,m.position,m.objective ?? null,m.templateKey ?? null,sessionId,revision),
+        SELECT ?,?,?,COALESCE((SELECT MAX(position) FROM modules WHERE course_id = ?), -1) + 1,?,? WHERE ${this.designGuard} AND EXISTS (SELECT 1 FROM design_sessions WHERE id = ? AND course_id = ?) AND EXISTS (SELECT 1 FROM courses WHERE id = ?)`)
+        .bind(m.id,m.courseId,m.title,m.courseId,m.objective ?? null,m.templateKey ?? null,sessionId,revision,sessionId,m.courseId,m.courseId),
       this.db.prepare(`UPDATE design_sessions SET data = json_set(data, ?, ?, ?, ?) WHERE id = ? AND stage = 'provisioning' AND json_extract(data, '$.applyRevision') = ? AND changes() = 1 AND EXISTS (SELECT 1 FROM modules WHERE id = ?)`)
         .bind(this.ledgerPath('moduleIds'),m.id,this.ledgerPath('modules',key),m.id,sessionId,revision,m.id));
   }
   async putDesignLesson(sessionId: Id, revision: Id, key: string, l: Lesson): Promise<boolean> {
     return this.designInsert(sessionId, revision,
       this.db.prepare(`INSERT INTO lessons (id,module_id,course_id,title,minutes,position,status,published_at,template_key,variant_of,variant_audience,variant_synced_at,objective)
-        SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${this.designGuard}`)
-        .bind(l.id,l.moduleId,l.courseId,l.title,l.minutes,l.position,l.status,l.publishedAt,l.templateKey ?? null,null,null,null,l.objective ?? null,sessionId,revision),
+        SELECT ?,?,?,?,?,COALESCE((SELECT MAX(position) FROM lessons WHERE module_id = ?), -1) + 1,?,?,?,?,?,?,? WHERE ${this.designGuard} AND EXISTS (SELECT 1 FROM modules WHERE id = ? AND course_id = ?) AND EXISTS (SELECT 1 FROM design_sessions WHERE id = ? AND course_id = ?)`)
+        .bind(l.id,l.moduleId,l.courseId,l.title,l.minutes,l.moduleId,l.status,l.publishedAt,l.templateKey ?? null,null,null,null,l.objective ?? null,sessionId,revision,l.moduleId,l.courseId,sessionId,l.courseId),
       this.db.prepare(`UPDATE design_sessions SET data = json_set(data, ?, ?, ?, ?) WHERE id = ? AND stage = 'provisioning' AND json_extract(data, '$.applyRevision') = ? AND changes() = 1 AND EXISTS (SELECT 1 FROM lessons WHERE id = ?)`)
         .bind(this.ledgerPath('lessonIds'),l.id,this.ledgerPath('lessons',key),l.id,sessionId,revision,l.id));
   }
   async putDesignAssignment(sessionId: Id, revision: Id, key: string, a: Assignment, outcomeIds: Id[]): Promise<boolean> {
     const guard = this.designGuard;
     const inserted = this.db.prepare(`INSERT INTO assignments (id,module_id,course_id,title,position,status,published_at,due_at,points,submission_type,rubric,instructions)
-      SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE ${guard}`)
-      .bind(a.id,a.moduleId,a.courseId,a.title,a.position,a.status,a.publishedAt,a.dueAt,a.points,a.submissionType,JSON.stringify(a.rubric),JSON.stringify(a.instructions),sessionId,revision);
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE ${guard} AND EXISTS (SELECT 1 FROM modules WHERE id = ? AND course_id = ?) AND EXISTS (SELECT 1 FROM design_sessions WHERE id = ? AND course_id = ?) AND ${outcomeIds.length ? `(${outcomeIds.map(() => "EXISTS (SELECT 1 FROM outcomes WHERE id = ? AND course_id = ?) ").join(' AND ')})` : '1=1'}`)
+      .bind(a.id,a.moduleId,a.courseId,a.title,a.position,a.status,a.publishedAt,a.dueAt,a.points,a.submissionType,JSON.stringify(a.rubric),JSON.stringify(a.instructions),sessionId,revision,a.moduleId,a.courseId,sessionId,a.courseId,...outcomeIds.flatMap(oid => [oid,a.courseId]));
     const statements = [inserted,
       this.db.prepare(`UPDATE design_sessions SET data = json_set(data, ?, ?, ?, ?) WHERE id = ? AND stage = 'provisioning' AND json_extract(data, '$.applyRevision') = ? AND changes() = 1 AND EXISTS (SELECT 1 FROM assignments WHERE id = ?)`)
         .bind(this.ledgerPath('assignmentIds'),a.id,this.ledgerPath('assignments',key),a.id,sessionId,revision,a.id),
-      ...a.instructions.map(b => this.db.prepare(`UPDATE design_sessions SET data = json_insert(data, ?, ?) WHERE id = ? AND ${guard}`)
-        .bind(this.ledgerPath('blockIds'),b.id,sessionId,sessionId,revision)),
+      ...a.instructions.map(b => this.db.prepare(`UPDATE design_sessions SET data = json_insert(data, ?, ?) WHERE id = ? AND ${guard} AND changes() = 1 AND EXISTS (SELECT 1 FROM assignments WHERE id = ?)`)
+        .bind(this.ledgerPath('blockIds'),b.id,sessionId,sessionId,revision,a.id)),
       ...outcomeIds.flatMap(oid => [
-        this.db.prepare(`INSERT INTO outcome_links (outcome_id,target_kind,target_id) SELECT ?,'assignment',? WHERE ${guard} AND EXISTS (SELECT 1 FROM assignments WHERE id = ?)`)
+        this.db.prepare(`INSERT INTO outcome_links (outcome_id,target_kind,target_id) SELECT ?,'assignment',? WHERE ${guard} AND changes() = 1 AND EXISTS (SELECT 1 FROM assignments WHERE id = ?)`)
           .bind(oid,a.id,sessionId,revision,a.id),
-        this.db.prepare(`UPDATE design_sessions SET data = json_insert(data, ?, ?) WHERE id = ? AND ${guard}`)
-          .bind(this.ledgerPath('linkKeys'),`assignment:${a.id}:${oid}`,sessionId,sessionId,revision),
+        this.db.prepare(`UPDATE design_sessions SET data = json_insert(data, ?, ?) WHERE id = ? AND ${guard} AND changes() = 1 AND EXISTS (SELECT 1 FROM outcome_links WHERE target_kind = 'assignment' AND target_id = ? AND outcome_id = ?)`)
+          .bind(this.ledgerPath('linkKeys'),`assignment:${a.id}:${oid}`,sessionId,sessionId,revision,a.id,oid),
       ])];
     const results = await this.db.batch(statements);
     return (results[0].meta.changes ?? 0) === 1;
@@ -365,10 +371,29 @@ export class D1Repo implements Repo {
     ]);
     return (result[0].meta.changes ?? 0) === 1;
   }
+  async appendDesignOutcomes(sessionId: Id, revision: Id, values: Outcome[]): Promise<Outcome[] | null> {
+    if (!values.length) return [];
+    if (new Set(values.map(value => value.id)).size !== values.length || values.some(value => value.courseId !== values[0].courseId)) return null;
+    const first = values[0];
+    const statements: D1PreparedStatement[] = values.map((o, i) => this.db.prepare(`INSERT INTO outcomes (id,course_id,code,text,position)
+      SELECT ?, ?, 'O' || (COALESCE((SELECT MAX(position) FROM outcomes WHERE course_id = ?), -1) + 2), ?, COALESCE((SELECT MAX(position) FROM outcomes WHERE course_id = ?), -1) + 1
+      WHERE ${this.designGuard} AND EXISTS (SELECT 1 FROM design_sessions WHERE id = ? AND course_id = ?) AND ${i ? 'changes() = 1' : '(SELECT COUNT(*) FROM outcomes WHERE course_id = ?) + ? <= 30'}`)
+      .bind(o.id,o.courseId,o.courseId,o.text,o.courseId,sessionId,revision,sessionId,o.courseId,...(i ? [] : [o.courseId,values.length])));
+    statements.push(this.db.prepare(`UPDATE courses SET outcomes = json_insert(outcomes, ${values.map(() => "'$[#]', ?").join(', ')}) WHERE id = ? AND ${this.designGuard} AND changes() = 1 AND EXISTS (SELECT 1 FROM outcomes WHERE id = ?)`)
+      .bind(...values.map(value => value.text),first.courseId,sessionId,revision,values.at(-1)!.id));
+    for (const o of values) statements.push(this.db.prepare(`UPDATE design_sessions SET data = json_set(data, ?, ?, ?, ?) WHERE id = ? AND stage = 'provisioning' AND json_extract(data, '$.applyRevision') = ? AND changes() = 1 AND EXISTS (SELECT 1 FROM outcomes WHERE id = ?)`)
+      .bind(this.ledgerPath('outcomeIds'),o.id,this.ledgerPath('outcomes',o.code),o.id,sessionId,revision,o.id));
+    const result = await this.db.batch(statements);
+    if (result.slice(0, values.length).some(row => (row.meta.changes ?? 0) !== 1)) return null;
+    const actual = await this.listOutcomes(first.courseId);
+    return values.map(value => actual.find(row => row.id === value.id)!);
+  }
+  async resetDesignCapacityFailure(id: Id, revision: Id, message: string): Promise<boolean> { const result = await this.db.prepare("UPDATE design_sessions SET stage = 'preview', data = json_set(data, '$.stage', 'preview', '$.provisioning.error', ?) WHERE id = ? AND stage = 'provisioning' AND json_extract(data, '$.applyRevision') = ? AND json_array_length(data, '$.created.outcomeIds') = 0 AND json_array_length(data, '$.created.moduleIds') = 0").bind(message,id,revision).run(); return (result.meta.changes ?? 0) === 1; }
+  async saveDesignAppliedPlan(id: Id, revision: Id, plan: DesignSession['plan'], codeMap: Record<string, string>): Promise<boolean> { const current = await this.getDesignSession(id); if (!current) return false; const ids = Object.fromEntries(Object.entries(current.planIds?.outcomes ?? {}).map(([code, oid]) => [codeMap[code] ?? code, oid])); const result = await this.db.prepare("UPDATE design_sessions SET data = json_set(data, '$.plan', json(?), '$.record.plan', json(?), '$.outcomeCodeMap', json(?), '$.planIds.outcomes', json(?)) WHERE id = ? AND stage = 'provisioning' AND json_extract(data, '$.applyRevision') = ?").bind(JSON.stringify(plan),JSON.stringify(plan),JSON.stringify(codeMap),JSON.stringify(ids),id,revision).run(); return (result.meta.changes ?? 0) === 1; }
   async cancelDesignApply(sessionId: Id, revision: Id, nextRevision: Id): Promise<boolean> {
     const results = await this.db.batch([
-      this.db.prepare(`UPDATE design_sessions SET data = json_set(data, '$.applyRevision', ?, '$.stage', 'approaches'), stage = 'approaches'
-        WHERE id = ? AND stage IN ('provisioning','review') AND json_extract(data, '$.applyRevision') = ?`).bind(nextRevision,sessionId,revision),
+      this.db.prepare(`UPDATE design_sessions SET data = json_set(data, '$.applyRevision', ?, '$.stage', 'undoing'), stage = 'undoing'
+        WHERE id = ? AND stage IN ('provisioning','review') AND COALESCE(json_extract(data, '$.applyRevision'), 'legacy-' || id) = ?`).bind(nextRevision,sessionId,revision),
       this.db.prepare(`UPDATE generation_jobs SET state = 'failed', error = 'Provisioning was undone.' WHERE id =
         (SELECT json_extract(data, '$.provisioning.jobId') FROM design_sessions WHERE id = ?) AND state = 'running' AND changes() = 1`).bind(sessionId),
     ]);
@@ -377,7 +402,7 @@ export class D1Repo implements Repo {
   async startDesignJob(sessionId: Id, revision: Id, j: GenerationJob): Promise<boolean> {
     const result = await this.db.prepare(`INSERT INTO generation_jobs (id,course_id,requested_by,state,done,total,lesson_ids,error,created_at,updated_at,work,instruction,failures,runner,kind,session_id)
       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${this.designGuard} AND NOT EXISTS (SELECT 1 FROM generation_jobs WHERE id = ?)`)
-      .bind(j.id,j.courseId,j.requestedBy,j.state,j.done,j.total,JSON.stringify(j.lessonIds),j.error,j.createdAt,j.updatedAt,JSON.stringify(j.work),j.instruction,JSON.stringify(j.failures),j.runner ?? 'poll',j.kind ?? 'generate',j.sessionId ?? null,sessionId,revision,j.id).run();
+      .bind(j.id,j.courseId,j.requestedBy,j.state,j.done,j.total,JSON.stringify(j.lessonIds),j.error,j.createdAt,j.updatedAt,JSON.stringify(j.work),j.instruction,jobNotes(j),j.runner ?? 'poll',j.kind ?? 'generate',j.sessionId ?? null,sessionId,revision,j.id).run();
     return (result.meta.changes ?? 0) === 1;
   }
   async setDesignRunner(sessionId: Id, revision: Id, jobId: Id, runner: 'poll' | 'workflow'): Promise<boolean> {
@@ -397,8 +422,8 @@ export class D1Repo implements Repo {
       const b = blocks[0];
       statements.push(this.db.prepare(`INSERT INTO blocks (id,lesson_id,position,type,content,origin,ai_state,provenance,previous,updated_at,template_key,source_block_id,source_hash)
         SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${guard} AND EXISTS (SELECT 1 FROM lessons WHERE id = ? AND module_id = ? AND title = ? AND objective IS ? AND minutes = ? AND position = ? AND status = ? AND published_at IS ?)
-        AND NOT EXISTS (SELECT 1 FROM blocks WHERE lesson_id = ?) AND NOT EXISTS (SELECT 1 FROM lessons WHERE variant_of = ?)`)
-        .bind(b.id,b.lessonId,b.position,b.type,contentJson(b),b.origin,b.aiState,jsonOrNull(b.provenance),jsonOrNull(b.previous),b.updatedAt,b.templateKey ?? null,b.source?.blockId ?? null,b.source?.hash ?? null,...args,lesson.id,lesson.moduleId,lesson.title,lesson.objective ?? null,lesson.minutes,lesson.position,lesson.status,lesson.publishedAt,lesson.id,lesson.id));
+        AND NOT EXISTS (SELECT 1 FROM blocks WHERE lesson_id = ?) AND NOT EXISTS (SELECT 1 FROM lessons WHERE variant_of = ?) ${outcomeIds.map(() => 'AND EXISTS (SELECT 1 FROM outcomes WHERE id = ? AND course_id = ?)').join(' ')}`)
+        .bind(b.id,b.lessonId,b.position,b.type,contentJson(b),b.origin,b.aiState,jsonOrNull(b.provenance),jsonOrNull(b.previous),b.updatedAt,b.templateKey ?? null,b.source?.blockId ?? null,b.source?.hash ?? null,...args,lesson.id,lesson.moduleId,lesson.title,lesson.objective ?? null,lesson.minutes,lesson.position,lesson.status,lesson.publishedAt,lesson.id,lesson.id,...outcomeIds.flatMap(oid => [oid,nextSession.courseId])));
       for (const other of blocks.slice(1)) statements.push(this.db.prepare(`INSERT INTO blocks (id,lesson_id,position,type,content,origin,ai_state,provenance,previous,updated_at,template_key,source_block_id,source_hash)
         SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ${guard} AND EXISTS (SELECT 1 FROM blocks WHERE id = ?)`)
         .bind(other.id,other.lessonId,other.position,other.type,contentJson(other),other.origin,other.aiState,jsonOrNull(other.provenance),jsonOrNull(other.previous),other.updatedAt,other.templateKey ?? null,other.source?.blockId ?? null,other.source?.hash ?? null,...args,b.id));
@@ -409,8 +434,8 @@ export class D1Repo implements Repo {
     const markerArgs = lesson && blocks.length ? [blocks[0].id] : [];
     statements.push(this.db.prepare(`UPDATE generation_jobs SET state = ?,done = ?,lesson_ids = ?,error = ?,updated_at = ?,work = ?,failures = ?
       WHERE id = ? AND state = 'running' AND done = ? AND COALESCE(runner,'poll') = ? AND ${this.designGuard}${marker}`)
-      .bind(next.state,next.done,JSON.stringify(next.lessonIds),next.error,next.updatedAt,JSON.stringify(next.work),JSON.stringify(next.failures),expected.id,expected.done,expected.runner ?? 'poll',sessionId,revision,...markerArgs));
-    statements.push(this.db.prepare(`UPDATE design_sessions SET data = ?,stage = ?,updated_at = ? WHERE id = ? AND stage = 'provisioning' AND json_extract(data, '$.applyRevision') = ? AND EXISTS (SELECT 1 FROM generation_jobs WHERE id = ? AND done = ?)${marker}`)
+      .bind(next.state,next.done,JSON.stringify(next.lessonIds),next.error,next.updatedAt,JSON.stringify(next.work),jobNotes(next),expected.id,expected.done,expected.runner ?? 'poll',sessionId,revision,...markerArgs));
+    statements.push(this.db.prepare(`UPDATE design_sessions SET data = ?,stage = ?,updated_at = ? WHERE id = ? AND stage = 'provisioning' AND json_extract(data, '$.applyRevision') = ? AND changes() = 1 AND EXISTS (SELECT 1 FROM generation_jobs WHERE id = ? AND done = ?)${marker}`)
       .bind(JSON.stringify(nextSession),nextSession.stage,nextSession.updatedAt,sessionId,revision,next.id,next.done,...markerArgs));
     const result = await this.db.batch(statements);
     return (result[result.length - 1].meta.changes ?? 0) === 1;
@@ -1043,7 +1068,7 @@ export class D1Repo implements Repo {
       kind = excluded.kind, session_id = excluded.session_id`)
       .bind(job.id, job.courseId, job.requestedBy, job.state, job.done, job.total,
         JSON.stringify(job.lessonIds), job.error, job.createdAt, job.updatedAt,
-        JSON.stringify(job.work), job.instruction, JSON.stringify(job.failures), job.runner ?? 'poll', job.kind ?? 'generate', job.sessionId ?? null);
+        JSON.stringify(job.work), job.instruction, jobNotes(job), job.runner ?? 'poll', job.kind ?? 'generate', job.sessionId ?? null);
   }
 
   private adaptationStmt(value: Adaptation): D1PreparedStatement {
@@ -1144,10 +1169,12 @@ interface GenerationRow extends Record<string, unknown> {
   kind: 'generate' | 'extract' | 'scaffold'; session_id: string | null;
 }
 function generationFromRow(row: GenerationRow): GenerationJob {
+  const stored = JSON.parse(row.failures) as GenerationJob['failures'] | { failures: GenerationJob['failures']; notes: NonNullable<GenerationJob['notes']> };
   return { id: row.id, courseId: row.course_id, requestedBy: row.requested_by,
     state: row.state, done: row.done, total: row.total, lessonIds: JSON.parse(row.lesson_ids),
     error: row.error, createdAt: row.created_at, updatedAt: row.updated_at,
-    work: JSON.parse(row.work), instruction: row.instruction, failures: JSON.parse(row.failures),
+    work: JSON.parse(row.work), instruction: row.instruction, failures: Array.isArray(stored) ? stored : stored.failures,
+    ...(!Array.isArray(stored) ? { notes: stored.notes } : {}),
     ...(row.runner === 'workflow' ? { runner: 'workflow' as const } : {}),
     ...(row.kind !== 'generate' ? { kind: row.kind } : {}),
     ...(row.session_id !== null ? { sessionId: row.session_id } : {}) };

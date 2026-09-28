@@ -1,23 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import type { DesignSession } from '../../../../shared/domain';
+import { explicitAssessmentPoints } from '../../../../shared/design/plan';
 import { AiContent, Button, StatusNotice } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
 import { paths } from '../../paths';
 import styles from './Design.module.css';
 
 export function Preview({ session }: { session: DesignSession }) {
-  const planQuery = useApiQuery('previewProvisionPlan', { sessionId: session.id }, { staleTime: 5000, retry: false });
+  const unresolved = session.extraction?.assessments.filter(item => item.weightPercent === null && explicitAssessmentPoints(item.span, item.title) === null) ?? [];
+  const needsPoints = unresolved.some(item => !session.confirmedPoints?.[item.id]);
+  const [pointValues, setPointValues] = useState<Record<string, string>>(() => Object.fromEntries(unresolved.map(item => [item.id, String(session.confirmedPoints?.[item.id] ?? '')])));
+  const confirmPoints = useApiMutation('confirmDesignPoints');
+  const planQuery = useApiQuery('previewProvisionPlan', { sessionId: session.id }, { enabled: !needsPoints, staleTime: 5000, retry: false });
   const apply = useApiMutation('applyProvisionPlan');
   const back = useApiMutation('undoProvisionPlan');
   const [leastSure, setLeastSure] = useState('');
   const plan = planQuery.data;
   useEffect(() => { if (plan && !leastSure) setLeastSure(plan.modules.find(m => m.leastSure)?.key ?? ''); }, [plan, leastSure]);
+  if (needsPoints) return <section className={styles.card}><h1>Confirm points</h1><p>Enter the points for each assessment that the syllabus does not state clearly. The plan will include these values before you apply it.</p><form onSubmit={event => { event.preventDefault(); const points = Object.fromEntries(unresolved.map(item => [item.id, Number(pointValues[item.id])])); void confirmPoints.mutateAsync({ sessionId: session.id, points }).catch(() => {}); }}><div className={styles.stack}>{unresolved.map(item => <div key={item.id}><label htmlFor={`points-${item.id}`}>{item.title} · points</label><input id={`points-${item.id}`} type="number" min="0.01" step="any" required value={pointValues[item.id] ?? ''} onChange={event => setPointValues(values => ({ ...values, [item.id]: event.target.value }))} /><p className={styles.muted}>{item.span ? `Syllabus ${item.span.page ? `p. ${item.span.page}` : item.span.section ? `§ ${item.span.section}` : 'citation'}: ${item.span.text}` : 'No source citation was found for this assessment.'}</p></div>)}</div><Button variant="primary" type="submit" disabled={confirmPoints.isPending || unresolved.some(item => !Number.isFinite(Number(pointValues[item.id])) || Number(pointValues[item.id]) <= 0)}>Save points and preview</Button></form>{confirmPoints.error && <StatusNotice tone="error">{confirmPoints.error.message}</StatusNotice>}</section>;
   if (planQuery.isPending) return <section className={styles.card} role="status"><h1>Preparing your change set</h1></section>;
   if (planQuery.error || !plan) return <StatusNotice tone="error">{planQuery.error?.message ?? 'The preview could not be created.'}</StatusNotice>;
   return <div className={styles.previewGrid}>
     <main className={styles.stack}>
-      <header><p className={styles.muted}>Nothing is written until you apply · plan {plan.hash.slice(0, 8)}</p><h1>Preview the draft course</h1><p>{plan.summary} Your existing modules and lessons stay where they are. Everything lands as a draft.</p></header>
+      <header><p className={styles.muted}>Nothing is written until you apply · plan {plan.hash.slice(0, 8)}</p><h1>Preview the draft course</h1><p>{plan.summary} Your existing modules and lessons stay where they are. Everything lands as a draft.</p>{session.provisioning?.error && <StatusNotice tone="error">{session.provisioning.error}</StatusNotice>}</header>
       <div className={styles.previewTableWrap}><table className={styles.previewTable}><caption>Exactly what this plan will create</caption><thead><tr><th>Module and objective</th><th>Weeks and lessons</th><th>Assignment</th><th>Outcomes</th><th>Hours</th></tr></thead><tbody>{plan.modules.map(module => <tr key={module.key}><th scope="row"><strong>{module.title}</strong><br /><span className={styles.muted}>{module.objective}</span>{module.overlaps && <p className={styles.overlap}>Overlaps your module “{module.overlaps.title}” · Move it in during review</p>}</th><td>{module.lessons.length} lessons · {module.lessons.map(l => l.week).filter((v): v is number => v !== null).filter((v, i, a) => a.indexOf(v) === i).map(v => `Week ${v}`).join(', ') || 'Orientation'}<ul>{module.lessons.map(lesson => <li key={lesson.key}>{lesson.title} · {lesson.minutes} min</li>)}</ul></td><td>{(module.assignments?.length ? module.assignments : module.assignment ? [module.assignment] : []).length ? <ul>{(module.assignments?.length ? module.assignments : [module.assignment!]).map(item => <li key={item.key}>{item.title} · {item.points} points{item.dueAt && ` · due ${item.dueAt.slice(0, 10)}`}{item.replaces && ` · replaces ${item.replaces}`}</li>)}</ul> : 'Ungraded'}</td><td>{module.outcomeCodes.join(', ') || '—'}</td><td>{module.hours}</td></tr>)}</tbody></table></div>
       <div className={styles.previewNotes}><section className={styles.card}><h2>Readings</h2><p>{plan.readings.length} cited schedule readings. {plan.placeholders} “[Reading to select]” placeholders. No uncited reading is added.</p></section><section className={styles.card}><h2>Existing content</h2><p>{plan.modules.filter(m => m.overlaps).length} topic overlaps are marked above. You can move lessons in during review.</p></section></div>
     </main>
