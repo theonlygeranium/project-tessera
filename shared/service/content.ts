@@ -7,6 +7,7 @@ import { policyBlocks } from '../access/score';
 import type { Service, ServiceContext } from './context';
 import { agentProvenance, aiEnabled, aiFailed, canReachCourse, content, fail, lessonFor, moduleFor, provenance, teachLesson, user } from './helpers';
 import { validateBlockContent } from './validate';
+import { readiness } from './readiness';
 
 async function detail(ctx: ServiceContext, lessonId: string): Promise<LessonDetail> {
   const lesson = await lessonFor(ctx, lessonId), module = await moduleFor(ctx, lesson.moduleId), course = await canReachCourse(ctx, lesson.courseId);
@@ -79,8 +80,12 @@ export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBl
     // The institution's accessibility policy (D-022) is checked alongside readiness.
     const access = lessonAccessReport(lessonId, blocks, ctx.now());
     const reasons = policyBlocks(access, access.issues, (await ctx.repo.getInstitution()).accessPolicy);
-    if (!report.ready || reasons.length) {
-      throw new ApiError('not-ready', ["This lesson isn't ready to publish.", ...reasons].join(' '), reasons.length ? { ...report, ready: false, accessPolicy: { score: access.score, reasons } } : report);
+    const institution = await ctx.repo.getInstitution();
+    const policy = institution.readinessPolicy;
+    const rubricResult = policy?.minimumPercent === null || !policy ? null : await readiness.getCourseReadiness(ctx, { courseId: l.courseId });
+    const rubric = rubricResult?.blocksPublishing ? { rubricName: rubricResult.rubricName, percent: rubricResult.percent, minimum: policy!.minimumPercent! } : undefined;
+    if (!report.ready || reasons.length || rubric) {
+      throw new ApiError('not-ready', ["This lesson isn't ready to publish.", ...reasons].join(' '), { ...report, ready: false, ...(reasons.length ? { accessPolicy: { score: access.score, reasons } } : {}), ...(rubric ? { rubric } : {}) });
     }
     l.status = 'published'; l.publishedAt = ctx.now(); await ctx.repo.putLesson(l); return l;
   },

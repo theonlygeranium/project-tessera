@@ -5,6 +5,7 @@ import type { Service, ServiceContext } from './context';
 import { agentProvenance, aiEnabled, canReachCourse, canTeach, content, fail, lessonFor, minutes, provenance, required, user } from './helpers';
 import { validateBlockContent } from './validate';
 import { courses } from './courses';
+import { saveCourseOutcomes } from './outcomes';
 
 const GENERATABLE: readonly BlockType[] = ['text', 'callout', 'check', 'document', 'table', 'scenario'];
 const VIDEO_SCRIPT = 'Write a video script. Title it "Video script: …" and make each section a scene with narration.';
@@ -131,12 +132,14 @@ export const generation: Pick<Service, 'generateAtScope' | 'getGenerationJob' | 
     const courseInput = input.course;
     const clean = { code: required(courseInput.code, 'code'), title: required(courseInput.title, 'title'), term: required(courseInput.term, 'term'),
       description: courseInput.description?.trim() ?? '', welcome: courseInput.welcome?.trim() ?? '', outcomes: (courseInput.outcomes ?? []).map(value => required(value, 'outcome')) };
+    if (clean.outcomes.length > 30 || clean.outcomes.some(value => value.length > 500)) fail('invalid', 'Outcomes must have 1–500 characters, at most 30.');
     const prepared = input.modules.map(module => ({ title: required(module.title, 'module title'), lessons: (Array.isArray(module.lessons) ? module.lessons : fail('invalid', 'Lessons must be an array.')).map(lesson => ({
       title: required(lesson.title, 'lesson title'), minutes: minutes(lesson.minutes ?? 15),
       blocks: (Array.isArray(lesson.blocks) ? lesson.blocks : fail('invalid', 'Blocks must be an array.')).map(validateBlockContent),
     })) }));
     const courseId = ctx.newId('c');
     await ctx.repo.putCourse({ id: courseId, ...clean, instructorIds: [], status: 'active' });
+    if (clean.outcomes.length) await saveCourseOutcomes(ctx, courseId, clean.outcomes.map(text => ({ text })));
     for (const [modulePosition, module] of prepared.entries()) {
       const moduleId = ctx.newId('m'); await ctx.repo.putModule({ id: moduleId, courseId, title: module.title, position: modulePosition });
       for (const [position, lesson] of module.lessons.entries()) {

@@ -49,6 +49,12 @@ const targets = [
 ];
 // The Night 1 app (D-014), on the in-memory mock (?data=mock) since there's no API here.
 // `as` signs in as a seed persona. Lane H adds every route.
+const adminReadinessSteps = (path) => async (page) => {
+  await page.getByRole('button', { name: 'Finish setup' }).click();
+  await page.waitForTimeout(300);
+  await page.evaluate((next) => { history.pushState({}, '', next); dispatchEvent(new PopStateEvent('popstate')); }, `/app${path}?data=mock&as=u-admin`);
+  await page.waitForTimeout(900);
+};
 const APP = [
   { name: 'App · Choose a persona', url: 'app/sign-in?data=mock' },
   { name: 'App · Design tokens', url: 'app/tokens?data=mock' },
@@ -68,6 +74,14 @@ const APP = [
   { name: 'App · Instructor · Course accessibility', url: 'app/teach/courses/c-stat110/access?data=mock&as=u-okafor' },
   { name: 'App · Instructor · File library', url: 'app/teach/courses/c-stat110/files?data=mock&as=u-okafor' },
   { name: 'App · Instructor · Assignment editor', url: 'app/teach/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-okafor' },
+  { name: 'App · Instructor · Course readiness', url: 'app/teach/courses/c-stat110/readiness?data=mock&as=u-okafor' },
+  { name: 'App · Instructor · Course outcomes', url: 'app/teach/courses/c-stat110/outcomes?data=mock&as=u-okafor' },
+  { name: 'App · Administrator · Rubrics', url: 'app/admin/rubrics?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/rubrics') },
+  { name: 'App · Administrator · Tessera rubric', url: 'app/admin/rubrics/rubric-tessera?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/rubrics/rubric-tessera') },
+  { name: 'App · Administrator · OSCQR rubric', url: 'app/admin/rubrics/rubric-oscqr?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/rubrics/rubric-oscqr') },
+  { name: 'App · Administrator · New rubric', url: 'app/admin/rubrics/new?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/rubrics/new') },
+  { name: 'App · Administrator · Course readiness', url: 'app/admin/courses/c-stat110/readiness?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/courses/c-stat110/readiness') },
+  { name: 'App · Administrator · Readiness policy', url: 'app/admin/policy?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/policy') },
   { name: 'App · Builder · Generate at scope', url: 'app/teach/courses/c-stat110/generate?data=mock&as=u-okafor' },
   { name: 'App · Builder · Start', url: 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor' },
   // Student (lane G): Priya has no profile yet (onboarding); Marcus has one
