@@ -25,7 +25,8 @@ describe('structure option validation', () => {
   });
   it('rejects wrong ids and unsupported claims, and repairs weeks and citations', async () => {
     const raw = (await fixtureAi.run('structure-options', input)).output;
-    expect(() => finalizeOptions(raw.map(option => ({ ...option, id: 'case' as const })), input)).toThrow();
+    // Wrong in id and label alike: nothing to map, so the job asks again.
+    expect(() => finalizeOptions(raw.map(option => ({ ...option, id: 'case' as const, label: 'Case inquiry' })), input)).toThrow();
     // A module entirely outside the term is dropped; an option left with none is rejected.
     expect(() => finalizeOptions(raw.map((option, index) => index === 0 ? { ...option, modules: [{ ...option.modules[0], weeks: [16] }] } : option), input)).toThrow(/no modules inside the term/);
     // An invented quote loses its citation, and the approach cites the passage the rule chose it from.
