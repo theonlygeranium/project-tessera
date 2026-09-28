@@ -93,6 +93,17 @@ describe('authoring and administration', () => {
     expect((await h.repo.listLessons({ moduleId: 'm-stat-1' })).map(x => [x.id,x.position])).toEqual([['l-stat-2',0],['l-stat-1',1]]);
     await code(h.call('deleteModule', { moduleId: 'm-stat-1' }), 'conflict');
   });
+  it('updates and clears module objectives in readiness', async () => {
+    const h = harness();
+    await h.call('updateModule', { moduleId: 'm-stat-1', objective: '  Interpret course evidence.  ' });
+    await h.call('updateModule', { moduleId: 'm-stat-2', objective: 'Compare statistical models.' });
+    expect((await h.repo.getModule('m-stat-1'))?.objective).toBe('Interpret course evidence.');
+    const readiness = await h.call('getCourseReadiness', { courseId: 'c-stat110' });
+    expect(readiness.standards.flatMap(s => s.items).find(i => i.number === '2.3')?.status).toBe('met');
+    await h.call('updateModule', { moduleId: 'm-stat-1', objective: null });
+    expect((await h.repo.getModule('m-stat-1'))?.objective).toBeUndefined();
+    expect((await h.call('getCourseReadiness', { courseId: 'c-stat110' })).standards.flatMap(s => s.items).find(i => i.number === '2.3')?.status).toBe('not-met');
+  });
   it('normalizes policy modes and announcement reads', async () => {
     const admin = harness('u-admin');
     const inst = await admin.call('updatePolicy', { aiAuthoring: true, tutorModes: { graded: ['open'], practice: [] } });

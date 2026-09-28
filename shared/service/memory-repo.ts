@@ -43,6 +43,9 @@ export class MemoryRepo implements Repo {
     this.data.enrollments = this.data.enrollments.filter(x => x.courseId !== courseId);
     this.data.enrollments.push(...[...new Set(userIds)].map(userId => ({ courseId, userId })));
   }
+  async addEnrollment(courseId: string, userId: string) {
+    if (!this.data.enrollments.some(x => x.courseId === courseId && x.userId === userId)) this.data.enrollments.push({ courseId, userId });
+  }
   async getModule(id: string): Promise<Module | null> { return copy(this.data.modules.find(x => x.id === id) ?? null); }
   async listModules(courseId: string): Promise<Module[]> { return copy(this.data.modules.filter(x => x.courseId === courseId).sort(byPosition)); }
   async putModule(value: Module) { this.upsert(this.data.modules, normalized(value)); }

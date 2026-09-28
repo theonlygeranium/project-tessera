@@ -60,6 +60,8 @@ export interface Repo {
   listEnrollments(filter: { courseId?: Id; userId?: Id }): Promise<Enrollment[]>;
   /** Replaces the course's enrollments. */
   setEnrollments(courseId: Id, userIds: Id[]): Promise<void>;
+  /** Idempotent: adds one enrollment; never removes any. */
+  addEnrollment(courseId: Id, userId: Id): Promise<void>;
 
   getModule(id: Id): Promise<Module | null>;
   listModules(courseId: Id): Promise<Module[]>;

@@ -26,6 +26,12 @@ export function createAccessDirectory({ token, accountId, groupId, fetch: reques
   fetch?: typeof fetch;
 }): Directory {
   const url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/access/groups/${encodeURIComponent(groupId)}`;
+  const hasEmail = (group: AccessGroup, normalized: string) => group.include.some((rule) => {
+    if (!rule || typeof rule !== 'object' || !('email' in rule)) return false;
+    const value = rule.email;
+    return !!value && typeof value === 'object' && 'email' in value && typeof value.email === 'string' && value.email.toLowerCase() === normalized;
+  });
+  const delay = () => new Promise<void>((resolve) => setTimeout(resolve, 50 + Math.random() * 200));
   async function call<T>(method: 'GET' | 'PUT', body?: unknown): Promise<T> {
     try {
       const response = await request(url, {
@@ -46,21 +52,23 @@ export function createAccessDirectory({ token, accountId, groupId, fetch: reques
   return {
     async grant(email: string): Promise<void> {
       const normalized = email.toLowerCase();
-      const group = await call<AccessGroup>('GET');
-      if (!Array.isArray(group.include)) throw accessError('The Access group has no include rules.');
-      const present = group.include.some((rule) => {
-        if (!rule || typeof rule !== 'object' || !('email' in rule)) return false;
-        const value = rule.email;
-        return !!value && typeof value === 'object' && 'email' in value && typeof value.email === 'string' && value.email.toLowerCase() === normalized;
-      });
-      if (present) return;
-      await call<AccessGroup>('PUT', {
-        name: group.name,
-        include: [...group.include, { email: { email: normalized } }],
-        exclude: group.exclude,
-        require: group.require,
-        is_default: group.is_default,
-      });
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const group = await call<AccessGroup>('GET');
+        if (!Array.isArray(group.include)) throw accessError('The Access group has no include rules.');
+        if (hasEmail(group, normalized)) return;
+        await call<AccessGroup>('PUT', {
+          name: group.name,
+          include: [...group.include, { email: { email: normalized } }],
+          exclude: group.exclude,
+          require: group.require,
+          is_default: group.is_default,
+        });
+        await delay();
+        const verified = await call<AccessGroup>('GET');
+        if (!Array.isArray(verified.include)) throw accessError('The Access group has no include rules.');
+        if (hasEmail(verified, normalized)) return;
+      }
+      throw accessError('The Access group changed during the update.');
     },
   };
 }

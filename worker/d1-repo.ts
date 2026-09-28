@@ -106,6 +106,9 @@ export class D1Repo implements Repo {
       ...userIds.map((userId) => this.enrollmentStmt(courseId, userId)),
     ]);
   }
+  async addEnrollment(courseId: Id, userId: Id): Promise<void> {
+    await this.db.prepare('INSERT OR IGNORE INTO enrollments (course_id, user_id) VALUES (?, ?)').bind(courseId, userId).run();
+  }
 
   async getModule(id: Id): Promise<Module | null> {
     const row = await this.first<ModuleRow>('SELECT * FROM modules WHERE id = ?', [id]);

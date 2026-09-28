@@ -6,6 +6,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "project-tessera",
   "main": "worker/index.ts",
+  "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": true }],
   "compatibility_date": "2026-09-26",
   // Local dev runs without Docker; OCR is exercised through its fake binding in tests (D-023).
   "dev": { "enable_containers": false },

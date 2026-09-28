@@ -91,6 +91,8 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
     it('replaces enrollments and resets from an empty seed', async () => {
       const repo = await makeRepo(); await repo.setEnrollments('c-stat110',['u-priya']);
       expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-priya']);
+      await repo.addEnrollment('c-stat110', 'u-dana'); await repo.addEnrollment('c-stat110', 'u-dana');
+      expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-dana', 'u-priya']);
       const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.adaptations = []; empty.builderSessions = []; empty.generationJobs = []; empty.requirements = []; empty.completionEvents = []; empty.testOuts = []; empty.reportingLines = [];
       await repo.reset(empty); expect(await repo.isEmpty()).toBe(true);
       await repo.reset(seedData()); expect(await repo.isEmpty()).toBe(false); expect(await repo.getUser('u-priya')).not.toBeNull();

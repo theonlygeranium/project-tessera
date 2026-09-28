@@ -19,6 +19,24 @@ async function keepAll(repo: MemoryRepo, teacher: ServiceContext, lessonId: stri
 }
 
 describe('persona variants', () => {
+  it('keeps copied AI document metadata and hides an unkept draft from students and publishing', async () => {
+    const repo = new MemoryRepo(seedData()), teacher = await ctx(repo, 'u-okafor'), student = await ctx(repo, 'u-priya');
+    const provenance = { model: 'fixture', task: 'element' as const, generatedAt: SEED_NOW, sources: [], summary: 'Draft document' };
+    await repo.putBlock({ id: 'b-master-ai-document', lessonId: masterId, position: 20, type: 'document', title: 'Draft guide', sections: [{ heading: 'One', text: 'Draft text' }], origin: 'ai', aiState: 'draft', provenance, previous: null, updatedAt: SEED_NOW });
+    await repo.putBlock({ id: 'b-master-kept-link', lessonId: masterId, position: 21, type: 'link', href: 'https://example.test', text: 'Source', description: '', origin: 'ai', aiState: 'kept', provenance, previous: null, updatedAt: SEED_NOW });
+    const plain = await dispatch(service, teacher, 'createVariant', { lessonId: masterId, audience: 'plain' });
+    const copied = plain.blocks.find(b => b.source?.blockId === 'b-master-ai-document')!;
+    expect(copied).toMatchObject({ origin: 'ai', aiState: 'draft', provenance });
+    expect(plain.blocks.find(b => b.source?.blockId === 'b-master-kept-link')).toMatchObject({ origin: 'ai', aiState: 'kept', provenance });
+    for (const b of plain.blocks.filter(b => b.id !== copied.id && b.aiState === 'draft')) await dispatch(service, teacher, 'keepBlock', { blockId: b.id });
+    await expect(dispatch(service, teacher, 'publishLesson', { lessonId: plain.lesson.id })).rejects.toMatchObject({ code: 'not-ready' });
+    await repo.putLesson({ ...plain.lesson, status: 'published', publishedAt: SEED_NOW });
+    const visible = await dispatch(service, student, 'getStudentLesson', { lessonId: plain.lesson.id });
+    expect(visible.blocks.map(b => b.id)).not.toContain(copied.id);
+    await repo.putLesson(plain.lesson);
+    await dispatch(service, teacher, 'keepBlock', { blockId: copied.id });
+    await dispatch(service, teacher, 'publishLesson', { lessonId: plain.lesson.id });
+  });
   it('hashes content only and enforces access, policy, and AI validation', async () => {
     const repo = new MemoryRepo(seedData()), teacher = await ctx(repo, 'u-okafor'), other = await ctx(repo, 'u-chen'), student = await ctx(repo, 'u-priya');
     const source = (await repo.getBlock('b-s1-2'))!;
@@ -85,12 +103,12 @@ describe('persona variants', () => {
     const rewritten = partial.blocks.find(b => b.id === variantBlock.id)!;
     expect(rewritten).toMatchObject({ aiState: 'draft', previous: { type: 'text' }, source: { blockId: 'b-s1-2' } });
     expect(rewritten.source?.hash).not.toBe(firstHash);
-    expect(partial.lesson.variantOf?.syncedAt).toBe(later);
+    expect(partial.lesson.variantOf?.syncedAt).toBe(SEED_NOW);
     const newMaster = (await repo.listBlocks(masterId)).at(-1)!;
     expect(partial.blocks.some(b => b.source?.blockId === newMaster.id)).toBe(false);
-    // Another master edit makes the uncovered item visible after the partial sync timestamp.
+    expect((await dispatch(service, edited, 'getVariantDiff', { variantId })).variant.uncoveredBlocks).toBe(1);
+    // The uncovered item remains visible without another master edit.
     const laterCtx = await ctx(repo, 'u-okafor', later2);
-    await repo.putBlock({ ...newMaster, updatedAt: later2 });
     const all = await dispatch(service, laterCtx, 'resyncVariant', { variantId });
     expect(all.blocks.some(b => b.source?.blockId === newMaster.id && b.aiState === 'draft')).toBe(true);
     expect(all.lesson.variantOf?.syncedAt).toBe(later2);

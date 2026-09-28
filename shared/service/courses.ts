@@ -90,6 +90,7 @@ export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseO
   updateModule: async (ctx, input) => {
     const m = await moduleFor(ctx, input.moduleId); await canTeach(ctx, m.courseId);
     if (input.title !== undefined) m.title = required(input.title, 'title');
+    if (input.objective !== undefined) m.objective = input.objective?.trim() || undefined;
     await ctx.repo.putModule(m);
     if (input.position !== undefined) {
       const ids = (await ctx.repo.listModules(m.courseId)).map(x => x.id);

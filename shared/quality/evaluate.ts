@@ -47,9 +47,10 @@ export function evaluateReadiness(
 ): ReadinessResult {
   const byItem = new Map(stored.map((s) => [s.itemId, s]));
   const cache = new Map<string, CheckOutcome>();
+  const contentSnapshot: CourseSnapshot = { ...snapshot, blocks: Object.fromEntries(Object.entries(snapshot.blocks).map(([lessonId, blocks]) => [lessonId, blocks.filter((block) => block.origin !== 'ai' || block.aiState === 'kept')])) };
   const run = (item: RubricItem): CheckOutcome | null => {
     if (item.kind !== 'automatic' || !item.check) return null;
-    if (!cache.has(item.check)) cache.set(item.check, AUTOMATIC_CHECKS[item.check](snapshot));
+    if (!cache.has(item.check)) cache.set(item.check, AUTOMATIC_CHECKS[item.check](item.check === 'ai-drafts-kept' ? snapshot : contentSnapshot));
     return cache.get(item.check)!;
   };
 
