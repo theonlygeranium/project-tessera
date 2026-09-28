@@ -4,6 +4,7 @@ import type { AccentId, Brand } from '../../../../shared/domain';
 import { ACCENTS } from '../../../../shared/policy';
 import { Button, StatusNotice, TopBar } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
+import { PageHelp } from '../../help/PageHelp';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
 import { ErrorNotice, Loading } from '../../shell/Status';
@@ -33,7 +34,7 @@ export function ProgramsPage() {
   const [name, setName] = useState(''), [description, setDescription] = useState(''), [templateId, setTemplateId] = useState('');
   const [brand, setBrand] = useState<Brand>({ accent: null, logo: null }), [error, setError] = useState('');
   const submit = (e: FormEvent) => { e.preventDefault(); setError(''); create.mutate({ name, description, templateId: templateId || null, brand }, { onSuccess: p => navigate(paths.admin.program(p.id)), onError: x => setError(x.message) }); };
-  return <div className={styles.page}><TopBar title="Programs" />
+  return <div className={styles.page}><TopBar title="Programs" /><PageHelp topic="admin.programs" />
     <section className={styles.section}><h2>Programs</h2>{programs.isPending || courses.isPending ? <Loading /> : programs.error || courses.error ? <ErrorNotice error={programs.error ?? courses.error} /> : <ul className={styles.list}>{programs.data?.map(p => <li key={p.id}><Link to={paths.admin.program(p.id)}>{p.name}</Link> · {courses.data?.filter(c => c.programId === p.id).length ?? 0} courses</li>)}{programs.data?.length === 0 && <li>No programs yet.</li>}</ul>}</section>
     <section className={styles.section}><h2>Create program</h2>{templates.isPending ? <Loading /> : templates.error ? <ErrorNotice error={templates.error} /> : <form className={styles.form} onSubmit={submit}>{error && <StatusNotice tone="error">{error}</StatusNotice>}<ProgramFields name={name} description={description} templateId={templateId} brand={brand} templates={templates.data ?? []} onName={setName} onDescription={setDescription} onTemplate={setTemplateId} onBrand={setBrand} /><div className={styles.actions}><Button type="submit" variant="primary" disabled={create.isPending}>Create program</Button></div></form>}</section>
   </div>;

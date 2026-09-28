@@ -1,3 +1,4 @@
+import { PageHelp } from '../../help/PageHelp';
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { FixLink, ItemResult } from '../../../../shared/domain';
@@ -24,7 +25,7 @@ export function ReadinessPage({ admin = false }: { admin?: boolean }) {
   const result = report.data, minimum = institution.readinessPolicy?.rubricId === result?.rubricId ? institution.readinessPolicy?.minimumPercent ?? null : null;
   const run = async (name: string, task: () => Promise<unknown>) => { setBusy(name); setError(''); try { await task(); } catch (e) { setError(e instanceof Error ? e.message : 'Action failed.'); } finally { setBusy(''); } };
   const close = () => { setForm(null); requestAnimationFrame(() => opener.current?.focus()); };
-  return <div style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}><TopBar title="Course readiness" />
+  return <div style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}><TopBar title="Course readiness" />{!admin && <PageHelp topic="teach.readiness" courseId={courseId} />}
     {report.isPending || rubrics.isPending ? <Loading /> : report.error ? <ErrorNotice error={report.error} onRetry={() => void report.refetch()} /> : rubrics.error ? <ErrorNotice error={rubrics.error} onRetry={() => void rubrics.refetch()} /> : result && <>
       <label htmlFor="readiness-rubric">Rubric</label> <select id="readiness-rubric" value={result.rubricId} onChange={e => setRubricId(e.target.value)}>{rubrics.data?.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
       <h2>{result.rubricName}</h2><p><strong>{result.met} of {result.applicable} met · {result.percent}%</strong> · {minimum === null ? 'Advisory' : `Publishing needs ${minimum}%`}</p><p>{result.needsReview} items need review</p>

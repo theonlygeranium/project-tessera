@@ -4,6 +4,8 @@ import { Link, useLocation, useParams } from 'react-router';
 import type { User } from '../../../../shared/domain';
 import { Button, ChoiceGroup, StatusNotice, TopBar } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
+import { PageHelp } from '../../help/PageHelp';
+import { SetupChecklist } from '../../help/SetupChecklist';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
 import { ErrorNotice, Loading } from '../../shell/Status';
@@ -67,6 +69,7 @@ export function CoursePage() {
         breadcrumbs={[{ label: 'Courses', href: paths.admin.courses }, { label: title }]}
         renderLink={renderRouterLink}
       />
+      <PageHelp topic="admin.course" courseId={courseId} />
       {!ready && <StatusNotice tone="error" title="Course link is incomplete">This page needs a course.</StatusNotice>}
       {loading && <Loading label="Loading course" />}
       {error && (
@@ -82,6 +85,8 @@ export function CoursePage() {
       )}
       {course && instructors.data && students.data && enrollments.data && (
         <>
+          <SetupChecklist role="admin" courseId={courseId} />
+          <p><Link to={paths.admin.courseReadiness(courseId)}>Readiness report</Link></p>
           {showCreated && (
             <StatusNotice tone="success" live="polite" title="Course created" onDismiss={() => setDismissedCreate(courseId)}>
               Assign an instructor and enroll students below.

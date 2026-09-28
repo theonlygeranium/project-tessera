@@ -1,7 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router';
-import { Button, StatusChip } from '../../components';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link, useLocation, useParams } from 'react-router';
+import { Button, StatusChip, StatusNotice } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
+import { PageHelp } from '../../help/PageHelp';
+import { SetupChecklist } from '../../help/SetupChecklist';
+import { StartOptions } from '../../help/StartOptions';
 import { paths } from '../../paths';
 import { ErrorNotice, Loading } from '../../shell/Status';
 import { usePageTitle } from '../../shell/usePageTitle';
@@ -10,6 +13,9 @@ import styles from './instructor.module.css';
 
 export function Workspace() {
   const { courseId = '' } = useParams();
+  const location = useLocation();
+  const [showCreated, setShowCreated] = useState(Boolean((location.state as { created?: boolean } | null)?.created));
+  const moduleFormRef = useRef<HTMLFormElement>(null);
   const q = useApiQuery('getCourseOutline', { courseId });
   usePageTitle(q.data?.course.title ?? 'Course');
   const updateCourse = useApiMutation('updateCourse'); const createModule = useApiMutation('createModule'); const updateModule = useApiMutation('updateModule'); const deleteModule = useApiMutation('deleteModule'); const createLesson = useApiMutation('createLesson'); const updateLesson = useApiMutation('updateLesson'); const deleteLesson = useApiMutation('deleteLesson');
@@ -23,8 +29,14 @@ export function Workspace() {
   const run = async (task: () => Promise<unknown>, success: string) => { try { setError(''); await task(); setMessage(success); return true; } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.'); return false; } };
   const closeRename = (id: string) => { setRenaming(null); requestAnimationFrame(() => document.getElementById(`rename-${id}`)?.focus()); };
   const modules = q.data?.modules ?? [];
-  return <><CourseBar title={q.data?.course.title ?? 'Course'} courseId={courseId} courseTitle={q.data?.course.title} />
-    {q.isPending ? <Loading /> : q.error ? <ErrorNotice error={q.error} onRetry={() => void q.refetch()} /> : <div className={styles.stack}><p><Link to={paths.teach.template(courseId)}>Template</Link></p><Message text={message} /><Message text={error} error />
+  const hasLessons = modules.some(module => module.lessons.length > 0);
+  const addYourself = () => { setAddingModule(true); requestAnimationFrame(() => moduleFormRef.current?.querySelector('input')?.focus()); };
+  return <><CourseBar title={q.data?.course.title ?? 'Course'} courseId={courseId} courseTitle={q.data?.course.title} actions={hasLessons ? <Link to={paths.teach.template(courseId)}>Course template</Link> : undefined} />
+    {showCreated && <StatusNotice tone="success" live="polite" onDismiss={() => setShowCreated(false)}>Course created. Choose how to build it below.</StatusNotice>}
+    <PageHelp topic="teach.workspace" courseId={courseId} />
+    {q.data && <SetupChecklist role="instructor" courseId={courseId} />}
+    {q.isPending ? <Loading /> : q.error ? <ErrorNotice error={q.error} onRetry={() => void q.refetch()} /> : <div className={styles.stack}><Message text={message} /><Message text={error} error />
+      <StartOptions courseId={courseId} hasLessons={hasLessons} onAddYourself={addYourself} />
       <section><h2>Course home</h2><form className={styles.inlineForm} onSubmit={(e: FormEvent) => { e.preventDefault(); void run(() => updateCourse.mutateAsync({ courseId, welcome, outcomes }), 'Course home saved.'); }}>
         <Field label="Welcome message" value={welcome} onChange={setWelcome} multiline />
         <div><h3>Outcomes</h3><ul className={styles.list}>{outcomes.map((value, i) => <li key={i} className={styles.fieldRow}><Field label={`Outcome ${i + 1}`} value={value} onChange={v => setOutcomes(outcomes.map((x, index) => index === i ? v : x))} /><Button density="compact" onClick={() => setOutcomes(outcomes.filter((_, index) => index !== i))}>Remove</Button></li>)}</ul><Button density="compact" onClick={() => setOutcomes([...outcomes, ''])}>Add outcome</Button></div><SaveButton pending={updateCourse.isPending}>Save course home</SaveButton></form></section>
@@ -35,6 +47,6 @@ export function Workspace() {
         {m.lessons.length > 0 && <ul className={styles.lessonList}>{m.lessons.map((l, lessonIndex) => <li key={l.id} className={styles.lessonRow}><Link to={paths.teach.lesson(courseId, l.id)}>{l.title}</Link><span className={styles.muted}>{l.minutes} {l.minutes === 1 ? 'minute' : 'minutes'}</span><StatusChip tone={l.draftBlockCount ? 'accent' : l.status === 'published' ? 'success' : 'neutral'}>{l.draftBlockCount ? `${l.draftBlockCount} AI ${l.draftBlockCount === 1 ? 'draft' : 'drafts'} to review` : l.status === 'published' ? 'Published' : 'Draft'}</StatusChip><div className={styles.row}><Button density="compact" disabled={lessonIndex === 0} onClick={() => void run(() => updateLesson.mutateAsync({ lessonId: l.id, position: lessonIndex - 1 }), 'Lesson moved.')}>Move up</Button><Button density="compact" disabled={lessonIndex === m.lessons.length - 1} onClick={() => void run(() => updateLesson.mutateAsync({ lessonId: l.id, position: lessonIndex + 1 }), 'Lesson moved.')}>Move down</Button><Button density="compact" onClick={() => { if (window.confirm(`Delete lesson “${l.title}”?`)) void run(() => deleteLesson.mutateAsync({ lessonId: l.id }), 'Lesson deleted.'); }}>Delete</Button></div></li>)}</ul>}
         {addingLesson === m.id ? <form className={styles.fieldRow} onSubmit={e => { e.preventDefault(); void (async () => { if (await run(() => createLesson.mutateAsync({ moduleId: m.id, title: lessonDraft.title, minutes: Number(lessonDraft.minutes) }), 'Lesson added.')) { setAddingLesson(null); setLessonDraft({ title: '', minutes: '15' }); } })(); }}><Field label="Lesson title" value={lessonDraft.title} onChange={title => setLessonDraft({ ...lessonDraft, title })} required /><Field label="Minutes" type="number" value={lessonDraft.minutes} onChange={minutes => setLessonDraft({ ...lessonDraft, minutes })} required /><SaveButton pending={createLesson.isPending}>Add</SaveButton><Button density="compact" onClick={() => setAddingLesson(null)}>Cancel</Button></form> : <Button variant="text" density="compact" className={styles.startButton} onClick={() => { setAddingLesson(m.id); setLessonDraft({ title: '', minutes: '15' }); }}>Add lesson</Button>}
       </div>)}
-      {addingModule ? <form className={styles.fieldRow} onSubmit={e => { e.preventDefault(); void (async () => { if (await run(() => createModule.mutateAsync({ courseId, title: moduleTitle }), 'Module added.')) { setAddingModule(false); setModuleTitle(''); } })(); }}><Field label="Module title" value={moduleTitle} onChange={setModuleTitle} required /><SaveButton pending={createModule.isPending}>Add</SaveButton><Button density="compact" onClick={() => setAddingModule(false)}>Cancel</Button></form> : <Button density="compact" className={styles.startButton} onClick={() => setAddingModule(true)}>Add module</Button>}</section>
+      {addingModule ? <form ref={moduleFormRef} className={styles.fieldRow} onSubmit={e => { e.preventDefault(); void (async () => { if (await run(() => createModule.mutateAsync({ courseId, title: moduleTitle }), 'Module added.')) { setAddingModule(false); setModuleTitle(''); } })(); }}><Field label="Module title" value={moduleTitle} onChange={setModuleTitle} required /><SaveButton pending={createModule.isPending}>Add</SaveButton><Button density="compact" onClick={() => setAddingModule(false)}>Cancel</Button></form> : <Button density="compact" className={styles.startButton} onClick={() => setAddingModule(true)}>Add module</Button>}</section>
     </div>}</>;
 }

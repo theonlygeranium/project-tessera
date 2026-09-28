@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Button, StatusNotice, TopBar } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
+import { PageHelp } from '../../help/PageHelp';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
 import { ErrorNotice, Loading } from '../../shell/Status';
@@ -20,6 +21,7 @@ export function CourseTemplatePage() {
   const p = preview.data;
   const additions = p ? p.addModules.length + p.addLessons.length + p.addBlocks.length : 0;
   return <div className={styles.page}><TopBar title={p ? `Template: ${p.templateName}` : 'Course template'} eyebrow={[course?.code, program?.name].filter(Boolean).join(' · ') || undefined} breadcrumbs={[{ label: 'My courses', href: paths.teach.courses }, { label: outline.data?.course.title ?? 'Course', href: paths.teach.course(courseId) }, { label: 'Template' }]} renderLink={renderRouterLink} />
+    <PageHelp topic="teach.template" courseId={courseId} />
     {outline.isPending || preview.isPending ? <Loading /> : outline.error ? <ErrorNotice error={outline.error} onRetry={() => void outline.refetch()} /> : preview.error?.code === 'not-found' ? <section className={styles.section}><h2>No template applies to this course</h2><p>A program or institution template can be assigned by an administrator.</p></section> : preview.error ? <ErrorNotice error={preview.error} onRetry={() => void preview.refetch()} /> : p && <section className={styles.section}>
       {message && <StatusNotice tone="success" live="polite">{message}</StatusNotice>}{error && <StatusNotice tone="error" live="polite">{error}</StatusNotice>}
       {additions === 0 ? <p>Your course has everything {p.templateName} requires. Applying it can fill any tutor defaults you have not set.</p> : <><h2>Changes to review</h2><p>{p.summary}</p>

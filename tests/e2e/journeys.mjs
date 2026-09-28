@@ -841,6 +841,47 @@ await journey('Journey 18 · An instructor completes assigned required training 
   });
 });
 
+await journey('Journey 19 · Instructor course setup help and manual start', async (page) => {
+  const createEmptyCourse = async (code) => {
+    await page.getByRole('textbox', { name: 'Code' }).fill(code);
+    await page.getByRole('textbox', { name: 'Title' }).fill('Contextual help practice');
+    await page.getByRole('textbox', { name: 'Term' }).fill('Fall 2026');
+    await page.getByRole('combobox', { name: 'Program' }).selectOption('');
+    await page.getByRole('button', { name: 'Create course' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Contextual help practice' }).waitFor();
+  };
+  await step('Create a course with no program and see the workspace guidance', async () => {
+    await page.goto(`${BASE}app/teach?data=mock&as=u-okafor`);
+    await createEmptyCourse('HELP 101');
+    await waitForIncludes(page.locator('main'), 'Course created. Choose how to build it below.');
+    await page.getByRole('heading', { name: 'Choose how to start' }).waitFor();
+    for (const name of ['Build with AI', 'Start from the template', 'Add it yourself']) await page.getByRole('heading', { name }).waitFor();
+    await page.getByRole('heading', { name: 'Course setup' }).waitFor();
+    const current = page.getByRole('navigation', { name: 'Course setup steps' }).locator('[aria-current="step"]');
+    await waitForIncludes(current, 'Write the welcome and outcomes');
+  });
+  await step('Collapse help and reload with the same mock persona', async () => {
+    const help = page.getByRole('button', { name: 'About the course workspace' });
+    await help.click();
+    if (await help.getAttribute('aria-expanded') !== 'false') throw new Error('Workspace help did not collapse');
+    const url = new URL(page.url());
+    url.search = '?data=mock&as=u-okafor';
+    await page.goto(url.toString());
+    await page.reload();
+    const remembered = page.getByRole('button', { name: 'About the course workspace' });
+    await remembered.waitFor();
+    if (await remembered.getAttribute('aria-expanded') !== 'false') throw new Error('Workspace help reopened after reload');
+  });
+  await step('Recreate the reset course and focus the new module title', async () => {
+    await page.getByRole('navigation').getByRole('link', { name: 'My courses' }).first().click();
+    await createEmptyCourse('HELP 102');
+    await page.getByRole('button', { name: 'Add the first module' }).click();
+    const field = page.getByRole('textbox', { name: 'Module title' });
+    await field.waitFor();
+    if (!await field.evaluate(el => document.activeElement === el)) throw new Error('Focus did not move to the new module title');
+  });
+});
+
 // ---- summary --------------------------------------------------------------------------
 await browser.close();
 server.close();

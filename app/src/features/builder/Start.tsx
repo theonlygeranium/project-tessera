@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Button, FormField, StatusNotice, TextArea, TextInput, TopBar } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
+import { PageHelp } from '../../help/PageHelp';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
 import { ErrorNotice, Loading } from '../../shell/Status';
@@ -70,6 +71,7 @@ export function BuilderStart() {
   const courseName = course.data?.course.title ?? 'Course';
   return <div className={styles.page}>
     <TopBar title="Build with AI" breadcrumbs={[{ label: 'My courses', href: paths.teach.courses }, { label: courseName, href: paths.teach.course(courseId) }, { label: 'Build with AI' }]} renderLink={renderRouterLink} />
+    <PageHelp topic="teach.build" courseId={courseId} />
     {course.isPending ? <Loading label="Loading course" /> : course.error ? <ErrorNotice error={course.error} onRetry={() => course.refetch()} /> : <>
       <p className={styles.intro}>The AI drafts; you decide. Nothing reaches students until you keep the drafts and publish the lessons.</p>
       <Link to={paths.teach.generate(courseId)}>Or add drafts to existing lessons →</Link>

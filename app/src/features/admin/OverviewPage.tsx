@@ -24,6 +24,9 @@ function StatTiles({ stats, className }: { stats: { label: string; value: number
 const LINKS = [
   { href: paths.admin.people, label: 'People', detail: 'Add someone, import a list, or change a role.' },
   { href: paths.admin.courses, label: 'Courses', detail: 'Create a course, then assign instructors and students.' },
+  { href: paths.admin.programs, label: 'Programs', detail: 'Group courses under a shared template and brand accent.' },
+  { href: paths.admin.templates, label: 'Templates', detail: 'Set the required course structure and defaults.' },
+  { href: paths.admin.rubrics, label: 'Rubrics', detail: 'Review the standards used for course readiness.' },
   { href: paths.admin.policy, label: 'AI policy', detail: 'Choose who can draft with AI, and which tutor modes are allowed.' },
 ];
 

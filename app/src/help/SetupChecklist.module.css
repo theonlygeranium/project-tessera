@@ -1,0 +1,7 @@
+.checklist { margin-block: 1rem; color: var(--ink-2); }
+.heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: .75rem; }
+.heading h2 { margin: 0; color: var(--ink); font-size: 1rem; }
+.checklist p { margin-bottom: 0; }
+.checklist a { color: var(--ink); }
+.checklist button { min-height: 44px; padding: .25rem .5rem; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); cursor: pointer; }
+.checklist a:focus-visible, .checklist button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

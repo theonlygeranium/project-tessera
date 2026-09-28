@@ -1,8 +1,9 @@
 // Course list and the form that creates the next one.
 import { useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { Button, CourseCard, FormField, StatusNotice, TextArea, TextInput, TopBar } from '../../components';
+import { Button, CourseCard, FormField, Select, StatusNotice, TextArea, TextInput, TopBar } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
+import { PageHelp } from '../../help/PageHelp';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
 import { ErrorNotice, Loading } from '../../shell/Status';
@@ -60,6 +61,7 @@ export function CoursesPage() {
   return (
     <div className={styles.page}>
       <TopBar title="Courses" />
+      <PageHelp topic="admin.courses" />
       <section className={styles.section}>
         <h2>All courses</h2>
         {courses.isLoading && <Loading label="Loading courses" />}
@@ -138,9 +140,7 @@ export function CoursesPage() {
               />
             )}
           </FormField>
-          <label className={styles.form}>Program
-            <select value={programId} onChange={event => setProgramId(event.target.value)}><option value="">No program</option>{programs.data?.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}</select>
-          </label>
+          <FormField label="Program" hint="The program's template adds its required modules and lessons to the new course.">{control => <Select {...control} value={programId} onChange={event => setProgramId(event.target.value)}><option value="">No program</option>{programs.data?.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}</Select>}</FormField>
           <div className={styles.actions}>
             <Button type="submit" variant="primary" density="compact" disabled={create.isPending}>
               {create.isPending ? 'Creating…' : 'Create course'}

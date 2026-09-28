@@ -82,6 +82,8 @@ const APP = [
   { name: 'App · Administrator · Tessera rubric', url: 'app/admin/rubrics/rubric-tessera?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/rubrics/rubric-tessera') },
   { name: 'App · Administrator · OSCQR rubric', url: 'app/admin/rubrics/rubric-oscqr?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/rubrics/rubric-oscqr') },
   { name: 'App · Administrator · New rubric', url: 'app/admin/rubrics/new?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/rubrics/new') },
+  { name: 'App · Administrator · Courses', url: 'app/admin/courses?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/courses') },
+  { name: 'App · Administrator · Course', url: 'app/admin/courses/c-stat110?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/courses/c-stat110') },
   { name: 'App · Administrator · Course readiness', url: 'app/admin/courses/c-stat110/readiness?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/courses/c-stat110/readiness') },
   { name: 'App · Administrator · Readiness policy', url: 'app/admin/policy?data=mock&as=u-admin', steps: adminReadinessSteps('/admin/policy') },
   { name: 'App · Builder · Generate at scope', url: 'app/teach/courses/c-stat110/generate?data=mock&as=u-okafor' },
@@ -113,7 +115,7 @@ const APP = [
 const adminNight3 = async (page, destination) => {
   await page.getByRole('button', { name: 'Finish setup' }).click();
   await page.waitForURL(/\/app\/admin(?:\?|$)/);
-  await page.getByRole('link', { name: destination }).click();
+  await page.getByRole('navigation', { name: 'Administrator navigation' }).getByRole('link', { name: destination }).click();
   await page.getByRole('heading', { name: destination, level: 1 }).waitFor();
 };
 APP.push(

@@ -1,0 +1,6 @@
+.section { margin-block: 1rem; }
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .75rem; }
+.options h3 { margin-block: 0 .5rem; }
+.options p { color: var(--ink-2); }
+.options a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink); }
+.options a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

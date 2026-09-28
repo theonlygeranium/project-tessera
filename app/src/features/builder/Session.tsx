@@ -147,7 +147,7 @@ function Review({ session, courseId }: { session: BuilderSession; courseId: stri
     <p>Open each lesson to keep, revert, or regenerate its AI blocks. Nothing publishes from this page.</p>
     <ProgressMeter label="AI blocks kept" value={kept} max={Math.max(total, 1)} valueText={`${kept} of ${total} AI blocks kept`} />
     {course.isPending ? <Loading label="Loading lessons" /> : course.error ? <ErrorNotice error={course.error} onRetry={() => course.refetch()} /> : <AiContent kind="note" who="AI draft lessons" source={sourceLine(session, 'lesson drafts')}><ul className={styles.reviewList}>{session.lessonIds.map(id => { const lesson = lessons.find(item => item.id === id); return <ReviewLesson key={id} courseId={courseId} lessonId={id} title={lesson?.title ?? 'Draft lesson'} status={lesson?.status ?? 'draft'} onCount={count => setCounts(current => { const previous = current[id]; return previous?.total === count.total && previous.kept === count.kept ? current : { ...current, [id]: count }; })} />; })}</ul></AiContent>}
-    <Link to={paths.teach.course(courseId)}>Back to course workspace</Link>
+    <Link to={paths.teach.course(courseId)}>Back to course workspace</Link> <Link to={paths.teach.readiness(courseId)}>Check readiness</Link>
   </section>;
 }
 

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import type { BlockType, LessonDetail } from '../../../../shared/domain';
 import { AiContent, Button, FormField, ProgressMeter, Select, StatusNotice, TextArea, TopBar } from '../../components';
 import { api, useApiMutation, useApiQuery } from '../../data/hooks';
+import { PageHelp } from '../../help/PageHelp';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
 import { ErrorNotice, Loading } from '../../shell/Status';
@@ -78,6 +79,7 @@ export function GeneratePage() {
   };
   return <div className={styles.page}>
     <TopBar title="Generate lesson drafts" breadcrumbs={[{ label: 'My courses', href: paths.teach.courses }, { label: course.data?.course.title ?? 'Course', href: paths.teach.course(courseId) }, { label: 'Generate lesson drafts' }]} renderLink={renderRouterLink} />
+    <PageHelp topic="teach.generate" courseId={courseId} />
     {course.isPending ? <Loading label="Loading course" /> : course.error ? <ErrorNotice error={course.error} onRetry={() => course.refetch()} /> : <>
       <p>Choose where drafts go and what to draft. Each element stays an AI draft until you review and keep it.</p>
       {!jobId && <form onSubmit={submit} className={styles.stack}>
