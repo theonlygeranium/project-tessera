@@ -56,7 +56,11 @@ export function AppShell() {
     return <Navigate to={paths.student.onboarding} replace />;
   }
 
-  const items = navFor(user.role, { courseId: courseMatch?.params.courseId, unread: today.data?.unreadCount });
+  const visibility = useApiQuery('getMyVisibility', undefined);
+  const team = useApiQuery('getManagerView', undefined);
+  const hasManager = (visibility.data?.managers.length ?? 0) > 0;
+  const hasReports = (team.data?.rows.length ?? 0) + (team.data?.notSharingCount ?? 0) > 0;
+  const items = navFor(user.role, { courseId: courseMatch?.params.courseId, unread: today.data?.unreadCount, hasManager, hasReports });
   return (
     <div className={styles.shell}>
       <a className={styles.skip} href="#main">Skip to main content</a>

@@ -6,12 +6,20 @@ import { icons } from './icons';
 
 export interface NavItem { id: string; label: string; href: string; icon: ReactNode; badge?: number }
 
-export function navFor(role: Role, options: { courseId?: string; unread?: number } = {}): NavItem[] {
+function withRelationships(items: NavItem[], options: { hasReports?: boolean; hasManager?: boolean }): NavItem[] {
+  const extra: NavItem[] = [];
+  if (options.hasReports) extra.push({ id: 'team', label: 'Team', href: paths.me.team, icon: icons.roster });
+  if (options.hasManager) extra.push({ id: 'sharing', label: 'Sharing', href: paths.me.sharing, icon: icons.policy });
+  return extra.length ? [...items, ...extra] : items;
+}
+
+export function navFor(role: Role, options: { courseId?: string; unread?: number; hasReports?: boolean; hasManager?: boolean } = {}): NavItem[] {
   if (role === 'administrator') {
-    return [
+    return withRelationships([
       { id: 'overview', label: 'Overview', href: paths.admin.overview, icon: icons.overview },
       { id: 'setup', label: 'Setup', href: paths.admin.setup, icon: icons.setup },
       { id: 'people', label: 'People', href: paths.admin.people, icon: icons.people },
+      { id: 'reporting-lines', label: 'Reporting lines', href: paths.admin.reportingLines, icon: icons.roster },
       { id: 'courses', label: 'Courses', href: paths.admin.courses, icon: icons.courses },
       { id: 'programs', label: 'Programs', href: paths.admin.programs, icon: icons.courses },
       { id: 'templates', label: 'Templates', href: paths.admin.templates, icon: icons.workspace },
@@ -21,7 +29,7 @@ export function navFor(role: Role, options: { courseId?: string; unread?: number
       { id: 'training', label: 'Required training', href: paths.admin.training, icon: icons.courses },
       { id: 'compliance', label: 'Compliance', href: paths.admin.compliance, icon: icons.grades },
       { id: 'my-training', label: 'My training', href: paths.me.training, icon: icons.today },
-    ];
+    ], options);
   }
   if (role === 'instructor') {
     const items: NavItem[] = [{ id: 'courses', label: 'My courses', href: paths.teach.courses, icon: icons.courses }, { id: 'my-training', label: 'My training', href: paths.me.training, icon: icons.today }];
@@ -41,15 +49,15 @@ export function navFor(role: Role, options: { courseId?: string; unread?: number
         { id: 'test-out', label: 'Test-out', href: paths.teach.testOut(c), icon: icons.grades },
       );
     }
-    return items;
+    return withRelationships(items, options);
   }
-  return [
+  return withRelationships([
     { id: 'today', label: 'Today', href: paths.student.today, icon: icons.today },
     { id: 'courses', label: 'Courses', href: paths.student.courses, icon: icons.courses },
     { id: 'announcements', label: 'Announcements', href: paths.student.announcements, icon: icons.announcements, badge: options.unread || undefined },
     { id: 'profile', label: 'Profile', href: paths.student.profile, icon: icons.profile },
     { id: 'my-training', label: 'Training', href: paths.me.training, icon: icons.courses },
-  ];
+  ], options);
 }
 
 /** Which rail item is current for a path. The most specific (longest) matching href wins. */
