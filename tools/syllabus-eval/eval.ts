@@ -104,7 +104,8 @@ function score(session: DesignSession, key: Key): Check[] {
   const topicHits = key.schedule.filter(k => { const r = rowFor(k); if (!r) return false; if (k.holidayOrBreak && (r.empty || !r.topic.trim())) return true; return k.keywords.every(w => loose(`${r.topic} ${r.reading} ${r.due}`).includes(loose(w))); });
   const falseEmpty = key.schedule.filter(k => !k.empty && !k.holidayOrBreak && rowFor(k)?.empty);
   const pct = key.schedule.length ? topicHits.length / key.schedule.length : 1;
-  const distinctRows = new Set(key.schedule.map(k => k.span ? k.span.join('-') : String(k.week))).size;
+  // A holiday or break week with nothing in it may be left out.
+  const distinctRows = new Set(key.schedule.filter(k => !(k.holidayOrBreak && !k.keywords.length)).map(k => k.span ? k.span.join('-') : String(k.week))).size;
   if ((key as Key & { scheduleArtifact?: string }).scheduleArtifact) { add('E7', true, `not scored: ${(key as Key & { scheduleArtifact?: string }).scheduleArtifact}`); } else
   add('E7', ex.schedule.length >= distinctRows && ex.schedule.length <= key.schedule.length + ((key as Key & { extraRows?: number }).extraRows ?? 0) && pct >= 0.9 && !falseEmpty.length,
     `${ex.schedule.length}/${key.schedule.length} rows; topics ${topicHits.length}/${key.schedule.length}${falseEmpty.length ? `; wrongly empty: weeks ${falseEmpty.map(k => k.week).join(', ')}` : ''}${pct < 1 ? `; missed weeks ${key.schedule.filter(k => !topicHits.includes(k)).map(k => k.week).join(', ')}` : ''}`);
