@@ -21,7 +21,7 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*", "/app/*"]
+    "run_worker_first": ["/api/*", "/app/*", "/mcp"]
   },
   // Production custom domain. Wrangler creates the DNS record and certificate
   // on the edstratumlabs.ai zone (same Cloudflare account) on deploy.

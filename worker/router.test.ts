@@ -454,3 +454,12 @@ describe('review 4', () => {
     expect(FILES.store.size).toBe(1);
   });
 });
+
+describe('wrangler routing', () => {
+  it('runs the Worker first for every path it handles (/api, /app, /mcp)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const config = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+    const list = /"run_worker_first":\s*\[([^\]]*)\]/.exec(config)?.[1] ?? '';
+    for (const path of ['"/api/*"', '"/app/*"', '"/mcp"']) expect(list).toContain(path);
+  });
+});
