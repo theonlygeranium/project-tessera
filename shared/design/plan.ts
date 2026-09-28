@@ -23,7 +23,8 @@ export function statedCourseTotal(span: SourceSpan | null): number | null {
 export function explicitAssessmentPoints(span: SourceSpan | null, title = ''): number | null {
   if (!span) return null;
   const rows = span.text.split(/[\n\r]+|(?<=[.!?])\s+/);
-  const titlePattern = title ? new RegExp(`(?:^|[.;!?:|•–—-])\\s*${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[:–—-]?\\s*$`, 'iu') : null;
+  // A dash separates list items only with a space before it; "Mini-project" is one title.
+  const titlePattern = title ? new RegExp(`(?:^|[.;!?:|•]|\\s[–—-])\\s*${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[:–—-]?\\s*$`, 'iu') : null;
   const values = rows.flatMap(row => [...row.matchAll(pointPattern)]
     .filter(match => {
       const before = row.slice(0, match.index);

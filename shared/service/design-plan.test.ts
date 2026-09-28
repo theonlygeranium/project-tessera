@@ -6,7 +6,7 @@ import type { ServiceContext } from './context';
 import { courseSnapshot } from './readiness';
 import { MemoryRepo, service } from './index';
 import { scaffoldBlocks } from './design-plan';
-import { titleOverlap } from '../design/plan';
+import { explicitAssessmentPoints, titleOverlap } from '../design/plan';
 
 async function setup(empty = false): Promise<{ ctx: ServiceContext; sessionId: string }> {
   const repo = new MemoryRepo(seedData()); let n = 0;
@@ -247,6 +247,22 @@ describe('syllabus provision plan', () => {
     const undone = await service.undoProvisionPlan(ctx, { sessionId });
     expect(undone.kept).toContainEqual({ kind: 'assignment', id, title: assignment.title });
     expect(await ctx.repo.getAssignment(id)).not.toBeNull();
+  });
+  it("doesn't take another assessment's points when its title contains this one", () => {
+    const span = (text: string) => ({ page: 1, text });
+    expect(explicitAssessmentPoints(span('Mini-project: 20 points. Project: points to be confirmed.'), 'Project')).toBeNull();
+    expect(explicitAssessmentPoints(span('Quiz – 10 points. Project – 40 points.'), 'Project')).toBe(40);
+  });
+  it('never reports an item that no longer exists as kept', async () => {
+    const { ctx, sessionId } = await setup();
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    await finish(ctx, sessionId);
+    const session = await ctx.repo.getDesignSession(sessionId);
+    // A concurrent undo retry already removed this block.
+    await ctx.repo.deleteBlock(session!.created.blockIds[0]);
+    const result = await service.undoProvisionPlan(ctx, { sessionId });
+    expect(result.kept.some(item => item.id === session!.created.blockIds[0])).toBe(false);
   });
   it('undoes an untouched plan without changing existing course records', async () => {
     const { ctx, sessionId } = await setup();
