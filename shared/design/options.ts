@@ -23,6 +23,13 @@ export function finalizeOptions(raw: unknown, input: Input): StructureOption[] {
   // Quotes are anchored to their page or section; one that isn't in the syllabus loses its citation.
   const grounded = groundSpans(structuredClone(raw) as StructureOption[], input.source).value;
   const options = grounded.map(option => ({ ...option, fits: Array.isArray(option?.fits) ? option.fits.map(fit => fit?.span && !inSource(fit.span.text, input.source) ? { ...fit, span: null } : fit) : option?.fits }));
+  // Near-miss ids ("Weekly", "project-based") map to the candidate they name; a single option left over
+  // takes the one remaining candidate. Anything else is rejected below and the job asks again.
+  const normalize = (value: unknown) => String(value ?? '').toLowerCase().replace(/[^a-z]/g, '');
+  const unclaimed = new Set(input.candidates);
+  for (const option of options) { const id = input.candidates.find(c => normalize(option?.id) === c || normalize(option?.id).startsWith(c) || normalize(option?.label).startsWith(c)); if (id && unclaimed.has(id)) { option.id = id; unclaimed.delete(id); } else if (option) option.id = '' as never; }
+  const stray = options.filter(option => option && !option.id);
+  if (stray.length === 1 && unclaimed.size === 1) stray[0].id = [...unclaimed][0];
   validateArchitectureIds(options, input.candidates);
   validateNoLearningStyles(options);
   const codes = new Set(input.confirmedOutcomes.map(item => item.code));

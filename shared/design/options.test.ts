@@ -34,6 +34,11 @@ describe('structure option validation', () => {
     expect(repaired[0].fits.some(fit => fit.span)).toBe(true);
     expect(() => finalizeOptions(raw.map((option, index) => index === 0 ? { ...option, description: 'learning styles' } : option), input)).toThrow();
   });
+  it('maps near-miss ids to their candidates', async () => {
+    const raw = (await fixtureAi.run('structure-options', input)).output;
+    const shouted = raw.map((option, index) => index === 0 ? { ...option, id: option.id.toUpperCase() as never } : index === 1 ? { ...option, id: 'something-else' as never } : option);
+    expect(finalizeOptions(shouted, input).map(option => option.id).sort()).toEqual([...input.candidates].sort());
+  });
   it('validates suggestions and makes deterministic combination notes', () => {
     expect(validateSuggestions({ suggestions: ['Explain', 'Apply', 'Evaluate'].map(verb => ({ text: `${verb} the evidence.`, why: 'From the topics.' })) }).suggestions).toHaveLength(3);
     expect(() => validateSuggestions({ suggestions: [{ text: 'Understand data', why: '' }] })).toThrow();

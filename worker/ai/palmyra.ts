@@ -236,6 +236,9 @@ const elementSchemas = {
 } as const;
 export const elementSchema = (type: keyof typeof elementSchemas) => obj({ block: elementSchemas[type] });
 
+/** The options' ids are exactly the service's candidates, so the model can't substitute its own. */
+const optionsSchema = (candidates: string[]) => obj({ options: { type: 'array', minItems: candidates.length, maxItems: candidates.length, items: obj({ id: { type: 'string', enum: candidates }, label: str, tag: str, description: str, fits: array(obj({ text: str, span: nullable(span) })), changes: str, tradeoffs: str, evidence: str, frameworks: array(str), modules: array(obj({ title: str, objective: str, outcomeIds: array(str), weeks: array(integer), lessons: integer, lessonMinutes: number, assessment: str, hours: number })), workload: obj({ averageHours: number, peakHours: number, peakModule: integer }) }) } });
+
 const SCHEMAS: Record<AiTaskName, unknown> = {
   'syllabus-extract': extractionSchema,
   'syllabus-analyze': analysisSchema,
@@ -437,7 +440,8 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
 
   function once<K extends AiTaskName>(task: K, input: AiTasks[K]['input'], timeoutMs: number): Promise<AiTasks[K]['output']> {
     const extra = TASK_OPTIONS[task];
-    const schema = task === 'element' ? elementSchema((input as AiTasks['element']['input']).type as keyof typeof elementSchemas) : SCHEMAS[task];
+    const schema = task === 'element' ? elementSchema((input as AiTasks['element']['input']).type as keyof typeof elementSchemas)
+      : task === 'structure-options' ? optionsSchema((input as AiTasks['structure-options']['input']).candidates) : SCHEMAS[task];
     // For a lesson, keep the complete blocks before a runaway if there are enough to be a lesson.
     const salvage = task === 'lesson-draft' ? (content: string) => { const blocks = salvageBlocks(content); return blocks.length >= 3 ? { blocks } : null; } : undefined;
     return request({ name: task.replace(/-/g, '_'), messages: PROMPTS[task](input as never), schema, maxTokens: MAX_TOKENS[task], reasoningEffort: extra?.reasoningEffort, salvage }, timeoutMs).then(raw => {
