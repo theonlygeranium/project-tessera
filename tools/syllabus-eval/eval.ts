@@ -29,6 +29,7 @@ const opt = (name: string, fallback?: string) => { const i = args.indexOf(`--${n
 const dirs = (opt('dirs', 'tests/fixtures/syllabus,tests/fixtures/syllabus/private') ?? '').split(',').filter(Boolean);
 const runs = Number(opt('runs', '1'));
 const concurrency = Number(opt('concurrency', '4'));
+const stages = Number(opt('stages', '2'));
 const only = opt('only');
 const aiName = opt('ai', process.env.WRITER_API_KEY ? 'palmyra' : 'fixture');
 const out = opt('out', 'reports/syllabus-eval.json')!;
@@ -163,7 +164,30 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
   const seconds = Math.round((Date.now() - t0) / 1000);
   const error = session.provisioning?.error ?? null;
   const checks = score(session, key);
-  checks.push({ id: 'E10', pass: !error && session.stage === 'read' && seconds <= 180, detail: `${session.stage} in ${seconds} s${extractedAt ? ` (extraction ${Math.round((extractedAt - t0) / 1000)} s, read ${Math.round((Date.now() - extractedAt) / 1000)} s)` : ''}${error ? `; error: ${error}` : ''}` });
+  const readStage = session.stage, readAt = Date.now();
+  // Stage 3 (--stages 3): confirm the outcomes (or accept suggestions when there are none),
+  // wait for the approaches, and score them.
+  if (stages >= 3 && !error && session.stage === 'read' && session.extraction) {
+    const t1 = Date.now();
+    try {
+      let outcomes = session.extraction.outcomes.map((o, i) => ({ code: `O${i + 1}`, text: o.text, originalText: o.text, source: 'syllabus' as const }));
+      if (!outcomes.length) {
+        const { suggestions } = await service.suggestDesignOutcomes(ctx, { sessionId: session.id });
+        outcomes = suggestions.map((s, i) => ({ code: `O${i + 1}`, text: s.text, originalText: '', source: 'suggested' as const, suggestedText: s.text })) as never;
+      }
+      session = await service.confirmOutcomes(ctx, { sessionId: session.id, outcomes });
+      while (Date.now() - t1 < 400_000 && !session.options && !session.provisioning?.error) session = await service.getDesignSession(ctx, { sessionId: session.id });
+      const options = session.options ?? [];
+      const confirmed = session.confirmedOutcomes ?? [];
+      checks.push({ id: 'P1', pass: options.length === 3 && options.every(o => o.fits.some(f => f.span) && o.evidence.trim() && o.modules.length), detail: `${options.length} options (${options.map(o => o.id).join(', ')}) in ${Math.round((Date.now() - t1) / 1000)} s${session.provisioning?.error ? `; error: ${session.provisioning.error}` : ''}; cited: ${options.map(o => o.fits.filter(f => f.span).length).join('/')}` });
+      const weekly = options.find(o => o.id === 'weekly');
+      const rows = session.extraction.schedule.filter(r => !r.empty).length;
+      const covered = options.every(o => confirmed.every(c => o.modules.some(m => m.outcomeIds.includes(c.code))));
+      checks.push({ id: 'P2', pass: covered && (!weekly || !rows || weekly.modules.length === rows), detail: `${weekly ? `weekly ${weekly.modules.length} modules for ${rows} schedule rows; ` : 'no weekly option; '}every outcome in every option: ${covered}; modules ${options.map(o => o.modules.length).join('/')}` });
+      if (options.length) session = await service.selectApproach(ctx, { sessionId: session.id, optionIds: [options[0].id], overlays: ['bookends'], rationale: 'Closest to how I already teach it.' });
+    } catch (e) { checks.push({ id: 'P1', pass: false, detail: `stage 3 failed: ${String(e).slice(0, 200)}` }); }
+  }
+  checks.push({ id: 'E10', pass: !error && readStage === 'read' && seconds <= 180, detail: `${readStage} in ${seconds} s${extractedAt ? ` (extraction ${Math.round((extractedAt - t0) / 1000)} s, read ${Math.round((readAt - extractedAt) / 1000)} s)` : ''}${error ? `; error: ${error}` : ''}` });
   return { file: basename(path), run, ok: !error, seconds, stage: session.stage, error, checks, ...(keepSessions ? { session } : {}) };
 }
 
@@ -185,7 +209,7 @@ async function main() {
   const done: RunResult[] = [];
   await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, async () => { for (let task = tasks.shift(); task; task = tasks.shift()) done.push(await task()); }));
   const results = done.sort((a, b) => a.file.localeCompare(b.file) || a.run - b.run);
-  const ids = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'R1', 'R2', 'R3', 'R4', 'R6'];
+  const ids = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'R1', 'R2', 'R3', 'R4', 'R6', ...(stages >= 3 ? ['P1', 'P2'] : [])];
   console.log(`\n${'syllabus'.padEnd(34)} run ${ids.map(i => i.padEnd(4)).join('')} pass`);
   let passed = 0;
   for (const r of results) {
