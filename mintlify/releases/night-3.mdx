@@ -1,0 +1,46 @@
+---
+title: "Night 3"
+description: "Templates and programs, a readiness rubric, plain-language and micro-path variants, and required training with certificates."
+---
+
+Night 3 builds on [Night 2](/releases/night-2): the same courses, the same block-based lessons, the same rule that AI never publishes without a person reviewing it. Night 3 adds institution and program templates, a readiness rubric that checks a course against a real standard, AI-drafted variants for different audiences, and Tessera's first industry-learner package — required training with due dates, test-out, certificates, and an opt-in manager view.
+
+## For administrators
+
+- **Templates and programs:** define required modules, lessons, and blocks for the whole institution or for one program, plus a default tutor mode per activity kind and an accessibility floor. Programs group courses and can carry their own brand accent; a course without a program uses the institution's template.
+- **Readiness rubric:** choose which rubric applies: the Tessera course standard, OSCQR 4.0, or a custom rubric of your own, and, optionally, a minimum result that blocks publishing. By default the rubric is advisory only.
+- **Required training:** assign a course or program to a role or to specific people, with a due date and optional annual recurrence.
+- **Reporting lines:** record who reports to whom, for the manager view below.
+- **Compliance report and audit trail:** a filterable report of everyone's required training, and an append-only CSV export of every assignment, start, completion, test-out, certificate, and due-date change.
+
+## For instructors and authors
+
+- **Courses start from a template:** a new course in a program (or under the institution, with no program) gets its required modules, lessons, and blocks automatically. Applying a template to an existing course previews exactly what it would add — "adds 2 lessons and 3 blocks; renames nothing; removes nothing" — before anything changes; templates never delete or rename content.
+- **Readiness report:** opens from a lesson's readiness panel or a course-level page. Each rubric item is automatic (computed from the course), AI-assisted (a drafted finding with evidence, reviewed before it counts), or an attestation (a named reviewer confirms it with a note). Every item links to the exact block or setting to fix.
+- **Outcome tagging:** course outcomes are now entities you can tag onto a check, scenario, or assignment, so the readiness report can confirm every outcome is actually assessed.
+- **Persona variants:** from a master lesson, generate a plain-language or a 15-minutes-or-less "micro-path" version as an AI draft. When you edit the master, affected variant blocks show as changed, with a side-by-side diff and a choice to resync (AI rewrites from the new master, again as a draft) or keep the variant as it is.
+- **Test-out:** add a short placement check to a course; passing it at your chosen threshold completes the course as "tested out."
+
+## For learners
+
+- **Variants that fit how you read:** a learner whose profile asks for plain-language reading gets the plain variant of a lesson automatically; a learner with short study sessions gets the micro-path version. Either way, the lesson says why and links back to the full version.
+- **Required training on Today:** required courses appear first, with their due date and status, ahead of everything else.
+- **Test-out and certificates:** pass a course's test-out to skip the lessons, or complete them normally; either way, finishing issues a certificate with a public verification code. The certificate page offers a PDF download, a link to public verification, and Print or save as PDF as a fallback.
+- **Choosing who sees your training:** from your profile's "Who sees this" panel, you decide per manager whether they see your required training. Nothing is shared until you turn it on, and turning it off takes effect right away.
+
+### For managers
+
+A manager is a relationship an administrator records, not a separate role — anyone can be one. A manager who has people sharing with them sees, for each person who opted in, their required training, due dates, whether they've started, finished, or tested out, the date they finished, and their certificates. They never see scores, attempts, tutor conversations, the learner's profile or the changes Tessera made for them, courses that aren't required training, or activity times. People who haven't opted in show up only as a count, never by name.
+
+## Carried over from Night 2
+
+- **Invitations sent at the same moment both get access.** Updates to the Access group are serialized and verified, so one invitation can't overwrite another.
+- **Alt text for images inside PDFs.** Tessera extracts each image from an uploaded PDF and suggests alt text from the image itself; alt text a person applies appears in the reading version and e-book (the PDF itself is unchanged).
+- **A second pass for hard-to-read scans.** Pages where OCR confidence is low get an AI transcription that an instructor keeps or discards. Only kept transcriptions reach the reading version and e-book, labeled with who reviewed them.
+- **Generation jobs finish in the background.** Generating drafts across a course no longer depends on keeping the page open (production only; see below).
+
+## Known limits
+
+- Required training assigned to staff (an administrator or instructor, rather than a student) appears in their training list but can't be completed through the student lesson flow.
+- Certificate PDFs render names in Latin, Greek, and Cyrillic scripts. A name that needs another script can't download as a PDF yet; the certificate page offers Print or save as PDF instead.
+- Background generation for **Generate** jobs (drafting elements across a course, modules, or lessons) runs on Cloudflare Workflows in production only. Branch previews and demo mode keep the earlier behavior, where a job advances while its page is open.

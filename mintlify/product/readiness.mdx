@@ -1,0 +1,37 @@
+---
+title: "Readiness"
+description: "How the readiness rubric checks a course, what counts as met, and how publishing can require a minimum result."
+---
+
+The readiness report checks a course against a rubric: a list of standards, each made up of items. It opens from a lesson's readiness panel in the editor, and from a course-level readiness page.
+
+## Rubrics and items
+
+Every item is judged one of three ways:
+
+- **Automatic** — computed directly from the course: outcomes are present, every module states an objective, every check, scenario, and assignment is tagged with the outcomes it assesses, the accessibility score meets the policy, reading level, navigation instructions, required template structure, time estimates, and more.
+- **AI-assisted** — Tessera judges the item against its written criteria and returns a finding with evidence and a suggested fix. Like every other AI output in Tessera, a finding is a draft: it needs review before it counts. An accepted "likely met" finding counts as met, an accepted "likely not met" finding counts as not met, and anything dismissed or unclear stays "needs review."
+- **Attestation** — a named reviewer confirms the item directly, with a note and a date. A reviewer can also mark an automatic item "not applicable" with a note, but can't attest past an automatic result any other way — that one is fixed by fixing the course.
+
+## Built-in rubrics
+
+Tessera ships two rubrics:
+
+- **The Tessera course standard** — written in plain language, in eight areas: overview and navigation, outcomes and objectives, assessment and feedback, materials, engagement and interaction, technology and AI, learner support, and accessibility.
+- **OSCQR 4.0** — SUNY's open course-quality rubric, reproduced under its license with the required attribution:
+
+  > The OSCQR Rubric, Dashboard & Process are made available by Online Learning Consortium, Inc. (OLC - https://onlinelearningconsortium.org/) under the Creative Commons Attribution 4.0 International License (CC By 4.0). To view a copy of this license, visit https://creativecommons.org/licenses/by/4.0/. The OSCQR Rubric, Dashboard & Process were originally developed by the State University of New York (SUNY) through the Open SUNY® COTE, now SUNY Online Teaching (https://online.suny.edu/onlineteaching/). Open SUNY, SUNY Online, and its logos are registered trademarks of the State University of New York.
+
+An institution that already has its own licensed course-quality rubric can load its items as a custom rubric under its own license.
+
+## Outcomes and alignment
+
+Course outcomes are entities with their own ids, not just text. A check, scenario, or assignment can be tagged with the outcomes it assesses, and the automatic alignment items read those tags directly — confirming both that every assessment is tagged and that every outcome is actually assessed somewhere.
+
+## Scoring and publishing
+
+A standard's result is met, partly met, not met, or not applicable (when it has no items that apply to this course). The course's overall percentage is the share of applicable items that are met or attested, rounded down; items marked not applicable are excluded rather than counted against the course.
+
+The rubric result is **advisory by default** — instructors see it, but it doesn't block anything. An administrator can set a minimum result that publishing must meet, the same way the accessibility policy can: the server enforces it when a lesson is published, not only on the screen, and the instructor sees the rubric, the course's percentage, and the minimum it needs.
+
+Automatic items that aren't met link to a fix: the exact block, module, lesson, assignment, or course setting responsible. AI-assisted and attestation items are resolved by reviewing the finding or attesting.

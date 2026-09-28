@@ -55,6 +55,7 @@
       {
         "group": "Releases",
         "pages": [
+          "releases/night-3",
           "releases/night-2",
           "releases/night-1"
         ]
@@ -66,7 +67,12 @@
           "components",
           "product/access",
           "product/authoring",
-          "product/grading"
+          "product/grading",
+          "product/templates",
+          "product/readiness",
+          "product/variants",
+          "product/required-training",
+          "product/managers"
         ]
       },
       {

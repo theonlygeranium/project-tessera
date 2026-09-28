@@ -1,0 +1,28 @@
+---
+title: "Required training"
+description: "Assignments with due dates, test-out, certificates, and an append-only audit trail."
+---
+
+Required training gives Tessera an industry-learner path alongside its academic one: courses an administrator assigns, with a due date, that show up first on a learner's Today page until they're done.
+
+## Assigning required training
+
+An administrator assigns a course, or every course in a program, to an audience: everyone with a given role, or a specific list of people. Each assignment has a due date and an optional recurrence — **annual**, meaning a completion stays valid for a year before the same training is due again, or **none**, a one-time assignment. Assigned training enrolls the person automatically.
+
+A learner's status for each required course is one of: not started, in progress, completed, tested out, or overdue.
+
+## Test-out
+
+A course can have a short placement check: a set of questions with a pass percentage. A learner who passes it at or above that threshold completes the course immediately, recorded as "tested out" rather than as finishing the lessons, with every attempt (passed or not) kept on their record.
+
+## Certificates
+
+Finishing required training — by completing the course or by testing out — issues a certificate: the learner's name, the course, the date, and a certificate code. A certificate is immutable once issued; a correction issues a new certificate and marks the old one replaced, so nothing is edited after the fact.
+
+From the certificate page, a learner can download it as a tagged, accessible PDF, open its public verification page, or use their browser's Print or save as PDF as a fallback. Certificate PDFs currently render names written in Latin, Greek, or Cyrillic scripts; a name that needs a different script can't be turned into a PDF yet, and the certificate page offers Print or save as PDF instead.
+
+**Public verification** works without signing in, at a certificate's own code, and shows only whether it's valid, the course, and the date — never the learner's name. That's by design: a certificate can be checked by anyone who has the code, without exposing who it belongs to.
+
+## Compliance report and audit trail
+
+Administrators have a compliance report of every person's required training, filterable by course and by status, and an **audit trail**: an append-only log of every assignment, start, completion, test-out, certificate issued or replaced, and due-date change, with who did it and when. It exports as a CSV for use outside Tessera. Because the trail only appends, nothing in it can be edited or deleted after the fact.
