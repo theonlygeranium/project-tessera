@@ -221,9 +221,10 @@ Rules from Night 1 stand: one owner per directory, contract first, small merges,
 
 ## 10. Status
 
-Branch `night2`. Workers Paid verified 2026-09-27.
+**Released to production 2026-09-27** (`main` at the `night-2` tag; Worker version `979d99d7`).
 
-- **Wave 0 done (2026-09-27):** contract v2 (`shared/domain.ts`, `shared/api.ts`), `/api/v1` with scoped tokens, identity mapping, rate limit, idempotency, runtime zod validation (`shared/schema/`), OpenAPI at `docs/api/openapi.json`, Tessera Access core (`shared/access/`, services, repo storage), document engine (`worker/access/`), grading (service + pages). 145 tests.
-- **Done since:** lanes B (Access UI), C (block editors and players), D (authoring at scope), E (grading), F (tutor), H (presets), OCR (D-023), public docs; journeys 1–10 and H pass; Codex reviews 1–3 addressed.
-- **Remaining:** lane G (invitations; needs the owner's scoped Cloudflare token), lane I (SDK + MCP server), journey 11, migrations 0002–0004 on `tessera-prod`, and the production release.
-- **Not started:** lanes B (Access UI), D (AI authoring at scope), F (tutor), G (invitations; needs the owner's scoped Cloudflare token), H (presets), I (SDK + MCP), J (journeys, docs, release notes). `0002_night2.sql` is applied to preview and local, not to `tessera-prod`.
+- Lanes A–J, OCR (D-023), SDK and MCP server, invitations and View as: done. Six Codex reviews on #49; every finding fixed or answered.
+- Production: migrations 0002–0005 applied (pre-release D1 bookmark recorded); secrets `WRITER_API_KEY` and `CF_ACCESS_API_TOKEN`; the OCR container application created and verified with a real scan (score 9 → 47).
+- Verified live: API with a scoped token, `/mcp` (20 tools), OCR, and all 18 public docs pages plus the generated API reference.
+- Checks at release: 258 unit tests, 176/176 accessibility, journeys 1–11 plus presets.
+- Known limits: OCR is English, Spanish, and French only and weak on handwriting; PDF alt text isn't written into the file; concurrent invitations can race on the Access group (re-invite fixes it); Cloudflare's image registry sometimes times out on push (retry the build).
