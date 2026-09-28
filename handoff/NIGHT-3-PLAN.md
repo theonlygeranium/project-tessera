@@ -1,6 +1,6 @@
 # Night 3 plan: consistency, quality, and the industry learner
 
-**Status: approved 2026-09-27 (scope and D1–D6, recorded as D-024 to D-029); Wave 0 in progress on branch `night3`.** Builds on Night 2 (tag `night-2`, D-019 to D-023).
+**Status: released to production 2026-09-28 (tag `night-3`).** Approved 2026-09-27 (scope and D1–D6, recorded as D-024 to D-029). Builds on Night 2 (tag `night-2`, D-019 to D-023).
 
 ## 1. Goals
 
@@ -135,3 +135,6 @@ Changes from §4: one migration for all lanes instead of one per lane (lanes nev
 **Wave 1 merged (2026-09-27):** lanes A (templates, programs, brand), B (readiness, rubrics, outcomes), C (variants), D (required training, test-out, certificates, compliance), and E (PDF image alt text, OCR second pass with reviewed AI transcriptions) by Codex Sol; carry-overs 1 (Access writes serialized by a Durable Object, verified live on the preview: two simultaneous invitations both landed, group restored) and 4 (generation on Workflows in production, polling elsewhere) by Claude. Checks on `night3`: typecheck clean, 364 unit tests, 201/201 accessibility, all existing journeys pass. The owner approved the manager view as drawn (recorded in D-026); lane D2 (Grok) is merged too. Journeys 12–17 pass; see `handoff/NIGHT-3-QA.md`. Codex Astra reviewed the branch; all 12 findings are fixed (see the QA log). Remaining before release: Night 3 docs and release notes, production migrations 0006–0007, and the merge to `main` (owner's go-ahead).
 
 Known limits: required training assigned to staff appears in their list but can't be completed through the student lesson flow; reviewed AI findings show the reviewer's id (the contract stores no name).
+
+**Released 2026-09-28.** Before migrating, a D1 restore point was recorded for `tessera-prod`: `00000006-00000000-000050f4-5ab8b371d45ca149a130784489eaa32d`. Migrations 0006 and 0007 were applied to production (existing data intact; 5 outcomes backfilled; 3 triggers), then `main` was fast-forwarded to `night3` (`3f3b464`). Production checks with a temporary token (removed afterwards): rubrics, readiness, outcomes, programs, templates, and variants answer; a Generate job ran on Cloudflare Workflows and finished in 11 s without polling (its draft block and job removed); the public verification page answers. All six new docs pages are live.
+
