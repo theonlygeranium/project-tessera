@@ -48,7 +48,9 @@ export async function designDocxSections(bytes: ArrayBuffer): Promise<{ heading:
       const allBold = runs.length > 0 && runs.every(run => { const bold = first(run, 'w:b'); return bold && bold.attrs['w:val'] !== '0' && bold.attrs['w:val'] !== 'false'; });
       const letters = value.replace(/[^\p{L}]/gu, '');
       const numberedTitle = /^\d+(?:\.\d+)*[.)]?\s+\S/.test(value) && value.length <= 60 && !/[.;:!?]$/.test(value) && value.split(/\s+/).length <= 8;
-      const pseudo = !hasStyleHeading && value.length <= 80 && letters.length >= 4 && (allBold || letters === letters.toLocaleUpperCase() || numberedTitle);
+      // "COURSE TITLE: Principles of Epidemiology" is a field, not a heading.
+      const field = /^[^:]{2,40}:\s*\S/.test(value);
+      const pseudo = !hasStyleHeading && !field && value.length <= 80 && letters.length >= 4 && (allBold || letters === letters.toLocaleUpperCase() || numberedTitle);
       if (match || pseudo) { flush(); current = { heading: value, level: match ? Number(match[1]) : 1, text: '', lines: [] }; }
       else current.lines.push(...lines);
       // Text boxes can sit inside a paragraph and are separate content in reading order.

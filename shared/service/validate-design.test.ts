@@ -15,7 +15,8 @@ describe('design output validators', () => {
     expect(() => validateSpans([{ page: null, text: 'paste' }], paste)).not.toThrow();
     expect(() => validateSpans([{ page: 1, text: '' }], file)).toThrow(/spans\[0\]\.page/);
     expect(() => validateSpans([{ page: 5, text: '' }], file)).toThrow(/spans\[0\]\.page/);
-    expect(() => validateSpans([{ page: null, text: '' }], file)).toThrow(/spans\[0\]\.page/);
+    // A quote that couldn't be anchored keeps no page rather than a wrong one.
+    expect(() => validateSpans([{ page: null, text: 'unanchored' }], file)).not.toThrow();
     expect(() => validateSpans([{ page: 1, text: '' }], paste)).toThrow(/spans\[0\]\.page/);
   });
   const source = seed as import('../domain').DesignSource;

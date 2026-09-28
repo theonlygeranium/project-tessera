@@ -9,7 +9,8 @@ export function validateSpans(spans: SourceSpan[], source: DesignSource): void {
   const pages = source.sections.map(section => section.page).filter((page): page is number => page !== null);
   const available = new Set(pages);
   spans.forEach((span, index) => {
-    const valid = available.size === 0 ? span.page === null : span.page !== null && available.has(span.page);
+    // A quote that couldn't be anchored has no page, which is better than a wrong one.
+    const valid = span.page === null || available.has(span.page);
     if (!valid) throw new ApiError('invalid', `spans[${index}].page is outside the source page range.`);
   });
 }
@@ -121,7 +122,16 @@ export function repairRead(output: unknown, extraction: SyllabusExtraction, fall
   if (Array.isArray(read.alignment)) {
     const kept = read.alignment.filter(link => link && outcomes.has(link.outcomeId) && assessments.has(link.assessmentId));
     if (kept.length !== read.alignment.length) repairs.push('links to unknown outcomes or assessments removed');
-    read.alignment = kept;
+    // The matrix and the audits must agree: a link an audit names is in the matrix.
+    const key = (o: string, a: string) => `${o}|${a}`;
+    const byKey = new Map(kept.map(link => [key(link.outcomeId, link.assessmentId), link]));
+    let added = 0;
+    for (const audit of Array.isArray(read.outcomeAudits) ? read.outcomeAudits : []) for (const link of audit.assessedBy ?? []) {
+      const existing = byKey.get(key(audit.outcomeId, link.assessmentId));
+      if (!existing || existing.state === 'none') { byKey.set(key(audit.outcomeId, link.assessmentId), { outcomeId: audit.outcomeId, assessmentId: link.assessmentId, state: link.fit }); added++; }
+    }
+    if (added) repairs.push('alignment completed from the outcome audits');
+    read.alignment = [...byKey.values()];
   }
   const palmer = read.learnerCenteredness?.palmer;
   if (palmer && Array.isArray(palmer.components)) {

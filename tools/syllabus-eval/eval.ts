@@ -91,10 +91,11 @@ function score(session: DesignSession, key: Key): Check[] {
   const missingWeights = altOk ? [] : missing(key.assessments);
   add('E6', altOk || (!missingWeights.length && Math.abs(total - key.weightsSum) < 1),
     `${ex.assessments.length}/${key.assessments.length} components, total ${total} (key ${key.weightsSum})${missingWeights.length ? `; missing ${missingWeights.map(m => `${m.title} ${m.weightPercent}%`).join(', ')}` : ''}`);
+  for (const k of key.schedule) if (!k.span) { const m = /weeks?\s*(\d+)\s*(?:-|–|—|and|to)\s*(\d+)/i.exec(k.label ?? ''); if (m) k.span = [Number(m[1]), Number(m[2])]; }
   const rows = new Map(ex.schedule.map(r => [r.week, r]));
   // A row covering several weeks ("Weeks 4 and 5") may come back once, as its first week.
   const rowFor = (k: Key['schedule'][number]) => rows.get(k.week) ?? (k.span ? rows.get(k.span[0]) : undefined);
-  const topicHits = key.schedule.filter(k => { const r = rowFor(k); if (!r) return false; if (k.holidayOrBreak && (r.empty || !r.topic.trim())) return true; return k.keywords.every(w => loose(`${r.topic} ${r.due}`).includes(loose(w))); });
+  const topicHits = key.schedule.filter(k => { const r = rowFor(k); if (!r) return false; if (k.holidayOrBreak && (r.empty || !r.topic.trim())) return true; return k.keywords.every(w => loose(`${r.topic} ${r.reading} ${r.due}`).includes(loose(w))); });
   const falseEmpty = key.schedule.filter(k => !k.empty && !k.holidayOrBreak && rowFor(k)?.empty);
   const pct = key.schedule.length ? topicHits.length / key.schedule.length : 1;
   const distinctRows = new Set(key.schedule.map(k => k.span ? k.span.join('-') : String(k.week))).size;

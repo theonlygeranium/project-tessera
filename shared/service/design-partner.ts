@@ -187,7 +187,7 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
   } catch (error) {
     const current = await ctx.repo.getGenerationJob(job.id);
     if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
-    const cause = error instanceof ApiError && error.details && typeof error.details === 'object' && 'cause' in error.details ? String(error.details.cause) : error instanceof Error ? error.message : String(error);
+    const cause = error instanceof ApiError && error.details && typeof error.details === 'object' && 'cause' in error.details ? String(error.details.cause) : error instanceof ApiError && error.code === 'invalid' ? `invalid shape: ${error.message}` : error instanceof Error ? error.message : String(error);
     console.error(`syllabus-${done === 0 ? 'extract' : 'analyze'} failed:`, cause);
     const reason = /cut off|length limit|truncat/i.test(cause) ? 'cut off at the length limit' : /timed? out|timeout|abort/i.test(cause) ? 'timed out' : /shape|schema|malformed|invalid json|unexpected token/i.test(cause) ? "response didn't match the expected shape" : 'AI service returned an error';
     current.state = 'failed';

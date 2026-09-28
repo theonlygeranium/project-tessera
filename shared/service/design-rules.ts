@@ -39,7 +39,11 @@ export function problemsFrom(extraction: SyllabusExtraction, termInfo?: TermInfo
     if (Math.abs(total - 100) > 1) add('weights-not-100', `Your grading components add to ${total}%.`, extraction.assessments.flatMap(item => item.span ? [item.span] : []));
   }
   const termWeeks = extraction.profile.termWeeks.value;
-  if (termWeeks !== null && extraction.schedule.length !== termWeeks) add('week-count-mismatch', `The schedule has ${extraction.schedule.length} rows for a ${termWeeks}-week term.`, extraction.schedule.flatMap(row => row.span ? [row.span] : []).slice(0, 1));
+  // Rows may group weeks ("Weeks 2–4"). Only a schedule with a row for every week can be missing
+  // one; a grouped schedule is only wrong when it runs past the term.
+  const lastWeek = Math.max(0, ...extraction.schedule.map(row => row.week));
+  const weekly = extraction.schedule.length > 0 && extraction.schedule.length === lastWeek;
+  if (termWeeks !== null && extraction.schedule.length && (weekly ? lastWeek !== termWeeks : lastWeek > termWeeks)) add('week-count-mismatch', `The schedule has ${extraction.schedule.length} rows for a ${termWeeks}-week term.`, extraction.schedule.flatMap(row => row.span ? [row.span] : []).slice(0, 1));
   for (const row of extraction.schedule.filter(row => row.empty || !row.topic.trim())) add('empty-week', `The schedule has no topic in week ${row.week} of a ${extraction.schedule.length}-week table${termWeeks ? `, in a ${termWeeks}-week term` : ''}.`, row.span ? [row.span] : []);
   const start = termInfo?.start ?? extraction.profile.termStart.value;
   const end = termInfo?.end ?? extraction.profile.termEnd.value;
