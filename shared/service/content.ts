@@ -14,7 +14,7 @@ async function detail(ctx: ServiceContext, lessonId: string): Promise<LessonDeta
   return { lesson, moduleTitle: module.title, courseTitle: course.title, blocks, readiness: lessonReadiness(blocks) };
 }
 function metadata(b: Block) {
-  return { id: b.id, lessonId: b.lessonId, position: b.position, origin: b.origin, aiState: b.aiState, provenance: b.provenance, previous: b.previous, updatedAt: b.updatedAt };
+  return { id: b.id, lessonId: b.lessonId, position: b.position, origin: b.origin, aiState: b.aiState, provenance: b.provenance, previous: b.previous, updatedAt: b.updatedAt, source: b.source, templateKey: b.templateKey };
 }
 async function blockForTeaching(ctx: ServiceContext, blockId: string): Promise<Block> {
   const b = await ctx.repo.getBlock(blockId) ?? fail('not-found', 'Block not found.');

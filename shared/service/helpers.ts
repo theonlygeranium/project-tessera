@@ -27,7 +27,7 @@ export async function studentLesson(ctx: ServiceContext, id: string): Promise<Le
 }
 /** The block's content without its metadata; works for every block type. */
 export const content = (b: Block): BlockContent => {
-  const { id: _id, lessonId: _l, position: _p, origin: _o, aiState: _a, provenance: _pr, previous: _pv, updatedAt: _u, ...rest } = b;
+  const { id: _id, lessonId: _l, position: _p, origin: _o, aiState: _a, provenance: _pr, previous: _pv, updatedAt: _u, source: _s, templateKey: _t, ...rest } = b;
   return rest as BlockContent;
 };
 export const provenance = (ctx: ServiceContext, model: string, task: Provenance['task'], summary: string, sources: Provenance['sources'] = []): Provenance =>
