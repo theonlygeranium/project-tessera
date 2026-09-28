@@ -1,0 +1,196 @@
+{
+ "code": "STAT 110",
+ "title": "Reasoning with Data",
+ "credits": 3,
+ "termWeeks": 15,
+ "termStart": "2026-08-24",
+ "termEnd": "2026-12-11",
+ "modality": "in-person",
+ "modalityAcceptable": [],
+ "level": "100-level",
+ "instructor": {
+  "name": "Dr. Amara Okafor",
+  "email": "a.okafor@meridianstate.example"
+ },
+ "outcomes": [
+  "Tell a statistical question from a non-statistical one.",
+  "Understand variability in data.",
+  "Describe the center and spread of a distribution.",
+  "Design a simple study to answer a question.",
+  "Communicate findings to a non-technical audience.",
+  "Critique a statistical claim in the news."
+ ],
+ "outcomeCodes": null,
+ "assessments": [
+  {
+   "title": "Weekly quizzes",
+   "weightPercent": 15
+  },
+  {
+   "title": "Homework sets",
+   "weightPercent": 20
+  },
+  {
+   "title": "Midterm exam",
+   "weightPercent": 20
+  },
+  {
+   "title": "Course project",
+   "weightPercent": 40
+  },
+  {
+   "title": "Participation",
+   "weightPercent": 5
+  }
+ ],
+ "weightsSum": 100,
+ "schedule": [
+  {
+   "week": 1,
+   "label": "1",
+   "topic": "What is a statistical question?",
+   "keywords": [
+    "statistical question"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 2,
+   "label": "2",
+   "topic": "Cases, variables, data tables",
+   "keywords": [
+    "variables"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 3,
+   "label": "3",
+   "topic": "Summarizing one variable",
+   "keywords": [
+    "summarizing"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 4,
+   "label": "4",
+   "topic": "Center and spread",
+   "keywords": [
+    "center",
+    "spread"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 5,
+   "label": "5",
+   "topic": "Shapes of distributions",
+   "keywords": [
+    "shapes"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 6,
+   "label": "6",
+   "topic": "Sampling and study design",
+   "keywords": [
+    "study design"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 7,
+   "label": "7",
+   "topic": "Bias and confounding",
+   "keywords": [
+    "confounding"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 8,
+   "label": "8",
+   "topic": "",
+   "keywords": [],
+   "empty": true,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 9,
+   "label": "9",
+   "topic": "Comparing two groups",
+   "keywords": [
+    "two groups"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 10,
+   "label": "10",
+   "topic": "Sampling variability",
+   "keywords": [
+    "sampling variability"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 11,
+   "label": "11",
+   "topic": "Confidence intervals",
+   "keywords": [
+    "confidence intervals"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 12,
+   "label": "12",
+   "topic": "Hypothesis tests",
+   "keywords": [
+    "hypothesis"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 13,
+   "label": "13",
+   "topic": "Reading a study",
+   "keywords": [
+    "reading a study"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  },
+  {
+   "week": 14,
+   "label": "14",
+   "topic": "Communicating results",
+   "keywords": [
+    "communicating"
+   ],
+   "empty": false,
+   "holidayOrBreak": false
+  }
+ ],
+ "workloadHoursPerWeek": null,
+ "traps": [
+  "15-week term but the schedule lists 14 weeks (Thanksgiving week is missing): week-count question is correct",
+  "week 8 row has dates only: empty-week question is correct",
+  "'Understand variability in data' has no observable verb (deliberate)",
+  "course project is 40% with one due date (deliberate)"
+ ],
+ "file": "STAT110_Syllabus_Fall2026.pdf"
+}

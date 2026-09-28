@@ -19,3 +19,8 @@ docs/storybook/
 # Screenshots from failing e2e journeys (tests/e2e/journeys.mjs); regenerated per run
 reports/e2e/
 .vitest/
+
+# Real syllabi and answer keys for tools/syllabus_eval.mjs: never commit them
+tests/fixtures/syllabus/private/
+reports/syllabus-eval.json
+tools/.syllabus-eval.mjs

@@ -27,7 +27,10 @@ describe('palmyraClient', () => {
     const fixture = (await fixtureAi.run('syllabus-extract', input)).output;
     const ai = palmyraClient({ apiKey: 'k', url: 'https://x', fetchImpl: async (_url, options) => {
       const body = JSON.parse(String(options?.body));
-      expect(body.max_tokens).toBe(8000);
+      expect(body.max_tokens).toBe(24000);
+      expect(body.reasoning_effort).toBe('low');
+      expect(body.stop).toEqual(['\n\n\n']);
+      expect(Number.isInteger(body.seed)).toBe(true);
       expect(body.response_format).toMatchObject({ type: 'json_schema', json_schema: { strict: true, schema: { required: ['profile', 'outcomes', 'assessments', 'schedule', 'policies'] } } });
       expect(body.messages[0].content).toContain("You are Tessera's design partner. The instructor is the subject-matter expert and the instructor of record;");
       expect(body.messages[1].content).toContain('[p. 4] Course schedule\nWeek Dates Topic Reading Due');

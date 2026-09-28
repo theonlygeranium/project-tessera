@@ -229,7 +229,9 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 };
 
 const MAX_TOKENS: Record<AiTaskName, number> = {
-  'syllabus-extract': 8000,
+  // A real 9-page syllabus needs ~6,000 output tokens plus 4,000–8,000 of reasoning; at 8,000
+  // most calls ended before the JSON did (D-032 check, 2026-09-28).
+  'syllabus-extract': 24000,
   tutor: 1800, 'tutor-summary': 1200,
   element: 8000,
   // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the
@@ -238,25 +240,51 @@ const MAX_TOKENS: Record<AiTaskName, number> = {
   'readiness-item': 2500, variant: 9000,
 };
 
+/**
+ * Per-task request options beyond the defaults. `reasoning_effort: 'low'` isn't in WRITER's
+ * published reference but Palmyra-X6 honors it: on the D-032 syllabus it cut reasoning enough
+ * that 3/3 extractions finished on the first try, against 0/3 without it.
+ */
+const TASK_OPTIONS: Partial<Record<AiTaskName, { reasoningEffort?: 'low' | 'medium' | 'high'; timeoutMs?: number }>> = {
+  'syllabus-extract': { reasoningEffort: 'low', timeoutMs: 150_000 },
+};
+
+/**
+ * Palmyra sometimes degenerates into blank lines mid-JSON until it hits max_tokens. Compact
+ * JSON never contains a raw newline (newlines inside strings are escaped), so three in a row
+ * only ever mean a runaway: stop there and retry instead of generating whitespace for minutes.
+ */
+const RUNAWAY_STOP = ['\n\n\n'];
+
+/** Every attempt of one `run` must finish inside a Workflow step (5 minutes), with margin. */
+const RUN_DEADLINE_MS = 270_000;
+
 // ---- Client ---------------------------------------------------------------------------------
 
 export function palmyraClient(options: PalmyraOptions): AiClient {
   const model = options.model ?? 'palmyra-x6';
   const doFetch = options.fetchImpl ?? fetch;
 
-  async function once<K extends AiTaskName>(task: K, input: AiTasks[K]['input']) {
+  async function once<K extends AiTaskName>(task: K, input: AiTasks[K]['input'], timeoutMs: number) {
+    const extra = TASK_OPTIONS[task];
     const res = await doFetch(options.url, {
       method: 'POST',
       headers: { authorization: `Bearer ${options.apiKey}`, 'content-type': 'application/json' },
       body: JSON.stringify({
         model,
         temperature: 0.4,
+        // WRITER caches identical requests upstream (AI Gateway's skip-cache header can't reach
+        // it), so without a fresh seed a retry, or the person's "Try again", replays the same
+        // failed response.
+        seed: Math.floor(Math.random() * 2 ** 31),
         // Palmyra-X6 counts reasoning tokens against max_tokens (D-015).
         max_tokens: MAX_TOKENS[task],
+        ...(extra?.reasoningEffort ? { reasoning_effort: extra.reasoningEffort } : {}),
+        stop: RUNAWAY_STOP,
         messages: PROMPTS[task](input as never),
         response_format: { type: 'json_schema', json_schema: { name: task.replace(/-/g, '_'), strict: true, schema: task === 'element' ? elementSchema((input as AiTasks['element']['input']).type as keyof typeof elementSchemas) : SCHEMAS[task] } },
       }),
-      signal: AbortSignal.timeout(options.timeoutMs ?? 90_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) {
       const detail = (await res.text()).slice(0, 300);
@@ -285,10 +313,15 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
   return {
     async run(task, input) {
       let last: unknown;
-      // Up to three attempts for transient failures and malformed or runaway output.
+      const deadline = Date.now() + RUN_DEADLINE_MS;
+      const perAttempt = options.timeoutMs ?? TASK_OPTIONS[task]?.timeoutMs ?? 90_000;
+      // Up to three attempts for transient failures and malformed or runaway output, while
+      // there's time left for a real one.
       for (let attempt = 0; attempt < 3; attempt++) {
+        const remaining = deadline - Date.now();
+        if (attempt > 0 && remaining < 30_000) break;
         try {
-          const output = await once(task, input);
+          const output = await once(task, input, Math.min(perAttempt, remaining));
           // Retry a lesson without a usable knowledge check (principle #4), except on the last try.
           if (attempt < 2 && task === 'lesson-draft' && !hasUsableCheck(output as AiTasks['lesson-draft']['output'])) {
             last = new Error('lesson draft had no usable knowledge check');
