@@ -15,56 +15,63 @@
       "y": 0,
       "w": 1440,
       "h": 900,
-      "title": "C \u00b7 Adaptive Today dashboard (learner)"
+      "title": "C · Adaptive Today dashboard (learner)"
     },
     "LessonPlayer.dc.html": {
       "x": 1520,
       "y": 0,
       "w": 1440,
       "h": 900,
-      "title": "A \u00b7 Focus lesson player (learner)"
+      "title": "A · Focus lesson player (learner)"
     },
     "MobileToday.dc.html": {
       "x": 3040,
       "y": 0,
       "w": 390,
       "h": 844,
-      "title": "C \u00b7 Today on phone"
+      "title": "C · Today on phone"
     },
     "CourseBuilder.dc.html": {
       "x": 0,
       "y": 1240,
       "w": 1440,
       "h": 900,
-      "title": "B \u00b7 Prompt-to-course canvas (author)"
+      "title": "B · Prompt-to-course canvas (author)"
     },
     "InstructorCommand.dc.html": {
       "x": 1520,
       "y": 1240,
       "w": 1440,
       "h": 900,
-      "title": "D \u00b7 Instructor command center"
+      "title": "D · Instructor command center"
     },
     "AdminConsole.dc.html": {
       "x": 0,
       "y": 2480,
       "w": 1440,
       "h": 900,
-      "title": "E \u00b7 Governance & outcomes console (admin)"
+      "title": "E · Governance & outcomes console (admin)"
     },
     "LearningProfile.dc.html": {
       "x": 3510,
       "y": 0,
       "w": 1440,
       "h": 1100,
-      "title": "C \u00b7 Learning profile setup (learner onboarding)"
+      "title": "C · Learning profile setup (learner onboarding)"
     },
     "TutorSettings.dc.html": {
       "x": 3040,
       "y": 1240,
       "w": 1440,
       "h": 900,
-      "title": "D \u00b7 Tutor settings by activity (instructor)"
+      "title": "D · Tutor settings by activity (instructor)"
+    },
+    "ManagerView.dc.html": {
+      "x": 1520,
+      "y": 2480,
+      "w": 1440,
+      "h": 900,
+      "title": "F · Manager view and sharing control (industry)"
     }
   },
   "order": [
@@ -75,7 +82,8 @@
     "InstructorCommand.dc.html",
     "AdminConsole.dc.html",
     "LearningProfile.dc.html",
-    "TutorSettings.dc.html"
+    "TutorSettings.dc.html",
+    "ManagerView.dc.html"
   ],
   "notes": {
     "t1": {
@@ -97,7 +105,7 @@
       "y": 2240,
       "text": "Institution / admin experience",
       "kind": "title1",
-      "maxW": 1440
+      "maxW": 2960
     },
     "s1": {
       "x": 5030,
@@ -110,7 +118,7 @@
       "x": 4560,
       "y": 1240,
       "w": 420,
-      "text": "Why these screens differ from Canvas\n\n1. Plan-first generation (Brief \u2192 Outline \u2192 Draft \u2192 Review \u2192 Publish) with human checkpoints.\n2. Provenance chips + review-coverage meter on every AI-touched block.\n3. Policy-bound Socratic tutor: instructor sets hint-only / explain / open per activity; tutor cites course sources.\n4. Persona variants generated from one master course.\n5. \u2318K palette turns natural language into a previewable change set.\n6. QM/WCAG 2.2 linter runs before publish.",
+      "text": "Why these screens differ from Canvas\n\n1. Plan-first generation (Brief → Outline → Draft → Review → Publish) with human checkpoints.\n2. Provenance chips + review-coverage meter on every AI-touched block.\n3. Policy-bound Socratic tutor: instructor sets hint-only / explain / open per activity; tutor cites course sources.\n4. Persona variants generated from one master course.\n5. ⌘K palette turns natural language into a previewable change set.\n6. QM/WCAG 2.2 linter runs before publish.",
       "fill": "purple"
     }
   },

@@ -70,5 +70,14 @@
     "description": "Governance & outcomes console: KPI strip, AI policy matrix, integration health, accessibility audit, and a policy inspector that simulates before applying.",
     "w": 1440,
     "h": 900
+  },
+  {
+    "file": "screens/manager-view.html",
+    "slug": "manager-view",
+    "group": "Admin",
+    "title": "F \u00b7 Manager view and sharing control (industry)",
+    "description": "Manager view and sharing control (D-025): a manager sees required-training completion only for people who opted in, with a count but no names for the rest; the employee turns sharing on or off per manager and sees exactly what is and isn't shared.",
+    "w": 1440,
+    "h": 900
   }
 ]

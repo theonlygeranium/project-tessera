@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Manager view and sharing control</title>
+<link rel="stylesheet" href="../assets/ai-voice.css">
+<script src="../assets/ai-voice.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+.mv-switch{appearance:none;-webkit-appearance:none;width:44px;height:26px;border-radius:13px;background:#cfc8bb;position:relative;margin:0;cursor:pointer;flex-shrink:0}
+.mv-switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}
+.mv-switch:checked{background:#0e6b63}
+.mv-switch:checked::after{left:21px}
+.mv-switch:focus-visible{outline:3px solid #1f4f9c;outline-offset:2px}
+</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e6b63%22/%3E%3Cpath d=%22M9 11h14M9 16h9M9 21h14%22 stroke=%22white%22 stroke-width=%222.4%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<style>
+html,body{margin:0;background:#e9e5dd}
+.tessera-stage{display:flex;justify-content:center;padding:24px 16px 48px;box-sizing:border-box;min-height:100vh}
+.tessera-frame{transform-origin:top left;box-shadow:0 18px 50px rgba(28,27,25,.18);border-radius:16px;overflow:hidden;background:#f4f1eb}
+.tessera-bar{position:fixed;left:0;right:0;bottom:0;height:40px;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:rgba(28,27,25,.92);color:#f4f1eb;font:500 13px/1 'IBM Plex Sans',system-ui,sans-serif;z-index:10}
+.tessera-bar a{color:#9fd8cf;text-decoration:none}.tessera-bar a:hover{text-decoration:underline}
+.tessera-bar span{opacity:.75}
+body.tessera-embed{background:transparent}
+body.tessera-embed .tessera-stage{padding:0;min-height:0;display:block}
+body.tessera-embed .tessera-frame{box-shadow:none;border-radius:0}
+body.tessera-embed .tessera-bar{display:none}
+</style>
+</head>
+<body>
+<div class="tessera-stage"><div><div class="tessera-frame" data-w="1440" data-h="900">
+<div style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; background: #f4f1eb; color: #1c1b19; font-size: 14px; line-height: 1.45; overflow: hidden">
+
+  <!-- Left: the manager's view (Sam) -->
+  <main aria-labelledby="mv-team-title" style="flex-grow: 1; min-width: 0; box-sizing: border-box; padding: 28px 32px; display: flex; flex-direction: column; gap: 16px; border-right: 1px solid #e3ded4">
+    <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">What Sam Ortiz sees · Operations manager</div>
+    <header style="display: flex; align-items: flex-end; gap: 20px">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 6px">
+        <h1 id="mv-team-title" style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 32px; line-height: 1.1; letter-spacing: -0.01em">Your team's required training</h1>
+        <p style="margin: 0; font-size: 14.5px; color: #3a3833; max-width: 640px">You see completion for people who chose to share it with you. Scores, attempts, and tutor conversations stay private.</p>
+      </div>
+      <a href="#what-you-see" style="display: inline-flex; align-items: center; height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #d5cfc4; background: #fff; color: #1c1b19; font-weight: 500; text-decoration: none">What you can see</a>
+    </header>
+
+    <section aria-label="People sharing with you" style="border: 1px solid #e3ded4; border-radius: 14px; background: #fff; overflow: hidden">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+        <caption style="text-align: left; padding: 14px 18px 10px; font-size: 15px; font-weight: 600">2 people share their training with you</caption>
+        <thead>
+          <tr style="background: #faf8f4; color: #5f5b54; font-size: 12.5px; text-align: left">
+            <th scope="col" style="padding: 10px 18px; font-weight: 600">Person</th>
+            <th scope="col" style="padding: 10px 12px; font-weight: 600">Required course</th>
+            <th scope="col" style="padding: 10px 12px; font-weight: 600">Due</th>
+            <th scope="col" style="padding: 10px 12px; font-weight: 600">Status</th>
+            <th scope="col" style="padding: 10px 18px 10px 12px; font-weight: 600">Certificate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-top: 1px solid #ede8df">
+            <th scope="rowgroup" rowspan="3" style="padding: 14px 18px; vertical-align: top; text-align: left; font-weight: 600">
+              <span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 50%; background: #d9cdb8; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #4a3f2c">DW</span>Dana Whitfield</span>
+            </th>
+            <td style="padding: 12px">Lockout/tagout</td>
+            <td style="padding: 12px; color: #3a3833">1 Oct</td>
+            <td style="padding: 12px"><span style="display: inline-block; padding: 3px 10px; border-radius: 999px; background: #e4f2e8; color: #1f5a37; font-weight: 600; font-size: 13px">Completed 12 Sep</span></td>
+            <td style="padding: 12px 18px 12px 12px"><a href="#cert-dw-1" style="font-weight: 600">View<span style="position: absolute; left: -9999px"> Dana Whitfield's Lockout/tagout certificate</span></a> <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: #5f5b54">TSR-7K2M-94QD</span></td>
+          </tr>
+          <tr style="border-top: 1px solid #ede8df">
+            <td style="padding: 12px">Hazard communication</td>
+            <td style="padding: 12px; color: #3a3833">1 Oct</td>
+            <td style="padding: 12px"><span style="display: inline-block; padding: 3px 10px; border-radius: 999px; background: #e4f2e8; color: #1f5a37; font-weight: 600; font-size: 13px">Tested out 18 Sep</span></td>
+            <td style="padding: 12px 18px 12px 12px"><a href="#cert-dw-2" style="font-weight: 600">View<span style="position: absolute; left: -9999px"> Dana Whitfield's Hazard communication certificate</span></a> <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: #5f5b54">TSR-3HQ8-2WZL</span></td>
+          </tr>
+          <tr style="border-top: 1px solid #ede8df">
+            <td style="padding: 12px">Forklift safety refresher</td>
+            <td style="padding: 12px; color: #3a3833">15 Oct</td>
+            <td style="padding: 12px"><span style="display: inline-block; padding: 3px 10px; border-radius: 999px; background: #e3f0ee; color: #0a4f49; font-weight: 600; font-size: 13px">In progress</span></td>
+            <td style="padding: 12px 18px 12px 12px; color: #5f5b54">Not yet</td>
+          </tr>
+          <tr style="border-top: 1px solid #e3ded4">
+            <th scope="rowgroup" rowspan="2" style="padding: 14px 18px; vertical-align: top; text-align: left; font-weight: 600">
+              <span style="display: flex; align-items: center; gap: 10px"><span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 50%; background: #d9cdb8; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #4a3f2c">RM</span>Ravi Menon</span>
+            </th>
+            <td style="padding: 12px">Lockout/tagout</td>
+            <td style="padding: 12px; color: #3a3833">20 Sep</td>
+            <td style="padding: 12px"><span style="display: inline-block; padding: 3px 10px; border-radius: 999px; background: #fbf1dc; color: #7a5310; font-weight: 600; font-size: 13px">Overdue · not started</span></td>
+            <td style="padding: 12px 18px 12px 12px; color: #5f5b54">Not yet</td>
+          </tr>
+          <tr style="border-top: 1px solid #ede8df">
+            <td style="padding: 12px">Hazard communication</td>
+            <td style="padding: 12px; color: #3a3833">1 Oct</td>
+            <td style="padding: 12px"><span style="display: inline-block; padding: 3px 10px; border-radius: 999px; background: #ebe6dd; color: #3a3833; font-weight: 600; font-size: 13px">Not started</span></td>
+            <td style="padding: 12px 18px 12px 12px; color: #5f5b54">Not yet</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-label="People not sharing" style="border: 1px dashed #c9c2b5; border-radius: 14px; background: #faf8f4; padding: 14px 18px; display: flex; gap: 14px; align-items: center">
+      <span aria-hidden="true" style="font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 600; color: #5f5b54; width: 36px; text-align: center">3</span>
+      <p style="margin: 0; font-size: 14px; color: #3a3833"><strong>3 people who report to you haven't chosen to share.</strong> Tessera doesn't show their names or their training. They can turn sharing on in their profile at any time.</p>
+    </section>
+
+    <section id="what-you-see" aria-labelledby="mv-sees-title" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: auto">
+      <h2 id="mv-sees-title" style="position: absolute; left: -9999px">What managers can and can't see</h2>
+      <div style="border-radius: 14px; background: #fff; border: 1px solid #e3ded4; padding: 14px 18px">
+        <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54; margin-bottom: 8px">You see, when someone shares</div>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px">
+          <li>Their required training and when each is due</li>
+          <li>Whether they've started, finished, or tested out, and the date they finished</li>
+          <li>Certificates for required training</li>
+        </ul>
+      </div>
+      <div style="border-radius: 14px; background: #fff; border: 1px solid #e3ded4; padding: 14px 18px">
+        <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54; margin-bottom: 8px">You never see</div>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px">
+          <li>Scores on checks, test-outs, or assignments, or how many attempts</li>
+          <li>Conversations with the tutor</li>
+          <li>Their learning profile and the changes Tessera made for them</li>
+          <li>Courses that aren't required training, or when and how long they studied</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- Right: the employee's control (Dana) -->
+  <aside aria-labelledby="mv-share-title" style="width: 470px; flex-shrink: 0; box-sizing: border-box; padding: 28px 28px; display: flex; flex-direction: column; gap: 16px; background: #faf8f4">
+    <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54">What Dana Whitfield sees · Profile › Who sees this</div>
+    <h2 id="mv-share-title" style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 26px; line-height: 1.15">Share your required training with a manager?</h2>
+    <p style="margin: 0; font-size: 14px; color: #3a3833">Nothing is shared until you turn it on. You choose for each manager, and turning it off takes effect right away.</p>
+
+    <form aria-label="Sharing with managers" style="display: flex; flex-direction: column; gap: 10px">
+      <label style="display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 12px 16px; border-radius: 12px; border: 1px solid #e3ded4; background: #fff">
+        <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 50%; background: #d9cdb8; display: inline-flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 600; color: #4a3f2c; flex-shrink: 0">SO</span>
+        <span style="flex-grow: 1; display: flex; flex-direction: column"><strong>Sam Ortiz</strong><span style="font-size: 13px; color: #1f5a37; font-weight: 500">Sharing since 10 Sep</span></span>
+        <input type="checkbox" role="switch" class="mv-switch" checked aria-label="Share with Sam Ortiz">
+      </label>
+      <label style="display: flex; align-items: center; gap: 14px; min-height: 64px; padding: 12px 16px; border-radius: 12px; border: 1px solid #e3ded4; background: #fff">
+        <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 50%; background: #d9cdb8; display: inline-flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 600; color: #4a3f2c; flex-shrink: 0">LC</span>
+        <span style="flex-grow: 1; display: flex; flex-direction: column"><strong>Lee Carter</strong><span style="font-size: 13px; color: #5f5b54">Not sharing</span></span>
+        <input type="checkbox" role="switch" class="mv-switch" aria-label="Share with Lee Carter">
+      </label>
+    </form>
+
+    <div style="border-radius: 14px; background: #fff; border: 1px solid #e3ded4; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px">
+      <div>
+        <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54; margin-bottom: 6px">A manager you share with sees</div>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px">
+          <li>Your required training and when each is due</li>
+          <li>Whether you've started, finished, or tested out, and the date you finished</li>
+          <li>Certificates for required training</li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #5f5b54; margin-bottom: 6px">Never, whatever you choose</div>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px">
+          <li>Scores on checks, test-outs, or assignments</li>
+          <li>How many attempts you made</li>
+          <li>Your conversations with the tutor</li>
+          <li>Your learning profile and the changes Tessera made for you</li>
+          <li>Courses that aren't required training</li>
+          <li>When you were active or how long you spent</li>
+        </ul>
+      </div>
+    </div>
+
+    <p style="margin: 0; font-size: 13px; color: #5f5b54">Your administrator records who you report to. If that changes, sharing starts off again for the new manager. <a href="#privacy" style="font-weight: 600">How Tessera uses your data</a></p>
+  </aside>
+</div>
+</div></div></div>
+<nav class="tessera-bar" aria-label="Site"><a href="../index.html">← All screens</a><span>F · Manager view and sharing control (industry)</span><span>1440×900</span></nav>
+<script>
+(function(){
+  var frame=document.querySelector('.tessera-frame');
+  var w=parseInt(frame.dataset.w,10), h=parseInt(frame.dataset.h,10);
+  var stage=document.querySelector('.tessera-stage');
+  var embed=/[?&]embed=1/.test(location.search);
+  if(embed){document.body.classList.add('tessera-embed');}
+  function fit(){
+    if(embed){frame.style.transform='none';frame.style.width=w+'px';frame.style.height=h+'px';return;}
+    var avail=stage.clientWidth-32;
+    var s=Math.min(1,avail/w);
+    frame.style.transform='scale('+s+')';
+    frame.style.width=w+'px';
+    frame.style.height=h+'px';
+    frame.parentElement.style.width=(w*s)+'px';
+    frame.parentElement.style.height=(h*s)+'px';
+  }
+  window.addEventListener('resize',fit);fit();
+})();
+</script>
+</body>
+</html>

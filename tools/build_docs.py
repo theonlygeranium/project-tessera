@@ -72,6 +72,12 @@ SCREENS = {
         "Governance & outcomes console: KPI strip, AI policy matrix, integration health, "
         "accessibility audit, and a policy inspector that simulates before applying.",
     ),
+    "ManagerView.dc.html": (
+        "manager-view",
+        "Admin",
+        "Manager view and sharing control (D-025): a manager sees required-training completion only for people who opted in, "
+        "with a count but no names for the rest; the employee turns sharing on or off per manager and sees exactly what is and isn't shared.",
+    ),
 }
 
 FAVICON = '<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e6b63%22/%3E%3Cpath d=%22M9 11h14M9 16h9M9 21h14%22 stroke=%22white%22 stroke-width=%222.4%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">'
