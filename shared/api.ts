@@ -18,7 +18,7 @@ import type {
   Timestamp, TutorMessage, TutorSession, TutorSetting, TutorSummary, User,
   // Night 3
   AlignableKind, Brand, Certificate, CertificateVerification, CompletionEvent, ComplianceRow, CourseTemplate, ManagerView,
-  MyVisibility, Outcome, OutcomeLink, Program, ReadinessPolicy, ReadinessResult, RequiredTraining, Requirement,
+  MyVisibility, Outcome, PageTranscription, OutcomeLink, Program, ReadinessPolicy, ReadinessResult, RequiredTraining, Requirement,
   RequirementAudience, Rubric, RubricCheckKind, AutomaticCheck, StudentTestOut, TemplateChangeSet, TemplateModule,
   TestOut, LessonVariant, ReportingLine, TrainingStatus, VariantAudience, VariantDiff,
 } from './domain';
@@ -173,6 +173,10 @@ export interface ApiSpec {
   getInstitutionAccess: { input: void; output: InstitutionAccessReport };
   exportInstitutionAccess: { input: void; output: { csv: string } };
   updateAccessPolicy: { input: AccessPolicy; output: Institution };
+  /** Night 3: AI transcriptions of low-confidence scanned pages for the file's current version (page image: GET /files/:fileId/pages/:page). */
+  listTranscriptions: { input: { fileId: Id }; output: PageTranscription[] };
+  /** A person keeps or discards one page's transcription (D-003). Returns the file's transcriptions. */
+  reviewTranscription: { input: { fileId: Id; page: number; decision: 'keep' | 'discard' }; output: PageTranscription[] };
 
   // Assignments, submissions, grading (plan §5.3)
   createAssignment: { input: { moduleId: Id; title: string; submissionType: SubmissionType; points: number; dueAt?: Timestamp | null }; output: Assignment };
@@ -444,6 +448,8 @@ export const ROUTES: { [K in Operation]: Route } = {
   getInstitutionAccess: { method: 'GET', path: '/access/institution', access: ADMIN, scope: 'access:read' },
   exportInstitutionAccess: { method: 'GET', path: '/access/institution/export', access: ADMIN, scope: 'access:read' },
   updateAccessPolicy: { method: 'PUT', path: '/institution/access-policy', access: ADMIN, scope: 'people:write' },
+  listTranscriptions: { method: 'GET', path: '/files/:fileId/transcriptions', access: STAFF, scope: 'access:read' },
+  reviewTranscription: { method: 'POST', path: '/files/:fileId/transcriptions/review', access: INSTRUCTOR, scope: 'access:write' },
 
   createAssignment: { method: 'POST', path: '/modules/:moduleId/assignments', access: INSTRUCTOR, scope: 'content:write' },
   listAssignments: { method: 'GET', path: '/courses/:courseId/assignments', access: 'signed-in', scope: 'content:read' },

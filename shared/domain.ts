@@ -445,6 +445,26 @@ export interface FileRecord {
 
 export type AccessibleFormat = 'reading' | 'audio' | 'epub' | 'ocr';
 
+/**
+ * Night 3 (carry-over 3): an AI transcription of a scanned page Tesseract couldn't read
+ * clearly. A draft until a person keeps it (D-003); only kept ones reach the reading
+ * version and e-book, labeled with who reviewed them.
+ */
+export interface PageTranscription {
+  fileId: Id;
+  version: number;
+  /** 1-based page number. */
+  page: number;
+  /** Tesseract's mean word confidence for the page, 0–100. */
+  confidence: number;
+  text: string;
+  provenance: Provenance;
+  state: 'pending' | 'kept' | 'discarded';
+  reviewedBy: Id | null;
+  reviewedByName: string | null;
+  reviewedAt: Timestamp | null;
+}
+
 export interface FormatStatus {
   format: AccessibleFormat;
   state: 'none' | 'generating' | 'ready' | 'failed';

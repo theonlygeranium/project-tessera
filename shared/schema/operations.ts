@@ -126,5 +126,7 @@ export const OPERATIONS: { [K in Operation]: { input: z.ZodType<Input<K>>; outpu
  removeReportingLine:{input:z.object({managerId:id,reportId:id}),output:ok},
  getMyVisibility:{input:z.void(),output:S.MyVisibilitySchema},
  setManagerSharing:{input:z.object({managerId:id,sharing:z.boolean()}),output:S.MyVisibilitySchema},
- getManagerView:{input:z.void(),output:S.ManagerViewSchema}
+ getManagerView:{input:z.void(),output:S.ManagerViewSchema},
+ listTranscriptions:{input:by('fileId'),output:z.array(S.PageTranscriptionSchema)},
+ reviewTranscription:{input:z.object({fileId:id,page:integer.min(1),decision:z.enum(['keep','discard'])}),output:z.array(S.PageTranscriptionSchema)}
 };
