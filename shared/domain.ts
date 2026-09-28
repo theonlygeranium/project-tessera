@@ -532,10 +532,12 @@ export interface ProvisionPlan {
   outcomes: { code: string; text: string; source: 'confirmed' | 'rewritten' }[];
   modules: { key: string; title: string; objective: string; position: number; outcomeCodes: string[]; templateKey: string | null;
     overlaps: { moduleId: Id; title: string } | null;
-    lessons: { key: string; title: string; objective: string; minutes: number; week: number | null; skeleton: LessonSkeleton }[];
-    assignment: { key: string; title: string; points: number; dueAt: string | null; outcomeCodes: string[]; replaces: string | null } | null;
+    lessons: { key: string; title: string; objective: string; minutes: number; week: number | null; skeleton: LessonSkeleton; patternNote?: string; resurface?: boolean; announcementSlot?: boolean; alternativeFormatSlot?: boolean }[];
+    assignment: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null } | null;
+    /** Additional distinct graded components due in the same module. */
+    assignments?: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null }[];
     hours: number; leastSure: boolean }[];
-  readings: { title: string; span: SourceSpan; moduleKey: string }[];       // only readings with a span
+  readings: { title: string; span: SourceSpan; moduleKey: string; week?: number | null }[];       // only readings with a span
   placeholders: number;                                                     // "[Reading to select]" count
   counts: { modules: number; lessons: number; checks: number; assignments: number; outcomes: number; links: number };
   summary: string;                                                          // "Adds … Renames nothing. Removes nothing."
@@ -554,7 +556,7 @@ export interface DesignRecord {
   decisions: { at: Timestamp; who: Id; what: string }[];                     // per-item keep/revert etc. summarised
 }
 
-export type DesignStage = 'start' | 'read' | 'confirm' | 'approaches' | 'preview' | 'provisioning' | 'review';
+export type DesignStage = 'start' | 'read' | 'confirm' | 'approaches' | 'preview' | 'provisioning' | 'review' | 'undoing';
 export interface DesignSession {
   id: Id; courseId: Id; mode: 'syllabus'; stage: DesignStage; createdBy: Id; createdAt: Timestamp; updatedAt: Timestamp;
   source: DesignSource; consent: { syllabusOnly: true; at: Timestamp; rememberProfile: boolean };
@@ -564,9 +566,22 @@ export interface DesignSession {
   /** Per-session assumptions override institution workload rates. */
   workloadRates?: WorkloadRates | null;
   options: StructureOption[] | null; selection: ApproachSelection | null;
-  plan: ProvisionPlan | null; provisioning: { jobId: Id | null; done: number; total: number; error: string | null } | null;
+  plan: ProvisionPlan | null; provisioning: { jobId: Id | null; done: number; total: number; error: string | null; modules?: { key: string; done: number; total: number }[] } | null;
   /** Everything the plan created, for undo. */
   created: { outcomeIds: Id[]; moduleIds: Id[]; lessonIds: Id[]; blockIds: Id[]; assignmentIds: Id[]; linkKeys: string[] };
+  /** Changes on every apply and undo. In-flight work may only write for this revision. */
+  applyRevision?: Id | null;
+  /** The applied session predates the revision and block snapshot ledger. */
+  legacyApply?: boolean;
+  /** Stable plan keys, recorded with creation rather than recovered from titles or positions. */
+  planIds?: { modules: Record<string, Id>; lessons: Record<string, Id>; assignments: Record<string, Id>; outcomes: Record<string, Id> };
+  /** Original generated block rows, for exact conditional undo. */
+  createdBlocks?: Record<Id, Block>;
+  /** Instructor-confirmed points for assessments without an unambiguous source value. */
+  confirmedPoints?: Record<Id, number>;
+  /** Planned outcome code to the code allocated by the course at apply time. */
+  outcomeCodeMap?: Record<string, string>;
+  undoKept?: { kind: 'block' | 'assignment' | 'lesson' | 'module' | 'outcome'; id: Id; title: string }[];
   record: DesignRecord;
 }
 

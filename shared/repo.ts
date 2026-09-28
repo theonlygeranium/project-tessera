@@ -16,6 +16,7 @@ export interface GenerationJob {
   id: Id; courseId: Id; requestedBy: Id; state: 'running' | 'done' | 'failed';
   done: number; total: number; lessonIds: Id[]; error: string | null;
   work: GenerationItem[]; instruction: string; failures: GenerationFailure[];
+  notes?: { lessonId: Id; message: string }[];
   createdAt: Timestamp; updatedAt: Timestamp;
   /** Night 3: who advances the job. Absent means 'poll' (each status poll advances it). */
   runner?: 'poll' | 'workflow';
@@ -130,6 +131,35 @@ export interface Repo {
 
   getDesignSession(id: Id): Promise<DesignSession | null>;
   putDesignSession(session: DesignSession): Promise<void>;
+  finishDesignUndo(sessionId: Id, revision: Id, session: DesignSession): Promise<boolean>;
+  revertDesignPreview(sessionId: Id): Promise<boolean>;
+  saveDesignPoints(sessionId: Id, values: Record<Id, number>): Promise<boolean>;
+  saveDesignPreview(sessionId: Id, expectedPoints: Record<Id, number>, plan: DesignSession['plan'], updatedAt: string): Promise<boolean>;
+  /** Atomically claims a preview for one apply; false when another request claimed it. */
+  claimDesignApply(session: DesignSession): Promise<boolean>;
+  /** Commit one created item and its ledger entry only while this apply revision is current. */
+  putDesignModule(sessionId: Id, revision: Id, key: string, module: Module): Promise<boolean>;
+  putDesignLesson(sessionId: Id, revision: Id, key: string, lesson: Lesson): Promise<boolean>;
+  putDesignAssignment(sessionId: Id, revision: Id, key: string, assignment: Assignment, outcomeIds: Id[]): Promise<boolean>;
+  appendDesignOutcome(sessionId: Id, revision: Id, outcome: Outcome): Promise<boolean>;
+  appendDesignOutcomes(sessionId: Id, revision: Id, outcomes: Outcome[]): Promise<Outcome[] | null>;
+  resetDesignCapacityFailure(sessionId: Id, revision: Id, message: string): Promise<boolean>;
+  saveDesignAppliedPlan(sessionId: Id, revision: Id, plan: DesignSession['plan'], codeMap: Record<string, string>, outcomeIdsByCode: Record<string, Id>): Promise<boolean>;
+  /** Changes the revision and stops the job in one operation. */
+  cancelDesignApply(sessionId: Id, revision: Id, nextRevision: Id): Promise<boolean>;
+  /** Fail an old-shape provisioning job without attempting to scaffold it. */
+  stopLegacyDesignJob(sessionId: Id, jobId: Id, message: string): Promise<boolean>;
+  startDesignJob(sessionId: Id, revision: Id, job: GenerationJob): Promise<boolean>;
+  setDesignRunner(sessionId: Id, revision: Id, jobId: Id, runner: 'poll' | 'workflow'): Promise<boolean>;
+  setDesignApplyError(sessionId: Id, revision: Id, message: string): Promise<boolean>;
+  /** An owned, empty lesson gets blocks, links and progress in one operation. */
+  commitDesignScaffold(sessionId: Id, revision: Id, expectedJob: GenerationJob, nextJob: GenerationJob, lesson: Lesson | null, blocks: Block[], outcomeIds: Id[], nextSession: DesignSession): Promise<boolean>;
+  appendDesignAlternatives(sessionId: Id, revision: Id, lessonId: Id, blocks: Block[]): Promise<boolean>;
+  deleteDesignBlockIfDraft(sessionId: Id, revision: Id, expected: Block, expectedOutcomeIds: Id[]): Promise<boolean>;
+  deleteDesignAssignmentIfUnchanged(sessionId: Id, revision: Id, expected: Assignment, expectedOutcomeIds: Id[]): Promise<boolean>;
+  deleteDesignLessonIfUnchanged(sessionId: Id, revision: Id, expected: Lesson): Promise<boolean>;
+  deleteDesignModuleIfUnchanged(sessionId: Id, revision: Id, expected: Module): Promise<boolean>;
+  deleteDesignOutcomeIfUnused(sessionId: Id, revision: Id, id: Id, expectedText: string): Promise<boolean>;
   /** Newest by createdAt, then id. */
   listDesignSessions(courseId: Id): Promise<DesignSession[]>;
   getInstructorProfile(userId: Id): Promise<InstructorProfile | null>;

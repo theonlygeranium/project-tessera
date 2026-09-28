@@ -55,6 +55,7 @@ export interface ApiSpec {
   retryDesignOptions: { input: { sessionId: Id }; output: DesignSession };
   selectApproach: { input: { sessionId: Id; optionIds: ArchitectureId[]; overlays: OverlayId[]; rationale: string }; output: DesignSession };
   previewProvisionPlan: { input: { sessionId: Id }; output: ProvisionPlan };
+  confirmDesignPoints: { input: { sessionId: Id; points: Record<Id, number> }; output: DesignSession };
   applyProvisionPlan: { input: { sessionId: Id; hash: string; leastSureModuleKey?: string }; output: DesignSession };
   undoProvisionPlan: { input: { sessionId: Id }; output: { session: DesignSession; kept: { kind: 'block' | 'lesson' | 'module' | 'assignment' | 'outcome'; id: Id; title: string }[] } };
   exportDesignRecord: { input: { sessionId: Id; format: 'json' | 'csv' }; output: { format: 'json' | 'csv'; content: string } };
@@ -399,6 +400,7 @@ export const ROUTES: { [K in Operation]: Route } = {
   retryDesignOptions: { method: 'POST', path: '/design/:sessionId/options/retry', access: INSTRUCTOR, scope: 'ai:run' },
   selectApproach: { method: 'POST', path: '/design/:sessionId/approach', access: INSTRUCTOR, scope: 'content:write' },
   previewProvisionPlan: { method: 'POST', path: '/design/:sessionId/plan', access: INSTRUCTOR, scope: 'content:read' },
+  confirmDesignPoints: { method: 'PUT', path: '/design/:sessionId/points', access: INSTRUCTOR, scope: 'content:write' },
   applyProvisionPlan: { method: 'POST', path: '/design/:sessionId/apply', access: INSTRUCTOR, scope: 'ai:run' },
   undoProvisionPlan: { method: 'POST', path: '/design/:sessionId/undo', access: INSTRUCTOR, scope: 'content:write' },
   exportDesignRecord: { method: 'GET', path: '/design/:sessionId/record', access: INSTRUCTOR, scope: 'content:read' },

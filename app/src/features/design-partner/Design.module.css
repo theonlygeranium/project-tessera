@@ -57,3 +57,20 @@
 .card textarea { min-height: 90px; }
 @media (max-width: 1100px) { .optionGrid { grid-template-columns: 1fr; } .overlayGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .overlayGrid { grid-template-columns: 1fr; } }
+.previewGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 350px); gap: 18px; align-items: start; }
+.previewGrid h1 { font: 500 29px/1.2 var(--font-display); margin: 0 0 8px; }
+.previewGrid aside { align-content: start; }
+.previewGrid select { min-height: 44px; padding: 8px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.previewTableWrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.previewTable { width: 100%; border-collapse: collapse; min-width: 750px; background: var(--surface); }
+.previewTable caption { text-align: left; padding: 12px; font-weight: 600; }
+.previewTable th, .previewTable td { vertical-align: top; text-align: left; border-top: 1px solid var(--line); padding: 12px; }
+.previewTable thead { background: var(--surface-sunk); }
+.previewTable tbody th { font-weight: 400; }
+.previewTable ul { padding-left: 18px; margin: 6px 0 0; }
+.previewTable li { margin: 3px 0; }
+.overlap { font-size: 13px; font-weight: 600; margin-top: 8px !important; }
+.previewNotes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.dialogButton { min-height: 44px; padding: 8px 16px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.dialogButton:focus-visible, .previewGrid select:focus-visible { outline: 3px solid var(--focus); }
+@media (max-width: 950px) { .previewGrid, .previewNotes { grid-template-columns: minmax(0, 1fr); } }

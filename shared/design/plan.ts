@@ -1,0 +1,174 @@
+import type { Assignment, Block, DesignSession, InstructorProfile, Lesson, Module, Outcome, OutcomeLink, ProvisionPlan, SourceSpan, StructureOption } from '../domain';
+import type { CourseSnapshot } from '../quality';
+import { AUTOMATIC_CHECKS } from '../quality';
+import { automaticCheck } from '../quality/evaluate';
+import { stableHash } from '../hash';
+import { moduleScaffoldFixture } from '../ai';
+import { DEFAULT_AI_DISCLOSURE } from '../policy';
+
+type PlanModule = ProvisionPlan['modules'][number];
+type PlanAssignment = NonNullable<PlanModule['assignment']>;
+export function coveredWeeks(row: { week: number; dates: string }): number[] {
+  const range = /\bweeks?\s*(\d+)\s*[–—-]\s*(\d+)\b/i.exec(row.dates);
+  if (!range) return [row.week];
+  const first = Number(range[1]), last = Number(range[2]);
+  return last >= first && last - first < 53 ? Array.from({ length: last - first + 1 }, (_, i) => first + i) : [row.week];
+}
+const pointPattern = /\b(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:points?|pts?)\b/gi;
+const numberOf = (value: string) => Number(value.replaceAll(',', ''));
+export function statedCourseTotal(span: SourceSpan | null): number | null {
+  const match = span?.text.match(/\b(?:(?:course|overall|grade)\s+total|total\s+points?)\s*:?\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*(?:points?|pts?)?\b/i);
+  return match ? numberOf(match[1]) : null;
+}
+export function explicitAssessmentPoints(span: SourceSpan | null, title = ''): number | null {
+  if (!span) return null;
+  const rows = span.text.split(/[\n\r]+|(?<=[.!?])\s+/);
+  // A dash separates list items only with a space before it; "Mini-project" is one title.
+  const titlePattern = title ? new RegExp(`(?:^|[.;!?:|•]|\\s[–—-])\\s*${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[:–—-]?\\s*$`, 'iu') : null;
+  const values = rows.flatMap(row => [...row.matchAll(pointPattern)]
+    .filter(match => {
+      const before = row.slice(0, match.index);
+      if (/\b(?:(?:course|overall|grade)\s+total|total\s+points?)\s*:?\s*$/i.test(before)) return false;
+      return titlePattern ? titlePattern.test(before) : rows.length === 1;
+    }).map(match => numberOf(match[1])));
+  return values.length === 1 ? values[0] : null;
+}
+const words = (s: string) => new Set((s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(w => w.length > 2).map(w => w.replace(/(ing|edly|ed|es|s)$/u, '').replace(/e$/u, '')));
+export function titleOverlap(a: string, b: string): boolean {
+  const aa = words(a), bb = words(b);
+  const intersection = [...aa].filter(w => bb.has(w)).length;
+  return !!intersection && intersection / (aa.size + bb.size - intersection) >= 0.5;
+}
+const weekOf = (date: string | null, start: string | null): number | null => {
+  const at = date ? Date.parse(date) : NaN, first = start ? Date.parse(start) : NaN;
+  return Number.isFinite(at) && Number.isFinite(first) ? Math.floor((at - first) / 604800000) + 1 : null;
+};
+const dayIndex = (day: string) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].findIndex(s => day.toLowerCase().startsWith(s));
+function dueDate(session: DesignSession, week: number, used: string[]): string | null {
+  const start = session.extraction?.profile.termStart.value;
+  if (!start || !Number.isFinite(Date.parse(start))) return null;
+  const base = new Date(Date.parse(start) + (week - 1) * 604800000);
+  const meeting = session.extraction?.profile.meeting.value?.days.map(dayIndex).filter(d => d >= 0) ?? [];
+  const candidates = Array.from({ length: 7 }, (_, i) => new Date(base.getTime() + i * 86400000)).filter(d => !meeting.length || meeting.includes(d.getUTCDay())).reverse();
+  for (const date of candidates) {
+    const iso = date.toISOString().slice(0, 10);
+    if (used.every(other => Math.abs(Date.parse(other) - Date.parse(iso)) > 3 * 86400000)) { used.push(iso); return `${iso}T23:59:00.000Z`; }
+  }
+  return null;
+}
+function assignmentWeek(session: DesignSession, title: string, dueAt: string | null, modules: PlanModule[]): number {
+  const explicit = weekOf(dueAt, session.extraction?.profile.termStart.value ?? null);
+  if (explicit !== null) return explicit;
+  const match = session.extraction?.schedule.find(row => row.due && (row.due.toLowerCase().includes(title.toLowerCase()) || title.toLowerCase().includes(row.due.toLowerCase())));
+  return match?.week ?? Math.max(...modules.flatMap(m => m.lessons.map(l => l.week ?? 0)), 1);
+}
+function sourceSpans(session: DesignSession, module: PlanModule): SourceSpan[] {
+  return (session.extraction?.schedule ?? []).filter(row => row.span && module.lessons.some(lesson => lesson.week !== null && coveredWeeks(row).includes(lesson.week))).map(row => row.span!);
+}
+export function previewProvisionPlan(session: DesignSession, snapshot: CourseSnapshot, instructorProfile: InstructorProfile | null = null): ProvisionPlan {
+  if (!session.selection || !session.options || !session.confirmedOutcomes || !session.extraction) throw Error('Choose an approach and confirm outcomes first.');
+  const selected = session.selection.optionIds.map(id => session.options!.find(option => option.id === id)).filter((v): v is StructureOption => !!v);
+  if (!selected.length) throw Error('The selected approach is unavailable.');
+  const spine = selected[0];
+  const nextCode = snapshot.outcomes.length + 1;
+  const codes = new Map(session.confirmedOutcomes.map((item, index) => [item.code, `O${nextCode + index}`]));
+  const outcomes = session.confirmedOutcomes.map(item => ({ code: codes.get(item.code)!, text: item.text, source: item.text === item.originalText ? 'confirmed' as const : 'rewritten' as const }));
+  const template = snapshot.template;
+  const base = snapshot.modules.length ? Math.max(...snapshot.modules.map(m => m.position)) + 1 : 0;
+  const skeleton = selected.some(o => o.id === 'case') ? 'case' : selected.some(o => o.id === 'project' || o.id === 'performance') ? 'milestone' : selected.some(o => o.id === 'competency' || o.id === 'scaffolded') ? 'merrill' : 'gagne';
+  const patternNotes: Record<string, string> = { weekly: 'Revisit the previous week before starting this one.', thematic: 'Connect this topic to the larger theme.', case: 'Test a claim, then critique the evidence.', project: 'Build and review one project milestone.', competency: 'Demonstrate the target competency.', flipped: 'Prepare before the meeting, then apply the idea together.', scaffolded: 'Study a model, practise with support, then try independently.', performance: 'Make a decision in a realistic job context.', micro: 'Use a short retrieval and application cycle.', hyflex: 'Offer equivalent participation paths.' };
+  const patternNote = selected.slice(1).map(option => patternNotes[option.id]).join(' ');
+  const modules: PlanModule[] = spine.modules.map((item, index) => {
+    const weeks = [...new Set(item.weeks)].sort((a, b) => a - b);
+    const rows = session.extraction!.schedule.filter(row => weeks.some(week => coveredWeeks(row).includes(week)) && !row.empty);
+    const lessonCount = Math.max(1, Math.round(item.lessons));
+    const lessons = Array.from({ length: lessonCount }, (_, n) => {
+      const week = weeks[Math.min(n, weeks.length - 1)] ?? rows[n]?.week ?? null;
+      const row = rows.find(candidate => week !== null && coveredWeeks(candidate).includes(week)) ?? rows[Math.min(n, rows.length - 1)];
+      const topic = row?.topic?.trim() || item.title;
+      return { key: `module-${index + 1}/lesson-${n + 1}`, title: lessonCount === 1 ? topic : `${topic}${n >= rows.length ? ` · part ${n + 1}` : ''}`, objective: item.objective || session.confirmedOutcomes![0]?.text || topic, minutes: Math.max(1, Math.round(item.lessonMinutes)), week, skeleton, ...(patternNote ? { patternNote } : {}), resurface: session.selection!.overlays.includes('spaced-review'), announcementSlot: session.selection!.overlays.includes('teaching-presence') && (n === 0 || week !== weeks[Math.min(n - 1, weeks.length - 1)]), alternativeFormatSlot: session.selection!.overlays.includes('udl-choice') } as PlanModule['lessons'][number];
+    });
+    const matched = snapshot.modules.find(m => titleOverlap(item.title, m.title));
+    const matchedTemplate = template?.modules.find(m => titleOverlap(item.title, m.title));
+    const outcomeCodes = item.outcomeIds.map(code => codes.get(code)).filter((c): c is string => !!c);
+    if (!outcomeCodes.length && outcomes.length) outcomeCodes.push(outcomes[index % outcomes.length].code);
+    return { key: `module-${index + 1}`, title: item.title, objective: item.objective, position: base + index, outcomeCodes, templateKey: matchedTemplate?.key ?? null, overlaps: matched ? { moduleId: matched.id, title: matched.title } : null, lessons, assignment: null, assignments: [], hours: item.hours, leastSure: false };
+  });
+  if (session.selection.overlays.includes('bookends')) {
+    const first: PlanModule = { key: 'start-here', title: 'Start here', objective: 'Find your way through the course, contact the instructor, and identify the learning outcomes.', position: base, outcomeCodes: outcomes.map(o => o.code), templateKey: template?.modules.find(m => /start here/i.test(m.title))?.key ?? 'start-here', overlaps: null, lessons: [{ key: 'start-here/lesson-1', title: 'Start here', objective: 'Explain how this course works and how to contact the instructor.', minutes: 20, week: null, skeleton: 'start-here' }], assignment: null, assignments: [], hours: 0.3, leastSure: false };
+    const last: PlanModule = { key: 'wrap-up', title: 'Wrap-up', objective: 'Revisit the course outcomes and reflect on progress.', position: base + modules.length + 1, outcomeCodes: outcomes.map(o => o.code), templateKey: null, overlaps: null, lessons: [{ key: 'wrap-up/lesson-1', title: 'Wrap-up and reflect', objective: 'Reflect on your progress toward the course outcomes.', minutes: 30, week: Math.max(...modules.flatMap(m => m.lessons.map(l => l.week ?? 0)), 1), skeleton: 'wrap-up' }], assignment: null, assignments: [], hours: 0.5, leastSure: false };
+    modules.unshift(first); modules.push(last);
+    modules.forEach((m, i) => { m.position = base + i; });
+  }
+  const instructional = modules.filter(m => m.key.startsWith('module-'));
+  const usedDates = snapshot.assignments.flatMap(a => a.dueAt ? [a.dueAt.slice(0, 10)] : []);
+  const breakWeeks = new Set(session.extraction.schedule.filter(row => /\bbreak\b|\bexam week\b/i.test(`${row.topic} ${row.due}`)).map(row => row.week));
+  for (const question of session.questions) {
+    const answer = question.answer?.value ?? '';
+    if (!/\bbreak\b|\bexam week\b/i.test(answer)) continue;
+    for (const match of answer.matchAll(/\bweek\s*(\d+)\b/gi)) breakWeeks.add(Number(match[1]));
+  }
+  for (const [index, item] of session.extraction.assessments.entries()) {
+    const dueWeek = assignmentWeek(session, item.title, item.dueAt, instructional);
+    const target = instructional.find(m => m.lessons.some(l => l.week === dueWeek)) ?? instructional[instructional.length - 1];
+    if (!target) continue;
+    const week = target.lessons.map(l => l.week ?? 0).find(w => w >= dueWeek && !breakWeeks.has(w)) ?? target.lessons.map(l => l.week ?? 0).find(w => !breakWeeks.has(w)) ?? instructional.flatMap(m => m.lessons.map(l => l.week ?? 0)).find(w => w > 0 && !breakWeeks.has(w)) ?? 0;
+    const dueAt = week ? dueDate(session, week, usedDates) : null;
+    const answered = session.confirmedPoints?.[item.id] ?? Number(session.questions.find(q => q.id === `question-assessment-points-${item.id}`)?.answer?.value);
+    const points = item.weightPercent ?? explicitAssessmentPoints(item.span, item.title) ?? (Number.isFinite(answered) && answered > 0 ? answered : null);
+    if (points === null) throw Error(`Confirm the points for ${item.title} before applying this plan.`);
+    const total = statedCourseTotal(item.span);
+    const weightPercent = item.weightPercent ?? (total && total > 0 ? Math.round(points / total * 10000) / 100 : null);
+    const assignment: PlanAssignment = { key: `${target.key}/assessment-${index + 1}`, title: item.title, points: Math.max(0, points), weightPercent, dueAt, outcomeCodes: target.outcomeCodes, replaces: item.title };
+    target.assignments!.push(assignment);
+    target.assignment ??= assignment;
+  }
+  if (selected.slice(1).some(option => option.id === 'case')) for (const module of instructional) {
+    const critique: PlanAssignment = { key: `${module.key}/claim-critique`, title: `Claim critique: ${module.title}`, points: 0, dueAt: null, outcomeCodes: module.outcomeCodes, replaces: null };
+    module.assignments!.push(critique);
+    module.assignment ??= critique;
+  }
+  for (const module of instructional) if (!module.assignments!.length) {
+    const practice: PlanAssignment = { key: `${module.key}/practice`, title: `Practice: ${module.title}`, points: 0, dueAt: null, outcomeCodes: module.outcomeCodes, replaces: null };
+    module.assignments!.push(practice);
+    module.assignment = practice;
+  }
+  const readings = modules.filter(m => m.key.startsWith('module-')).flatMap(m => session.extraction!.schedule.filter(row => row.span && row.reading.trim()).flatMap(row => m.lessons.filter(l => l.week !== null && coveredWeeks(row).includes(l.week)).map(l => ({ title: row.reading.trim(), span: row.span!, moduleKey: m.key, week: l.week }))));
+  const placeholders = modules.reduce((sum, m) => sum + m.lessons.filter(l => l.skeleton !== 'start-here' && !readings.some(r => r.moduleKey === m.key && r.week === l.week)).length, 0);
+  const citedCount = (module: PlanModule) => new Set([
+    ...sourceSpans(session, module),
+    ...session.extraction!.assessments.filter(a => module.assignments?.some(item => item.replaces === a.title)).map(a => a.span).filter((span): span is SourceSpan => !!span),
+    ...session.extraction!.outcomes.filter(o => o.span && module.outcomeCodes.some(code => outcomes.find(p => p.code === code)?.text === o.text)).map(o => o.span!),
+  ].map(span => `${span.page}:${span.section ?? ''}:${span.text}`)).size;
+  const unsure = instructional.length ? instructional.reduce((a, b) => citedCount(a) <= citedCount(b) ? a : b) : modules[0];
+  if (unsure) unsure.leastSure = true;
+  const assignmentCount = modules.reduce((n, m) => n + (m.assignments?.length ?? 0), 0);
+  const counts = { modules: modules.length, lessons: modules.reduce((n, m) => n + m.lessons.length, 0), checks: modules.reduce((n, m) => n + m.lessons.reduce((x, l) => x + (l.skeleton === 'start-here' ? 5 : 1), 0), 0), assignments: assignmentCount, outcomes: outcomes.length, links: modules.reduce((n, m) => n + m.lessons.reduce((x, l) => x + (l.skeleton === 'start-here' ? 5 : 1) * m.outcomeCodes.length, 0) + (m.assignments?.length ?? 0) * m.outcomeCodes.length, 0) };
+  const summary = `Will add ${counts.modules} modules, ${counts.lessons} lessons, ${counts.checks} checks, ${counts.assignments} assignments, ${counts.outcomes} outcomes and ${counts.links} alignment links. Renames nothing. Removes nothing.`;
+  const satisfied = template?.modules.filter(t => modules.some(m => m.templateKey === t.key) || snapshot.modules.some(m => m.templateKey === t.key)).map(t => t.title) ?? [];
+  const missing = template?.modules.filter(t => !satisfied.includes(t.title)).map(t => t.title) ?? [];
+  const planned: CourseSnapshot = { ...snapshot, course: { ...snapshot.course, outcomes: [...snapshot.course.outcomes, ...outcomes.map(o => o.text)] }, modules: [...snapshot.modules, ...modules.map(m => ({ id: m.key, courseId: session.courseId, title: m.title, objective: m.objective, position: m.position, templateKey: m.templateKey } as Module))], lessons: [...snapshot.lessons, ...modules.flatMap(m => m.lessons.map((l, i) => ({ id: l.key, moduleId: m.key, courseId: session.courseId, title: l.title, objective: l.objective, minutes: l.minutes, position: i, status: 'draft', publishedAt: null, templateKey: l.skeleton === 'start-here' ? 'start-here' : null } as Lesson)))], assignments: [...snapshot.assignments, ...modules.flatMap(m => (m.assignments ?? []).map((a, i) => ({ id: a.key, moduleId: m.key, courseId: session.courseId, title: a.title, position: i, status: 'draft', publishedAt: null, dueAt: a.dueAt, points: a.points, submissionType: 'text', rubric: [], instructions: [] } as Assignment)))], outcomes: [...snapshot.outcomes, ...outcomes.map((o, i) => ({ id: o.code, courseId: session.courseId, code: o.code, text: o.text, position: snapshot.outcomes.length + i } as Outcome))], outcomeLinks: [...snapshot.outcomeLinks, ...modules.flatMap(m => (m.assignments ?? []).flatMap(a => a.outcomeCodes.map(code => ({ courseId: session.courseId, outcomeId: code, targetKind: 'assignment' as const, targetId: a.key } as OutcomeLink))))], blocks: { ...snapshot.blocks } };
+  const startLesson = modules.flatMap(m => m.lessons).find(l => l.skeleton === 'start-here');
+  if (startLesson) {
+    const contact = session.extraction.profile.instructor.value?.email || session.extraction.profile.instructor.value?.officeHours || 'Contact your instructor through the course message tool.';
+    planned.blocks[startLesson.key] = [
+      `Open the course outline to find each module and lesson. Work through the lessons in order, then review the draft assignments. Your instructor can be reached at ${contact}.\n\n[Your welcome and course navigation example]`,
+      `Course outcomes:\n${outcomes.map(o => `${o.code}: ${o.text}`).join('\n')}\n\n${instructorProfile?.disclosureText ?? DEFAULT_AI_DISCLOSURE}\n\n[Your AI-use guidance]`,
+    ].map((text, position) => ({ id: `forecast-start-${position}`, lessonId: startLesson.key, position, type: 'text', text, origin: 'ai', aiState: 'draft', provenance: null, previous: null, updatedAt: session.updatedAt } as Block));
+  }
+  for (const module of modules) for (const lesson of module.lessons) {
+    if (lesson.skeleton === 'start-here') {
+      const baseline = moduleScaffoldFixture({ courseTitle: snapshot.course.title, module, lesson, skeleton: lesson.skeleton, outcomes, spans: [], teachingNote: session.teachingNote, instructorProfile: null, priorLessonTitles: [] }).blocks.find(value => value.type === 'check')!;
+      planned.blocks[lesson.key].push(...Array.from({ length: 5 }, (_, i) => ({ ...baseline, id: `forecast-${lesson.key}-baseline-${i}`, lessonId: lesson.key, position: i + 2, origin: 'ai', aiState: 'draft', provenance: null, previous: null, updatedAt: session.updatedAt } as Block)));
+      continue;
+    }
+    const fixture = moduleScaffoldFixture({ courseTitle: snapshot.course.title, module, lesson, skeleton: lesson.skeleton, outcomes, spans: [], teachingNote: session.teachingNote, instructorProfile: null, priorLessonTitles: [] });
+    planned.blocks[lesson.key] = fixture.blocks.map((value, position) => ({ ...value, id: `forecast-${lesson.key}-${position}`, lessonId: lesson.key, position, origin: 'ai', aiState: 'draft', provenance: null, previous: null, updatedAt: session.updatedAt } as Block));
+  }
+  for (const module of modules) for (const lesson of module.lessons) for (const block of planned.blocks[lesson.key] ?? []) {
+    if (block.type === 'check' || block.type === 'scenario') planned.outcomeLinks.push(...module.outcomeCodes.map(code => ({ outcomeId: code, targetKind: 'block' as const, targetId: block.id })));
+  }
+  const readinessForecast = (Object.keys(AUTOMATIC_CHECKS) as (keyof typeof AUTOMATIC_CHECKS)[]).map(check => ({ check, expected: automaticCheck(planned, check).status === 'met' ? 'met' as const : 'not-met' as const }));
+  const plan = { sessionId: session.id, courseId: session.courseId, outcomes, modules, readings, placeholders, counts, summary, template: template ? { name: template.name, satisfied, missing } : null, readinessForecast };
+  return { ...plan, hash: stableHash({ plan, confirmedPoints: session.confirmedPoints ?? {}, instructorDisclosure: instructorProfile?.disclosureText ?? DEFAULT_AI_DISCLOSURE, existing: { course: snapshot.course, modules: snapshot.modules, lessons: snapshot.lessons, blocks: snapshot.blocks, assignments: snapshot.assignments, outcomes: snapshot.outcomes, links: snapshot.outcomeLinks, access: snapshot.access, template: snapshot.template?.updatedAt } }) };
+}

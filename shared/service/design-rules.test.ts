@@ -9,6 +9,11 @@ const extraction = (): SyllabusExtraction => ({ ...extractSyllabusFixture({ sour
 const codes = (x: SyllabusExtraction) => problemsFrom(x).map(problem => problem.code);
 
 describe('design questions from deterministic rules', () => {
+  it('keeps unresolved assessment points for the Preview editor', () => {
+    const x = extraction();
+    x.assessments = [{ id: 'unweighted', title: 'Final project', weightPercent: null, dueAt: null, format: 'project', span: { page: 3, text: 'Final project: grade to be determined.' } }];
+    expect(questionsFrom([], x, null).some(q => q.id === 'question-assessment-points-unweighted')).toBe(false);
+  });
   it('finds week count, empty week, unobservable outcome, and missing enrolment in the sample', () => {
     const result = codes(extraction());
     expect(result).toContain('week-count-mismatch');

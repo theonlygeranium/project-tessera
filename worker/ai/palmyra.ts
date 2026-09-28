@@ -55,6 +55,10 @@ type Messages = { role: 'system' | 'user'; content: string }[];
 
 
 const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } = {
+  'module-scaffold': ({ courseTitle, module, lesson, skeleton, outcomes, spans, teachingNote, instructorProfile, priorLessonTitles }) => [
+    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nDraft a starter scaffold, never a polished full lesson. Use 3–6 blocks: heading, activation or claim callout, text with a [Your …] instructor slot, and an objective-targeted check with 3–4 choices and feedback. Use a scenario only for a case skeleton. Cite only supplied spans. A link is allowed only when its URL appears verbatim in a supplied span. The check must target the lesson objective's Bloom level. Assignment language uses Purpose, Task, Criteria (TILT). For industry training, address the learner as you in a job context.` },
+    { role: 'user', content: JSON.stringify({ courseTitle, module, lesson, skeleton, outcomes, spans, teachingNote, instructorProfile, priorLessonTitles }).slice(0, 30_000) },
+  ],
   'syllabus-extract': ({ sourceKind, name, sections, institutionTerm }) => [
     { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nYou are reading one part of a syllabus for a course designer. The service will compute problems and questions.` },
     { role: 'user', content: `Source kind: ${sourceKind}\nName: ${name}\nInstitution term: ${institutionTerm ? JSON.stringify(institutionTerm) : 'not supplied'}\nSource:\n${sourceText(sections, 60_000)}` },
@@ -230,6 +234,7 @@ const elementSchemas = {
   text: obj({ type: { type: 'string', enum: ['text'] }, text: str }),
   callout: obj({ type: { type: 'string', enum: ['callout'] }, tone: { type: 'string', enum: ['info', 'tip', 'warning'] }, title: str, text: str }),
   check: obj({ type: { type: 'string', enum: ['check'] }, question: str, options: { type: 'array', minItems: 3, maxItems: 4, items: obj({ id: str, text: str }) }, correctOptionId: str, feedbackCorrect: str, feedbackIncorrect: str }),
+  link: obj({ type: { type: 'string', enum: ['link'] }, href: str, text: str, description: str }),
   document: obj({ type: { type: 'string', enum: ['document'] }, title: str, sections: { type: 'array', minItems: 3, maxItems: 8, items: obj({ heading: str, text: str }) } }),
   table: obj({ type: { type: 'string', enum: ['table'] }, caption: str, headerRow: { type: 'boolean', enum: [true] }, rows: { type: 'array', minItems: 3, maxItems: 8, items: { type: 'array', minItems: 2, maxItems: 5, items: str } } }),
   scenario: obj({ type: { type: 'string', enum: ['scenario'] }, title: str, setting: str, startNodeId: str, nodes: { type: 'array', minItems: 4, maxItems: 8, items: obj({ id: str, text: str, outcome: str, choices: { type: 'array', maxItems: 3, items: obj({ id: str, text: str, nextNodeId: str, feedback: str, quality: { type: 'string', enum: ['best', 'okay', 'poor'] } }) } }) } }),
@@ -240,6 +245,7 @@ export const elementSchema = (type: keyof typeof elementSchemas) => obj({ block:
 const optionsSchema = (candidates: string[]) => obj({ options: { type: 'array', minItems: candidates.length, maxItems: candidates.length, items: obj({ id: { type: 'string', enum: candidates }, label: str, tag: str, description: str, fits: array(obj({ text: str, span: nullable(span) })), changes: str, tradeoffs: str, evidence: str, frameworks: array(str), modules: array(obj({ title: str, objective: str, outcomeIds: array(str), weeks: array(integer), lessons: integer, lessonMinutes: number, assessment: str, hours: number })), workload: obj({ averageHours: number, peakHours: number, peakModule: integer }) }) } });
 
 const SCHEMAS: Record<AiTaskName, unknown> = {
+  'module-scaffold': obj({ blocks: { type: 'array', minItems: 3, maxItems: 6, items: { anyOf: [BLOCK, elementSchemas.link, elementSchemas.scenario] } } }),
   'syllabus-extract': extractionSchema,
   'syllabus-analyze': analysisSchema,
   'objective-rewrite': obj({ text: str, why: str }),
@@ -292,6 +298,7 @@ export function toBlock(b: FlatBlock, fallback?: BlockContent): BlockContent {
 }
 
 const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTasks[K]['output'] } = {
+  'module-scaffold': raw => ({ blocks: (raw.blocks as FlatBlock[]).map(item => item.type === 'link' || item.type === 'scenario' ? item as unknown as BlockContent : toBlock(item)) }),
   'syllabus-extract': raw => raw,
   'syllabus-analyze': raw => raw,
   'objective-rewrite': raw => raw,
@@ -338,6 +345,7 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 };
 
 const MAX_TOKENS: Record<AiTaskName, number> = {
+  'module-scaffold': 12000,
   // A real 9-page syllabus needs ~6,000 output tokens plus 4,000–8,000 of reasoning; at 8,000
   // most calls ended before the JSON did (D-032 check, 2026-09-28). The read is the same size.
   'syllabus-extract': 24000, 'syllabus-analyze': 24000, 'objective-rewrite': 6000, 'outcome-suggest': 4000, 'structure-options': 16000,
@@ -355,6 +363,7 @@ const MAX_TOKENS: Record<AiTaskName, number> = {
  * that 3/3 extractions finished on the first try, against 0/3 without it.
  */
 const TASK_OPTIONS: Partial<Record<AiTaskName, { reasoningEffort?: 'low' | 'medium' | 'high'; timeoutMs?: number }>> = {
+  'module-scaffold': { reasoningEffort: 'low', timeoutMs: 120_000 },
   'syllabus-extract': { reasoningEffort: 'low', timeoutMs: 150_000 },
   'syllabus-analyze': { reasoningEffort: 'low', timeoutMs: 150_000 },
   'objective-rewrite': { reasoningEffort: 'low' },
