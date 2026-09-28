@@ -192,6 +192,47 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
       if (options.length) session = await service.selectApproach(ctx, { sessionId: session.id, optionIds: [options[0].id], overlays: ['bookends'], rationale: 'Closest to how I already teach it.' });
     } catch (e) { checks.push({ id: 'P1', pass: false, detail: `stage 3 failed: ${String(e).slice(0, 200)}` }); }
   }
+  // Stage 4 (--stages 4): preview the plan, apply it, let scaffolding finish, inspect the draft
+  // course, then undo and check that everything the plan created is gone.
+  if (stages >= 4 && session.stage === 'preview' && session.selection) {
+    const t2 = Date.now();
+    try {
+      const before = { modules: (await repo.listModules('c-stat110')).length, outcomes: (await repo.listOutcomes('c-stat110')).length };
+      // Answer the points the Preview asks for, as an instructor would (the key's weight when it has one).
+      const unresolved = session.extraction!.assessments.filter(a => a.weightPercent === null);
+      if (unresolved.length) session = await service.confirmDesignPoints(ctx, { sessionId: session.id, points: Object.fromEntries(unresolved.map(a => [a.id, Math.round(key.assessments.find(k => similarity(k.title, a.title) >= 0.5)?.weightPercent ?? 10)])) });
+      const plan = await service.previewProvisionPlan(ctx, { sessionId: session.id });
+      const components = session.extraction!.assessments.filter(a => (a.weightPercent ?? 0) > 0);
+      const placed = components.filter(a => plan.modules.some(m => [...((m as { assignments?: { replaces: string | null }[] }).assignments ?? []), ...(m.assignment ? [m.assignment] : [])].some(item => item.replaces === a.title)));
+      const readingsCited = plan.readings.every(r => r.span && r.span.text);
+      checks.push({ id: 'P3', pass: plan.outcomes.length === (session.confirmedOutcomes ?? []).length && placed.length === components.length && readingsCited,
+        detail: `${plan.modules.length} modules, ${plan.counts.lessons} lessons, ${plan.counts.assignments} assignments; outcomes ${plan.outcomes.length}/${(session.confirmedOutcomes ?? []).length}; graded components placed ${placed.length}/${components.length}; readings ${plan.readings.length} (all cited: ${readingsCited}); placeholders ${plan.placeholders}` });
+      session = await service.applyProvisionPlan(ctx, { sessionId: session.id, hash: plan.hash });
+      // A failed lesson is recorded and the job goes on: poll until provisioning ends.
+      while (Date.now() - t2 < 1_800_000 && session.stage === 'provisioning') session = await service.getDesignSession(ctx, { sessionId: session.id });
+      const modules = (await repo.listModules('c-stat110')).length - before.modules;
+      const lessons = await Promise.all(session.created.lessonIds.map(id => repo.getLesson(id)));
+      const blocks = (await Promise.all(session.created.lessonIds.map(id => repo.listBlocks(id)))).flat();
+      const readiness = await service.getCourseReadiness(ctx, { courseId: 'c-stat110' });
+      const rubric = await repo.getRubric(readiness.rubricId);
+      const itemFor = new Map((rubric?.standards ?? []).flatMap(st => st.items).filter(item => item.check).map(item => [item.check as string, item.id]));
+      const statusOf = new Map(readiness.standards.flatMap(st => st.items).map(item => [item.itemId, item.status]));
+      const mismatched = plan.readinessForecast.filter(f => { const id = itemFor.get(f.check); const status = id ? statusOf.get(id) : undefined; return status !== undefined && (status === 'met') !== (f.expected === 'met'); });
+      const forecastOk = mismatched.length === 0;
+      checks.push({ id: 'P4', pass: session.stage === 'review' && modules === plan.counts.modules && lessons.filter(Boolean).length === plan.counts.lessons && forecastOk,
+        detail: `stage ${session.stage} in ${Math.round((Date.now() - t2) / 1000)} s${session.provisioning?.error ? ` (error: ${session.provisioning.error})` : ''}; modules ${modules}/${plan.counts.modules}; lessons ${lessons.filter(Boolean).length}/${plan.counts.lessons}; forecast matches readiness: ${forecastOk}${mismatched.length ? ` (${mismatched.map(f => f.check).join(', ')})` : ''}` });
+      const texts = blocks.filter(b => b.type === 'text');
+      const drafts = blocks.every(b => b.aiState === 'draft' || b.origin !== 'ai');
+      const slots = texts.filter(b => /\[Your /.test((b as { text?: string }).text ?? '')).length;
+      checks.push({ id: 'P6', pass: drafts && lessons.every(l => l?.status === 'draft') && slots === texts.length && blocks.length > 0,
+        detail: `${blocks.length} blocks in ${lessons.length} lessons; all AI drafts: ${drafts}; text blocks with [Your …] slots ${slots}/${texts.length}; lessons all draft: ${lessons.every(l => l?.status === 'draft')}` });
+      const undone = await service.undoProvisionPlan(ctx, { sessionId: session.id });
+      const after = { modules: (await repo.listModules('c-stat110')).length, outcomes: (await repo.listOutcomes('c-stat110')).length };
+      checks.push({ id: 'P5', pass: undone.kept.length === 0 && after.modules === before.modules && after.outcomes === before.outcomes,
+        detail: `kept ${undone.kept.length}; modules back to ${after.modules}/${before.modules}; outcomes back to ${after.outcomes}/${before.outcomes}` });
+    } catch (e) { checks.push({ id: 'P4', pass: false, detail: `stage 4 failed: ${String(e).slice(0, 200)}` }); }
+  }
+
   checks.push({ id: 'E10', pass: !error && readStage === 'read' && seconds <= 180, detail: `${readStage} in ${seconds} s${extractedAt ? ` (extraction ${Math.round((extractedAt - t0) / 1000)} s, read ${Math.round((readAt - extractedAt) / 1000)} s)` : ''}${error ? `; error: ${error}` : ''}` });
   return { file: basename(path), run, ok: !error, seconds, stage: session.stage, error, checks, ...(keepSessions ? { session } : {}) };
 }
@@ -205,7 +246,7 @@ async function main() {
     let names: string[] = []; try { names = await readdir(dir); } catch { continue; }
     for (const name of names.filter(n => n.endsWith('.expected.json'))) {
       const key = JSON.parse(await readFile(join(dir, name), 'utf8')) as Key;
-      if (only && !key.file.includes(only)) continue;
+      if (only && !only.split(',').some(part => key.file.includes(part))) continue;
       jobs.push({ path: join(dir, key.file), key });
     }
   }
@@ -216,7 +257,7 @@ async function main() {
   const done: RunResult[] = [];
   await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, async () => { for (let task = tasks.shift(); task; task = tasks.shift()) done.push(await task()); }));
   const results = done.sort((a, b) => a.file.localeCompare(b.file) || a.run - b.run);
-  const ids = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'R1', 'R2', 'R3', 'R4', 'R6', ...(stages >= 3 ? ['P1', 'P2'] : [])];
+  const ids = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'R1', 'R2', 'R3', 'R4', 'R6', ...(stages >= 3 ? ['P1', 'P2'] : []), ...(stages >= 4 ? ['P3', 'P4', 'P5', 'P6'] : [])];
   console.log(`\n${'syllabus'.padEnd(34)} run ${ids.map(i => i.padEnd(4)).join('')} pass`);
   let passed = 0;
   for (const r of results) {

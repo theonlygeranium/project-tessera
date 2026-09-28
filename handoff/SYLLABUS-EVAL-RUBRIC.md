@@ -53,4 +53,4 @@ A syllabus **passes extraction** when E1–E3, E5–E7, E9 and E10 pass and E4, 
 
 ## Recording results
 
-Each run of `tools/syllabus_eval.mjs` prints a scorecard per syllabus and writes `reports/syllabus-eval.json` (gitignored). Summaries (never the syllabi or their contents) go in `handoff/NIGHT-4-QA.md`, naming real syllabi generically (for example "real syllabus A, DOCX, 4 credits").
+Run stage 3 with `--stages 3` and the whole pipeline (preview, apply, scaffolding, undo) with `--stages 4`; `--only a,b` picks syllabi and `--concurrency N` limits parallel runs. Each run of `tools/syllabus_eval.mjs` prints a scorecard per syllabus and writes `reports/syllabus-eval.json` (gitignored); `node tools/syllabus-eval/report.mjs <run.json> <out.html>` turns a run made with `--keep` into a review pack (keep it out of the repo: it contains the syllabi's content). Summaries (never the syllabi or their contents) go in `handoff/NIGHT-4-QA.md`, naming real syllabi generically (for example "real syllabus A, DOCX, 4 credits").
