@@ -104,6 +104,68 @@ describe('design partner service', () => {
     expect(confirmed.record.decisions.some(item => item.what.includes('Contested profile meeting'))).toBe(true);
     await expect(service.confirmOutcomes(ctx, { sessionId: ready.id, outcomes: [{ code: 'O1', text: original[0].text, originalText: original[0].text }] })).rejects.toMatchObject({ code: 'invalid' });
   });
+  it('advances options on a poll, validates selection, and records the choice', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, sample);
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    const outcome = read.extraction!.outcomes[0];
+    const confirmed = await service.confirmOutcomes(ctx, { sessionId: read.id, outcomes: [{ code: 'O1', text: outcome.text, originalText: outcome.text }] });
+    expect(confirmed).toMatchObject({ stage: 'approaches', options: null, provisioning: { done: 0, total: 1 } });
+    const options = await service.getDesignSession(ctx, { sessionId: read.id });
+    expect(options.options).toHaveLength(3);
+    expect(options.record.optionsShown).toEqual(options.options);
+    await expect(service.selectApproach(ctx, { sessionId: read.id, optionIds: ['micro'], overlays: [], rationale: 'These students need repeated practice.' })).rejects.toMatchObject({ code: 'invalid' });
+    await expect(service.selectApproach(ctx, { sessionId: read.id, optionIds: [options.options![0].id], overlays: [], rationale: 'Too short' })).rejects.toMatchObject({ code: 'invalid' });
+    const selection = await service.selectApproach(ctx, { sessionId: read.id, optionIds: options.options!.slice(0, 2).map(item => item.id), overlays: ['bookends'], rationale: 'These students need repeated practice.' });
+    expect(selection).toMatchObject({ stage: 'preview', selection: { overlays: ['bookends'], rationale: 'These students need repeated practice.' } });
+    expect(selection.selection?.combinationNote).toContain(' with ');
+    expect(selection.record.selection).toEqual(selection.selection);
+  });
+  it('keeps confirmed outcomes when options fail and retries only options', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, sample);
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    const outcome = read.extraction!.outcomes[0];
+    await service.confirmOutcomes(ctx, { sessionId: read.id, outcomes: [{ code: 'O1', text: outcome.text, originalText: outcome.text }] });
+    const broken = { ...ctx, ai: { run: async (task: never, input: never) => task === 'structure-options' ? { output: [], model: 'broken' } : fixtureAi.run(task, input) } as ServiceContext['ai'] };
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failed = await service.getDesignSession(broken, { sessionId: read.id });
+    spy.mockRestore();
+    expect(failed.options).toBeNull();
+    expect(failed.confirmedOutcomes).toHaveLength(1);
+    expect(failed.provisioning?.error).toContain('Try again');
+    expect((await ctx.repo.getGenerationJob(failed.provisioning!.jobId!))?.state).toBe('failed');
+    const retried = await service.retryDesignOptions(ctx, { sessionId: read.id });
+    expect(retried.provisioning?.jobId).not.toBe(failed.provisioning?.jobId);
+    const done = await service.getDesignSession(ctx, { sessionId: read.id });
+    expect(done.options).toHaveLength(3);
+  });
+  it('accepts instructor-written outcomes and requires a click for suggested ones', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, sample);
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    const suggestions = await service.suggestDesignOutcomes(ctx, { sessionId: read.id });
+    expect(suggestions.suggestions).toHaveLength(3);
+    await expect(service.confirmOutcomes(ctx, { sessionId: read.id, outcomes: [{ code: 'O1', text: 'Explain the topic.', originalText: '', source: 'suggested' }] })).rejects.toMatchObject({ code: 'invalid' });
+    const confirmed = await service.confirmOutcomes(ctx, { sessionId: read.id, outcomes: [{ code: 'O1', text: 'Explain the topic.', originalText: '', source: 'instructor' }, { code: 'O2', text: suggestions.suggestions[0].text, originalText: '', source: 'suggested' }] });
+    expect(confirmed.confirmedOutcomes?.map(item => item.source)).toEqual(['instructor', 'suggested']);
+    expect(confirmed.record.confirmedOutcomes).toEqual(confirmed.confirmedOutcomes);
+  });
+  it('asks before suggesting when a syllabus lists no outcomes', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, { ...sample, sample: undefined, text: 'Course title: Community inquiry\n3 credits, 10 weeks\nCourse schedule\n1 Sep 1–5 Question design Ch. 1 Quiz 1' });
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    expect(read.extraction?.outcomes).toHaveLength(0);
+    expect(read.questions.some(question => question.text.includes("doesn't list course outcomes"))).toBe(true);
+    expect(read.confirmedOutcomes).toBeNull();
+    const suggested = await service.suggestDesignOutcomes(ctx, { sessionId: read.id });
+    expect(suggested.suggestions).toHaveLength(3);
+    expect((await service.getDesignSession(ctx, { sessionId: read.id })).confirmedOutcomes).toBeNull();
+  });
   it('accepts pasted text and refuses fileId without a document engine', async () => {
     const ctx = await context();
     const pasted = await service.createDesignSession(ctx, { ...sample, sample: undefined, text: 'A brief\nSecond line', sourceKind: 'brief' });

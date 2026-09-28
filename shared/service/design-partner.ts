@@ -12,6 +12,8 @@ import { problemsFrom, questionsFrom } from './design-rules';
 import { groundSpans } from './ground-spans';
 import { normalizeExtraction } from './normalize-extraction';
 import { WORKFLOW_STALL_MS } from './generation';
+import { selectCandidates } from '../design/candidates';
+import { combinationNote, finalizeOptions, validateSuggestions } from '../design/options';
 
 type Problem = SyllabusExtraction['problems'][number];
 const MAX_CHARS = 60_000;
@@ -108,6 +110,7 @@ async function sessionFor(ctx: ServiceContext, id: string): Promise<DesignSessio
 
 export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob): Promise<GenerationJob> {
   if (job.state !== 'running' || job.kind !== 'extract' || !job.sessionId) return job;
+  if (job.instruction === 'options') return advanceOptionsJob(ctx, job);
   const session = await ctx.repo.getDesignSession(job.sessionId);
   if (!session) return job;
   const { done, state, runner } = job;
@@ -200,7 +203,59 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
   }
 }
 
-export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSession' | 'listDesignSessions' | 'answerDesignQuestions' | 'contestDesignField' | 'updateDesignRates' | 'confirmOutcomes' | 'getInstructorProfile' | 'updateInstructorProfile'> = {
+async function startOptionsJob(ctx: ServiceContext, session: DesignSession): Promise<void> {
+  const now = ctx.now(), jobId = ctx.newId('gj');
+  const job: GenerationJob = { id: jobId, courseId: session.courseId, requestedBy: user(ctx).id, kind: 'extract', sessionId: session.id, state: 'running', done: 0, total: 1, lessonIds: [], error: null, work: [], instruction: 'options', failures: [], createdAt: now, updatedAt: now };
+  session.options = null;
+  session.provisioning = { jobId, done: 0, total: 1, error: null };
+  session.updatedAt = now;
+  await ctx.repo.putDesignSession(session);
+  await ctx.repo.putGenerationJob(job);
+  if (ctx.background) {
+    try { job.runner = 'workflow'; await ctx.repo.putGenerationJob(job); await ctx.background.startGeneration(job.id); }
+    catch { job.runner = 'poll'; await ctx.repo.putGenerationJob(job); }
+  }
+}
+
+async function advanceOptionsJob(ctx: ServiceContext, job: GenerationJob): Promise<GenerationJob> {
+  const session = await ctx.repo.getDesignSession(job.sessionId!);
+  if (!session?.extraction || !session.confirmedOutcomes?.length) return job;
+  const { done, state, runner } = job;
+  try {
+    const institution = await ctx.repo.getInstitution();
+    const choice = selectCandidates(session.extraction, session.questions, session.teachingNote, designPartnerPolicy(institution.policy).allowedArchitectures, session.source.kind);
+    const input = { profile: session.extraction.profile, schedule: session.extraction.schedule, assessments: session.extraction.assessments, source: session.source, confirmedOutcomes: session.confirmedOutcomes, answers: session.questions, teachingNote: session.teachingNote, instructorProfile: await ctx.repo.getInstructorProfile(session.createdBy), candidates: choice.ids, closest: choice.closest, overlaysDefault: choice.overlaysDefault, rates: session.workloadRates ?? workloadRatesFor(institution.policy), weeks: choice.weeks };
+    let options!: ReturnType<typeof finalizeOptions>;
+    for (let attempt = 0; ; attempt++) {
+      const result = await ctx.ai.run('structure-options', input);
+      try { options = finalizeOptions(result.output, input); break; }
+      catch (error) { if (attempt >= 1) throw error; }
+    }
+    const current = await ctx.repo.getGenerationJob(job.id);
+    if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
+    const latest = await ctx.repo.getDesignSession(job.sessionId!);
+    if (!latest || latest.stage !== 'approaches' || latest.options) return current;
+    latest.options = options;
+    latest.record.optionsShown = options;
+    latest.provisioning = { jobId: current.id, done: 1, total: 1, error: null };
+    latest.updatedAt = ctx.now();
+    current.done = 1; current.state = 'done'; current.updatedAt = ctx.now();
+    await ctx.repo.putDesignSession(latest);
+    await ctx.repo.putGenerationJob(current);
+    return current;
+  } catch (error) {
+    const current = await ctx.repo.getGenerationJob(job.id);
+    if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
+    console.error('structure-options failed:', error);
+    current.state = 'failed'; current.error = 'The approaches could not be drafted. Try again.'; current.updatedAt = ctx.now();
+    const latest = await ctx.repo.getDesignSession(job.sessionId!);
+    if (latest) { latest.provisioning = { jobId: current.id, done: 0, total: 1, error: current.error }; latest.updatedAt = ctx.now(); await ctx.repo.putDesignSession(latest); }
+    await ctx.repo.putGenerationJob(current);
+    return current;
+  }
+}
+
+export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSession' | 'listDesignSessions' | 'answerDesignQuestions' | 'contestDesignField' | 'updateDesignRates' | 'confirmOutcomes' | 'suggestDesignOutcomes' | 'retryDesignOptions' | 'selectApproach' | 'getInstructorProfile' | 'updateInstructorProfile'> = {
   createDesignSession: async (ctx, input) => {
     await canTeach(ctx, input.courseId);
     await aiEnabled(ctx);
@@ -222,7 +277,7 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
   getDesignSession: async (ctx, { sessionId }) => {
     const session = await sessionFor(ctx, sessionId);
     const jobId = session.provisioning?.jobId;
-    if (session.stage !== 'start' || !jobId || session.provisioning?.error) return session;
+    if ((session.stage !== 'start' && !(session.stage === 'approaches' && !session.options)) || !jobId || session.provisioning?.error) return session;
     const job = await ctx.repo.getGenerationJob(jobId);
     if (!job || job.kind !== 'extract' || job.state !== 'running') return session;
     if (job.runner === 'workflow') {
@@ -294,17 +349,56 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     const originals = new Map(session.extraction!.outcomes.map(item => [item.text, item]));
     const codes = new Set<string>();
     const sourceTexts = new Set<string>();
+    const texts = new Set<string>();
     for (const outcome of outcomes) {
-      if (!outcome.code.trim() || !outcome.text.trim() || !originals.has(outcome.originalText) || codes.has(outcome.code) || sourceTexts.has(outcome.originalText)) fail('invalid', 'Outcomes must have unique codes, text, and an original syllabus outcome.');
+      if (!outcome.code.trim() || !outcome.text.trim() || codes.has(outcome.code) || texts.has(outcome.text.trim()) || (outcome.originalText && sourceTexts.has(outcome.originalText))) fail('invalid', 'Outcomes must have unique codes and text.');
+      if (outcome.source === 'suggested' && !session.suggestedOutcomes?.some(item => item.text === (outcome.suggestedText ?? outcome.text))) fail('invalid', 'Use a suggestion shown in this session.');
+      if ((outcome.source === 'instructor' || outcome.source === 'suggested') ? outcome.originalText !== '' : !originals.has(outcome.originalText)) fail('invalid', 'The outcome source is invalid.');
       codes.add(outcome.code);
-      sourceTexts.add(outcome.originalText);
+      texts.add(outcome.text.trim());
+      if (outcome.originalText) sourceTexts.add(outcome.originalText);
     }
-    session.confirmedOutcomes = outcomes.map(item => ({ code: item.code.trim(), text: item.text.trim(), originalText: item.originalText }));
+    session.confirmedOutcomes = outcomes.map(item => ({ code: item.code.trim(), text: item.text.trim(), originalText: item.originalText, source: item.source ?? 'syllabus', ...(item.suggestedText ? { suggestedText: item.suggestedText } : {}) }));
     session.record.confirmedOutcomes = session.confirmedOutcomes;
     session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `Confirmed ${outcomes.length} outcomes before approaches.` });
     session.stage = 'approaches';
-    session.options = null;
+    await startOptionsJob(ctx, session);
+    return session;
+  },
+  suggestDesignOutcomes: async (ctx, { sessionId }) => {
+    const session = await sessionFor(ctx, sessionId);
+    if (session.stage !== 'read' || !session.extraction) fail('invalid', 'Read the syllabus first.');
+    await aiEnabled(ctx);
+    const extraction = session.extraction!;
+    const profile = extraction.profile;
+    const input = { title: profile.title.value ?? '', description: profile.description.value ?? '', scheduleTopics: extraction.schedule.map(row => row.topic), assessments: extraction.assessments.map(item => ({ title: item.title, format: item.format })) };
+    let output!: ReturnType<typeof validateSuggestions>;
+    for (let attempt = 0; ; attempt++) {
+      const result = await ctx.ai.run('outcome-suggest', input);
+      try { output = validateSuggestions(result.output); break; } catch (error) { if (attempt >= 1) throw error; }
+    }
+    session.suggestedOutcomes = output.suggestions;
     session.updatedAt = ctx.now();
+    await ctx.repo.putDesignSession(session);
+    return output;
+  },
+  retryDesignOptions: async (ctx, { sessionId }) => {
+    const session = await sessionFor(ctx, sessionId);
+    if (session.stage !== 'approaches' || session.options || !session.provisioning?.error) fail('invalid', 'There is no failed approaches draft to retry.');
+    await aiEnabled(ctx);
+    await startOptionsJob(ctx, session);
+    return session;
+  },
+  selectApproach: async (ctx, { sessionId, optionIds, overlays, rationale }) => {
+    const session = await sessionFor(ctx, sessionId);
+    if (session.stage !== 'approaches' || !session.options) fail('invalid', 'Wait for the approaches to be drafted.');
+    if (!Array.isArray(optionIds) || !optionIds.length || new Set(optionIds).size !== optionIds.length || optionIds.some(id => !session.options!.some(option => option.id === id))) fail('invalid', 'Choose one or more shown approaches.');
+    if (!Array.isArray(overlays) || new Set(overlays).size !== overlays.length || overlays.some(id => !['bookends', 'spaced-review', 'udl-choice', 'teaching-presence'].includes(id))) fail('invalid', 'Choose valid overlays.');
+    if (rationale.trim().length < 12) fail('invalid', 'Explain why this fits your students in one sentence.');
+    session.selection = { optionIds, overlays, rationale: rationale.trim(), combinationNote: combinationNote(optionIds) };
+    session.record.selection = session.selection;
+    session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `Selected ${optionIds.join(', ')} with ${overlays.join(', ')}. Why: ${session.selection.rationale}` });
+    session.stage = 'preview'; session.updatedAt = ctx.now();
     await ctx.repo.putDesignSession(session);
     return session;
   },

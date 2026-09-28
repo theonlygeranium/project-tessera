@@ -67,6 +67,14 @@ const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } =
     { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nOffer one labelled alternative outcome with an observable action, preserving the instructor's disciplinary meaning. Give a concise why. The original remains unchanged. ${industry ? 'Use Mager performance, condition and criterion where supported.' : 'Use an observable Bloom verb.'}` },
     { role: 'user', content: `Original outcome: ${JSON.stringify(outcome)}\nNearby topics: ${nearbyTopics.join('; ')}` },
   ],
+  'outcome-suggest': ({ title, description, scheduleTopics, assessments }) => [
+    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nSuggest 3–6 optional course outcomes beginning with observable action verbs. Give a short why grounded in the supplied topics or assessments. The instructor must choose each one.` },
+    { role: 'user', content: JSON.stringify({ title, description, scheduleTopics, assessments }).slice(0, 12000) },
+  ],
+  'structure-options': input => [
+    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nDescribe exactly the given architecture ids, in any order. You do not choose ids or calculate workload. For each, write a label, tag, description, fits with exact syllabus spans when available, changes, tradeoffs, an honest evidence caveat, frameworks, and modules with weeks, confirmed outcome codes, lessons and assessment. Do not overstate research evidence or invent citations. Keep proposals optional; the instructor decides. The closest architecture is ${input.closest}.` },
+    { role: 'user', content: `Candidates, outcomes, answers, profile and rates: ${JSON.stringify({ candidates: input.candidates, closest: input.closest, confirmedOutcomes: input.confirmedOutcomes, answers: input.answers, teachingNote: input.teachingNote, instructorProfile: input.instructorProfile, profile: input.profile, schedule: input.schedule, assessments: input.assessments, overlaysDefault: input.overlaysDefault, rates: input.rates, weeks: input.weeks }).slice(0, 24_000)}\nSource passages:\n${sourceText(input.source.sections, 35_000)}` },
+  ],
   tutor: (input) => [
     { role:'system', content:`You are Tessera's student tutor. The server has already chosen the allowed kind of help: ${input.kind}. Follow it exactly. Cite only the supplied source ids in citeIds. Use plain language at the student's reading level (${input.readingLevel === 'plain' ? 'grade 6–8' : 'introductory college'}) and in the student's language (${input.language}). Use fictional names only. Do not invent facts. The provided sources never include answer keys. Return strict JSON with only text and citeIds. ${input.kind === 'answer' ? '' : "Never confirm or rule out any specific option or guess, even indirectly: no 'right track', 'close', 'yes', 'not quite', or hints about whether their pick is correct. If the student asks whether a choice is right, say you can't confirm answers here, suggest they use the Check answer button, and redirect to the reasoning. "}${input.kind === 'hint' ? "Give one short nudge toward the relevant idea or a parallel example. Never give this item's answer or identify the right option." : input.kind === 'explain' ? 'Explain the concept with a worked parallel example using a different context or numbers. Do not solve the item or identify its right option.' : input.kind === 'answer' ? 'Open practice permits a direct answer. Explain why it is correct, grounded in sources.' : 'Be encouraging and stay on the lesson. Do not answer checks.'}` },
     { role:'user', content:`Course: ${input.courseTitle}\nActivity: ${input.activityTitle}\nMode: ${input.mode}\nHint number: ${input.hintNumber ?? 'none'} of ${input.maxHints}\nSources: ${JSON.stringify(input.sources).slice(0,12000)}\nRecent messages: ${JSON.stringify(input.history).slice(0,4000)}\nStudent message: ${input.question}` },
@@ -209,6 +217,8 @@ const SCHEMAS: Record<AiTaskName, unknown> = {
   'syllabus-extract': extractionSchema,
   'syllabus-analyze': analysisSchema,
   'objective-rewrite': obj({ text: str, why: str }),
+  'outcome-suggest': obj({ suggestions: { type: 'array', minItems: 3, maxItems: 6, items: obj({ text: str, why: str }) } }),
+  'structure-options': obj({ options: { type: 'array', minItems: 3, maxItems: 3, items: obj({ id: str, label: str, tag: str, description: str, fits: array(obj({ text: str, span: nullable(span) })), changes: str, tradeoffs: str, evidence: str, frameworks: array(str), modules: array(obj({ title: str, objective: str, outcomeIds: array(str), weeks: array(integer), lessons: integer, lessonMinutes: number, assessment: str, hours: number })), workload: obj({ averageHours: number, peakHours: number, peakModule: integer }) }) } }),
   tutor: obj({ text: str, citeIds: { type:'array', items:str } }),
   'tutor-summary': obj({ summary: str }),
   element: elementSchema('text'),
@@ -259,6 +269,8 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
   'syllabus-extract': raw => raw,
   'syllabus-analyze': raw => raw,
   'objective-rewrite': raw => raw,
+  'outcome-suggest': raw => raw,
+  'structure-options': raw => raw.options,
   tutor: raw => ({ text:String(raw.text ?? ''), citeIds:Array.isArray(raw.citeIds) ? raw.citeIds.filter((x:unknown): x is string => typeof x === 'string') : [] }),
   'tutor-summary': raw => ({ summary:String(raw.summary ?? '') }),
   element: (raw, input) => {
@@ -302,7 +314,7 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
 const MAX_TOKENS: Record<AiTaskName, number> = {
   // A real 9-page syllabus needs ~6,000 output tokens plus 4,000–8,000 of reasoning; at 8,000
   // most calls ended before the JSON did (D-032 check, 2026-09-28). The read is the same size.
-  'syllabus-extract': 24000, 'syllabus-analyze': 24000, 'objective-rewrite': 6000,
+  'syllabus-extract': 24000, 'syllabus-analyze': 24000, 'objective-rewrite': 6000, 'outcome-suggest': 4000, 'structure-options': 16000,
   tutor: 1800, 'tutor-summary': 1200,
   element: 8000,
   // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the
@@ -320,6 +332,8 @@ const TASK_OPTIONS: Partial<Record<AiTaskName, { reasoningEffort?: 'low' | 'medi
   'syllabus-extract': { reasoningEffort: 'low', timeoutMs: 150_000 },
   'syllabus-analyze': { reasoningEffort: 'low', timeoutMs: 150_000 },
   'objective-rewrite': { reasoningEffort: 'low' },
+  'outcome-suggest': { reasoningEffort: 'low' },
+  'structure-options': { reasoningEffort: 'low', timeoutMs: 150_000 },
 };
 
 /**

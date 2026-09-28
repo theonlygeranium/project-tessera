@@ -10,6 +10,7 @@ import { ErrorNotice, Loading } from '../../shell/Status';
 import { usePageTitle } from '../../shell/usePageTitle';
 import { useSession } from '../../shell/session';
 import { DesignStepper } from './Stepper';
+import { TeachingPreferences } from './TeachingPreferences';
 import styles from './Design.module.css';
 
 export function DesignStart() {
@@ -74,6 +75,7 @@ export function DesignStart() {
             </ul>
             <label className={styles.check}><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} required />I understand. Read this syllabus and show me what you found before proposing anything.</label>
             <label className={styles.check}><input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)} />Remember my teaching preferences for future courses (you can edit or clear them any time).</label>
+            <a href="#teaching-preferences">Edit your teaching preferences</a>
             <Button type="submit" variant="primary" disabled={!consent || create.isPending || !!created || !institution.policy.aiAuthoring}>Read my syllabus</Button>
           </section>
           <section className={styles.card}><p><strong>{institution.name} {institution.policy.aiAuthoring ? 'allows' : 'has turned off'} AI authoring</strong> for this program. Model: Palmyra-X6 via Tessera's gateway. Set by your administrator.</p></section>
@@ -82,6 +84,7 @@ export function DesignStart() {
           {progress.data?.provisioning?.error && <StatusNotice tone="error">{progress.data.provisioning.error}</StatusNotice>}
           </aside>
         </form>
+        <TeachingPreferences />
         {created && <section className={styles.card} aria-label="Reading progress"><div className={styles.progress} role="status"><strong>Reading · {percent}%</strong><progress value={percent} max={100} aria-label="Reading the syllabus" /></div><ul>
           <li>Course profile{found ? ' · found' : ' · looking'}</li><li>Learning outcomes{found ? ` · ${found.outcomes.length} found` : ' · looking'}</li><li>Grading components{found ? ` · ${found.assessments.length} found` : ' · looking'}</li><li>Weekly schedule{found ? ` · ${found.schedule.length} rows found` : ' · looking'}</li><li>Policies{found ? ` · ${found.policies.length} found` : ' · looking'}</li>
         </ul></section>}
