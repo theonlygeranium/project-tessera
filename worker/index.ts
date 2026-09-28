@@ -3,6 +3,7 @@
 import { createAiClient } from './ai';
 import { createDocumentEngine } from './access/engine';
 import { createAccessDirectory } from './identity/access-directory';
+import { lockedDirectory } from './identity/access-lock';
 import { RateLimiter, bearerToken, hasAccessCredential, readCookie, resolvePrincipal } from './api/auth';
 import { findFileRoute } from './api/files';
 import { handleMcp } from './mcp';
@@ -50,6 +51,7 @@ export default {
 
 // Durable Object classes must be exported from the main module.
 export { OcrContainer } from './ocr';
+export { AccessGroupLock } from './identity/access-lock';
 
 /** Strips the version prefix (or the unversioned alias) from an API path. */
 export function apiRelativePath(pathname: string): string {
@@ -148,7 +150,9 @@ function createServiceContext(env: Env, repo: Repo, principal: Awaited<ReturnTyp
     newId: (prefix) => prefix + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12),
     documents: createDocumentEngine(env),
     directory: env.CF_ACCESS_API_TOKEN && env.ACCESS_GROUP_ID && env.CLOUDFLARE_ACCOUNT_ID
-      ? createAccessDirectory({ token: env.CF_ACCESS_API_TOKEN, accountId: env.CLOUDFLARE_ACCOUNT_ID, groupId: env.ACCESS_GROUP_ID })
+      ? env.ACCESS_LOCK
+        ? lockedDirectory(env.ACCESS_LOCK, env.ACCESS_GROUP_ID)
+        : createAccessDirectory({ token: env.CF_ACCESS_API_TOKEN, accountId: env.CLOUDFLARE_ACCOUNT_ID, groupId: env.ACCESS_GROUP_ID })
       : null,
   };
 }

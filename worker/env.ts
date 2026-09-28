@@ -18,6 +18,8 @@ export interface Env {
   OCR?: DurableObjectNamespace<import('./ocr').OcrContainer>;
   /** How many OCR instances to spread across; must match the environment's container max_instances. */
   OCR_INSTANCES?: string;
+  /** Night 3: serializes Access group writes, one instance per group (carry-over 1). Absent in tests. */
+  ACCESS_LOCK?: DurableObjectNamespace<import('./identity/access-lock').AccessGroupLock>;
   /** Lane G (D-021): a Cloudflare API token scoped to Access groups, and the group invitations add to. */
   CF_ACCESS_API_TOKEN?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;

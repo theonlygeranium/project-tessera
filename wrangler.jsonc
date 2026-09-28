@@ -46,8 +46,9 @@
       "max_instances": 3
     }
   ],
-  "durable_objects": { "bindings": [{ "name": "OCR", "class_name": "OcrContainer" }] },
-  "migrations": [{ "tag": "v1-ocr", "new_sqlite_classes": ["OcrContainer"] }],
+  "durable_objects": { "bindings": [{ "name": "OCR", "class_name": "OcrContainer" }, { "name": "ACCESS_LOCK", "class_name": "AccessGroupLock" }] },
+  // Durable Object classes. v2: Access group writes are serialized (Night 3 carry-over 1).
+  "migrations": [{ "tag": "v1-ocr", "new_sqlite_classes": ["OcrContainer"] }, { "tag": "v2-access-lock", "new_sqlite_classes": ["AccessGroupLock"] }],
   "vars": {
     "ENVIRONMENT": "production",
     "OWNER_EMAILS": "jeff@jgeronimo.com",
@@ -72,7 +73,7 @@
         "max_instances": 1
       }
     ],
-    "durable_objects": { "bindings": [{ "name": "OCR", "class_name": "OcrContainer" }] },
+    "durable_objects": { "bindings": [{ "name": "OCR", "class_name": "OcrContainer" }, { "name": "ACCESS_LOCK", "class_name": "AccessGroupLock" }] },
     "d1_databases": [
       {
         "binding": "DB",
