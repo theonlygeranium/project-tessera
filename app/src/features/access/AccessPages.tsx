@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import type { AccessIssue, AccessPolicy, AccessReport, AccessSeverity, FileRecord } from '../../../../shared/domain';
-import { Button, DataTable, FormField, Select, StatusChip, StatusNotice, TextInput, TopBar } from '../../components';
+import type { AccessIssue, AccessPolicy, AccessReport, AccessSeverity, FileRecord, PageTranscription } from '../../../../shared/domain';
+import { AiContent, Button, DataTable, FormField, Select, StatusChip, StatusNotice, TextInput, TopBar } from '../../components';
 import { useQuery } from '@tanstack/react-query';
 import type { ApiError } from '../../../../shared/api';
 import { api, useApiMutation, useApiQuery } from '../../data/hooks';
@@ -70,6 +70,36 @@ function FileIssue({ issue, index, report, file, onFixed }: { issue: AccessIssue
     {error && <StatusNotice tone="error" live="assertive">{error}</StatusNotice>}
   </li>;
 }
+
+function TranscriptionReview({ file }: { file: FileRecord }) {
+  const listed = useApiQuery('listTranscriptions', { fileId: file.id });
+  const review = useApiMutation('reviewTranscription');
+  const [error, setError] = useState('');
+  const [imageFailed, setImageFailed] = useState<Record<number, boolean>>({});
+  const controls = useRef<Record<number, HTMLDivElement | null>>({});
+  useEffect(() => setImageFailed({}), [file.version]);
+  async function decide(page: number, decision: 'keep' | 'discard') {
+    try { setError(''); await review.mutateAsync({ fileId: file.id, page, decision }); requestAnimationFrame(() => controls.current[page]?.focus()); }
+    catch (cause) { setError(errorText(cause)); }
+  }
+  if (listed.error) return <ErrorNotice error={listed.error} onRetry={() => void listed.refetch()} />;
+  if (listed.isPending || !listed.data?.length) return null;
+  return <section aria-labelledby="transcription-heading"><h2 id="transcription-heading">Pages Tesseract couldn't read clearly</h2>
+    <p>Compare each draft with the page image. Only kept text appears in reading and e-book versions.</p>
+    {error && <StatusNotice tone="error" live="assertive">{error}</StatusNotice>}
+    {listed.data.map((entry: PageTranscription) => <div key={entry.page} ref={element => { controls.current[entry.page] = element; }} tabIndex={-1} className={styles.issue}>
+      <h3>Page {entry.page} · {entry.state === 'pending' ? 'Awaiting review' : entry.state === 'kept' ? 'Kept' : 'Discarded'}</h3>
+      <div className={styles.comparison}>
+        {!imageFailed[entry.page] && <img src={`/api/v1/files/${encodeURIComponent(file.id)}/pages/${entry.page}`} alt={`Original page ${entry.page} of ${file.name} for comparison`} onError={() => setImageFailed(value => ({ ...value, [entry.page]: true }))} />}
+        <AiContent kind="block" state={entry.state === 'kept' ? 'kept' : 'draft'} who={`AI transcription · ${entry.provenance.model}`} source={`Page ${entry.page} of ${file.name}`} actions={entry.state === 'pending' ? <div className={styles.row}>
+          <Button density="compact" variant="primary" disabled={review.isPending} onClick={() => void decide(entry.page, 'keep')}>Keep</Button>
+          <Button density="compact" disabled={review.isPending} onClick={() => void decide(entry.page, 'discard')}>Discard</Button>
+        </div> : undefined}><p className={styles.transcriptionText}>{entry.text}</p></AiContent>
+      </div>
+      {imageFailed[entry.page] && <p>Page image unavailable here. Open the original PDF to compare.</p>}
+    </div>)}
+  </section>;
+}
 export function FileRemediationPage() {
   const { courseId = '', fileId = '' } = useParams();
   const file = useApiQuery('getFile', { fileId }, { enabled: !!fileId });
@@ -87,7 +117,7 @@ export function FileRemediationPage() {
       <section><h2>Accessibility report</h2><Button density="compact" disabled={scan.isPending} onClick={() => { setError(''); scan.mutate({ fileId }, { onSuccess: () => setMessage('Scan complete.'), onError: cause => setError(errorText(cause)) }); }}>Scan file again</Button>
         {report.isPending ? <Loading label="Loading scan report" /> : report.error ? <ErrorNotice error={report.error} onRetry={() => void report.refetch()} /> : report.data && <><Summary summary={report.data} /><p ref={progressRef} role="status" tabIndex={-1}>{fixed} of {initial ?? report.data.issueCount} fixed this visit</p><p>Report for version {report.data.target.kind === 'file' ? report.data.target.version : file.data.version}</p>{report.data.document && <p>{report.data.document.pages} pages or slides · {report.data.document.images} images · {report.data.document.hasText ? 'Text available' : 'No extractable text'}</p>}
           {report.data.issues.length ? <ol className={styles.issues}>{report.data.issues.map((issue, index) => <FileIssue key={`${issue.code}-${index}-${report.data.target.kind === 'file' ? report.data.target.version : 0}`} issue={issue} index={index} report={report.data} file={file.data} onFixed={onFixed} />)}</ol> : <p>No accessibility issues found.</p>}</>}
-      </section><AccessibleFormats fileId={fileId} kind={file.data.kind} />
+      </section>{file.data.kind === 'pdf' && <TranscriptionReview file={file.data} />}<AccessibleFormats fileId={fileId} kind={file.data.kind} />
     </>}
   </div>;
 }

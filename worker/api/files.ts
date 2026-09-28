@@ -98,9 +98,22 @@ const content: FileHandler = async (request, ctx, bucket, { fileId: raw }) => {
   return new Response(body, { status: 200, headers });
 };
 
+const pageImage: FileHandler = async (_request, ctx, _bucket, { fileId, page: rawPage }) => {
+  const f = await ctx.repo.getFile(fileId);
+  if (!f) throw new ApiError('not-found', 'File not found.');
+  await canReadFile(ctx, f);
+  if (user(ctx).role === 'student') throw new ApiError('forbidden', 'Staff only.');
+  const page = Number(rawPage);
+  if (!Number.isInteger(page) || page < 1 || f.kind !== 'pdf') throw new ApiError('invalid', 'A PDF page number is required.');
+  if (!ctx.documents) throw new ApiError('unsupported', 'Page images are unavailable in demo mode.');
+  const png = await ctx.documents.pageImage(f, page);
+  return new Response(png, { headers: { 'content-type': 'image/png', 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=300' } });
+};
+
 export const FILE_ROUTES: { route: Route; handle: FileHandler }[] = [
   { route: { method: 'POST', path: '/courses/:courseId/files/upload', access: 'signed-in', scope: 'content:write' }, handle: upload },
   { route: { method: 'GET', path: '/files/:fileId/content', access: 'signed-in', scope: 'content:read' }, handle: content },
+  { route: { method: 'GET', path: '/files/:fileId/pages/:page', access: 'signed-in', scope: 'content:read' }, handle: pageImage },
 ];
 
 export function findFileRoute(method: string, relPath: string): { route: Route; handle: FileHandler; params: Record<string, string> } | null {

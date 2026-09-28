@@ -6,7 +6,7 @@ FROM debian:bookworm-slim
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ocrmypdf tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-fra \
-      python3 ghostscript pngquant unpaper \
+      python3 ghostscript pngquant unpaper poppler-utils \
  && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home ocr

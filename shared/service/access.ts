@@ -88,7 +88,7 @@ async function courseReport(ctx: ServiceContext, courseId: Id): Promise<CourseAc
   };
 }
 
-export const access: Pick<Service, 'getLessonAccess' | 'getCourseAccess' | 'getInstitutionAccess' | 'exportInstitutionAccess' | 'updateAccessPolicy' | 'scanFile' | 'getFileAccess' | 'fixFileIssue' | 'suggestFix'> = {
+export const access: Pick<Service, 'getLessonAccess' | 'getCourseAccess' | 'getInstitutionAccess' | 'exportInstitutionAccess' | 'updateAccessPolicy' | 'scanFile' | 'getFileAccess' | 'fixFileIssue' | 'suggestFix' | 'listTranscriptions' | 'reviewTranscription'> = {
   getLessonAccess: async (ctx, { lessonId }) => {
     const l = await lessonFor(ctx, lessonId);
     await staffCourse(ctx, l.courseId);
@@ -169,5 +169,19 @@ export const access: Pick<Service, 'getLessonAccess' | 'getCourseAccess' | 'getI
     if (!f) throw new ApiError('not-found', 'File not found.');
     await canTeach(ctx, f.courseId);
     return engine.suggest({ kind, file: f, element: target.element, courseTitle: (await ctx.repo.getCourse(f.courseId))?.title ?? '' }, ctx);
+  },
+  listTranscriptions: async (ctx, { fileId }) => {
+    const f = await requireFile(ctx, fileId);
+    return ctx.documents ? ctx.documents.listTranscriptions(f) : [];
+  },
+  reviewTranscription: async (ctx, { fileId, page, decision }) => {
+    const f = await ctx.repo.getFile(fileId);
+    if (!f) throw new ApiError('not-found', 'File not found.');
+    await canTeach(ctx, f.courseId);
+    const result = await docs(ctx).reviewTranscription(f, page, decision, user(ctx), ctx.now());
+    for (const format of ['reading', 'epub'] as const) {
+      await ctx.repo.putFormat({ fileId: f.id, version: f.version, format, state: 'none', outputKey: null, generatedAt: null, error: null });
+    }
+    return result;
   },
 };
