@@ -53,9 +53,9 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
     });
     it('orders users, courses, modules, lessons, blocks, announcements, and sessions', async () => {
       const repo = await makeRepo();
-      expect((await repo.listUsers()).map(x => x.role)).toEqual(['administrator','instructor','instructor','student','student','student','student']);
-      expect((await repo.listUsers({ role: 'student' })).map(x => x.name)).toEqual(['Jordan Lee','Marcus Bell','Priya Natarajan','Sofia Alvarez']);
-      expect((await repo.listCourses()).map(x => x.code)).toEqual(['COMM 120','STAT 110']);
+      expect((await repo.listUsers()).map(x => x.role)).toEqual(['administrator','instructor','instructor','student','student','student','student','student','student']);
+      expect((await repo.listUsers({ role: 'student' })).map(x => x.name)).toEqual(['Dana Whitfield','Jordan Lee','Marcus Bell','Priya Natarajan','Sam Ortiz','Sofia Alvarez']);
+      expect((await repo.listCourses()).map(x => x.code)).toEqual(['COMM 120','OPS 101','STAT 110']);
       expect((await repo.listModules('c-stat110')).map(x => x.id)).toEqual(['m-stat-1','m-stat-2']);
       expect((await repo.listLessons({ courseId: 'c-stat110' })).map(x => x.id)).toEqual(['l-stat-1','l-stat-2','l-stat-3']);
       expect((await repo.listBlocks('l-stat-1')).map(x => x.position)).toEqual([0,1,2,3,4]);
@@ -91,7 +91,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
     it('replaces enrollments and resets from an empty seed', async () => {
       const repo = await makeRepo(); await repo.setEnrollments('c-stat110',['u-priya']);
       expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-priya']);
-      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.adaptations = []; empty.builderSessions = []; empty.generationJobs = [];
+      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.adaptations = []; empty.builderSessions = []; empty.generationJobs = []; empty.requirements = []; empty.completionEvents = []; empty.testOuts = []; empty.reportingLines = [];
       await repo.reset(empty); expect(await repo.isEmpty()).toBe(true);
       await repo.reset(seedData()); expect(await repo.isEmpty()).toBe(false); expect(await repo.getUser('u-priya')).not.toBeNull();
       expect(await repo.getAssignment('asg-stat-1')).not.toBeNull();
@@ -142,10 +142,28 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect(await repo.getLesson(lesson.id)).toEqual(seed.lessons[0]);
       expect(await repo.getBlock(block.id)).toEqual(seed.blocks[0]);
     });
+    it('omits Night 3 optional fields written as null, in both repos', async () => {
+      const repo = await makeRepo();
+      const module = (await repo.getModule('m-stat-1'))!;
+      await repo.putModule({ ...module, objective: null, templateKey: null });
+      expect(await repo.getModule(module.id)).toEqual(module);
+      const lesson = (await repo.getLesson('l-stat-1'))!;
+      await repo.putLesson({ ...lesson, templateKey: null, variantOf: null });
+      expect(await repo.getLesson(lesson.id)).toEqual(lesson);
+      const block = (await repo.getBlock('b-s1-1'))!;
+      await repo.putBlock({ ...block, templateKey: null, source: null });
+      expect(await repo.getBlock(block.id)).toEqual(block);
+      const course = (await repo.getCourse('c-stat110'))!;
+      await repo.putCourse({ ...course, programId: null });
+      expect(await repo.getCourse(course.id)).toEqual(course);
+      const withSync = { ...lesson, id: 'l-sync', variantOf: { lessonId: lesson.id, audience: 'plain' as const, syncedAt: '2026-09-27T01:02:03.000Z' } };
+      await repo.putLesson(withSync);
+      expect(await repo.getLesson('l-sync')).toEqual(withSync);
+    });
     it('keeps variants out of outlines and deletes their blocks and progress with the master', async () => {
       const repo = await makeRepo(); const master = (await repo.getLesson('l-stat-1'))!;
-      const plain = { ...master, id: 'l-plain', variantOf: { lessonId: master.id, audience: 'plain' as const } };
-      const micro = { ...master, id: 'l-micro', variantOf: { lessonId: master.id, audience: 'micro' as const } };
+      const plain = { ...master, id: 'l-plain', variantOf: { lessonId: master.id, audience: 'plain' as const, syncedAt: '2026-09-27T00:00:00.000Z' } };
+      const micro = { ...master, id: 'l-micro', variantOf: { lessonId: master.id, audience: 'micro' as const, syncedAt: '2026-09-27T00:00:00.000Z' } };
       await repo.putLesson(plain); await repo.putLesson(micro);
       await expect(repo.putLesson({ ...micro, id: 'l-micro-duplicate' })).rejects.toThrow();
       expect((await repo.listLessons({ courseId: master.courseId })).map(x => x.id)).not.toContain(plain.id);
@@ -207,7 +225,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       const r: Requirement = { id: 'req-1', target: { kind: 'course', courseId: 'c-stat110' }, audience: { kind: 'users', userIds: ['u-priya'] }, dueAt: null, recurrence: 'annual', createdBy: 'u-admin', createdAt: at };
       await repo.putRequirement(r); await repo.putRequirement({ ...r, id: 'req-2', target: { kind: 'program', programId: 'p-1' }, createdAt: '2026-09-28T00:00:00Z' });
       expect(await repo.getRequirement(r.id)).toEqual(r);
-      expect((await repo.listRequirements()).map(x => x.id)).toEqual(['req-2', 'req-1']);
+      expect((await repo.listRequirements()).map(x => x.id)).toEqual(['req-2', 'req-1', 'req-ops-dana']);
       expect((await repo.listRequirements({ targetKind: 'course', targetId: 'c-stat110' })).map(x => x.id)).toEqual([r.id]);
       (await repo.getRequirement(r.id))!.audience = { kind: 'role', role: 'student' }; expect(await repo.getRequirement(r.id)).toEqual(r);
       await repo.putRequirement({ ...r, dueAt: '2026-10-01T00:00:00Z' }); expect((await repo.getRequirement(r.id))?.dueAt).toBe('2026-10-01T00:00:00Z');
@@ -250,12 +268,12 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       await repo.putManagerConsent({ managerId: line.managerId, reportId: line.reportId, sharing: false, at: line.createdAt });
       expect((await repo.listManagerConsents({ managerId: line.managerId }))[0].sharing).toBe(false);
       await repo.deleteReportingLine(line.managerId, line.reportId);
-      expect(await repo.listReportingLines({})).toEqual([]); expect(await repo.listManagerConsents({})).toEqual([]);
+      expect(await repo.listReportingLines({ managerId: line.managerId })).toEqual([]); expect(await repo.listManagerConsents({})).toEqual([]);
       await repo.putManagerConsent({ managerId: line.managerId, reportId: line.reportId, sharing: true, at: line.createdAt });
       await repo.deleteReportingLine(line.managerId, line.reportId);
       expect(await repo.listManagerConsents({})).toEqual([]);
       await repo.putReportingLine(line); await repo.putManagerConsent({ managerId: line.managerId, reportId: line.reportId, sharing: true, at: line.createdAt });
-      await repo.reset(seedData()); expect(await repo.listReportingLines({})).toEqual([]); expect(await repo.listManagerConsents({})).toEqual([]);
+      await repo.reset(seedData()); expect(await repo.listReportingLines({})).toEqual(seedData().reportingLines); expect(await repo.listManagerConsents({})).toEqual([]);
     });
     it('loads supplied Night 3 seed arrays and clears them on the next reset', async () => {
       const repo = await makeRepo(), seed = seedData(), at = '2026-09-27T00:00:00Z';
@@ -287,9 +305,10 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect(await repo.listManagerConsents({})).toEqual(seed.managerConsents);
       await repo.reset(seedData());
       expect(await repo.listPrograms()).toEqual([]); expect(await repo.listTemplates()).toEqual([]); expect(await repo.listRubrics()).toEqual([]);
-      expect(await repo.listOutcomeLinks({})).toEqual([]); expect(await repo.listRequirements()).toEqual([]); expect(await repo.listCompletionEvents({})).toEqual([]);
+      const fresh = seedData();
+      expect(await repo.listOutcomeLinks({})).toEqual([]); expect(await repo.listRequirements()).toEqual(fresh.requirements); expect(await repo.listCompletionEvents({})).toEqual(fresh.completionEvents);
       expect(await repo.getTestOut('c-stat110')).toBeNull(); expect(await repo.listTestOutAttempts('u-priya', 'c-stat110')).toEqual([]);
-      expect(await repo.listCertificates({})).toEqual([]); expect(await repo.listReportingLines({})).toEqual([]); expect(await repo.listManagerConsents({})).toEqual([]);
+      expect(await repo.listCertificates({})).toEqual([]); expect(await repo.listReportingLines({})).toEqual(fresh.reportingLines); expect(await repo.listManagerConsents({})).toEqual([]);
     });
   });
 }

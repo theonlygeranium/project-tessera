@@ -57,7 +57,7 @@ describe('API tokens (D-020)', () => {
     expect(denied.status).toBe(401);
     const ok = await call(prod, '/api/v1/courses', { headers: { authorization: `Bearer ${secret}` } });
     expect(ok.status).toBe(200);
-    expect(((await ok.json()) as unknown[]).length).toBe(2);
+    expect(((await ok.json()) as unknown[]).length).toBe(3);
   });
 
   it('enforces scopes, revocation, and expiry', async () => {

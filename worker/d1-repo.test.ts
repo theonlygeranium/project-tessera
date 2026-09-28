@@ -331,7 +331,7 @@ describe('D1Repo', () => {
     expect(await repo.listProgress({ lessonIds: [] })).toEqual([]);
     expect(await repo.listProgress({ userId: 'u-marcus' })).toHaveLength(2);
     expect((await repo.listLessons({ moduleId: 'm-stat-1' })).map((lesson) => lesson.id)).toEqual(['l-stat-1', 'l-stat-2']);
-    expect((await repo.listCourses()).map((course) => course.code)).toEqual(['COMM 120', 'STAT 110']);
+    expect((await repo.listCourses()).map((course) => course.code)).toEqual(['COMM 120', 'OPS 101', 'STAT 110']);
   });
 });
 

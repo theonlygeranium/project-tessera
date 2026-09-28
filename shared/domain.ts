@@ -1023,7 +1023,7 @@ export interface CompletionEvent {
 export interface TestOut {
   courseId: Id;
   items: { id: string; question: string; options: { id: string; text: string }[]; correctOptionId: string }[];
-  /** 0–100. */
+  /** 1–100. */
   passPercent: number;
   updatedBy: Id;
   updatedAt: Timestamp;

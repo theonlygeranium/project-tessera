@@ -682,8 +682,8 @@ export class D1Repo implements Repo {
 
   private lessonStmt(lesson: Lesson): D1PreparedStatement {
     return this.db.prepare(
-      `INSERT INTO lessons (id, module_id, course_id, title, minutes, position, status, published_at, template_key, variant_of, variant_audience)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO lessons (id, module_id, course_id, title, minutes, position, status, published_at, template_key, variant_of, variant_audience, variant_synced_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          module_id = excluded.module_id,
          course_id = excluded.course_id,
@@ -694,7 +694,8 @@ export class D1Repo implements Repo {
          published_at = excluded.published_at,
          template_key = excluded.template_key,
          variant_of = excluded.variant_of,
-         variant_audience = excluded.variant_audience`,
+         variant_audience = excluded.variant_audience,
+         variant_synced_at = excluded.variant_synced_at`,
     ).bind(
       lesson.id,
       lesson.moduleId,
@@ -707,6 +708,7 @@ export class D1Repo implements Repo {
       lesson.templateKey ?? null,
       lesson.variantOf?.lessonId ?? null,
       lesson.variantOf?.audience ?? null,
+      lesson.variantOf?.syncedAt ?? null,
     );
   }
 
@@ -1071,7 +1073,7 @@ interface LessonRow extends Record<string, unknown> {
   published_at: string | null;
   template_key: string | null;
   variant_of: string | null;
-  variant_audience: NonNullable<Lesson['variantOf']>['audience'] | null;
+  variant_synced_at: string | null; variant_audience: NonNullable<Lesson['variantOf']>['audience'] | null;
 }
 
 interface BlockRow extends Record<string, unknown> {
@@ -1183,7 +1185,7 @@ function lessonFromRow(row: LessonRow): Lesson {
     status: row.status,
     publishedAt: row.published_at,
     ...(row.template_key !== null ? { templateKey: row.template_key } : {}),
-    ...(row.variant_of !== null && row.variant_audience !== null ? { variantOf: { lessonId: row.variant_of, audience: row.variant_audience } } : {}),
+    ...(row.variant_of !== null && row.variant_audience !== null ? { variantOf: { lessonId: row.variant_of, audience: row.variant_audience, syncedAt: row.variant_synced_at ?? '' } } : {}),
   };
 }
 

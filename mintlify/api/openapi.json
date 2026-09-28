@@ -22686,11 +22686,16 @@
                   },
                   "audience": {
                     "$ref": "#/components/schemas/VariantAudience"
+                  },
+                  "syncedAt": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
                   "lessonId",
-                  "audience"
+                  "audience",
+                  "syncedAt"
                 ],
                 "additionalProperties": false
               },
@@ -24031,11 +24036,16 @@
                   },
                   "audience": {
                     "$ref": "#/components/schemas/VariantAudience"
+                  },
+                  "syncedAt": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
                   "lessonId",
-                  "audience"
+                  "audience",
+                  "syncedAt"
                 ],
                 "additionalProperties": false
               },
@@ -24127,6 +24137,31 @@
             "required": [
               "score",
               "reasons"
+            ],
+            "additionalProperties": false
+          },
+          "rubric": {
+            "type": "object",
+            "properties": {
+              "rubricName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "percent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "minimum": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "rubricName",
+              "percent",
+              "minimum"
             ],
             "additionalProperties": false
           }
@@ -24227,6 +24262,10 @@
               "published"
             ]
           },
+          "syncedAt": {
+            "type": "string",
+            "minLength": 1
+          },
           "divergedBlocks": {
             "type": "number",
             "minimum": 0
@@ -24243,6 +24282,7 @@
           "title",
           "minutes",
           "status",
+          "syncedAt",
           "divergedBlocks",
           "uncoveredBlocks"
         ],

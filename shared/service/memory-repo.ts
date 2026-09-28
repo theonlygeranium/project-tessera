@@ -5,6 +5,16 @@ import { ApiError } from '../api';
 
 declare const structuredClone: <T>(value: T) => T;
 const copy = <T>(value: T): T => structuredClone(value);
+/**
+ * Night 3 optional fields are omitted when null, as D1 omits NULL columns, so both repos
+ * return identical objects (including through `toEqual`).
+ */
+const OPTIONAL_NIGHT3 = ['templateId', 'readinessPolicy', 'programId', 'objective', 'templateKey', 'variantOf', 'source'] as const;
+function normalized<T extends object>(value: T): T {
+  const out = copy(value) as Record<string, unknown>;
+  for (const key of OPTIONAL_NIGHT3) if (key in out && (out[key] === null || out[key] === undefined)) delete out[key];
+  return out as T;
+}
 const cmp = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const byName = (a: { name: string }, b: { name: string }) => cmp(a.name, b.name);
 const byPosition = (a: { position: number }, b: { position: number }) => a.position - b.position;
@@ -15,7 +25,7 @@ export class MemoryRepo implements Repo {
   private data: SeedData & { readinessItems: StoredReadinessItem[] };
   constructor(seed: SeedData) { this.data = this.withNight3(seed); }
   async getInstitution(): Promise<Institution> { return copy(this.data.institution); }
-  async putInstitution(value: Institution) { this.data.institution = copy(value); }
+  async putInstitution(value: Institution) { this.data.institution = normalized(value); }
   async getUser(id: string): Promise<User | null> { return copy(this.data.users.find(x => x.id === id) ?? null); }
   async listUsers(filter?: { role?: User['role'] }): Promise<User[]> {
     const order = { administrator: 0, instructor: 1, student: 2 };
@@ -25,7 +35,7 @@ export class MemoryRepo implements Repo {
   async putUser(value: User) { this.upsert(this.data.users, value); }
   async getCourse(id: string): Promise<Course | null> { return copy(this.data.courses.find(x => x.id === id) ?? null); }
   async listCourses(): Promise<Course[]> { return copy(this.data.courses.sort((a,b) => a.code.localeCompare(b.code))); }
-  async putCourse(value: Course) { this.upsert(this.data.courses, value); }
+  async putCourse(value: Course) { this.upsert(this.data.courses, normalized(value)); }
   async listEnrollments(filter: { courseId?: string; userId?: string }): Promise<Enrollment[]> {
     return copy(this.data.enrollments.filter(x => (!filter.courseId || x.courseId === filter.courseId) && (!filter.userId || x.userId === filter.userId)).sort((a,b) => a.courseId.localeCompare(b.courseId) || a.userId.localeCompare(b.userId)));
   }
@@ -35,7 +45,7 @@ export class MemoryRepo implements Repo {
   }
   async getModule(id: string): Promise<Module | null> { return copy(this.data.modules.find(x => x.id === id) ?? null); }
   async listModules(courseId: string): Promise<Module[]> { return copy(this.data.modules.filter(x => x.courseId === courseId).sort(byPosition)); }
-  async putModule(value: Module) { this.upsert(this.data.modules, value); }
+  async putModule(value: Module) { this.upsert(this.data.modules, normalized(value)); }
   async deleteModule(id: string) { this.data.modules = this.data.modules.filter(x => x.id !== id); }
   async getLesson(id: string): Promise<Lesson | null> { return copy(this.data.lessons.find(x => x.id === id) ?? null); }
   async listLessons(filter: { courseId?: string; moduleId?: string }): Promise<Lesson[]> {
@@ -48,7 +58,7 @@ export class MemoryRepo implements Repo {
       if (!this.data.lessons.some(x => x.id === value.variantOf!.lessonId)) throw new Error('Unknown master lesson');
       if (this.data.lessons.some(x => x.id !== value.id && x.variantOf?.lessonId === value.variantOf!.lessonId && x.variantOf.audience === value.variantOf!.audience)) throw new Error('Duplicate variant audience');
     }
-    this.upsert(this.data.lessons, value);
+    this.upsert(this.data.lessons, normalized(value));
   }
   async deleteLesson(id: string) {
     const ids = new Set([id]);
@@ -65,9 +75,9 @@ export class MemoryRepo implements Repo {
   async listBlocks(lessonId: string): Promise<Block[]> { return copy(this.data.blocks.filter(x => x.lessonId === lessonId).sort(byPosition)); }
   async replaceBlocks(lessonId: string, blocks: Block[]) {
     this.data.blocks = this.data.blocks.filter(x => x.lessonId !== lessonId);
-    this.data.blocks.push(...copy(blocks));
+    this.data.blocks.push(...blocks.map(normalized));
   }
-  async putBlock(value: Block) { this.upsert(this.data.blocks, value); }
+  async putBlock(value: Block) { this.upsert(this.data.blocks, normalized(value)); }
   async deleteBlock(id: string) { this.data.blocks = this.data.blocks.filter(x => x.id !== id); }
   async getAssignment(id: string): Promise<Assignment | null> { return copy(this.data.assignments.find(x => x.id === id) ?? null); }
   async listAssignments(filter: { courseId?: string; moduleId?: string }): Promise<Assignment[]> {
@@ -173,15 +183,15 @@ export class MemoryRepo implements Repo {
   async hasInvitations() { return this.data.invitations.length > 0; }
   async listVariantLessons(masterLessonId: string) { return copy(this.data.lessons.filter(x => x.variantOf?.lessonId === masterLessonId).sort((a, b) => cmp(a.variantOf!.audience, b.variantOf!.audience) || cmp(a.id, b.id))); }
   async getProgram(id: string) { return copy(this.data.programs!.find(x => x.id === id) ?? null); }
-  async listPrograms() { return copy(this.data.programs!.sort((a, b) => byName(a, b) || cmp(a.id, b.id))); }
+  async listPrograms() { return copy([...this.data.programs!].sort((a, b) => byName(a, b) || cmp(a.id, b.id))); }
   async putProgram(value: Program) { this.upsert(this.data.programs!, value); }
   async deleteProgram(id: string) { this.data.programs = this.data.programs!.filter(x => x.id !== id); }
   async getTemplate(id: string) { return copy(this.data.templates!.find(x => x.id === id) ?? null); }
-  async listTemplates() { return copy(this.data.templates!.sort((a, b) => byName(a, b) || cmp(a.id, b.id))); }
+  async listTemplates() { return copy([...this.data.templates!].sort((a, b) => byName(a, b) || cmp(a.id, b.id))); }
   async putTemplate(value: CourseTemplate) { this.upsert(this.data.templates!, value); }
   async deleteTemplate(id: string) { this.data.templates = this.data.templates!.filter(x => x.id !== id); }
   async getRubric(id: string) { return copy(this.data.rubrics!.find(x => x.id === id) ?? null); }
-  async listRubrics() { return copy(this.data.rubrics!.sort((a, b) => byName(a, b) || cmp(a.id, b.id))); }
+  async listRubrics() { return copy([...this.data.rubrics!].sort((a, b) => byName(a, b) || cmp(a.id, b.id))); }
   async putRubric(value: Rubric) { this.upsert(this.data.rubrics!, { ...value, source: 'custom', builtIn: false }); }
   async deleteRubric(id: string) { this.data.rubrics = this.data.rubrics!.filter(x => x.id !== id); }
   async listReadinessItems(courseId: string, rubricId: string) { return copy(this.data.readinessItems!.filter(x => x.courseId === courseId && x.rubricId === rubricId).sort((a, b) => cmp(a.itemId, b.itemId))); }
