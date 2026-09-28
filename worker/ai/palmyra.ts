@@ -154,7 +154,7 @@ const extractionSchema = obj({
  */
 const materialSchema = obj({ title: str, kind: { type: 'string', enum: ['textbook','reading','tool'] }, span });
 const { materials: _materials, ...profileProps } = (extractionSchema.properties.profile as { properties: Record<string, unknown> }).properties;
-const EXTRACT_RULES = `Extract only facts present in the source; never invent. Every extracted or inferred field has an origin and verbatim source spans. A span's text is a short exact quote (at most 30 words) and its page is the page label it came from; use null pages for sources without pages. Missing fields have origin missing, value null, confidence 0 and no spans. Dates are ISO YYYY-MM-DD: resolve a month and day with the term's year; if there is no specific date, use null.`;
+const EXTRACT_RULES = `Extract only facts present in the source; never invent. Every extracted or inferred field has an origin and verbatim source spans. Give one span per field: the best short exact quote (at most 20 words), with the page label it came from; use null pages for sources without pages. Missing fields have origin missing, value null, confidence 0 and no spans. Dates are ISO YYYY-MM-DD: resolve a month and day with the term's year; if there is no specific date, use null.`;
 const EXTRACT_PARTS = {
   course: {
     schema: obj({ profile: obj(profileProps), outcomes: extractionSchema.properties.outcomes, assessments: extractionSchema.properties.assessments }),
@@ -200,13 +200,13 @@ const analysisSchema = obj({ summary: str, cites: array(span), outcomeAudits: ar
 const ANALYZE_PARTS = {
   audit: {
     schema: obj({ outcomeAudits: array(auditSchema) }),
-    focus: `Return one audit per outcome, in order. For each outcome: its observable verb (or null), Bloom level, Fink category, whether it is measurable, and assessedBy: every graded assessment that gives evidence of the outcome, judged from the assessment titles and formats and from how the Source describes each assignment, project, exam or discussion. Most outcomes are assessed by at least one assessment; leave assessedBy empty only when nothing in the syllabus could show the outcome. Use fit verb-mismatch when the assessment can't reach the outcome's level (for example multiple choice for create or evaluate). suggestion is null (the service asks for rewrites separately).`,
+    focus: `Return one audit per outcome, in order. For each outcome: its observable verb (or null), Bloom level, Fink category, whether it is measurable, and assessedBy: every graded assessment that gives evidence of the outcome, judged from the assessment titles and formats and from how the Source describes each assignment, project, exam or discussion. Most outcomes are assessed by at least one assessment; leave assessedBy empty only when nothing in the syllabus could show the outcome. fit is assessed by default; use verb-mismatch only when the assessment's format clearly can't show the outcome's level (for example a multiple-choice quiz for create or evaluate). suggestion is null (the service asks for rewrites separately).`,
     maxTokens: 12000,
   },
   review: {
     schema: obj({ summary: str, cites: array(span), learnerCenteredness: (analysisSchema.properties as Record<string, unknown>).learnerCenteredness, deficiencies: (analysisSchema.properties as Record<string, unknown>).deficiencies }),
-    focus: `Return the summary, its cites, learner-centeredness, and deficiencies (gaps a reviewer would raise: unclear outcomes, missing policies, workload, alignment, accessibility, feedback). The outcome audits are done separately.`,
-    maxTokens: 12000,
+    focus: `Return the summary (at most 120 words), 3 to 8 cites, learner-centeredness (at most 8 components, at most 6 Cullen-Harris quotes), and at most 8 deficiencies (gaps a reviewer would raise: unclear outcomes, missing policies, workload, alignment, accessibility, feedback). Keep every quote short. The outcome audits are done separately.`,
+    maxTokens: 20000,
   },
 } as const;
 type AnalyzePart = keyof typeof ANALYZE_PARTS;
@@ -448,10 +448,14 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
   }
 
   async function extract(input: AiTasks['syllabus-extract']['input'], deadline: number): Promise<AiTasks['syllabus-extract']['output']> {
+    // A source with a calendar (many lines that start with a week, module or date) should give
+    // more than a couple of rows.
+    const calendarLines = input.sections.flatMap(section => section.lines).filter(line => /^(?:(?:week|wk|module|unit|session)\s*)?\d{1,2}\b|^\d{1,2}\/\d{1,2}\b|^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d/i.test(line.trim())).length;
+    const calendar = (output: any, attempt: number) => attempt >= 2 || calendarLines < 6 || (output?.schedule?.length ?? 0) >= 3;
     // Weights that add up to almost nothing mean the grading table was cut short: try again.
     const plausible = (output: any, attempt: number) => attempt >= 2 || !output?.assessments?.length || (() => { const total = output.assessments.reduce((sum: number, item: { weightPercent: number | null }) => sum + (item.weightPercent ?? 0), 0); return total === 0 || (total >= 50 && total <= 150); })();
     const part = <P extends ExtractPart>(name: P) => withRetries(options.timeoutMs ?? 120_000, deadline, timeoutMs =>
-      request({ name: `syllabus_extract_${name}`, messages: extractMessages(name, input), schema: EXTRACT_PARTS[name].schema, maxTokens: EXTRACT_PARTS[name].maxTokens, reasoningEffort: 'low' }, timeoutMs), name === 'course' ? plausible : undefined) as Promise<any>;
+      request({ name: `syllabus_extract_${name}`, messages: extractMessages(name, input), schema: EXTRACT_PARTS[name].schema, maxTokens: EXTRACT_PARTS[name].maxTokens, reasoningEffort: 'low' }, timeoutMs), name === 'course' ? plausible : name === 'schedule' ? calendar : undefined) as Promise<any>;
     // Policies and materials are the least essential part: if they can't be read, the read goes on without them.
     const missing = { value: null, origin: 'missing', confidence: 0, spans: [] };
     const [course, schedule, policies] = await Promise.all([part('course'), part('schedule'), part('policies').catch(error => { console.warn('syllabus-extract policies part failed:', String(error?.details?.cause ?? error)); return { materials: missing, policies: [] }; })]);
@@ -459,9 +463,11 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
   }
 
   async function analyze(input: AiTasks['syllabus-analyze']['input'], deadline: number): Promise<AiTasks['syllabus-analyze']['output']> {
-    const part = <P extends AnalyzePart>(name: P) => withRetries(options.timeoutMs ?? 120_000, deadline, timeoutMs =>
-      request({ name: `syllabus_analyze_${name}`, messages: analyzeMessages(name, input), schema: ANALYZE_PARTS[name].schema, maxTokens: ANALYZE_PARTS[name].maxTokens, reasoningEffort: 'low' }, timeoutMs)) as Promise<any>;
-    const [audit, review] = await Promise.all([part('audit'), part('review')]);
+    const part = <P extends AnalyzePart>(name: P, accept?: (output: any, attempt: number) => boolean) => withRetries(options.timeoutMs ?? 120_000, deadline, timeoutMs =>
+      request({ name: `syllabus_analyze_${name}`, messages: analyzeMessages(name, input), schema: ANALYZE_PARTS[name].schema, maxTokens: ANALYZE_PARTS[name].maxTokens, reasoningEffort: 'low' }, timeoutMs), accept) as Promise<any>;
+    // An audit that links no outcome to any assessment is almost always a lazy answer: ask again.
+    const linked = (output: any, attempt: number) => attempt >= 2 || !input.extraction.assessments.length || !input.extraction.outcomes.length || (output?.outcomeAudits ?? []).some((audit: { assessedBy?: unknown[] }) => audit.assessedBy?.length);
+    const [audit, review] = await Promise.all([part('audit', linked), part('review')]);
     // The service builds the alignment matrix from the audits (repairRead).
     return MAP['syllabus-analyze']({ ...review, outcomeAudits: audit.outcomeAudits, alignment: [] }, input);
   }

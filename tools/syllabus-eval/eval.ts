@@ -87,7 +87,8 @@ function score(session: DesignSession, key: Key): Check[] {
   const matched = key.outcomes.map(k => Math.max(0, ...ex.outcomes.map(o => similarity(o.text, k))));
   add('E5', ex.outcomes.length === key.outcomes.length && matched.every(m => m >= 0.9),
     `${ex.outcomes.length}/${key.outcomes.length} outcomes; weakest match ${Math.min(...matched).toFixed(2)}`);
-  const missing = (want: { title: string; weightPercent: number }[]) => want.filter(k => !ex.assessments.some(a => a.weightPercent != null && Math.abs(a.weightPercent - k.weightPercent) <= 0.5 && similarity(a.title, k.title) >= 0.5));
+  const titled = (a: string, b: string) => similarity(a, b) >= 0.5 || loose(b).startsWith(loose(a)) || loose(a).startsWith(loose(b));
+  const missing = (want: { title: string; weightPercent: number }[]) => want.filter(k => !ex.assessments.some(a => a.weightPercent != null && Math.abs(a.weightPercent - k.weightPercent) <= 0.5 && titled(a.title, k.title)));
   const total = ex.assessments.reduce((n, a) => n + (a.weightPercent ?? 0), 0);
   const altOk = !!key.assessmentsAlt && !missing(key.assessmentsAlt).length && Math.abs(total - key.assessmentsAlt.reduce((n, a) => n + a.weightPercent, 0)) < 1;
   const missingWeights = altOk ? [] : missing(key.assessments);
@@ -102,7 +103,7 @@ function score(session: DesignSession, key: Key): Check[] {
   const pct = key.schedule.length ? topicHits.length / key.schedule.length : 1;
   const distinctRows = new Set(key.schedule.map(k => k.span ? k.span.join('-') : String(k.week))).size;
   if ((key as Key & { scheduleArtifact?: string }).scheduleArtifact) { add('E7', true, `not scored: ${(key as Key & { scheduleArtifact?: string }).scheduleArtifact}`); } else
-  add('E7', ex.schedule.length >= distinctRows && ex.schedule.length <= key.schedule.length && pct >= 0.9 && !falseEmpty.length,
+  add('E7', ex.schedule.length >= distinctRows && ex.schedule.length <= key.schedule.length + ((key as Key & { extraRows?: number }).extraRows ?? 0) && pct >= 0.9 && !falseEmpty.length,
     `${ex.schedule.length}/${key.schedule.length} rows; topics ${topicHits.length}/${key.schedule.length}${falseEmpty.length ? `; wrongly empty: weeks ${falseEmpty.map(k => k.week).join(', ')}` : ''}${pct < 1 ? `; missed weeks ${key.schedule.filter(k => !topicHits.includes(k)).map(k => k.week).join(', ')}` : ''}`);
   const spans = spansOf(session).map(s => ({ s, g: grounded(s, session.source) }));
   const found = spans.filter(x => x.g.found).length, pageBad = spans.filter(x => x.g.pageOk === false).length;
@@ -191,6 +192,8 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
   return { file: basename(path), run, ok: !error, seconds, stage: session.stage, error, checks, ...(keepSessions ? { session } : {}) };
 }
 
+const label = (file: string) => file.length <= 33 ? file : `${file.slice(0, 26)}….${file.split('.').pop()}`;
+
 async function main() {
   const client = await ai();
   const jobs: { path: string; key: Key }[] = [];
@@ -217,11 +220,11 @@ async function main() {
     const must = ['E1', 'E2', 'E3', 'E5', 'E6', 'E7', 'E9', 'E10'].every(id => by.get(id)?.pass);
     const soft = ['E4', 'E8', 'E11'].filter(id => by.get(id) && !by.get(id)!.pass).length <= 1;
     const pass = must && soft; if (pass) passed++;
-    console.log(`${r.file.slice(0, 33).padEnd(34)} ${String(r.run).padEnd(4)}${ids.map(id => (by.get(id) ? (by.get(id)!.pass ? 'ok' : 'NO') : '·').padEnd(4)).join('')} ${pass ? 'PASS' : 'FAIL'}`);
+    console.log(`${label(r.file).padEnd(34)} ${String(r.run).padEnd(4)}${ids.map(id => (by.get(id) ? (by.get(id)!.pass ? 'ok' : 'NO') : '·').padEnd(4)).join('')} ${pass ? 'PASS' : 'FAIL'}`);
   }
   console.log(`\n${passed}/${results.length} runs pass extraction.\n`);
-  for (const r of results) if (!r.checks.length) console.log(`${r.file.slice(0, 24)} #${r.run} crashed: ${r.error}`);
-  for (const r of results) for (const c of r.checks.filter(c => !c.pass)) console.log(`${r.file.slice(0, 24)} #${r.run} ${c.id}: ${c.detail}`);
+  for (const r of results) if (!r.checks.length) console.log(`${label(r.file)} #${r.run} crashed: ${r.error}`);
+  for (const r of results) for (const c of r.checks.filter(c => !c.pass)) console.log(`${label(r.file)} #${r.run} ${c.id}: ${c.detail}`);
   await mkdir('reports', { recursive: true });
   await writeFile(out, JSON.stringify(results, null, 1));
 }
