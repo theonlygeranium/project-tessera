@@ -247,6 +247,8 @@ Approved 2026-09-27 (#50 D2). Night 3 features are built directly in the app, as
 ### D-026 · Managers are a relationship, not a role
 Approved 2026-09-27 (#50 D3). An administrator records reporting lines between users of any role. A learner opts in per manager; a manager sees opted-in people's required training, due dates, completion, and certificates only, never scores, attempts, tutor chats, or adaptations. Opting out removes access immediately.
 
+Owner review of the manager-view artboard (`design/canvas/ManagerView.dc.html`), 2026-09-27: approved as drawn. A manager sees how many reports haven't chosen to share (a count, no names), and "Tested out" is an allowed status (no score is shown).
+
 ### D-027 · Certificate verification
 Approved 2026-09-27 (#50 D4). Certificates are immutable (corrections issue a replacement). The public verification URL shows validity, course, and date only; the learner's name appears only on their own copy.
 
