@@ -11,3 +11,4 @@
 .use input { width: 24px; height: 24px; accent-color: var(--accent); }
 .bottom { align-self: end; color: var(--ink-3); font-size: 12px; }
 .modules { max-height: 180px; overflow: auto; }
+.modules:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
