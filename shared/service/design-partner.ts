@@ -5,15 +5,32 @@ import type { GenerationJob } from '../repo';
 import type { Service, ServiceContext } from './context';
 import { DEFAULT_AI_DISCLOSURE, designPartnerPolicy, workloadRatesFor } from '../policy';
 import { aiEnabled, canTeach, fail, provenance, required, user } from './helpers';
-import { validateExtraction, validateRead, validateObjectiveRewrite } from './validate-design';
+import { validateExtraction, validateRead, validateObjectiveRewrite, repairRead } from './validate-design';
+import { analyzeSyllabusFixture } from '../design/read-fixture';
 import { estimateWorkload } from '../design/workload';
 import { problemsFrom, questionsFrom } from './design-rules';
 import { groundSpans } from './ground-spans';
+import { normalizeExtraction } from './normalize-extraction';
 import { WORKFLOW_STALL_MS } from './generation';
 
 type Problem = SyllabusExtraction['problems'][number];
 const MAX_CHARS = 60_000;
 const SAMPLE = seed as DesignSource;
+
+/**
+ * Headings set in small caps often come out of a PDF as "C ATALOG D ESCRIPTION". In a short
+ * all-capitals line, join a lone capital to the capitals after it, unless that would glue the
+ * word "A" or "I" to an ordinary word or the line shows no other small-caps split.
+ */
+const SMALL_WORDS = new Set(['ALL', 'AND', 'ARE', 'AM', 'AN', 'AS', 'AT', 'BE', 'BY', 'DO', 'FOR', 'IF', 'IN', 'IS', 'IT', 'NO', 'NOT', 'OF', 'ON', 'OR', 'SO', 'THE', 'TO', 'WE', 'WILL', 'CAN', 'HAVE', 'NEED', 'MUST', 'MAY', 'WANT']);
+export function joinSmallCaps(line: string): string {
+  const letters = line.replace(/[^\p{L}]/gu, '');
+  if (line.length > 90 || letters.length < 4 || letters !== letters.toLocaleUpperCase()) return line;
+  const split = /(^|[\s(–—-])(\p{Lu}) (\p{Lu}{2,})(?=$|[\s,.:;)–—&-])/gu;
+  // "A" and "I" are real words; join them only when the line shows other small-caps splits.
+  const smallCaps = [...line.matchAll(split)].some(match => match[2] !== 'A' && match[2] !== 'I');
+  return line.replace(split, (all, lead: string, first: string, rest: string) => (first === 'A' || first === 'I') && (!smallCaps || SMALL_WORDS.has(rest)) ? all : `${lead}${first}${rest}`);
+}
 
 function cleanSource(source: DesignSource): { source: DesignSource; problems: Problem[] } {
   const problems: Problem[] = [];
@@ -31,17 +48,20 @@ function cleanSource(source: DesignSource): { source: DesignSource; problems: Pr
     }
   });
   const running = new Set([...repeated].filter(([, seen]) => seen.size >= Math.ceil(pages.size / 2)).map(([key]) => key));
-  const flattened = source.sections.flatMap((section, sectionIndex) => (section.lines ?? section.text.split('\n'))
+  const flattened = source.sections.flatMap((section, sectionIndex) => (section.lines ?? section.text.split('\n')).map(joinSmallCaps)
     .filter(line => !running.has(line.trim().toLocaleLowerCase().replace(/\d/g, '#').replace(/\s+/g, ' ')))
     .map(line => ({ line, sectionIndex })));
-  const rosterRow = (line: string) => /(?:\||\t|\s{2,})/.test(line) && /[A-Za-z]{2,}/.test(line)
+  // A roster is a table headed by student names or IDs whose rows hold a name and an ID or
+  // email. Ordinary tables mention students too ("student choice from a set"), so both are required.
+  const rosterHeader = (line: string) => /\bstudent\b[\s|]{0,4}(?:name|id|number|e-?mail)\b|\bname\b[^|]{0,20}\|\s*(?:student\s*)?id\b/i.test(line);
+  const rosterRow = (line: string) => /^(?:\d{3,}\s*\|?\s*)?[A-Z][a-z]+,?\s+[A-Z][a-z]+/.test(line.trim()) && (/\b\d{3,}\b/.test(line) || /@/.test(line))
     || /^(?:\d{3,}\s+)?[A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+\d{3,})?$/.test(line.trim());
   const kept = source.sections.map(() => [] as string[]);
   let roster = false;
   for (let index = 0; index < flattened.length; index++) {
     const { line, sectionIndex } = flattened[index];
     const candidates = flattened.slice(index + 1, index + 5).map(entry => entry.line);
-    if (/\b(?:student|student\s*id|id\s*number)\b/i.test(line) && candidates.filter(rosterRow).length >= 3) { roster = true; stripped++; continue; }
+    if (rosterHeader(line) && candidates.filter(rosterRow).length >= 3) { roster = true; stripped++; continue; }
     if (roster && rosterRow(line)) { stripped++; continue; }
     roster = false;
     if (remaining <= 0) { clipped = true; clippedAt ??= source.sections[sectionIndex].page; continue; }
@@ -93,6 +113,7 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
   const { done, state, runner } = job;
   try {
     let result: Awaited<ReturnType<ServiceContext['ai']['run']>> | undefined;
+    let readRepairs: string[] = [];
     if (done === 0) result = await ctx.ai.run('syllabus-extract', { sourceKind: session.source.kind, name: session.source.name, sections: session.source.sections });
     if (done === 1 && session.extraction) {
       const institution = await ctx.repo.getInstitution();
@@ -101,8 +122,22 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
       const rates = session.workloadRates ?? workloadRatesFor(institution.policy);
       const extraction = { ...session.extraction, problems: [...session.extraction.problems, ...problemsFrom(session.extraction)] };
       const allowed: ('tessera' | 'oscqr' | 'qm')[] = allowQm ? ['tessera', 'oscqr', 'qm'] : ['tessera', 'oscqr'];
-      const analyzed = await ctx.ai.run('syllabus-analyze', { extraction, profileAnswers: {}, rates, rubricRefsAllowed: allowed, sourceKind: session.source.kind, sections: session.source.sections });
-      const validated = validateRead(groundSpans(analyzed.output, session.source).value, extraction, session.source);
+      const analyzeInput = { extraction, profileAnswers: {}, rates, rubricRefsAllowed: allowed, sourceKind: session.source.kind, sections: session.source.sections };
+      // Tessera's rule-based read fills any outcome the model didn't audit.
+      const fallback = analyzeSyllabusFixture(analyzeInput);
+      let analyzed!: Awaited<ReturnType<ServiceContext['ai']['run']>>;
+      let validated!: ReturnType<typeof validateRead>;
+      for (let attempt = 0; ; attempt++) {
+        analyzed = await ctx.ai.run('syllabus-analyze', analyzeInput);
+        try {
+          const repaired = repairRead(groundSpans(analyzed.output, session.source).value, extraction, fallback);
+          validated = validateRead(repaired.value, extraction, session.source);
+          readRepairs = repaired.repairs;
+          break;
+        } catch (error) {
+          if (attempt >= 1) throw error; // one more read when the shape is wrong
+        }
+      }
       if (session.source.kind === 'brief' && validated.outcomeAudits.some(audit => audit.mager === null)) fail('invalid', 'The training brief read needs a Mager objective audit.');
       const audits = await Promise.all(validated.outcomeAudits.map(async audit => {
         if (audit.measurable) return audit;
@@ -117,7 +152,7 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
     const latest = await ctx.repo.getDesignSession(job.sessionId);
     if (!latest) return current;
     if (done === 0) {
-      const grounded = groundSpans(result!.output, latest.source);
+      const grounded = groundSpans(normalizeExtraction(result!.output), latest.source);
       const valid = validateExtraction(grounded.value, latest.source);
       const notes = JSON.parse(current.instruction || '[]') as Problem[];
       const extraction: SyllabusExtraction = { ...valid, problems: notes, provenance: provenance(ctx, result!.model, 'syllabus-extract', `Read ${latest.source.name}.${grounded.unmatched ? ` ${grounded.unmatched} quote${grounded.unmatched === 1 ? '' : 's'} could not be matched to the syllabus.` : ''}`, latest.source.sections.map(section => ({ id: latest.source.fileId ?? latest.id, name: `${latest.source.name}${section.page ? ` p. ${section.page}` : section.heading ? ` § ${section.heading}` : ''}` }))) };
@@ -134,7 +169,7 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
       const institution = await ctx.repo.getInstitution();
       const rates = latest.workloadRates ?? workloadRatesFor(institution.policy);
       const citations = readOutput.cites;
-      const read = { ...readOutput, workload: estimateWorkload(extraction.profile, extraction.schedule, extraction.assessments, rates), provenance: provenance(ctx, result!.model, 'syllabus-analyze', `Instructional read of ${latest.source.name}`, citations.map((span, index) => ({ id: `${latest.id}-cite-${index + 1}`, name: `${latest.source.name}${span.page ? ` p. ${span.page}` : ''}`, span }))) };
+      const read = { ...readOutput, workload: estimateWorkload(extraction.profile, extraction.schedule, extraction.assessments, rates), provenance: provenance(ctx, result!.model, 'syllabus-analyze', `Instructional read of ${latest.source.name}${readRepairs.length ? ` (repaired: ${readRepairs.join('; ')})` : ''}`, citations.map((span, index) => ({ id: `${latest.id}-cite-${index + 1}`, name: `${latest.source.name}${span.page ? ` p. ${span.page}` : ''}`, span }))) };
       latest.read = read;
       latest.record.read = read;
       latest.questions = questionsFrom(problems, extraction, await ctx.repo.getInstructorProfile(latest.createdBy), read);

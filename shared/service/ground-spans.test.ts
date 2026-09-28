@@ -35,4 +35,14 @@ describe('groundSpans', () => {
   it('keeps the model page and clears an invented section for fabricated text', () => {
     expect(groundSpans(quote('Fabricated syllabus passage.', 2, 'Unknown'), source)).toMatchObject({ value: { span: { page: 2, section: null } }, unmatched: 1 });
   });
+  it('anchors a quote that crosses a page break where it starts, and drops a page the document does not have', () => {
+    const source = { kind: 'syllabus' as const, fileId: 'f', version: 1, name: 's.pdf', chars: 0, ocr: false, sections: [
+      { page: 1, heading: '', level: 0, text: '', lines: ['Late work loses ten percent per day for up to five'] },
+      { page: 2, heading: '', level: 0, text: '', lines: ['days, after which it is not accepted.'] },
+    ] };
+    const out = groundSpans({ a: { page: 2, text: 'Late work loses ten percent per day for up to five days, after which it is not accepted.' }, b: { page: 9, text: 'A sentence that is not in the syllabus at all.' } }, source);
+    expect(out.value.a).toMatchObject({ page: 1 });
+    expect(out.value.b).toMatchObject({ page: null });
+    expect(out.unmatched).toBe(1);
+  });
 });

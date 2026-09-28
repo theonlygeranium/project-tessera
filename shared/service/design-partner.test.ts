@@ -6,6 +6,7 @@ import { seedData } from '../seed';
 import type { ServiceContext } from './context';
 import { advanceGenerationJob, WORKFLOW_STALL_MS } from './generation';
 import { MemoryRepo, service } from './index';
+import { joinSmallCaps } from './design-partner';
 
 const at = '2026-09-28T12:00:00.000Z';
 let clock = Date.parse(at);
@@ -210,5 +211,22 @@ describe('design partner service', () => {
     expect(first.done).toBe(1);
     expect(await ctx.repo.getDesignSession(started.id)).toEqual(before);
     expect((await ctx.repo.getGenerationJob(initial.id))?.done).toBe(1);
+  });
+  it('joins small-caps splits in headings only', () => {
+    expect(joinSmallCaps('C ATALOG D ESCRIPTION')).toBe('CATALOG DESCRIPTION');
+    expect(joinSmallCaps('F ALL 2014')).toBe('FALL 2014');
+    expect(joinSmallCaps('A SSESSMENT OF F INAL G RADE')).toBe('ASSESSMENT OF FINAL GRADE');
+    expect(joinSmallCaps('B LACKBOARD, E MAIL, & T ECHNICAL S UPPORT')).toBe('BLACKBOARD, EMAIL, & TECHNICAL SUPPORT');
+    expect(joinSmallCaps('I AM A STUDENT')).toBe('I AM A STUDENT');
+    expect(joinSmallCaps('Week 1 A new start')).toBe('Week 1 A new start');
+  });
+  it('keeps ordinary tables that mention students and strips a real roster', async () => {
+    const ctx = await context();
+    const rows = ['9 | Oct 18–24 | Justice and the political. | Checkpoint 8', '10 | Oct 25–31 | Applied ethics case (student choice from a set). Essay due. | Essay', '11 | Nov 1–7 | Meaning and absurdity. | Checkpoint 9', '12 | Nov 8–12 | Synthesis and final. | Final exam', 'Student name | Student ID | Email', 'Rivera, Ana | 1234567 | ana@example.edu', 'Chen, Li | 2345678 | li@example.edu', 'Okoro, Sam | 3456789 | sam@example.edu'];
+    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: rows.join('\n'), consent: { syllabusOnly: true, rememberProfile: false } });
+    const text = session.source.sections.map(section => section.lines.join('\n')).join('\n');
+    expect(text).toContain('10 | Oct 25–31');
+    expect(text).toContain('12 | Nov 8–12');
+    expect(text).not.toContain('Rivera');
   });
 });

@@ -92,3 +92,55 @@ export function validateArchitectureIds(options: StructureOption[], candidates: 
     throw new ApiError('invalid', 'options must have exactly the candidate architecture ids.');
   }
 }
+
+const OPENER = 'Here is what I understood, and here is what I need from you.';
+type ReadOutput = AiTasks['syllabus-analyze']['output'];
+/**
+ * Repairs what a model's read can safely lose or garble before `validateRead` checks it:
+ * one audit per outcome (Tessera's rule-based audit fills a missing one), no links to unknown
+ * outcomes or assessments, no rubric numbers that don't exist, Palmer scores inside their
+ * ranges, and the fixed summary opener. Shape errors are left for `validateRead` to reject.
+ * Returns what was repaired so the provenance can say so.
+ */
+export function repairRead(output: unknown, extraction: SyllabusExtraction, fallback: ReadOutput): { value: unknown; repairs: string[] } {
+  if (!output || typeof output !== 'object') return { value: output, repairs: [] };
+  const read = structuredClone(output) as Partial<ReadOutput> & Record<string, unknown>;
+  const repairs: string[] = [];
+  const outcomes = new Set(extraction.outcomes.map(item => item.id));
+  const assessments = new Set(extraction.assessments.map(item => item.id));
+  if (typeof read.summary === 'string' && !read.summary.startsWith(OPENER)) { read.summary = `${OPENER} ${read.summary.trim()}`; repairs.push('summary opener'); }
+  if (Array.isArray(read.outcomeAudits)) {
+    const seen = new Map<string, ReadOutput['outcomeAudits'][number]>();
+    for (const audit of read.outcomeAudits) if (audit && outcomes.has(audit.outcomeId) && !seen.has(audit.outcomeId)) seen.set(audit.outcomeId, audit);
+    const filled = extraction.outcomes.filter(item => !seen.has(item.id));
+    if (filled.length) repairs.push(`rule-based audit for ${filled.map(item => item.id).join(', ')}`);
+    if (seen.size !== read.outcomeAudits.length) repairs.push('duplicate or unknown audits removed');
+    read.outcomeAudits = extraction.outcomes.map(item => seen.get(item.id) ?? fallback.outcomeAudits.find(audit => audit.outcomeId === item.id)!).filter(Boolean)
+      .map(audit => Array.isArray(audit.assessedBy) ? { ...audit, assessedBy: audit.assessedBy.filter(link => assessments.has(link?.assessmentId)) } : audit);
+  }
+  if (Array.isArray(read.alignment)) {
+    const kept = read.alignment.filter(link => link && outcomes.has(link.outcomeId) && assessments.has(link.assessmentId));
+    if (kept.length !== read.alignment.length) repairs.push('links to unknown outcomes or assessments removed');
+    read.alignment = kept;
+  }
+  const palmer = read.learnerCenteredness?.palmer;
+  if (palmer && Array.isArray(palmer.components)) {
+    const components = palmer.components.map(item => ({ ...item, score: Math.max(0, Math.min(item.score, item.max)) }));
+    const score = Math.max(0, Math.min(46, components.reduce((sum, item) => sum + item.score, 0)));
+    if (score !== palmer.score || components.some((item, i) => item.score !== palmer.components[i].score)) repairs.push('Palmer scores kept within range');
+    read.learnerCenteredness = { ...read.learnerCenteredness!, palmer: { ...palmer, components, score, band: score >= 30 ? 'learning-focused' : score >= 15 ? 'transitional' : 'content-focused' } };
+  }
+  if (Array.isArray(read.deficiencies)) {
+    const builtIn = { tessera: new Set(TESSERA_RUBRIC.standards.flatMap(standard => standard.items.map(item => item.number))), oscqr: new Set(OSCQR_RUBRIC.standards.flatMap(standard => standard.items.map(item => item.number))) };
+    let dropped = 0;
+    read.deficiencies = read.deficiencies.map(item => {
+      if (!item || !Array.isArray(item.rubricRefs)) return item;
+      const rubricRefs = item.rubricRefs.filter(ref => ref && (ref.rubric === 'qm' || builtIn[ref.rubric as 'tessera' | 'oscqr']?.has(ref.item)));
+      dropped += item.rubricRefs.length - rubricRefs.length;
+      return { ...item, rubricRefs };
+    });
+    if (dropped) repairs.push(`${dropped} unknown rubric reference${dropped === 1 ? '' : 's'} removed`);
+  }
+  return { value: read, repairs };
+}
+

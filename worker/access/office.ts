@@ -25,7 +25,8 @@ export async function designDocxSections(bytes: ArrayBuffer): Promise<{ heading:
     return node.children.flatMap(parts);
   };
   const paragraphLines = (node: XmlNode) => parts(node).join('').split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
-  const hasStyleHeading = descendants(body, 'w:p').some(p => /^Heading[1-6]$/i.test(first(p, 'w:pStyle')?.attrs['w:val'] ?? ''));
+  // A few styled headings (say, three for a hardware list) don't structure a whole syllabus.
+  const hasStyleHeading = descendants(body, 'w:p').filter(p => /^Heading[1-6]$/i.test(first(p, 'w:pStyle')?.attrs['w:val'] ?? '')).length >= 4;
   const sections: { heading: string; level: number; text: string; lines: string[] }[] = [];
   let current = { heading: '', level: 0, text: '', lines: [] as string[] };
   const flush = () => { if (current.heading || current.lines.length) sections.push({ ...current, text: current.lines.join('\n') }); };
@@ -45,7 +46,9 @@ export async function designDocxSections(bytes: ArrayBuffer): Promise<{ heading:
       const match = /^Heading([1-6])$/i.exec(style);
       const runs = descendants(node, 'w:r').filter(run => content(xml, run, ['w:t']).trim());
       const allBold = runs.length > 0 && runs.every(run => { const bold = first(run, 'w:b'); return bold && bold.attrs['w:val'] !== '0' && bold.attrs['w:val'] !== 'false'; });
-      const pseudo = !hasStyleHeading && value.length <= 80 && value.length > 0 && (allBold || (/\p{L}/u.test(value) && value === value.toLocaleUpperCase()) || /^\d+(?:\.\d+)*[.)]?\s+\S/.test(value));
+      const letters = value.replace(/[^\p{L}]/gu, '');
+      const numberedTitle = /^\d+(?:\.\d+)*[.)]?\s+\S/.test(value) && value.length <= 60 && !/[.;:!?]$/.test(value) && value.split(/\s+/).length <= 8;
+      const pseudo = !hasStyleHeading && value.length <= 80 && letters.length >= 4 && (allBold || letters === letters.toLocaleUpperCase() || numberedTitle);
       if (match || pseudo) { flush(); current = { heading: value, level: match ? Number(match[1]) : 1, text: '', lines: [] }; }
       else current.lines.push(...lines);
       // Text boxes can sit inside a paragraph and are separate content in reading order.

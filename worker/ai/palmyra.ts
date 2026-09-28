@@ -6,6 +6,7 @@ import type { AiClient, AiTaskName, AiTasks } from '../../shared/ai';
 import { ApiError } from '../../shared/api';
 import type { BlockContent, DesignSource, SourceDoc } from '../../shared/domain';
 import { validateGeneratedElement } from '../../shared/service/generation';
+import { OSCQR_RUBRIC, TESSERA_RUBRIC } from '../../shared/quality/rubrics';
 
 export interface PalmyraOptions {
   apiKey: string;
@@ -34,6 +35,11 @@ export function sourceText(sections: DesignSource['sections'], budget: number): 
     return `${label} ${(section.lines.length ? section.lines.join('\n') : section.text)}`;
   }).join('\n\n').slice(0, budget);
 }
+/** The rubric items a read may cite, by number with a short gist (never QM text, D-024/D-031). */
+function rubricItems(allowed: ('tessera' | 'oscqr' | 'qm')[]): string {
+  const list = (name: string, rubric: typeof TESSERA_RUBRIC) => `${name}: ${rubric.standards.flatMap(standard => standard.items.map(item => `${item.number} ${item.text.split(/\s+/).slice(0, 8).join(' ')}`)).join('; ')}`;
+  return [allowed.includes('tessera') ? list('tessera', TESSERA_RUBRIC) : '', allowed.includes('oscqr') ? list('oscqr', OSCQR_RUBRIC) : '', allowed.includes('qm') ? 'qm: cite a standard number only, never its text' : ''].filter(Boolean).join('\n');
+}
 function sourcesBlock(sources: SourceDoc[]): string {
   if (!sources.length) return 'Sources: none provided.';
   let budget = MAX_SOURCE_CHARS;
@@ -54,7 +60,7 @@ const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } =
     { role: 'user', content: `Source kind: ${sourceKind}\nName: ${name}\nInstitution term: ${institutionTerm ? JSON.stringify(institutionTerm) : 'not supplied'}\nSource:\n${sourceText(sections, 60_000)}` },
   ],
   'syllabus-analyze': ({ extraction, profileAnswers, rates, rubricRefsAllowed, sourceKind, sections }) => [
-    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nAudit each outcome for an observable verb, Bloom level, Fink category, and assessment alignment. For a training brief provide Mager performance, condition and criterion checks; otherwise mager is null. Multiple-choice assessments cannot demonstrate create or evaluate by themselves. Cite exact page passages in cites and deficiencies. Start the summary "Here is what I understood, and here is what I need from you." Do not claim completeness. Evaluate Palmer (maximum 46) and Cullen-Harris only when this is a syllabus. Use only these rubric names: ${rubricRefsAllowed.join(', ')}. Never reproduce QM rubric text. The server computes workload and provenance.` },
+    { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nAudit each outcome for an observable verb, Bloom level, Fink category, and assessment alignment. For a training brief provide Mager performance, condition and criterion checks; otherwise mager is null. Multiple-choice assessments cannot demonstrate create or evaluate by themselves. Cite exact page passages in cites and deficiencies. Start the summary "Here is what I understood, and here is what I need from you." Do not claim completeness. Evaluate Palmer (maximum 46) and Cullen-Harris only when this is a syllabus. Use only these rubric names: ${rubricRefsAllowed.join(', ')}, and only these item numbers:\n${rubricItems(rubricRefsAllowed)}\nNever reproduce QM rubric text. Audit every outcome exactly once, using only these outcome ids: ${extraction.outcomes.map(item => item.id).join(', ') || 'none'}; link only these assessment ids: ${extraction.assessments.map(item => `${item.id} (${item.title})`).join(', ') || 'none'}. The server computes workload and provenance.` },
     { role: 'user', content: `Source kind: ${sourceKind ?? 'syllabus'}\nProfile answers: ${JSON.stringify(profileAnswers)}\nWorkload rates: ${JSON.stringify(rates)}\nExtraction:\n${JSON.stringify(extraction).slice(0, 60_000)}\nSource:\n${sourceText(sections ?? [], 60_000)}` },
   ],
   'objective-rewrite': ({ outcome, nearbyTopics, industry }) => [
