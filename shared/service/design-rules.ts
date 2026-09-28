@@ -9,6 +9,25 @@ function needsObservableVerb(text: string): boolean {
   const first = normalized.match(/^\p{L}+/u)?.[0];
   return !first || !observableVerbs.has(first);
 }
+function calendarDate(value: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const time = Date.parse(`${value}T00:00:00Z`);
+  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? time : null;
+}
+const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+function dueDate(value: string, termStart: number): number | null {
+  const iso = calendarDate(value.trim());
+  if (iso !== null) return iso;
+  const monthName = /^(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+(\d{1,2})$/i.exec(value.trim());
+  const slash = /^(\d{1,2})\/(\d{1,2})$/.exec(value.trim());
+  const month = monthName ? months.findIndex(m => monthName[1].toLowerCase().startsWith(m)) + 1 : slash ? Number(slash[1]) : 0;
+  const day = Number(monthName?.[2] ?? slash?.[2]);
+  if (!month || month > 12 || !day) return null;
+  let year = new Date(termStart).getUTCFullYear();
+  let parsed = calendarDate(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+  if (parsed !== null && parsed < termStart - 60 * 86_400_000) parsed = calendarDate(`${++year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+  return parsed;
+}
 
 /** Deterministic checks ask before changing any interpretation of the syllabus. */
 export function problemsFrom(extraction: SyllabusExtraction, termInfo?: TermInfo): Problem[] {
@@ -24,7 +43,15 @@ export function problemsFrom(extraction: SyllabusExtraction, termInfo?: TermInfo
   for (const row of extraction.schedule.filter(row => row.empty || !row.topic.trim())) add('empty-week', `The schedule has no topic in week ${row.week} of a ${extraction.schedule.length}-week table${termWeeks ? `, in a ${termWeeks}-week term` : ''}.`, row.span ? [row.span] : []);
   const start = termInfo?.start ?? extraction.profile.termStart.value;
   const end = termInfo?.end ?? extraction.profile.termEnd.value;
-  if (start && end) for (const item of extraction.assessments) if (item.dueAt && (item.dueAt < start || item.dueAt > end)) add('due-outside-term', `${item.title} is due outside the term.`, item.span ? [item.span] : []);
+  const startDate = start ? calendarDate(start) : null;
+  const endDate = end ? calendarDate(end) : null;
+  if (startDate !== null && endDate !== null) {
+    const outside = extraction.assessments.filter(item => {
+      const due = item.dueAt ? dueDate(item.dueAt, startDate) : null;
+      return due !== null && (due < startDate - 3 * 86_400_000 || due > endDate + 3 * 86_400_000);
+    });
+    if (outside.length) add('due-outside-term', `${outside.map(item => item.title).join(', ')} ${outside.length === 1 ? 'is' : 'are'} due outside the term.`, outside.flatMap(item => item.span ? [item.span] : []));
+  }
   for (const outcome of extraction.outcomes) if (needsObservableVerb(outcome.text)) add('objective-no-verb', `Outcome ${outcome.id} may need an observable verb.`, outcome.span ? [outcome.span] : []);
   for (const field of ['credits', 'termWeeks', 'modality', 'enrolment'] as const) if (extraction.profile[field].origin === 'missing') add('missing-field', `${field} is not stated in the source.`);
   return problems;

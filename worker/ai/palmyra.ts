@@ -4,7 +4,7 @@
 // again and stores it as a draft (D-003); nothing here publishes anything.
 import type { AiClient, AiTaskName, AiTasks } from '../../shared/ai';
 import { ApiError } from '../../shared/api';
-import type { BlockContent, SourceDoc } from '../../shared/domain';
+import type { BlockContent, DesignSource, SourceDoc } from '../../shared/domain';
 import { validateGeneratedElement } from '../../shared/service/generation';
 
 export interface PalmyraOptions {
@@ -27,6 +27,13 @@ Rules:
 
 const MAX_SOURCE_CHARS = 12_000;
 const DESIGN_SYSTEM = "You are Tessera's design partner. The instructor is the subject-matter expert and the instructor of record; you handle sequencing, alignment, scaffolding and quality checks. Cite the syllabus page for every claim. Never invent readings, citations, URLs, statistics, or names. Keep the instructor's own outcome wording verbatim; a rewrite is a labelled suggestion. Phrase content suggestions as questions or optional drafts, never corrections. Never use the phrase 'learning styles'.";
+export function sourceText(sections: DesignSource['sections'], budget: number): string {
+  const paste = sections.length === 1 && sections[0].page === null && !sections[0].heading && sections[0].level === 0;
+  return sections.map(section => {
+    const label = section.page !== null ? `[p. ${section.page}]` : paste ? '[pasted]' : `[§ ${section.heading || 'start'}]`;
+    return `${label} ${(section.lines.length ? section.lines.join('\n') : section.text)}`;
+  }).join('\n\n').slice(0, budget);
+}
 function sourcesBlock(sources: SourceDoc[]): string {
   if (!sources.length) return 'Sources: none provided.';
   let budget = MAX_SOURCE_CHARS;
@@ -44,11 +51,11 @@ type Messages = { role: 'system' | 'user'; content: string }[];
 const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } = {
   'syllabus-extract': ({ sourceKind, name, sections, institutionTerm }) => [
     { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nYou are reading one part of a syllabus for a course designer. The service will compute problems and questions.` },
-    { role: 'user', content: `Source kind: ${sourceKind}\nName: ${name}\nInstitution term: ${institutionTerm ? JSON.stringify(institutionTerm) : 'not supplied'}\nSource:\n${sections.map(section => `${section.page === null ? '[pasted]' : `[p. ${section.page}]`} ${(section.lines.length ? section.lines.join('\n') : section.text)}`).join('\n\n').slice(0, 60_000)}` },
+    { role: 'user', content: `Source kind: ${sourceKind}\nName: ${name}\nInstitution term: ${institutionTerm ? JSON.stringify(institutionTerm) : 'not supplied'}\nSource:\n${sourceText(sections, 60_000)}` },
   ],
-  'syllabus-analyze': ({ extraction, profileAnswers, rates, rubricRefsAllowed, sourceKind }) => [
+  'syllabus-analyze': ({ extraction, profileAnswers, rates, rubricRefsAllowed, sourceKind, sections }) => [
     { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nAudit each outcome for an observable verb, Bloom level, Fink category, and assessment alignment. For a training brief provide Mager performance, condition and criterion checks; otherwise mager is null. Multiple-choice assessments cannot demonstrate create or evaluate by themselves. Cite exact page passages in cites and deficiencies. Start the summary "Here is what I understood, and here is what I need from you." Do not claim completeness. Evaluate Palmer (maximum 46) and Cullen-Harris only when this is a syllabus. Use only these rubric names: ${rubricRefsAllowed.join(', ')}. Never reproduce QM rubric text. The server computes workload and provenance.` },
-    { role: 'user', content: `Source kind: ${sourceKind ?? 'syllabus'}\nProfile answers: ${JSON.stringify(profileAnswers)}\nWorkload rates: ${JSON.stringify(rates)}\nExtraction:\n${JSON.stringify(extraction).slice(0, 60_000)}` },
+    { role: 'user', content: `Source kind: ${sourceKind ?? 'syllabus'}\nProfile answers: ${JSON.stringify(profileAnswers)}\nWorkload rates: ${JSON.stringify(rates)}\nExtraction:\n${JSON.stringify(extraction).slice(0, 60_000)}\nSource:\n${sourceText(sections ?? [], 60_000)}` },
   ],
   'objective-rewrite': ({ outcome, nearbyTopics, industry }) => [
     { role: 'system', content: `${SYSTEM}\n${DESIGN_SYSTEM}\nOffer one labelled alternative outcome with an observable action, preserving the instructor's disciplinary meaning. Give a concise why. The original remains unchanged. ${industry ? 'Use Mager performance, condition and criterion where supported.' : 'Use an observable Bloom verb.'}` },

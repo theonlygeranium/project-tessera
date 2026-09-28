@@ -5,7 +5,7 @@ export type { StatusChipProps } from './StatusChip/StatusChip';
 export { Card } from './Card/Card';
 export type { CardProps } from './Card/Card';
 export { AiContent, AiRef } from './AiContent/AiContent';
-export { Citation } from './Citation/Citation';
+export { Citation, citationLabel } from './Citation/Citation';
 export { AlignmentMatrix } from './AlignmentMatrix/AlignmentMatrix';
 export { WorkloadChart } from './WorkloadChart/WorkloadChart';
 export type { AiContentProps } from './AiContent/AiContent';

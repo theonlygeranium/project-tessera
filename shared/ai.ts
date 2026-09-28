@@ -4,7 +4,7 @@
 // the a11y audit, docs screenshots, and local development without a key.
 //
 // Whatever a client returns is stored as a *draft*; a person keeps it (D-003).
-import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc, VariantAudience, DesignSourceKind, SyllabusExtraction, InstructionalRead, WorkloadRates, ExtractedOutcome } from './domain';
+import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc, VariantAudience, DesignSource, DesignSourceKind, SyllabusExtraction, InstructionalRead, WorkloadRates, ExtractedOutcome } from './domain';
 import { extractSyllabusFixture } from './syllabus-fixture';
 import { analyzeSyllabusFixture, rewriteObjectiveFixture } from './design/read-fixture';
 import type { TutorKind } from './tutor/policy';
@@ -15,7 +15,7 @@ export interface AiTasks {
     output: Omit<SyllabusExtraction, 'problems' | 'provenance'>;
   };
   'syllabus-analyze': {
-    input: { extraction: SyllabusExtraction; profileAnswers: Record<string, string>; rates: WorkloadRates; rubricRefsAllowed: ('tessera' | 'oscqr' | 'qm')[]; sourceKind?: DesignSourceKind };
+    input: { extraction: SyllabusExtraction; profileAnswers: Record<string, string>; rates: WorkloadRates; rubricRefsAllowed: ('tessera' | 'oscqr' | 'qm')[]; sourceKind?: DesignSourceKind; sections?: DesignSource['sections'] };
     output: Omit<InstructionalRead, 'workload' | 'provenance'>;
   };
   'objective-rewrite': {

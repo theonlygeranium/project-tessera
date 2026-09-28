@@ -7,7 +7,7 @@ type Line = { text: string; page: number | null };
 
 /** A deterministic, line-oriented parser for fictional demo syllabi. It does not infer absent facts. */
 export function extractSyllabusFixture(input: Input): Output {
-  const lines: Line[] = input.sections.flatMap(section => (section.lines ?? section.text.split('\n')).map(text => ({ text: text.trim(), page: section.page })).filter(line => line.text));
+  const lines: Line[] = input.sections.flatMap(section => [section.heading, ...(section.lines ?? section.text.split('\n'))].map(text => ({ text: text.trim(), page: section.page })).filter(line => line.text));
   const find = (pattern: RegExp) => lines.find(line => pattern.test(line.text));
   const span = (line: Line): SourceSpan => ({ page: line.page, text: line.text });
   const field = <T>(value: T | null, line?: Line, origin: 'extracted' | 'inferred' = 'extracted'): Extracted<T> => value === null

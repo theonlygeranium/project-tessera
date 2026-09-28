@@ -25,7 +25,7 @@ export function validateExtraction(output: unknown, source: DesignSource): AiTas
   const spans: SourceSpan[] = [];
   const collect = (node: unknown): void => {
     if (node && typeof node === 'object') {
-      if ('page' in node && 'text' in node && Object.keys(node).length === 2) spans.push(node as SourceSpan);
+      if ('page' in node && 'text' in node) spans.push(node as SourceSpan);
       else if (Array.isArray(node)) node.forEach(collect);
       else Object.values(node).forEach(collect);
     }
@@ -52,19 +52,13 @@ export function validateRead(output: unknown, extraction: SyllabusExtraction, so
   const spans: SourceSpan[] = [];
   const collect = (node: unknown): void => {
     if (node && typeof node === 'object') {
-      if ('page' in node && 'text' in node && Object.keys(node).length === 2) spans.push(node as SourceSpan);
+      if ('page' in node && 'text' in node) spans.push(node as SourceSpan);
       else if (Array.isArray(node)) node.forEach(collect);
       else Object.values(node).forEach(collect);
     }
   };
   collect(read);
   validateSpans(spans, source);
-  const normalize = (value: string) => value.replace(/\s+/g, ' ').trim().toLocaleLowerCase();
-  spans.forEach((span, index) => {
-    const passage = normalize(span.text);
-    const pageText = normalize(source.sections.filter(section => section.page === span.page).map(section => section.text).join(' '));
-    if (!passage || !pageText.includes(passage)) throw new ApiError('invalid', `spans[${index}].text is not in the cited source page.`);
-  });
   validateNoLearningStyles(read);
   return read;
 }

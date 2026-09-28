@@ -1,5 +1,5 @@
 .wrap { position: relative; display: inline-flex; }
-.chip { border: 0; border-radius: var(--radius-sm); background: var(--ai-soft); color: var(--ai-strong); font: 600 11px/1.4 var(--font-mono); padding: 2px 6px; cursor: help; }
+.chip { border: 0; border-radius: var(--radius-sm); background: var(--ai-soft); color: var(--ai-strong); font: 600 11px/1.4 var(--font-mono); padding: 4px 6px; min-height: 24px; cursor: help; }
 .chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .tooltip { display: none; position: absolute; z-index: 5; left: 0; top: 100%; width: min(38ch, 75vw); padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: 13px/1.45 var(--font-sans); white-space: normal; }
 .wrap:hover .tooltip, .wrap:focus-within .tooltip { display: block; }

@@ -434,7 +434,7 @@ export interface BuilderSession {
 
 // ---- Night 4 · Syllabus design partner (D-030 to D-036) ----
 export type FieldOrigin = 'extracted' | 'inferred' | 'user_supplied' | 'missing';
-export interface SourceSpan { page: number | null; text: string }            // page null for pasted text
+export interface SourceSpan { page: number | null; text: string; section?: string | null } // section anchors DOCX passages
 export interface Extracted<T> { value: T | null; origin: FieldOrigin; confidence: number; spans: SourceSpan[] }
 
 export type DesignSourceKind = 'syllabus' | 'brief';                           // D-035

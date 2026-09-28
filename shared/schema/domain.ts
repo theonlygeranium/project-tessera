@@ -19,7 +19,7 @@ export const LearningProfileSchema = z.object({ goals: z.array(z.enum(['finish-d
 export const UserSchema = z.object({ id, name:required, email, role:RoleSchema, initials:required, profile:LearningProfileSchema.nullable() });
 // ---- Night 4 · Syllabus design partner (D-030 to D-036) ----
 export const FieldOriginSchema = z.enum(['extracted','inferred','user_supplied','missing']);
-export const SourceSpanSchema = z.object({page:integer.min(1).nullable(),text:z.string()});
+export const SourceSpanSchema = z.object({page:integer.min(1).nullable(),text:z.string(),section:z.string().nullable().optional()});
 export const DesignSourceKindSchema = z.enum(['syllabus','brief']);
 export const ArchitectureIdSchema = z.enum(['weekly','thematic','case','project','competency','flipped','scaffolded','performance','micro','hyflex']);
 export const OverlayIdSchema = z.enum(['bookends','spaced-review','udl-choice','teaching-presence']);

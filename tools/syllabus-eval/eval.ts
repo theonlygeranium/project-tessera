@@ -4,6 +4,7 @@
 import { readFile, readdir, writeFile, mkdir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { checkDocument } from '../../worker/access/index';
+import { designDocxSections } from '../../worker/access/office';
 import { palmyraClient } from '../../worker/ai/palmyra';
 import { fixtureAi, type AiClient } from '../../shared/ai';
 import { MemoryRepo, service } from '../../shared/service/index';
@@ -43,11 +44,11 @@ function similarity(a: string, b: string): number {
 }
 function grounded(span: SourceSpan, source: DesignSession['source']): { found: boolean; pageOk: boolean | null } {
   const pieces = span.text.split(/\.\.\.|…/).map(loose).filter(p => p.length >= 12);
-  if (!pieces.length) return { found: loose(span.text).length > 0 && loose(source.sections.map(s => s.lines.join(' ')).join(' ')).includes(loose(span.text)), pageOk: null };
-  const all = loose(source.sections.map(s => s.lines.join(' ')).join(' '));
+  if (!pieces.length) return { found: loose(span.text).length > 0 && loose(source.sections.map(s => [s.heading, ...s.lines].join(' ')).join(' ')).includes(loose(span.text)), pageOk: null };
+  const all = loose(source.sections.map(s => [s.heading, ...s.lines].join(' ')).join(' '));
   const found = pieces.every(p => all.includes(p));
   if (span.page == null) return { found, pageOk: null };
-  const page = loose(source.sections.filter(s => s.page === span.page).map(s => s.lines.join(' ')).join(' '));
+  const page = loose(source.sections.filter(s => s.page === span.page).map(s => [s.heading, ...s.lines].join(' ')).join(' '));
   return { found, pageOk: pieces.every(p => page.includes(p)) };
 }
 function spansOf(session: DesignSession): SourceSpan[] {
@@ -144,7 +145,7 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
   const file: FileRecord = { id: 'f-eval', courseId: 'c-stat110', name: basename(path), kind, mime: kind === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: bytes.length, key: 'eval', version: 1, uploadedBy: 'u-okafor', uploadedAt: new Date().toISOString(), scan: null };
   await repo.putFile(file);
   const documents = {
-    extract: async () => { const check = await checkDocument(kind, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer); return { sections: check.text.sections, ocr: false }; },
+    extract: async () => { const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer; const check = await checkDocument(kind, buffer); return { sections: kind === 'docx' ? await designDocxSections(buffer) : check.text.sections, ocr: false }; },
     scan: async () => { throw new Error('not used'); }, fix: async () => { throw new Error('not used'); }, suggest: async () => { throw new Error('not used'); },
   } as unknown as ServiceContext['documents'];
   const ctx: ServiceContext = { repo, ai: client, user: await repo.getUser('u-okafor'), now: () => new Date().toISOString(), newId: prefix => `${prefix}-${++n}`, documents };

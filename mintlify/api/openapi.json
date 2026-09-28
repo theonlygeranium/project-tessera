@@ -20884,6 +20884,12 @@
           },
           "text": {
             "type": "string"
+          },
+          "section": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
