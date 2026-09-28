@@ -52,6 +52,14 @@ const PROMPTS: { [K in AiTaskName]: (input: AiTasks[K]['input']) => Messages } =
     { role: 'system', content: `${SYSTEM}\nGround the element in the existing lesson text. Use fictional names only. Do not invent statistics, citations, sources, URLs, or media. Use plain language and sentence case. Return exactly the requested block type. A video script is a document titled "Video script: …" whose sections are scenes with narration.` },
     { role: 'user', content: `Course: ${courseTitle}\nModule: ${moduleTitle}\nLesson: ${lessonTitle}\nType: ${type}\nInstructor instruction: ${instruction || 'Fit this lesson.'}\nExisting lesson text:\n${lessonText.slice(0, 6000) || '(The lesson has no text yet.)'}\n\nDraft one ${type} block. Checks need 3–4 options. Documents need 3–8 sections. Tables need 3–8 equal-width rows with 2–5 cells and a header first row. Scenarios need 4–8 nodes, 2–3 choices per non-ending node, and at least two endings with outcomes.` },
   ],
+  'readiness-item': ({ courseTitle, item, content }) => [
+    { role: 'system', content: `${SYSTEM}\nYou review a course against one quality-rubric item and report what you find. Your finding is a draft a person reviews; it never passes the item on its own. Judge only from the course content given. Quote or point to where you found evidence, using the content labels. If the content doesn't show the item is met, say "likely-not-met" and suggest one concrete addition. Use "unclear" only when the content can't show it either way (for example, something that happens outside the course). Keep evidence and suggestion to one or two sentences each.` },
+    { role: 'user', content: `Course: ${courseTitle}\nRubric item ${item.number}: ${item.text}\n${item.criteria ? `What to look for: ${item.criteria}\n` : ''}\nCourse content:\n${content.map((c) => `[${c.label}]\n${c.text}`).join('\n\n').slice(0, 14000)}` },
+  ],
+  variant: ({ courseTitle, lessonTitle, audience, targetMinutes, blocks }) => [
+    { role: 'system', content: `${SYSTEM}\nYou write a variant of a lesson for a specific audience. Every output block names the input block it came from in sourceBlockId (or null for a new block). ${audience === 'plain' ? 'Plain language: keep every block, in order, and every fact, term, number, and check answer; use short sentences and common words at about a grade 8 reading level. Keep check options and the correct option id the same.' : `Micro-path: the essentials only, readable in at most ${Math.min(targetMinutes, 15)} minutes. Keep the key ideas and at least one check; leave out elaboration and optional examples. You may add one short opening callout (sourceBlockId null) that says what the learner will get.`} Only use heading, text, callout, and check blocks.` },
+    { role: 'user', content: `Course: ${courseTitle}\nLesson: ${lessonTitle}\nBlocks:\n${JSON.stringify(blocks).slice(0, 14000)}` },
+  ],
   rewrite: ({ courseTitle, text }) => [
     { role: 'system', content: `${SYSTEM}\nYou rewrite course text in plain language for accessibility (WCAG 3.1.5). Keep every fact, term, and number. Use short sentences, common words, and the same order. Don't add content.` },
     { role: 'user', content: `Course: ${courseTitle}\nRewrite this passage at about a grade 8 reading level:\n\n${text.slice(0, 8000)}` },
@@ -118,6 +126,8 @@ const SCHEMAS: Record<AiTaskName, unknown> = {
   element: elementSchema('text'),
   feedback: obj({ feedback: str }),
   rewrite: obj({ text: str }),
+  'readiness-item': obj({ verdict: { type: 'string', enum: ['likely-met', 'likely-not-met', 'unclear'] }, evidence: str, suggestion: str }),
+  variant: obj({ title: str, minutes: { type: 'integer' }, blocks: { type: 'array', items: obj({ sourceBlockId: { type: ['string', 'null'] }, block: BLOCK }) } }),
   'link-text': obj({ text: str }),
   brief: obj({
     audience: str,
@@ -170,6 +180,23 @@ const MAP: { [K in AiTaskName]: (raw: any, input: AiTasks[K]['input']) => AiTask
   },
   feedback: (raw) => ({ feedback: String(raw.feedback ?? '') }),
   rewrite: (raw) => ({ text: String(raw.text ?? '') }),
+  'readiness-item': (raw) => ({
+    verdict: (['likely-met', 'likely-not-met', 'unclear'] as const).find((v) => v === raw.verdict) ?? 'unclear',
+    evidence: String(raw.evidence ?? '').trim(),
+    suggestion: String(raw.suggestion ?? '').trim(),
+  }),
+  variant: (raw, input) => {
+    const ids = new Set(input.blocks.map((b) => b.id));
+    const byId = new Map(input.blocks.map((b) => [b.id, b.content]));
+    return {
+      title: String(raw.title ?? input.lessonTitle).trim() || input.lessonTitle,
+      minutes: Math.max(1, Math.min(Number(raw.minutes) || input.targetMinutes, input.targetMinutes)),
+      blocks: (raw.blocks as { sourceBlockId: string | null; block: FlatBlock }[]).map((b) => {
+        const sourceBlockId = typeof b.sourceBlockId === 'string' && ids.has(b.sourceBlockId) ? b.sourceBlockId : null;
+        return { sourceBlockId, content: toBlock(b.block, sourceBlockId ? byId.get(sourceBlockId) : undefined) };
+      }),
+    };
+  },
   'link-text': (raw) => ({ text: String(raw.text ?? '').trim() }),
   brief: (raw) => raw,
   outline: (raw) => raw,
@@ -187,6 +214,7 @@ const MAX_TOKENS: Record<AiTaskName, number> = {
   // A good lesson draft uses ~2,000 tokens (about 1,400 of them reasoning). The cap stops the
   // occasional runaway generation within seconds instead of a minute.
   brief: 6000, outline: 8000, 'lesson-draft': 7000, 'block-regenerate': 5000, announcement: 4000, feedback: 2000, rewrite: 4000, 'link-text': 1500,
+  'readiness-item': 2500, variant: 9000,
 };
 
 // ---- Client ---------------------------------------------------------------------------------

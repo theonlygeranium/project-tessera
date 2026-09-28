@@ -4,7 +4,7 @@
 // the a11y audit, docs screenshots, and local development without a key.
 //
 // Whatever a client returns is stored as a *draft*; a person keeps it (D-003).
-import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc } from './domain';
+import type { BlockContent, BlockType, CourseBrief, OutlineDraft, RubricCriterion, SourceDoc, VariantAudience } from './domain';
 import type { TutorKind } from './tutor/policy';
 
 export interface AiTasks {
@@ -63,6 +63,28 @@ export interface AiTasks {
   'tutor-summary': {
     input: { courseTitle: string; questions: string[] };
     output: { summary: string };
+  };
+  /**
+   * Night 3 (D-029): judge one AI-assisted rubric item against the course. The result is
+   * a draft finding with evidence; a person accepts or dismisses it. `content` is a digest
+   * the service builds (welcome, outcomes, module objectives, lesson text), labeled so the
+   * evidence can say where something was found.
+   */
+  'readiness-item': {
+    input: { courseTitle: string; item: { number: string; text: string; criteria: string }; content: { label: string; text: string }[] };
+    output: { verdict: 'likely-met' | 'likely-not-met' | 'unclear'; evidence: string; suggestion: string };
+  };
+  /**
+   * Night 3 (D-028): derive a variant of a lesson for an audience, or resync some blocks.
+   * Only heading, text, callout, and check blocks are sent; the service copies other
+   * blocks (media, files, tables, scenarios) as they are. Each output block names the
+   * master block it came from (`sourceBlockId`), or null for a new block (for example a
+   * micro-path's one-line summary). A micro-path may leave blocks out; plain language
+   * keeps every block and every fact.
+   */
+  variant: {
+    input: { courseTitle: string; lessonTitle: string; audience: VariantAudience; targetMinutes: number; blocks: { id: string; content: BlockContent }[] };
+    output: { title: string; minutes: number; blocks: { sourceBlockId: string | null; content: BlockContent }[] };
   };
 }
 
@@ -207,6 +229,35 @@ const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K][
     }
   },
 
+  'readiness-item': ({ item, content }) => {
+    // Deterministic: looks for the item's longer words in the content.
+    const words = new Set(`${item.text} ${item.criteria}`.toLowerCase().match(/[a-z]{6,}/g) ?? []);
+    let best: { label: string; text: string; hits: number } | null = null;
+    for (const c of content) {
+      const hits = [...words].filter((w) => c.text.toLowerCase().includes(w)).length;
+      if (!best || hits > best.hits) best = { ...c, hits };
+    }
+    if (best && best.hits >= 2) {
+      return { verdict: 'likely-met', evidence: `${best.label}: "${firstSentence(best.text).slice(0, 160)}"`, suggestion: '' };
+    }
+    return { verdict: content.length ? 'likely-not-met' : 'unclear', evidence: content.length ? 'The course content doesn\'t mention this yet.' : 'There is no course content to judge yet.', suggestion: `Add a short passage that covers: ${item.text}` };
+  },
+  variant: ({ lessonTitle, audience, targetMinutes, blocks }) => {
+    const plain = (text: string) => text.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean).slice(0, 4).join(' ');
+    const rewrite = (c: BlockContent): BlockContent => {
+      switch (c.type) {
+        case 'text': return { ...c, text: plain(c.text) };
+        case 'callout': return { ...c, text: plain(c.text) };
+        default: return c;
+      }
+    };
+    const kept = audience === 'micro'
+      ? blocks.filter((b, i) => b.content.type === 'check' || b.content.type === 'heading' || (b.content.type === 'text' && i === blocks.findIndex((x) => x.content.type === 'text')))
+      : blocks;
+    const out: { sourceBlockId: string | null; content: BlockContent }[] = kept.map((b) => ({ sourceBlockId: b.id, content: rewrite(b.content) }));
+    if (audience === 'micro') out.unshift({ sourceBlockId: null, content: { type: 'callout', tone: 'info', title: 'In 15 minutes', text: `The essentials of ${lessonTitle.toLowerCase()}, then one check.` } });
+    return { title: audience === 'micro' ? `${lessonTitle} (15-minute version)` : `${lessonTitle} (plain language)`, minutes: Math.min(targetMinutes, audience === 'micro' ? 15 : targetMinutes), blocks: out };
+  },
   announcement: ({ courseTitle, prompt }) => ({
     title: `${courseTitle}: ${firstSentence(prompt).replace(/[.!?]$/, '').slice(0, 70) || 'An update'}`,
     body: `Hello everyone,\n\n${prompt.trim()}\n\nReply here or come to office hours with any questions.`,
