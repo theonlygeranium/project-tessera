@@ -1,0 +1,15 @@
+.page { display: grid; gap: 16px; min-width: 0; }
+.page h2, .page p { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.actions a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600; }
+.actions a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 14px; padding: 0; list-style: none; }
+.card { display: grid; align-content: start; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.tableWrap { min-width: 0; overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.table th { text-align: left; background: var(--surface); }
+.table th, .table td { width: 50%; padding: 16px; border: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.table td { background: var(--paper); }
+.blockText { white-space: pre-wrap; line-height: 1.55; margin-top: 10px !important; }
+.empty { color: var(--ink-2); }
+@media (max-width: 650px) { .table, .table tbody, .table tr, .table td, .table th { display: block; width: 100%; box-sizing: border-box; } .table thead { display: none; } .table td:first-child::before { content: 'Master'; display: block; font-weight: 700; } .table td:last-child::before { content: 'Variant'; display: block; font-weight: 700; } }

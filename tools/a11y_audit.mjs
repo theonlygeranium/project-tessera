@@ -62,6 +62,8 @@ const APP = [
   { name: 'App · Instructor · Course workspace', url: 'app/teach/courses/c-stat110?data=mock&as=u-okafor' },
   { name: 'App · Instructor · Lesson with an AI draft', url: 'app/teach/courses/c-stat110/lessons/l-stat-3?data=mock&as=u-okafor' },
   { name: 'App · Instructor · Published lesson', url: 'app/teach/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-okafor' },
+  { name: 'App · Instructor · Variants', url: 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor' },
+  { name: 'App · Instructor · Variant compare', url: 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor', steps: async (p) => { await p.getByRole('button', { name: 'Create plain-language version' }).click(); await p.getByRole('link', { name: 'Manage variants' }).click(); await p.getByRole('link', { name: 'Compare' }).click(); } },
   { name: 'App · Instructor · Announcements', url: 'app/teach/courses/c-stat110/announcements?data=mock&as=u-okafor' },
   { name: 'App · Instructor · Roster', url: 'app/teach/courses/c-stat110/roster?data=mock&as=u-okafor' },
   { name: 'App · Instructor · Grades', url: 'app/teach/courses/c-stat110/grades?data=mock&as=u-okafor' },
@@ -132,12 +134,14 @@ for (const t of targets) {
 }
 // ---- reflow: WCAG 1.4.10 (content usable at 320 CSS px without horizontal scrolling) ----
 // Screens under docs/screens/ are fixed-size design artboards and are exempt; site pages and the prototype are not.
-const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/sign-in?data=mock', 'app/?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-3?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor', 'app/today?data=mock&as=u-marcus', 'app/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-marcus', 'app/teach/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-okafor', 'app/onboarding?data=mock&as=u-priya', 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
-for (const u of REFLOW) {
+const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/sign-in?data=mock', 'app/?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-3?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor', { url: 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor', steps: async (p) => { await p.getByRole('button', { name: 'Create plain-language version' }).click(); await p.getByRole('link', { name: 'Manage variants' }).click(); await p.getByRole('link', { name: 'Compare' }).click(); } }, 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor', 'app/today?data=mock&as=u-marcus', 'app/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-marcus', 'app/teach/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-okafor', 'app/onboarding?data=mock&as=u-priya', 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
+for (const target of REFLOW) {
+  const u = typeof target === 'string' ? target : target.url;
   const page = await browser.newPage({ viewport: { width: 320, height: 256 } });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
   await page.goto(BASE + u);
   await page.waitForTimeout(300);
+  if (typeof target !== 'string') await target.steps(page);
   const r = await page.evaluate(() => {
     const iw = innerWidth;
     const off = [...document.querySelectorAll('body *')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.right > iw + 1 && !e.closest('pre,iframe,.viewport,table'); });

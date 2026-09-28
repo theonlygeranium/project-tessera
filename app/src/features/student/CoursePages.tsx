@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { Button, LessonOutline, PresenceCard, StatusNotice, TopBar, AiContent } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
 import { paths } from '../../paths';
@@ -48,8 +48,10 @@ function ContentBlock({ block, lessonId }: { block: import('../../../../shared/d
 
 export function LessonPage() {
   const { courseId = '', lessonId = '' } = useParams();
+  const [search] = useSearchParams();
+  const version = search.get('version') === 'full' ? 'full' : 'auto';
   const { user } = useSession();
-  const lesson = useApiQuery('getStudentLesson', { lessonId }, { enabled: !!lessonId });
+  const lesson = useApiQuery('getStudentLesson', { lessonId, version }, { enabled: !!lessonId });
   const progress = useApiMutation('setLessonProgress');
   const started = useRef<string | null>(null);
   const [completed, setCompleted] = useState(false);
@@ -67,8 +69,10 @@ export function LessonPage() {
     <TopBar title={data?.lesson.title ?? 'Lesson'} eyebrow={data ? `${data.lesson.minutes} min lesson` : undefined} breadcrumbs={[{ label: 'Courses', href: paths.student.courses }, { label: data?.courseTitle ?? 'Course', href: paths.student.course(courseId) }, { label: data?.moduleTitle ?? 'Module' }]} renderLink={renderRouterLink} />
     {lesson.isPending ? <Loading label="Loading lesson" /> : lesson.error ? <ErrorNotice error={lesson.error} onRetry={() => lesson.refetch()} /> : data && <>
       <p className={styles.intro}>{data.courseTitle} · {data.moduleTitle} · {data.lesson.minutes} minutes</p>
+      {data.variant && <aside className={styles.variantNotice}><strong>You're reading the {data.variant.audience === 'plain' ? 'plain-language' : '15-minute'} version.</strong> {data.variant.why} <Link to={`${paths.student.lesson(courseId, data.variant.fullLessonId)}?version=full`}>Read the full lesson</Link></aside>}
+      {data.variantAvailable && <p className={styles.variantOffer}>{data.variantAvailable.why} <Link to={paths.student.lesson(courseId, data.variantAvailable.lessonId)}>Read the {data.variantAvailable.audience === 'plain' ? 'plain-language' : '15-minute'} version</Link></p>}
       <ErrorNotice error={progress.error} onRetry={progress.error && data.progress.state === 'not-started' && !completed ? () => progress.mutate({ lessonId, state: 'in-progress' }) : undefined} />
-      <article className={styles.lessonBody}>{[...data.blocks].sort((a,b) => a.position - b.position).map(block => <ContentBlock key={block.id} block={block} lessonId={lessonId} />)}</article>
+      <article className={styles.lessonBody}>{[...data.blocks].sort((a,b) => a.position - b.position).map(block => <ContentBlock key={block.id} block={block} lessonId={data.lesson.id} />)}</article>
       <TutorPanel key={lessonId} activityKind="lesson" activityId={lessonId} />
       <div className={styles.lessonFinish}>{isComplete ? <StatusNotice tone="success" live="polite">Lesson complete.</StatusNotice> : <Button variant="primary" disabled={progress.isPending} onClick={() => progress.mutate({ lessonId, state: 'completed' }, { onSuccess: () => setCompleted(true) })}>Mark lesson complete</Button>}
         {isComplete && <Link className={styles.primaryLink} to={data.nextLessonId ? paths.student.lesson(courseId, data.nextLessonId) : paths.student.course(courseId)}>{data.nextLessonId ? 'Next lesson' : 'Back to course'}</Link>}

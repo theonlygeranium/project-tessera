@@ -34,6 +34,9 @@
 .largerText .lessonBody { font-size: calc(var(--size-text-reading) * 1.25); }
 .reducedMotion *, .reducedMotion *::before, .reducedMotion *::after { animation: none !important; transition: none !important; }
 .callout { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.variantNotice { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); line-height: 1.6; }
+.variantNotice a, .variantOffer a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600; }
+.variantNotice a:focus-visible, .variantOffer a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .callout .tone { font: 700 var(--size-text-compact)/1.2 var(--font-sans); text-transform: capitalize; color: var(--ink-2); margin: 0; }
 .callout h3 { margin: 8px 0; }
 .figure { margin: 0; }

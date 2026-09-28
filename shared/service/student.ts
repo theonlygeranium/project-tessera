@@ -46,33 +46,47 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
     }
     return { doNext: tasks, announcements: recent, unreadCount, courses: summaries, week: { minutesGoal: u.profile?.weeklyMinutes ?? 120, minutesDone } };
   },
-  getStudentLesson: async (ctx, { lessonId }) => {
-    const l = await studentLesson(ctx, lessonId), c = await canReachCourse(ctx, l.courseId), m = await moduleFor(ctx, l.moduleId);
-    const blocks: StudentBlock[] = (await ctx.repo.listBlocks(lessonId)).filter(visible).map(b => {
+  getStudentLesson: async (ctx, { lessonId, version = 'auto' }) => {
+    const requested = await studentLesson(ctx, lessonId);
+    const master = requested.variantOf ? await studentLesson(ctx, requested.variantOf.lessonId) : requested;
+    const profile = (await ctx.repo.getUser(user(ctx).id))?.profile;
+    const variants = (await ctx.repo.listVariantLessons(master.id)).filter(v => v.status === 'published');
+    const matched = profile?.readingLevel === 'plain' ? variants.find(v => v.variantOf?.audience === 'plain') : undefined;
+    const available = matched ?? (profile?.sessionMinutes !== undefined && profile.sessionMinutes <= 15 ? variants.find(v => v.variantOf?.audience === 'micro') : undefined);
+    const chosen = version === 'full' ? master : requested.variantOf ? requested : available ?? master;
+    const why = (audience: 'plain' | 'micro') => audience === 'plain' ? 'Shown in plain language because your profile asks for plain reading.' : 'Shown as a 15-minute version because your sessions are 15 minutes or less.';
+    const c = await canReachCourse(ctx, master.courseId), m = await moduleFor(ctx, chosen.moduleId);
+    const blocks: StudentBlock[] = (await ctx.repo.listBlocks(chosen.id)).filter(visible).map(b => {
       const meta = { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance };
       const c = content(b);
       // Students never receive the answer key (D-005).
       if (c.type === 'check') return { ...meta, type: 'check', question: c.question, options: c.options };
       return { ...meta, ...c } as StudentBlock;
     });
-    const siblings = (await ctx.repo.listLessons({ courseId: l.courseId })).filter(x => x.status === 'published');
-    const index = siblings.findIndex(x => x.id === lessonId);
-    const p = await ctx.repo.getProgress(user(ctx).id, lessonId);
-    return { lesson: l, moduleTitle: m.title, courseTitle: c.title, blocks, progress: p ? publicProgress(p) : defaultProgress(lessonId), previousLessonId: siblings[index-1]?.id ?? null, nextLessonId: siblings[index+1]?.id ?? null };
+    const siblings = (await ctx.repo.listLessons({ courseId: master.courseId })).filter(x => x.status === 'published');
+    const index = siblings.findIndex(x => x.id === master.id);
+    const p = await ctx.repo.getProgress(user(ctx).id, master.id);
+    return { lesson: chosen, moduleTitle: m.title, courseTitle: c.title, blocks, progress: p ? publicProgress(p) : defaultProgress(master.id), previousLessonId: siblings[index-1]?.id ?? null, nextLessonId: siblings[index+1]?.id ?? null,
+      variant: chosen.variantOf ? { audience: chosen.variantOf.audience, why: available?.id === chosen.id ? why(chosen.variantOf.audience) : `You opened the ${chosen.variantOf.audience === 'plain' ? 'plain-language' : '15-minute'} version.`, fullLessonId: master.id } : null,
+      variantAvailable: chosen.variantOf || !available ? null : { audience: available.variantOf!.audience, lessonId: available.id, why: why(available.variantOf!.audience) } };
   },
   answerCheck: async (ctx, { lessonId, blockId, optionId }) => {
-    await studentLesson(ctx, lessonId);
+    const lesson = await studentLesson(ctx, lessonId);
+    const progressId = lesson.variantOf?.lessonId ?? lessonId;
+    if (lesson.variantOf) await studentLesson(ctx, progressId);
     const b = (await ctx.repo.listBlocks(lessonId)).find(x => x.id === blockId && visible(x));
     if (!b || b.type !== 'check' || !b.options.some(x => x.id === optionId)) throw new ApiError('invalid', 'Invalid check or option.');
-    const u = user(ctx), p = await ctx.repo.getProgress(u.id, lessonId) ?? { ...defaultProgress(lessonId), userId: u.id };
+    const u = user(ctx), p = await ctx.repo.getProgress(u.id, progressId) ?? { ...defaultProgress(progressId), userId: u.id };
     const correct = b.correctOptionId === optionId, attempts = (p.checks[blockId]?.attempts ?? 0) + 1;
     p.checks[blockId] = { correct, attempts }; if (p.state === 'not-started') p.state = 'in-progress'; p.updatedAt = ctx.now();
     await ctx.repo.putProgress(p); return { correct, feedback: correct ? b.feedbackCorrect : b.feedbackIncorrect, attempts };
   },
   setLessonProgress: async (ctx, { lessonId, state }) => {
-    await studentLesson(ctx, lessonId);
+    const lesson = await studentLesson(ctx, lessonId);
+    const progressId = lesson.variantOf?.lessonId ?? lessonId;
+    if (lesson.variantOf) await studentLesson(ctx, progressId);
     if (state !== 'in-progress' && state !== 'completed') fail('invalid', 'Invalid progress state.');
-    const u = user(ctx), p = await ctx.repo.getProgress(u.id, lessonId) ?? { ...defaultProgress(lessonId), userId: u.id };
+    const u = user(ctx), p = await ctx.repo.getProgress(u.id, progressId) ?? { ...defaultProgress(progressId), userId: u.id };
     if (p.state !== 'completed' || state === 'completed') p.state = state;
     p.updatedAt = ctx.now(); await ctx.repo.putProgress(p); return publicProgress(p);
   },
