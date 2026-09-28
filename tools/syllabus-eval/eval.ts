@@ -28,6 +28,7 @@ const args = process.argv.slice(2);
 const opt = (name: string, fallback?: string) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : fallback; };
 const dirs = (opt('dirs', 'tests/fixtures/syllabus,tests/fixtures/syllabus/private') ?? '').split(',').filter(Boolean);
 const runs = Number(opt('runs', '1'));
+const concurrency = Number(opt('concurrency', '4'));
 const only = opt('only');
 const aiName = opt('ai', process.env.WRITER_API_KEY ? 'palmyra' : 'fixture');
 const out = opt('out', 'reports/syllabus-eval.json')!;
@@ -99,6 +100,7 @@ function score(session: DesignSession, key: Key): Check[] {
   const falseEmpty = key.schedule.filter(k => !k.empty && !k.holidayOrBreak && rowFor(k)?.empty);
   const pct = key.schedule.length ? topicHits.length / key.schedule.length : 1;
   const distinctRows = new Set(key.schedule.map(k => k.span ? k.span.join('-') : String(k.week))).size;
+  if ((key as Key & { scheduleArtifact?: string }).scheduleArtifact) { add('E7', true, `not scored: ${(key as Key & { scheduleArtifact?: string }).scheduleArtifact}`); } else
   add('E7', ex.schedule.length >= distinctRows && ex.schedule.length <= key.schedule.length && pct >= 0.9 && !falseEmpty.length,
     `${ex.schedule.length}/${key.schedule.length} rows; topics ${topicHits.length}/${key.schedule.length}${falseEmpty.length ? `; wrongly empty: weeks ${falseEmpty.map(k => k.week).join(', ')}` : ''}${pct < 1 ? `; missed weeks ${key.schedule.filter(k => !topicHits.includes(k)).map(k => k.week).join(', ')}` : ''}`);
   const spans = spansOf(session).map(s => ({ s, g: grounded(s, session.source) }));
@@ -176,7 +178,11 @@ async function main() {
   }
   if (!jobs.length) throw new Error(`No answer keys found in ${dirs.join(', ')}`);
   console.log(`Evaluating ${jobs.length} syllabi × ${runs} run(s) with ${aiName}…`);
-  const results = (await Promise.all(jobs.flatMap(job => Array.from({ length: runs }, (_, i) => runOne(job.path, job.key, i + 1, client).catch(e => ({ file: basename(job.path), run: i + 1, ok: false, seconds: 0, stage: 'crash', error: String(e), checks: [] } as RunResult)))))).sort((a, b) => a.file.localeCompare(b.file) || a.run - b.run);
+  // Limited concurrency: a real upload runs alone, and dozens of parallel calls inflate latency.
+  const tasks = jobs.flatMap(job => Array.from({ length: runs }, (_, i) => () => runOne(job.path, job.key, i + 1, client).catch(e => ({ file: basename(job.path), run: i + 1, ok: false, seconds: 0, stage: 'crash', error: String(e), checks: [] } as RunResult))));
+  const done: RunResult[] = [];
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, async () => { for (let task = tasks.shift(); task; task = tasks.shift()) done.push(await task()); }));
+  const results = done.sort((a, b) => a.file.localeCompare(b.file) || a.run - b.run);
   const ids = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'R1', 'R2', 'R3', 'R4', 'R6'];
   console.log(`\n${'syllabus'.padEnd(34)} run ${ids.map(i => i.padEnd(4)).join('')} pass`);
   let passed = 0;

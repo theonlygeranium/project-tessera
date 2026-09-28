@@ -122,16 +122,16 @@ export function repairRead(output: unknown, extraction: SyllabusExtraction, fall
   if (Array.isArray(read.alignment)) {
     const kept = read.alignment.filter(link => link && outcomes.has(link.outcomeId) && assessments.has(link.assessmentId));
     if (kept.length !== read.alignment.length) repairs.push('links to unknown outcomes or assessments removed');
-    // The matrix and the audits must agree: a link an audit names is in the matrix.
+    // The matrix and the audits must agree: every link either names is in both, and every
+    // other outcome and assessment pair is "none".
     const key = (o: string, a: string) => `${o}|${a}`;
-    const byKey = new Map(kept.map(link => [key(link.outcomeId, link.assessmentId), link]));
-    let added = 0;
-    for (const audit of Array.isArray(read.outcomeAudits) ? read.outcomeAudits : []) for (const link of audit.assessedBy ?? []) {
-      const existing = byKey.get(key(audit.outcomeId, link.assessmentId));
-      if (!existing || existing.state === 'none') { byKey.set(key(audit.outcomeId, link.assessmentId), { outcomeId: audit.outcomeId, assessmentId: link.assessmentId, state: link.fit }); added++; }
-    }
-    if (added) repairs.push('alignment completed from the outcome audits');
-    read.alignment = [...byKey.values()];
+    const links = new Map<string, 'assessed' | 'verb-mismatch'>();
+    for (const link of kept) if (link.state !== 'none') links.set(key(link.outcomeId, link.assessmentId), link.state);
+    for (const audit of Array.isArray(read.outcomeAudits) ? read.outcomeAudits : []) for (const link of audit.assessedBy ?? []) if (!links.has(key(audit.outcomeId, link.assessmentId))) links.set(key(audit.outcomeId, link.assessmentId), link.fit);
+    if (Array.isArray(read.outcomeAudits)) read.outcomeAudits = read.outcomeAudits.map(audit => ({ ...audit, assessedBy: extraction.assessments.filter(item => links.has(key(audit.outcomeId, item.id))).map(item => ({ assessmentId: item.id, fit: links.get(key(audit.outcomeId, item.id))! })) }));
+    const full = extraction.outcomes.flatMap(outcome => extraction.assessments.map(item => ({ outcomeId: outcome.id, assessmentId: item.id, state: links.get(key(outcome.id, item.id)) ?? 'none' as const })));
+    if (full.length !== kept.length || full.some((link, i) => kept[i]?.state !== link.state)) repairs.push('alignment matrix completed from the audits');
+    read.alignment = full;
   }
   const palmer = read.learnerCenteredness?.palmer;
   if (palmer && Array.isArray(palmer.components)) {
