@@ -4,9 +4,11 @@ import { Button, FormField, StatusNotice, TextArea, TextInput, TopBar } from '..
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
 import styles from './instructor.module.css';
+import { useStaffCourseBrand } from '../templates/brand';
 
 export function CourseBar({ title, courseId, courseTitle, actions }: { title: string; courseId: string; courseTitle?: string; actions?: ReactNode }) {
-  return <TopBar title={title} breadcrumbs={[{ label: 'My courses', href: paths.teach.courses }, { label: courseTitle ?? title, href: title === courseTitle ? undefined : paths.teach.course(courseId) }, ...(title !== courseTitle ? [{ label: title }] : [])]} renderLink={renderRouterLink} actions={actions} />;
+  const { course, program } = useStaffCourseBrand(courseId);
+  return <TopBar title={title} eyebrow={[course?.code, program?.name].filter(Boolean).join(' · ') || undefined} breadcrumbs={[{ label: 'My courses', href: paths.teach.courses }, { label: courseTitle ?? title, href: title === courseTitle ? undefined : paths.teach.course(courseId) }, ...(title !== courseTitle ? [{ label: title }] : [])]} renderLink={renderRouterLink} actions={actions} />;
 }
 export function Message({ text, error }: { text: string; error?: boolean }) {
   return text ? <StatusNotice tone={error ? 'error' : 'success'} live="polite">{text}</StatusNotice> : null;

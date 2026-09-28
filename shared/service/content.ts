@@ -7,6 +7,7 @@ import { policyBlocks } from '../access/score';
 import type { Service, ServiceContext } from './context';
 import { agentProvenance, aiEnabled, aiFailed, canReachCourse, content, fail, lessonFor, moduleFor, provenance, teachLesson, user } from './helpers';
 import { validateBlockContent } from './validate';
+import { effectiveTemplate } from './templates';
 
 async function detail(ctx: ServiceContext, lessonId: string): Promise<LessonDetail> {
   const lesson = await lessonFor(ctx, lessonId), module = await moduleFor(ctx, lesson.moduleId), course = await canReachCourse(ctx, lesson.courseId);
@@ -78,7 +79,15 @@ export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBl
     const l = await teachLesson(ctx, lessonId), blocks = await ctx.repo.listBlocks(lessonId), report = lessonReadiness(blocks);
     // The institution's accessibility policy (D-022) is checked alongside readiness.
     const access = lessonAccessReport(lessonId, blocks, ctx.now());
-    const reasons = policyBlocks(access, access.issues, (await ctx.repo.getInstitution()).accessPolicy);
+    const institution = await ctx.repo.getInstitution();
+    const template = await effectiveTemplate(ctx, await canReachCourse(ctx, l.courseId));
+    const floor = template?.accessFloor ?? 0;
+    const reasons = policyBlocks(access, access.issues, { ...institution.accessPolicy, minimumScore: Math.max(institution.accessPolicy.minimumScore, floor) });
+    if (floor > institution.accessPolicy.minimumScore && access.score < floor) {
+      const scoreReason = `The accessibility score is ${access.score}; your institution requires at least ${floor}.`;
+      const index = reasons.indexOf(scoreReason);
+      if (index >= 0) reasons[index] = `The accessibility score is ${access.score}; your course template requires at least ${floor}.`;
+    }
     if (!report.ready || reasons.length) {
       throw new ApiError('not-ready', ["This lesson isn't ready to publish.", ...reasons].join(' '), reasons.length ? { ...report, ready: false, accessPolicy: { score: access.score, reasons } } : report);
     }

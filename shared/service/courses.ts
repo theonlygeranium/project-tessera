@@ -1,6 +1,7 @@
 import type { Course, CourseSummary, LessonSummary, RosterEntry } from '../domain';
 import type { Service, ServiceContext } from './context';
 import { canReachCourse, canTeach, course, fail, lessonFor, minutes, moduleFor, move, renumberLessons, renumberModules, required, user } from './helpers';
+import { applyTemplatePlan, effectiveTemplate } from './templates';
 
 export async function summary(ctx: ServiceContext, c: Course): Promise<CourseSummary> {
   const [modules, lessons, enrollments] = await Promise.all([ctx.repo.listModules(c.id), ctx.repo.listLessons({ courseId: c.id }), ctx.repo.listEnrollments({ courseId: c.id })]);
@@ -18,8 +19,13 @@ export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseO
     return Promise.all(visible.map(c => summary(ctx, c)));
   },
   createCourse: async (ctx, input) => {
-    const c: Course = { id: ctx.newId('c'), code: required(input.code, 'code'), title: required(input.title, 'title'), term: required(input.term, 'term'), description: input.description?.trim() ?? '', welcome: '', outcomes: [], instructorIds: [], status: 'active' };
-    await ctx.repo.putCourse(c); return c;
+    if (input.programId && !(await ctx.repo.getProgram(input.programId))) fail('invalid', 'Program not found.');
+    const creator = user(ctx);
+    const c: Course = { id: ctx.newId('c'), code: required(input.code, 'code'), title: required(input.title, 'title'), term: required(input.term, 'term'), description: input.description?.trim() ?? '', welcome: '', outcomes: [], instructorIds: creator.role === 'instructor' ? [creator.id] : [], status: 'active', programId: input.programId ?? null };
+    const template = input.skipTemplate ? null : await effectiveTemplate(ctx, c);
+    await ctx.repo.putCourse(c);
+    if (template) await applyTemplatePlan(ctx, c, template, { course: { id: c.id }, modules: [], lessons: [], blocks: {} });
+    return c;
   },
   getCourseOutline: async (ctx, { courseId }) => {
     const c = await canReachCourse(ctx, courseId), u = user(ctx), modules = await ctx.repo.listModules(courseId);

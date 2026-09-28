@@ -36,3 +36,6 @@
 
 .rosterProgress { display: grid; gap: 5px; min-width: 120px; }
 .rosterProgress progress { width: 100%; height: 6px; accent-color: var(--accent); }
+.inlineForm label { display: grid; gap: 5px; }
+.inlineForm label input, .inlineForm label select { width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink); background: var(--surface); font: inherit; }
+.inlineForm label :is(input, select):focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

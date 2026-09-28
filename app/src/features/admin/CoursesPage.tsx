@@ -13,12 +13,14 @@ import { applyApiFieldError, blankErrors, countPhrase, focusInvalid, hasErrors, 
 export function CoursesPage() {
   const navigate = useNavigate();
   const courses = useApiQuery('listCourses', undefined);
+  const programs = useApiQuery('listPrograms', undefined);
   const create = useApiMutation('createCourse');
   const formRef = useRef<HTMLFormElement>(null);
   const [code, setCode] = useState('');
   const [title, setTitle] = useState('');
   const [term, setTerm] = useState('');
   const [description, setDescription] = useState('');
+  const [programId, setProgramId] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -43,6 +45,7 @@ export function CoursesPage() {
       title: title.trim(),
       term: term.trim(),
       ...(description.trim() ? { description: description.trim() } : {}),
+      programId: programId || null,
     }, {
       onSuccess: (course) => navigate(paths.admin.course(course.id), { state: { created: true } }),
       onError: (error) => {
@@ -135,6 +138,9 @@ export function CoursesPage() {
               />
             )}
           </FormField>
+          <label className={styles.form}>Program
+            <select value={programId} onChange={event => setProgramId(event.target.value)}><option value="">No program</option>{programs.data?.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}</select>
+          </label>
           <div className={styles.actions}>
             <Button type="submit" variant="primary" density="compact" disabled={create.isPending}>
               {create.isPending ? 'Creating…' : 'Create course'}
