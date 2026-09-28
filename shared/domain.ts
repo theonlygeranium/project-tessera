@@ -139,8 +139,12 @@ export interface Lesson {
   publishedAt: Timestamp | null;
   /** Night 3: the template item this lesson came from. */
   templateKey?: string | null;
-  /** Night 3: set on a variant lesson (#23); variants never appear in outlines. */
-  variantOf?: { lessonId: Id; audience: VariantAudience } | null;
+  /**
+   * Night 3: set on a variant lesson (#23); variants never appear in outlines. `syncedAt`
+   * is when the variant was made or last resynced: master blocks changed after it and not
+   * covered by the variant show as new in the diff.
+   */
+  variantOf?: { lessonId: Id; audience: VariantAudience; syncedAt: Timestamp } | null;
 }
 
 /** A lesson in an outline, with the viewer's progress (students) or block counts (staff). */
@@ -291,6 +295,8 @@ export interface ReadinessReport {
   keptAiBlocks: number;
   /** Set when the institution's accessibility policy blocks publishing (D-022). */
   accessPolicy?: { score: number; reasons: string[] };
+  /** Night 3: set when the readiness policy's minimum blocks publishing (D-029). */
+  rubric?: { rubricName: string; percent: number; minimum: number };
 }
 
 // ---- Progress -------------------------------------------------------------------------
@@ -938,6 +944,7 @@ export interface LessonVariant {
   title: string;
   minutes: number;
   status: LessonStatus;
+  syncedAt: Timestamp;
   /** Variant blocks whose master block changed since the last sync. */
   divergedBlocks: number;
   /** Master blocks added since the last sync that the variant doesn't cover. */

@@ -43,6 +43,7 @@ ALTER TABLE blocks ADD COLUMN template_key TEXT;
 
 ALTER TABLE lessons ADD COLUMN variant_of TEXT REFERENCES lessons(id) ON DELETE CASCADE;
 ALTER TABLE lessons ADD COLUMN variant_audience TEXT CHECK (variant_audience IS NULL OR variant_audience IN ('plain', 'micro'));
+ALTER TABLE lessons ADD COLUMN variant_synced_at TEXT;          -- when the variant was made or last resynced
 CREATE UNIQUE INDEX lessons_variant ON lessons(variant_of, variant_audience) WHERE variant_of IS NOT NULL;
 ALTER TABLE blocks ADD COLUMN source_block_id TEXT;             -- the master block
 ALTER TABLE blocks ADD COLUMN source_hash TEXT;                 -- master content hash at the last sync
