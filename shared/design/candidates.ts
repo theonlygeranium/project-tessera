@@ -30,13 +30,14 @@ export function selectCandidates(extraction: SyllabusExtraction, answers: Design
   if (isBrief) { priorities.push('performance'); if (competencies) priorities.push('competency'); if ((profile.weeklyHoursBudget > 0 && profile.weeklyHoursBudget <= 3) || /\b(refresher|procedure)\b/.test(text)) priorities.push('micro'); }
   if (modality === 'hyflex') priorities.push('hyflex');
   const permitted = new Set(allowed ?? ALL);
-  if (permitted.size < 3) throw new Error('At least three architectures must be allowed.');
+  if (!permitted.size) throw new Error('The design partner policy allows no course structures.');
   const ids: ArchitectureId[] = [];
   const add = (id: ArchitectureId) => { if (permitted.has(id) && (id !== 'hyflex' || modality === 'hyflex') && (id !== 'micro' || isBrief) && (id !== 'performance' || isBrief) && !ids.includes(id) && !(id === 'micro' && ids.includes('weekly')) && !(id === 'weekly' && ids.includes('micro'))) ids.push(id); };
   add(closest);
   if (isBrief) add('performance');
   for (const id of priorities) add(id);
   for (const id of ALL) add(id);
-  if (ids.length < 3) throw new Error('Policy does not permit three compatible architectures.');
+  // Three when the policy allows it; fewer when an administrator has narrowed the list.
+  if (!ids.length) throw new Error('The design partner policy allows no structure that fits this course.');
   return { ids: ids.slice(0, 3), closest: ids[0], weeks: Math.max(weeks, 1), overlaysDefault: ['bookends', 'spaced-review', ...((modality === 'online-async' || modality === 'online-sync' || modality === 'hybrid' || modality === 'hyflex') ? ['teaching-presence' as const] : [])] };
 }

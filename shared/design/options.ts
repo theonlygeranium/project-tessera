@@ -3,15 +3,26 @@ import type { AiTasks } from '../ai';
 import type { ArchitectureId, DesignSource, StructureOption } from '../domain';
 import { estimateWorkload } from './workload';
 import { validateArchitectureIds, validateNoLearningStyles } from '../service/validate-design';
+import { groundSpans } from '../service/ground-spans';
 
 type Input = AiTasks['structure-options']['input'];
 const bad = (message: string): never => { throw new ApiError('invalid', message); };
-const validSpan = (span: { page: number | null; text: string }, source: DesignSource) => source.sections.some(section => section.page === span.page && section.text.includes(span.text));
 
-/** Repair safe omissions, then reject ungrounded claims and invalid model structure. */
+const inSource = (text: string, source: DesignSource) => { const n = (value: string) => value.toLowerCase().replace(/\s+/g, ' ').trim(); const quote = n(text); return !!quote && source.sections.some(section => n(section.lines.join(' ')).includes(quote.slice(0, 60))); };
+function fallbackCitation(id: ArchitectureId, input: Input) {
+  const heavy = [...input.assessments].sort((a, b) => (b.weightPercent ?? 0) - (a.weightPercent ?? 0))[0];
+  const firstRow = input.schedule.find(row => row.span);
+  const pick = id === 'project' || id === 'case' ? heavy?.span : id === 'weekly' || id === 'thematic' ? firstRow?.span : null;
+  return pick ?? firstRow?.span ?? heavy?.span ?? input.profile.description.spans[0] ?? input.profile.title.spans[0] ?? null;
+}
+const fallbackReason = (id: ArchitectureId) => id === 'project' || id === 'case' ? 'Your heaviest graded work shapes this structure.' : 'Your schedule shapes this structure.';
+
+/** Repair what is safe (citations, weekly modules, weeks outside the term), then reject what isn't. */
 export function finalizeOptions(raw: unknown, input: Input): StructureOption[] {
   if (!Array.isArray(raw)) bad('Options must be an array.');
-  const options = structuredClone(raw) as StructureOption[];
+  // Quotes are anchored to their page or section; one that isn't in the syllabus loses its citation.
+  const grounded = groundSpans(structuredClone(raw) as StructureOption[], input.source).value;
+  const options = grounded.map(option => ({ ...option, fits: Array.isArray(option?.fits) ? option.fits.map(fit => fit?.span && !inSource(fit.span.text, input.source) ? { ...fit, span: null } : fit) : option?.fits }));
   validateArchitectureIds(options, input.candidates);
   validateNoLearningStyles(options);
   const codes = new Set(input.confirmedOutcomes.map(item => item.code));
@@ -20,22 +31,34 @@ export function finalizeOptions(raw: unknown, input: Input): StructureOption[] {
   const weekHours = new Map(workload.weeks.map(week => [week.week, week.hours]));
   for (const option of options) {
     if (!option || typeof option.label !== 'string' || typeof option.tag !== 'string' || typeof option.description !== 'string' || typeof option.changes !== 'string' || typeof option.tradeoffs !== 'string' || typeof option.evidence !== 'string' || !Array.isArray(option.fits) || !Array.isArray(option.frameworks) || !Array.isArray(option.modules) || !option.modules.length) bad('Option response has an invalid shape.');
-    if (option.fits.some(fit => typeof fit.text !== 'string' || (fit.span && !validSpan(fit.span, input.source)))) bad('Option cites a passage outside the source.');
-    if ((input.schedule.some(row => row.span) || input.assessments.some(item => item.span) || input.profile.description.spans.length > 0) && !option.fits.some(fit => fit.span)) bad('Each approach needs a syllabus citation.');
+    if (option.fits.some(fit => typeof fit.text !== 'string')) bad('Option response has an invalid shape.');
+    // Every approach cites the syllabus: when the model's quotes didn't hold up, cite the passage the rule chose it from.
+    if (!option.fits.some(fit => fit.span)) { const span = fallbackCitation(option.id, input); if (span) option.fits.push({ text: fallbackReason(option.id), span }); }
     if (!option.evidence.trim()) bad('Each approach needs an evidence caveat.');
     if (!/\b(?:varies|vary|depends|uncertain|limited|mixed|context|not a prediction|may)\b/i.test(option.evidence)) option.evidence += ' Results vary by context; this is not a prediction for your students.';
     option.tag = option.id === input.closest ? 'Closest to your syllabus' : option.tag.replace(/closest to your syllabus/ig, 'Alternative structure');
-    if (option.id === 'weekly') {
-      const expected = input.schedule.length ? input.schedule.filter(row => !row.empty).map(row => row.week) : Array.from({ length: input.weeks }, (_, index) => index + 1);
-      const actual = option.modules.flatMap(module => module.weeks);
-      if (option.modules.length !== expected.length || option.modules.some(module => module.weeks.length !== 1) || actual.some(week => !expected.includes(week)) || new Set(actual).size !== expected.length) bad('Weekly architecture needs one module per scheduled week or unit.');
-    }
     for (const module of option.modules) {
-      if (typeof module.title !== 'string' || typeof module.objective !== 'string' || typeof module.assessment !== 'string' || !Array.isArray(module.outcomeIds) || !Array.isArray(module.weeks) || !module.weeks.length || !Number.isInteger(module.lessons) || !Number.isFinite(module.lessonMinutes)) bad('Module response has an invalid shape.');
+      if (typeof module.title !== 'string' || typeof module.objective !== 'string' || typeof module.assessment !== 'string' || !Array.isArray(module.outcomeIds) || !Array.isArray(module.weeks) || !Number.isInteger(module.lessons) || !Number.isFinite(module.lessonMinutes)) bad('Module response has an invalid shape.');
       module.outcomeIds = [...new Set(module.outcomeIds.filter(code => codes.has(code)))];
-      if (module.weeks.some(week => !Number.isInteger(week) || week < 1 || week > input.weeks)) bad('Module week is outside the term.');
-      module.hours = Math.round(module.weeks.reduce((sum, week) => sum + (weekHours.get(week) ?? 0), 0) * 10) / 10;
+      module.weeks = module.weeks.filter(week => Number.isInteger(week) && week >= 1 && week <= input.weeks);
     }
+    option.modules = option.modules.filter(module => module.weeks.length);
+    if (!option.modules.length) bad('Option has no modules inside the term.');
+    if (option.id === 'weekly') {
+      // The weekly structure is the syllabus's own calendar: one module per scheduled week or row.
+      const rows = input.schedule.length ? input.schedule.filter(row => !row.empty) : Array.from({ length: input.weeks }, (_, index) => ({ week: index + 1, topic: `Week ${index + 1}`, due: '' }));
+      const expected = rows.map(row => row.week);
+      const actual = option.modules.flatMap(module => module.weeks);
+      if (option.modules.length !== expected.length || option.modules.some(module => module.weeks.length !== 1) || new Set(actual).size !== expected.length || actual.some(week => !expected.includes(week))) {
+        const template = option.modules[0];
+        option.modules = rows.map(row => {
+          const from = option.modules.find(module => module.weeks.includes(row.week));
+          return { title: row.topic || `Week ${row.week}`, objective: from?.objective ?? '', outcomeIds: from?.outcomeIds ?? [], weeks: [row.week], lessons: template.lessons, lessonMinutes: template.lessonMinutes, assessment: row.due || (from?.assessment ?? ''), hours: 0 };
+        });
+        option.changes += ' The weekly modules follow your schedule row by row.';
+      }
+    }
+    for (const module of option.modules) module.hours = Math.round(module.weeks.reduce((sum, week) => sum + (weekHours.get(week) ?? 0), 0) * 10) / 10;
     for (const outcome of input.confirmedOutcomes) {
       if (option.modules.some(module => module.outcomeIds.includes(outcome.code))) continue;
       const original = input.source.sections.find(section => section.text.includes(outcome.originalText));

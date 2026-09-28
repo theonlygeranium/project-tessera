@@ -241,7 +241,7 @@ const SCHEMAS: Record<AiTaskName, unknown> = {
   'syllabus-analyze': analysisSchema,
   'objective-rewrite': obj({ text: str, why: str }),
   'outcome-suggest': obj({ suggestions: { type: 'array', minItems: 3, maxItems: 6, items: obj({ text: str, why: str }) } }),
-  'structure-options': obj({ options: { type: 'array', minItems: 3, maxItems: 3, items: obj({ id: str, label: str, tag: str, description: str, fits: array(obj({ text: str, span: nullable(span) })), changes: str, tradeoffs: str, evidence: str, frameworks: array(str), modules: array(obj({ title: str, objective: str, outcomeIds: array(str), weeks: array(integer), lessons: integer, lessonMinutes: number, assessment: str, hours: number })), workload: obj({ averageHours: number, peakHours: number, peakModule: integer }) }) } }),
+  'structure-options': obj({ options: { type: 'array', minItems: 1, maxItems: 3, items: obj({ id: str, label: str, tag: str, description: str, fits: array(obj({ text: str, span: nullable(span) })), changes: str, tradeoffs: str, evidence: str, frameworks: array(str), modules: array(obj({ title: str, objective: str, outcomeIds: array(str), weeks: array(integer), lessons: integer, lessonMinutes: number, assessment: str, hours: number })), workload: obj({ averageHours: number, peakHours: number, peakModule: integer }) }) } }),
   tutor: obj({ text: str, citeIds: { type:'array', items:str } }),
   'tutor-summary': obj({ summary: str }),
   element: elementSchema('text'),

@@ -23,11 +23,15 @@ describe('structure option validation', () => {
     expect(options[0].changes).toContain('Outcome O6 was added');
     expect(options[0].tradeoffs).toContain('weekly budget');
   });
-  it('rejects wrong ids, bad weeks, false spans, and unsupported claims', async () => {
+  it('rejects wrong ids and unsupported claims, and repairs weeks and citations', async () => {
     const raw = (await fixtureAi.run('structure-options', input)).output;
     expect(() => finalizeOptions(raw.map(option => ({ ...option, id: 'case' as const })), input)).toThrow();
-    expect(() => finalizeOptions(raw.map((option, index) => index === 0 ? { ...option, modules: [{ ...option.modules[0], weeks: [16] }] } : option), input)).toThrow();
-    expect(() => finalizeOptions(raw.map((option, index) => index === 0 ? { ...option, fits: [{ text: 'Cited', span: { page: 9, text: 'invented' } }] } : option), input)).toThrow();
+    // A module entirely outside the term is dropped; an option left with none is rejected.
+    expect(() => finalizeOptions(raw.map((option, index) => index === 0 ? { ...option, modules: [{ ...option.modules[0], weeks: [16] }] } : option), input)).toThrow(/no modules inside the term/);
+    // An invented quote loses its citation, and the approach cites the passage the rule chose it from.
+    const repaired = finalizeOptions(raw.map((option, index) => index === 0 ? { ...option, fits: [{ text: 'Cited', span: { page: 9, text: 'invented passage that is not in the syllabus' } }] } : option), input);
+    expect(repaired[0].fits.find(fit => fit.text === 'Cited')?.span).toBeNull();
+    expect(repaired[0].fits.some(fit => fit.span)).toBe(true);
     expect(() => finalizeOptions(raw.map((option, index) => index === 0 ? { ...option, description: 'learning styles' } : option), input)).toThrow();
   });
   it('validates suggestions and makes deterministic combination notes', () => {
