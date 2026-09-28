@@ -19,6 +19,29 @@ describe('design questions from deterministic rules', () => {
   it('flags weights outside the 99–101 tolerance', () => { const x = extraction(); x.assessments[0].weightPercent = 10; expect(codes(x)).toContain('weights-not-100'); });
   it('asks about a mismatched week count when no row is empty', () => { const x = extraction(); const row = x.schedule.find(item => item.week === 8)!; row.topic = 'Midterm exam'; row.empty = false; expect(questionsFrom(problemsFrom(x), x, null).some(question => question.fromProblem === 'week-count-mismatch')).toBe(true); });
   it('flags a due date outside the term', () => { const x = extraction(); x.assessments[0].dueAt = '2027-01-01'; expect(codes(x)).toContain('due-outside-term'); });
+  it('parses only actual dates, resolves month and slash forms, and groups outside dates', () => {
+    const x = extraction();
+    const start = x.profile.termStart.value!;
+    const end = x.profile.termEnd.value!;
+    x.assessments.forEach(item => { item.dueAt = 'Weekly'; });
+    x.assessments[0].dueAt = 'Week 7'; x.assessments[1].dueAt = 'TBA';
+    expect(problemsFrom(x).filter(problem => problem.code === 'due-outside-term')).toHaveLength(0);
+    x.assessments[0].dueAt = 'Oct 15'; x.assessments[1].dueAt = 'October 15'; x.assessments[2].dueAt = '10/15';
+    expect(problemsFrom(x).filter(problem => problem.code === 'due-outside-term')).toHaveLength(0);
+    x.assessments[0].dueAt = start; x.assessments[1].dueAt = end;
+    expect(problemsFrom(x).filter(problem => problem.code === 'due-outside-term')).toHaveLength(0);
+    x.assessments[0].dueAt = '2026-12-14'; x.assessments[1].dueAt = '2026-12-15';
+    expect(problemsFrom(x).filter(problem => problem.code === 'due-outside-term')).toHaveLength(1);
+    x.assessments[2].dueAt = '2027-01-01';
+    const problems = problemsFrom(x).filter(problem => problem.code === 'due-outside-term');
+    expect(problems).toHaveLength(1);
+    expect(questionsFrom(problems, x, null).filter(question => question.fromProblem === 'due-outside-term')).toHaveLength(1);
+  });
+  it('uses the next year for a month far before a cross-year term start', () => {
+    const x = extraction(); x.assessments.forEach(item => { item.dueAt = 'TBA'; });
+    x.assessments[0].dueAt = 'Jan 15';
+    expect(problemsFrom(x, { start: '2026-12-01', end: '2027-03-31', holidays: [] }).filter(problem => problem.code === 'due-outside-term')).toHaveLength(0);
+  });
   it('asks for date confirmation and missing profile fields with the intended controls', () => {
     const x = extraction(); x.assessments[0].dueAt = '2027-01-01';
     const questions = questionsFrom(problemsFrom(x), x, null);

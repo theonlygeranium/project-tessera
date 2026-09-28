@@ -31,6 +31,12 @@ async function setup(env: Record<string, unknown> = {}) {
 }
 
 describe('document engine (Worker)', () => {
+  it('uses heading-grouped DOCX sections for design extraction while scanning remains unchanged', async () => {
+    const { engine, file } = await setup();
+    const extracted = await engine.extract(file);
+    expect(extracted.sections).toMatchObject([{ heading: 'Sampling basics', level: 1, lines: ['A sample is part of a population.'] }]);
+    expect(extracted.sections).toHaveLength(1);
+  });
   it('scans the stored version and reports it as a file target', async () => {
     const { engine, file } = await setup();
     const report = await engine.scan(file);

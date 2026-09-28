@@ -8,6 +8,17 @@ import type { ApiSpec } from '../../shared/api';
 type Struct = { role?: string; alt?: string; children?: Struct[]; type?: string; id?: string };
 const mul=(a:number[],b:number[])=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const clamp=(n:number)=>Math.max(0,Math.min(1,n));
+type LineItem = { str: string; transform: number[]; width: number };
+export function joinPdfLine(items: LineItem[]): string {
+  const sorted = [...items].sort((a, b) => a.transform[4] - b.transform[4]);
+  return sorted.reduce((line, item, index) => {
+    if (!index) return item.str.trim();
+    const prior = sorted[index - 1];
+    const gap = item.transform[4] - (prior.transform[4] + prior.width);
+    const size = Math.hypot(prior.transform[0], prior.transform[1]);
+    return line + (gap < size * 0.15 ? '' : ' ') + item.str.trim();
+  }, '').trim();
+}
 function walk(node:Struct, result:Struct[]=[]):Struct[] { result.push(node); for(const child of node.children??[]) walk(child,result); return result; }
 export async function checkPdf(bytes:ArrayBuffer):Promise<DocumentCheck>{
   const loading=getDocument({data:new Uint8Array(bytes.slice(0)),verbosity:0,useWorkerFetch:false,disableFontFace:true,disableAutoFetch:true});
@@ -31,10 +42,10 @@ export async function checkPdf(bytes:ArrayBuffer):Promise<DocumentCheck>{
       const figures=nodes.filter(n=>n.role==='Figure');
       const missingFigures=figures.filter(n=>!n.alt?.trim()).length;
       const pageLines=textItems.map(t=>({text:t.str,y:t.transform[5],x:t.transform[4]}));
-      const byLine=new Map<number,{text:string;x:number}[]>();
-      for(const item of pageLines){ const key=Math.round(item.y/3)*3; byLine.set(key,[...(byLine.get(key)??[]),{text:item.text,x:item.x}]); }
-      if([...byLine.values()].some(parts=>{ const line=parts.map(part=>part.text).join(' ').trim(); return line.length>=3 && line.length<=60 && !/[.!?]$/.test(line); })) heuristicHeadings++;
-      const lines=[...byLine].sort(([a],[b])=>b-a).map(([,parts])=>parts.sort((a,b)=>a.x-b.x).map(part=>part.text).join(' ').trim());
+      const byLine=new Map<number,LineItem[]>();
+      for(const item of textItems){ const key=Math.round(item.transform[5]/3)*3; byLine.set(key,[...(byLine.get(key)??[]),item as LineItem]); }
+      if([...byLine.values()].some(parts=>{ const line=parts.map(part=>part.str).join(' ').trim(); return line.length>=3 && line.length<=60 && !/[.!?]$/.test(line); })) heuristicHeadings++;
+      const lines=[...byLine].sort(([a],[b])=>b-a).map(([,parts])=>joinPdfLine(parts));
       if(tree && nodes.some(n=>n.type==='content')) {
         const ids=nodes.filter(n=>n.type==='content').map(n=>n.id).filter((id):id is string=>!!id);
         const positions=new Map<string,{x:number;y:number}>();

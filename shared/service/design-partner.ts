@@ -8,6 +8,7 @@ import { aiEnabled, canTeach, fail, provenance, required, user } from './helpers
 import { validateExtraction, validateRead, validateObjectiveRewrite } from './validate-design';
 import { estimateWorkload } from '../design/workload';
 import { problemsFrom, questionsFrom } from './design-rules';
+import { groundSpans } from './ground-spans';
 import { WORKFLOW_STALL_MS } from './generation';
 
 type Problem = SyllabusExtraction['problems'][number];
@@ -20,7 +21,19 @@ function cleanSource(source: DesignSource): { source: DesignSource; problems: Pr
   let remaining = MAX_CHARS;
   let clipped = false;
   let clippedAt: number | null = null;
-  const flattened = source.sections.flatMap((section, sectionIndex) => (section.lines ?? section.text.split('\n')).map(line => ({ line, sectionIndex })));
+  const pages = new Set(source.sections.map(section => section.page).filter((page): page is number => page !== null));
+  const repeated = new Map<string, Set<number>>();
+  if (pages.size >= 3) source.sections.forEach(section => {
+    if (section.page === null) return;
+    for (const line of section.lines ?? section.text.split('\n')) {
+      const key = line.trim().toLocaleLowerCase().replace(/\d/g, '#').replace(/\s+/g, ' ');
+      if (key) repeated.set(key, (repeated.get(key) ?? new Set()).add(section.page));
+    }
+  });
+  const running = new Set([...repeated].filter(([, seen]) => seen.size >= Math.ceil(pages.size / 2)).map(([key]) => key));
+  const flattened = source.sections.flatMap((section, sectionIndex) => (section.lines ?? section.text.split('\n'))
+    .filter(line => !running.has(line.trim().toLocaleLowerCase().replace(/\d/g, '#').replace(/\s+/g, ' ')))
+    .map(line => ({ line, sectionIndex })));
   const rosterRow = (line: string) => /(?:\||\t|\s{2,})/.test(line) && /[A-Za-z]{2,}/.test(line)
     || /^(?:\d{3,}\s+)?[A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+\d{3,})?$/.test(line.trim());
   const kept = source.sections.map(() => [] as string[]);
@@ -88,8 +101,8 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
       const rates = session.workloadRates ?? workloadRatesFor(institution.policy);
       const extraction = { ...session.extraction, problems: [...session.extraction.problems, ...problemsFrom(session.extraction)] };
       const allowed: ('tessera' | 'oscqr' | 'qm')[] = allowQm ? ['tessera', 'oscqr', 'qm'] : ['tessera', 'oscqr'];
-      const analyzed = await ctx.ai.run('syllabus-analyze', { extraction, profileAnswers: {}, rates, rubricRefsAllowed: allowed, sourceKind: session.source.kind });
-      const validated = validateRead(analyzed.output, extraction, session.source);
+      const analyzed = await ctx.ai.run('syllabus-analyze', { extraction, profileAnswers: {}, rates, rubricRefsAllowed: allowed, sourceKind: session.source.kind, sections: session.source.sections });
+      const validated = validateRead(groundSpans(analyzed.output, session.source).value, extraction, session.source);
       if (session.source.kind === 'brief' && validated.outcomeAudits.some(audit => audit.mager === null)) fail('invalid', 'The training brief read needs a Mager objective audit.');
       const audits = await Promise.all(validated.outcomeAudits.map(async audit => {
         if (audit.measurable) return audit;
@@ -104,9 +117,10 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
     const latest = await ctx.repo.getDesignSession(job.sessionId);
     if (!latest) return current;
     if (done === 0) {
-      const valid = validateExtraction(result!.output, latest.source);
+      const grounded = groundSpans(result!.output, latest.source);
+      const valid = validateExtraction(grounded.value, latest.source);
       const notes = JSON.parse(current.instruction || '[]') as Problem[];
-      const extraction: SyllabusExtraction = { ...valid, problems: notes, provenance: provenance(ctx, result!.model, 'syllabus-extract', `Read ${latest.source.name}`, latest.source.sections.map(section => ({ id: latest.source.fileId ?? latest.id, name: `${latest.source.name}${section.page ? ` p. ${section.page}` : ''}` }))) };
+      const extraction: SyllabusExtraction = { ...valid, problems: notes, provenance: provenance(ctx, result!.model, 'syllabus-extract', `Read ${latest.source.name}. ${grounded.unmatched} quote${grounded.unmatched === 1 ? '' : 's'} could not be matched to the syllabus.`, latest.source.sections.map(section => ({ id: latest.source.fileId ?? latest.id, name: `${latest.source.name}${section.page ? ` p. ${section.page}` : section.heading ? ` § ${section.heading}` : ''}` }))) };
       latest.extraction = extraction;
       latest.record.extraction = extraction;
     } else {
@@ -138,8 +152,11 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
   } catch (error) {
     const current = await ctx.repo.getGenerationJob(job.id);
     if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
+    const cause = error instanceof ApiError && error.details && typeof error.details === 'object' && 'cause' in error.details ? String(error.details.cause) : error instanceof Error ? error.message : String(error);
+    console.error(`syllabus-${done === 0 ? 'extract' : 'analyze'} failed:`, cause);
+    const reason = /cut off|length limit|truncat/i.test(cause) ? 'cut off at the length limit' : /timed? out|timeout|abort/i.test(cause) ? 'timed out' : /shape|schema|malformed|invalid json|unexpected token/i.test(cause) ? "response didn't match the expected shape" : 'AI service returned an error';
     current.state = 'failed';
-    current.error = error instanceof Error ? error.message : 'The syllabus could not be read.';
+    current.error = `The AI draft could not be created. Try again. (${reason})`;
     current.updatedAt = ctx.now();
     const latest = await ctx.repo.getDesignSession(job.sessionId);
     if (latest) { latest.provisioning = { jobId: current.id, done: current.done, total: current.total, error: current.error }; latest.updatedAt = ctx.now(); await ctx.repo.putDesignSession(latest); }

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../api';
 import { fixtureAi } from '../ai';
 import type { FileRecord } from '../domain';
 import { seedData } from '../seed';
@@ -72,7 +73,7 @@ describe('design partner service', () => {
     await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
     const failed = await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
     expect(failed.read).toBeNull();
-    expect(failed.provisioning?.error).toMatch(/invalid shape/);
+    expect(failed.provisioning?.error).toMatch(/expected shape/);
   });
   it('rejects malformed suggested rewrites without writing a read', async () => {
     const ctx = await context();
@@ -81,7 +82,7 @@ describe('design partner service', () => {
     await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
     const failed = await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
     expect(failed.read).toBeNull();
-    expect(failed.provisioning?.error).toMatch(/rewrite has an invalid shape/);
+    expect(failed.provisioning?.error).toMatch(/expected shape/);
   });
   it('confirms edited, reordered outcomes only after the read, records a contest, and recomputes rates', async () => {
     const ctx = await context();
@@ -133,6 +134,30 @@ describe('design partner service', () => {
     expect(documents!.extract).toHaveBeenCalledWith(file);
     expect(started.source).toMatchObject({ fileId: file.id, version: 1, ocr: true });
   });
+  it('removes page furniture repeated on at least half of three PDF pages', async () => {
+    const ctx = await context(); await ctx.repo.putFile(file);
+    const distinct = ['alpha', 'beta', 'gamma'];
+    const documents = { extract: async () => ({ sections: [1, 2, 3].map(page => ({ page, heading: '', level: 0, text: '', lines: [`${page} | P a g e`, `Unique ${distinct[page - 1]} content`] })), ocr: false }) } as unknown as ServiceContext['documents'];
+    const started = await service.createDesignSession({ ...ctx, documents }, { ...sample, sample: undefined, fileId: file.id });
+    expect(started.source.sections.flatMap(section => section.lines)).toEqual(['Unique alpha content', 'Unique beta content', 'Unique gamma content']);
+  });
+  it('logs the underlying cause and stores a short reason for extract and read failures', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const ctx = await context();
+      const broken = { run: async () => { throw new ApiError('ai-failed', 'The AI draft could not be created. Try again.', { cause: 'Error: cut off at length limit' }); } } as ServiceContext['ai'];
+      const first = await service.createDesignSession({ ...ctx, ai: broken }, sample);
+      const failed = await service.getDesignSession({ ...ctx, ai: broken }, { sessionId: first.id });
+      expect(failed.provisioning?.error).toContain('(cut off at the length limit)');
+      expect(log).toHaveBeenCalledWith('syllabus-extract failed:', 'Error: cut off at length limit');
+      const next = await service.createDesignSession(ctx, sample);
+      await service.getDesignSession(ctx, { sessionId: next.id });
+      const readAi = { run: async (task: never, input: never) => task === 'syllabus-analyze' ? Promise.reject(new Error('request timed out')) : fixtureAi.run(task, input) } as ServiceContext['ai'];
+      const readFailed = await service.getDesignSession({ ...ctx, ai: readAi }, { sessionId: next.id });
+      expect(readFailed.provisioning?.error).toContain('(timed out)');
+      expect(log).toHaveBeenCalledWith('syllabus-analyze failed:', 'request timed out');
+    } finally { log.mockRestore(); }
+  });
   it('rejects another course file and session access', async () => {
     const ctx = await context(); await ctx.repo.putFile({ ...file, courseId: 'c-comm120' });
     await expect(service.createDesignSession(ctx, { ...sample, sample: undefined, fileId: file.id })).rejects.toMatchObject({ code: 'forbidden' });
@@ -144,7 +169,7 @@ describe('design partner service', () => {
     const started = await service.createDesignSession({ ...ctx, ai: { run: async () => ({ output: { profile: null }, model: 'broken' }) } as ServiceContext['ai'] }, sample);
     const after = await service.getDesignSession({ ...ctx, ai: { run: async () => ({ output: { profile: null }, model: 'broken' }) } as ServiceContext['ai'] }, { sessionId: started.id });
     expect(after.extraction).toBeNull();
-    expect(after.provisioning?.error).toMatch(/invalid shape/);
+    expect(after.provisioning?.error).toMatch(/expected shape/);
     expect((await ctx.repo.getGenerationJob(started.provisioning!.jobId!))?.state).toBe('failed');
   });
   it('validates answers and saves an opted-in teaching note to a default profile', async () => {

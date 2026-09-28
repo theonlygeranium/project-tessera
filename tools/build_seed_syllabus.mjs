@@ -13,6 +13,13 @@ try {
   const bytes = await readFile(resolve(root, 'tests/fixtures/syllabus/STAT110_Syllabus_Fall2026.pdf'));
   const check = await checkDocument('pdf', bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
   const sections = check.text.sections.map(section => ({ page: section.page ?? null, heading: section.heading, level: section.level, text: section.text, lines: section.lines ?? section.text.split('\n') }));
+  if (sections.length >= 3) {
+    const seen = new Map();
+    const key = line => line.trim().toLowerCase().replace(/\d/g, '#').replace(/\s+/g, ' ');
+    sections.forEach(section => new Set(section.lines.map(key).filter(Boolean)).forEach(line => seen.set(line, (seen.get(line) ?? 0) + 1)));
+    const running = new Set([...seen].filter(([, count]) => count >= Math.ceil(sections.length / 2)).map(([line]) => line));
+    sections.forEach(section => { section.lines = section.lines.filter(line => !running.has(key(line))); section.text = section.lines.join('\n'); });
+  }
   const source = { kind: 'syllabus', fileId: null, version: null, name: 'STAT110_Syllabus_Fall2026.pdf', sections, chars: sections.reduce((n, section) => n + section.lines.join('\n').length, 0), ocr: false };
   await writeFile(resolve(root, 'shared/seed-syllabus.json'), `${JSON.stringify(source, null, 2)}\n`);
 } finally {

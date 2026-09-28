@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { elementSchema, palmyraClient, salvageBlocks } from './palmyra';
+import { elementSchema, palmyraClient, salvageBlocks, sourceText } from './palmyra';
 import { fixtureAi } from '../../shared/ai';
 import { validateBlockContent } from '../../shared/service/validate';
 import type { BlockType } from '../../shared/domain';
@@ -7,6 +7,14 @@ import seed from '../../shared/seed-syllabus.json';
 
 const block = (text: string) => ({ type: 'text', level: 2, text, tone: '', title: '', question: '', options: [], correctOptionId: '', feedbackCorrect: '', feedbackIncorrect: '' });
 const full = JSON.stringify({ blocks: [block('One "quoted" {brace}'), block('Two'), block('Three'), block('Four')] });
+
+describe('design source labels', () => {
+  it('labels PDF pages, DOCX headings and starts, and pasted text', () => {
+    expect(sourceText([{ page: 3, heading: '', level: 0, text: 'PDF', lines: ['PDF'] }], 100)).toBe('[p. 3] PDF');
+    expect(sourceText([{ page: null, heading: '', level: 0, text: 'Intro', lines: ['Intro'] }, { page: null, heading: 'Grading', level: 2, text: 'Quizzes', lines: ['Quizzes'] }], 100)).toBe('[§ start] Intro\n\n[§ Grading] Quizzes');
+    expect(sourceText([{ page: null, heading: '', level: 0, text: 'Paste', lines: ['Paste'] }], 100)).toBe('[pasted] Paste');
+  });
+});
 
 describe('salvageBlocks', () => {
   it('keeps every complete block before a cut-off', () => {

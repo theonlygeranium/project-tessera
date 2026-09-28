@@ -8,6 +8,61 @@ type Fix = ApiSpec['fixFileIssue']['input']['fix'];
 const read = async (zip: JSZip, name: string) => zip.file(name)?.async('string') ?? '';
 const meaningful = (value: string) => !!value.trim() && !/^(picture|image)\s*\d+$|\.(png|jpe?g|gif|svg|webp)$/i.test(value.trim());
 function paragraphText(xml: string, node: XmlNode): string { return content(xml, node, ['w:t']).trim(); }
+
+/** Design-partner reading order; Access continues to use checkDocx's paragraph sections. */
+export async function designDocxSections(bytes: ArrayBuffer): Promise<{ heading: string; level: number; text: string; lines: string[] }[]> {
+  const zip = await JSZip.loadAsync(bytes);
+  const xml = await read(zip, 'word/document.xml');
+  if (!xml) throw new Error('DOCX lacks word/document.xml');
+  const root = parseXml(xml);
+  const body = first(root, 'w:body') ?? root;
+  const visible = (node: XmlNode) => node.name !== 'mc:Fallback';
+  const parts = (node: XmlNode): string[] => {
+    if (!visible(node) || node.name === 'w:txbxContent') return [];
+    if (node.name === 'w:t') return [decodeXml(xml.slice(node.openEnd, node.closeStart))];
+    if (node.name === 'w:br' || node.name === 'w:cr') return ['\n'];
+    if (node.name === 'w:tab') return [' '];
+    return node.children.flatMap(parts);
+  };
+  const paragraphLines = (node: XmlNode) => parts(node).join('').split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const hasStyleHeading = descendants(body, 'w:p').some(p => /^Heading[1-6]$/i.test(first(p, 'w:pStyle')?.attrs['w:val'] ?? ''));
+  const sections: { heading: string; level: number; text: string; lines: string[] }[] = [];
+  let current = { heading: '', level: 0, text: '', lines: [] as string[] };
+  const flush = () => { if (current.heading || current.lines.length) sections.push({ ...current, text: current.lines.join('\n') }); };
+  const visit = (node: XmlNode): void => {
+    if (!visible(node)) return;
+    if (node.name === 'w:tbl') { node.children.filter(row => row.name === 'w:tr').forEach(row => {
+      const cells = row.children.filter(cell => cell.name === 'w:tc').map(cell => descendants(cell, 'w:p')
+        .filter(p => { for (let parent = p.parent; parent && parent !== cell; parent = parent.parent) if (parent.name === 'mc:Fallback') return false; return true; })
+        .flatMap(paragraphLines).join(' / '));
+      const line = cells.join(' | ').trim();
+      if (line) current.lines.push(line);
+    }); return; }
+    if (node.name === 'w:p') {
+      const lines = paragraphLines(node);
+      const value = lines.join(' ');
+      const style = first(node, 'w:pStyle')?.attrs['w:val'] ?? '';
+      const match = /^Heading([1-6])$/i.exec(style);
+      const runs = descendants(node, 'w:r').filter(run => content(xml, run, ['w:t']).trim());
+      const allBold = runs.length > 0 && runs.every(run => { const bold = first(run, 'w:b'); return bold && bold.attrs['w:val'] !== '0' && bold.attrs['w:val'] !== 'false'; });
+      const pseudo = !hasStyleHeading && value.length <= 80 && value.length > 0 && (allBold || (/\p{L}/u.test(value) && value === value.toLocaleUpperCase()) || /^\d+(?:\.\d+)*[.)]?\s+\S/.test(value));
+      if (match || pseudo) { flush(); current = { heading: value, level: match ? Number(match[1]) : 1, text: '', lines: [] }; }
+      else current.lines.push(...lines);
+      // Text boxes can sit inside a paragraph and are separate content in reading order.
+      node.children.forEach(child => { if (child.name !== 'w:pPr') visitTextBoxes(child); });
+      return;
+    }
+    node.children.forEach(visit);
+  };
+  const visitTextBoxes = (node: XmlNode): void => {
+    if (!visible(node)) return;
+    if (node.name === 'w:txbxContent') { node.children.forEach(visit); return; }
+    node.children.forEach(visitTextBoxes);
+  };
+  visit(body);
+  flush();
+  return sections;
+}
 function shade(node: XmlNode): string | undefined {
   for (let p: XmlNode | undefined = node; p; p = p.parent) { const fill = first(p, 'w:shd')?.attrs['w:fill']; if (fill && /^[0-9a-f]{6}$/i.test(fill)) return fill; }
   return undefined;

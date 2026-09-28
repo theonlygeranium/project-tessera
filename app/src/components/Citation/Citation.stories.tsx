@@ -5,3 +5,4 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Page: Story = {};
 export const Pasted: Story = { args: { span: { page: null, text: 'Training brief passage.' } } };
+export const Section: Story = { args: { span: { page: null, section: 'Grading and assessment policies for STAT 110', text: 'The project counts for 30%.' } } };

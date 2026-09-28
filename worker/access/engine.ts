@@ -10,6 +10,7 @@ import type { AccessReport, AccessibleFormat, Block, FileRecord, PageTranscripti
 import { canReadFile, type DocumentEngine, type ServiceContext } from '../../shared/service';
 import { describeImage, transcribePage, type VisionEnv } from '../ai/vision';
 import { applyFix, checkDocument, extractImage, type DocumentCheck } from './index';
+import { designDocxSections } from './office';
 import { extractPdfImages, pageConfidences, renderPdfPage, runOcr, type OcrContainer } from '../ocr';
 
 export interface EngineEnv extends VisionEnv { FILES: R2Bucket; OCR?: DurableObjectNamespace<OcrContainer>; OCR_INSTANCES?: string }
@@ -238,7 +239,7 @@ export function createDocumentEngine(env: EngineEnv): DocumentEngine {
         ocr = true;
       }
       if (!doc.document?.hasText) throw new ApiError('invalid', 'I could not find readable text in this file.');
-      return { sections: doc.text.sections, ocr };
+      return { sections: file.kind === 'docx' ? await designDocxSections(await bytesOf(env, file.key)) : doc.text.sections, ocr };
     },
     async scan(file): Promise<AccessReport> {
       const doc = await check(env, file);
