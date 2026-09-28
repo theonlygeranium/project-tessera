@@ -2,16 +2,19 @@
 // `put*` upserts. replaceBlocks, setEnrollments, deleteLesson, and reset each run
 // in one batch so a failure leaves the previous rows in place.
 import type {
-  AccessibleFormat, ActivityKind, Adaptation, ApiToken, Assignment, Block, BlockContent, BuilderSession, Course, FileRecord, Id, Institution, Invitation, Lesson, Module, Role, Submission, TutorSetting, User,
+  AccessibleFormat, ActivityKind, Adaptation, AlignableKind, ApiToken, Assignment, Block, BlockContent, BuilderSession, Certificate, CompletionEvent, Course, CourseTemplate, FileRecord, Id, Institution, Invitation, Lesson, ManagerConsent, Module, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Role, Rubric, Submission, TestOut, TutorSetting, User,
 } from '../shared/domain';
 import type {
-  AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession,
+  AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt,
 } from '../shared/repo';
 import type { SeedData } from '../shared/seed';
+import { ApiError } from '../shared/api';
 
 type SqlBind = string | number | null;
 
 const DELETE_ORDER = [
+  'manager_consents', 'reporting_lines', 'certificates', 'test_out_attempts', 'test_outs',
+  'completion_events', 'requirements', 'outcome_links', 'outcomes', 'readiness_items', 'rubrics', 'templates', 'programs',
   // Night 2 tables first (they reference users, courses, modules, files).
   'idempotency_keys', 'api_tokens', 'format_jobs', 'file_versions', 'access_scans', 'submissions', 'assignments',
   'tutor_sessions', 'tutor_settings', 'adaptations', 'invitations', 'generation_jobs', 'files',
@@ -136,7 +139,7 @@ export class D1Repo implements Repo {
     const rows = await this.all<LessonRow>(
       `SELECT l.* FROM lessons l
        JOIN modules m ON m.id = l.module_id
-       WHERE (? IS NULL OR l.course_id = ?) AND (? IS NULL OR l.module_id = ?)
+       WHERE l.variant_of IS NULL AND (? IS NULL OR l.course_id = ?) AND (? IS NULL OR l.module_id = ?)
        ORDER BY m.position, l.position, l.id`,
       [courseId, courseId, moduleId, moduleId],
     );
@@ -149,8 +152,8 @@ export class D1Repo implements Repo {
 
   async deleteLesson(id: Id): Promise<void> {
     await this.db.batch([
-      this.db.prepare('DELETE FROM blocks WHERE lesson_id = ?').bind(id),
-      this.db.prepare('DELETE FROM progress WHERE lesson_id = ?').bind(id),
+      this.db.prepare('DELETE FROM blocks WHERE lesson_id IN (SELECT id FROM lessons WHERE id = ? OR variant_of = ?)').bind(id, id),
+      this.db.prepare('DELETE FROM progress WHERE lesson_id IN (SELECT id FROM lessons WHERE id = ? OR variant_of = ?)').bind(id, id),
       this.db.prepare('DELETE FROM lessons WHERE id = ?').bind(id),
     ]);
   }
@@ -449,6 +452,101 @@ export class D1Repo implements Repo {
     return !!row && row.n > 0;
   }
 
+  async listVariantLessons(masterLessonId: Id): Promise<Lesson[]> {
+    return (await this.all<LessonRow>('SELECT * FROM lessons WHERE variant_of = ? ORDER BY variant_audience, id', [masterLessonId])).map(lessonFromRow);
+  }
+
+  async getProgram(id: Id): Promise<Program | null> { const r = await this.first<ProgramRow>('SELECT * FROM programs WHERE id = ?', [id]); return r ? programFromRow(r) : null; }
+  async listPrograms(): Promise<Program[]> { return (await this.all<ProgramRow>('SELECT * FROM programs ORDER BY name, id')).map(programFromRow); }
+  async putProgram(p: Program): Promise<void> { await this.programStmt(p).run(); }
+  async deleteProgram(id: Id): Promise<void> { await this.db.prepare('DELETE FROM programs WHERE id = ?').bind(id).run(); }
+
+  async getTemplate(id: Id): Promise<CourseTemplate | null> { const r = await this.first<TemplateRow>('SELECT * FROM templates WHERE id = ?', [id]); return r ? templateFromRow(r) : null; }
+  async listTemplates(): Promise<CourseTemplate[]> { return (await this.all<TemplateRow>('SELECT * FROM templates ORDER BY name, id')).map(templateFromRow); }
+  async putTemplate(t: CourseTemplate): Promise<void> { await this.templateStmt(t).run(); }
+  async deleteTemplate(id: Id): Promise<void> { await this.db.prepare('DELETE FROM templates WHERE id = ?').bind(id).run(); }
+
+  async getRubric(id: Id): Promise<Rubric | null> { const r = await this.first<RubricRow>('SELECT * FROM rubrics WHERE id = ?', [id]); return r ? rubricFromRow(r) : null; }
+  async listRubrics(): Promise<Rubric[]> { return (await this.all<RubricRow>('SELECT * FROM rubrics ORDER BY name, id')).map(rubricFromRow); }
+  async putRubric(r: Rubric): Promise<void> { await this.rubricStmt(r).run(); }
+  async deleteRubric(id: Id): Promise<void> { await this.db.prepare('DELETE FROM rubrics WHERE id = ?').bind(id).run(); }
+
+  async listReadinessItems(courseId: Id, rubricId: Id): Promise<StoredReadinessItem[]> {
+    return (await this.all<ReadinessRow>('SELECT * FROM readiness_items WHERE course_id = ? AND rubric_id = ? ORDER BY item_id', [courseId, rubricId])).map(readinessFromRow);
+  }
+  async putReadinessItem(item: StoredReadinessItem): Promise<void> { await this.readinessStmt(item).run(); }
+
+  async listOutcomes(courseId: Id): Promise<Outcome[]> { return (await this.all<OutcomeRow>('SELECT * FROM outcomes WHERE course_id = ? ORDER BY position, id', [courseId])).map(outcomeFromRow); }
+  async replaceOutcomes(courseId: Id, outcomes: Outcome[]): Promise<void> {
+    const ids = outcomes.map(x => x.id);
+    await this.db.batch([
+      this.db.prepare(`DELETE FROM outcomes WHERE course_id = ?${ids.length ? ` AND id NOT IN (${placeholders(ids.length)})` : ''}`).bind(courseId, ...ids),
+      ...outcomes.map(x => this.outcomeStmt(x)),
+    ]);
+  }
+  async listOutcomeLinks(filter: { courseId?: Id; targetKind?: AlignableKind; targetId?: Id }): Promise<OutcomeLink[]> {
+    const courseId = filter.courseId ?? null, kind = filter.targetKind ?? null, targetId = filter.targetId ?? null;
+    const rows = await this.all<OutcomeLinkRow>(`SELECT l.* FROM outcome_links l JOIN outcomes o ON o.id = l.outcome_id
+      WHERE (? IS NULL OR o.course_id = ?) AND (? IS NULL OR l.target_kind = ?) AND (? IS NULL OR l.target_id = ?)
+      ORDER BY l.outcome_id, l.target_kind, l.target_id`, [courseId, courseId, kind, kind, targetId, targetId]);
+    return rows.map(linkFromRow);
+  }
+  async setOutcomeLinks(targetKind: AlignableKind, targetId: Id, outcomeIds: Id[]): Promise<void> {
+    await this.db.batch([
+      this.db.prepare('DELETE FROM outcome_links WHERE target_kind = ? AND target_id = ?').bind(targetKind, targetId),
+      ...[...new Set(outcomeIds)].map(id => this.linkStmt({ outcomeId: id, targetKind, targetId })),
+    ]);
+  }
+
+  async getRequirement(id: Id): Promise<Requirement | null> { const r = await this.first<RequirementRow>('SELECT * FROM requirements WHERE id = ?', [id]); return r ? requirementFromRow(r) : null; }
+  async listRequirements(filter?: { targetKind?: Requirement['target']['kind']; targetId?: Id }): Promise<Requirement[]> {
+    const kind = filter?.targetKind ?? null, id = filter?.targetId ?? null;
+    return (await this.all<RequirementRow>('SELECT * FROM requirements WHERE (? IS NULL OR target_kind = ?) AND (? IS NULL OR target_id = ?) ORDER BY created_at DESC, id DESC', [kind, kind, id, id])).map(requirementFromRow);
+  }
+  async putRequirement(r: Requirement): Promise<void> { await this.requirementStmt(r).run(); }
+  async deleteRequirement(id: Id): Promise<void> { await this.db.prepare('DELETE FROM requirements WHERE id = ?').bind(id).run(); }
+
+  async appendCompletionEvent(e: CompletionEvent): Promise<void> { await this.completionEventStmt(e).run(); }
+  async listCompletionEvents(filter: { userId?: Id; courseId?: Id; since?: string }): Promise<CompletionEvent[]> {
+    const user = filter.userId ?? null, course = filter.courseId ?? null, since = filter.since ?? null;
+    return (await this.all<CompletionEventRow>('SELECT * FROM completion_events WHERE (? IS NULL OR user_id = ?) AND (? IS NULL OR course_id = ?) AND (? IS NULL OR at >= ?) ORDER BY at, id', [user, user, course, course, since, since])).map(eventFromRow);
+  }
+
+  async getTestOut(courseId: Id): Promise<TestOut | null> { const r = await this.first<TestOutRow>('SELECT * FROM test_outs WHERE course_id = ?', [courseId]); return r ? testOutFromRow(r) : null; }
+  async putTestOut(t: TestOut): Promise<void> { await this.testOutStmt(t).run(); }
+  async deleteTestOut(courseId: Id): Promise<void> { await this.db.prepare('DELETE FROM test_outs WHERE course_id = ?').bind(courseId).run(); }
+  async putTestOutAttempt(a: TestOutAttempt): Promise<void> { await this.testOutAttemptStmt(a).run(); }
+  async listTestOutAttempts(userId: Id, courseId: Id): Promise<TestOutAttempt[]> { return (await this.all<TestOutAttemptRow>('SELECT * FROM test_out_attempts WHERE user_id = ? AND course_id = ? ORDER BY at, id', [userId, courseId])).map(attemptFromRow); }
+
+  async getCertificate(id: Id): Promise<Certificate | null> { const r = await this.first<CertificateRow>('SELECT * FROM certificates WHERE id = ?', [id]); return r ? certificateFromRow(r) : null; }
+  async getCertificateByCode(code: string): Promise<Certificate | null> { const r = await this.first<CertificateRow>('SELECT * FROM certificates WHERE code = ?', [code]); return r ? certificateFromRow(r) : null; }
+  async listCertificates(filter: { userId?: Id; courseId?: Id }): Promise<Certificate[]> {
+    const user = filter.userId ?? null, course = filter.courseId ?? null;
+    return (await this.all<CertificateRow>('SELECT * FROM certificates WHERE (? IS NULL OR user_id = ?) AND (? IS NULL OR course_id = ?) ORDER BY issued_at DESC, id DESC', [user, user, course, course])).map(certificateFromRow);
+  }
+  async insertCertificate(c: Certificate): Promise<void> { await this.certificateStmt(c).run(); }
+  async markCertificateReplaced(id: Id, replacedBy: Id): Promise<void> {
+    const result = await this.db.prepare('UPDATE certificates SET replaced_by = ? WHERE id = ? AND replaced_by IS NULL').bind(replacedBy, id).run();
+    if (result.meta.changes !== 1) throw new ApiError('conflict', 'Certificate is missing or already replaced.');
+  }
+
+  async listReportingLines(filter: { managerId?: Id; reportId?: Id }): Promise<ReportingLine[]> {
+    const manager = filter.managerId ?? null, report = filter.reportId ?? null;
+    return (await this.all<ReportingLineRow>('SELECT * FROM reporting_lines WHERE (? IS NULL OR manager_id = ?) AND (? IS NULL OR report_id = ?) ORDER BY manager_id, report_id', [manager, manager, report, report])).map(reportingFromRow);
+  }
+  async putReportingLine(line: ReportingLine): Promise<void> { await this.reportingLineStmt(line).run(); }
+  async deleteReportingLine(managerId: Id, reportId: Id): Promise<void> {
+    await this.db.batch([
+      this.db.prepare('DELETE FROM reporting_lines WHERE manager_id = ? AND report_id = ?').bind(managerId, reportId),
+      this.db.prepare('DELETE FROM manager_consents WHERE manager_id = ? AND report_id = ?').bind(managerId, reportId),
+    ]);
+  }
+  async listManagerConsents(filter: { managerId?: Id; reportId?: Id }): Promise<ManagerConsent[]> {
+    const manager = filter.managerId ?? null, report = filter.reportId ?? null;
+    return (await this.all<ConsentRow>('SELECT * FROM manager_consents WHERE (? IS NULL OR manager_id = ?) AND (? IS NULL OR report_id = ?) ORDER BY manager_id, report_id', [manager, manager, report, report])).map(consentFromRow);
+  }
+  async putManagerConsent(c: ManagerConsent): Promise<void> { await this.managerConsentStmt(c).run(); }
+
   async isEmpty(): Promise<boolean> {
     const row = await this.first<{ i: number; u: number }>('SELECT (SELECT count(*) FROM institution) AS i, (SELECT count(*) FROM users) AS u');
     return !row || row.i === 0 || row.u === 0;
@@ -459,10 +557,22 @@ export class D1Repo implements Repo {
       ...DELETE_ORDER.map((table) => this.db.prepare(`DELETE FROM ${table}`)),
       this.institutionStmt(seed.institution),
       ...seed.users.map((user) => this.userStmt(user)),
+      ...(seed.programs ?? []).map((p) => this.programStmt(p)),
+      ...(seed.templates ?? []).map((t) => this.templateStmt(t)),
       ...seed.courses.map((course) => this.courseStmt(course)),
       ...seed.modules.map((module) => this.moduleStmt(module)),
-      ...seed.lessons.map((lesson) => this.lessonStmt(lesson)),
+      ...[...seed.lessons].sort((a, b) => Number(!!a.variantOf) - Number(!!b.variantOf)).map((lesson) => this.lessonStmt(lesson)),
       ...seed.blocks.map((block) => this.blockStmt(block)),
+      ...(seed.rubrics ?? []).map((r) => this.rubricStmt(r)),
+      ...(seed.outcomes ?? seed.courses.flatMap(course => course.outcomes.flatMap((value, i) => value.trim() ? [{ id: `${course.id}-o${i + 1}`, courseId: course.id, code: `O${i + 1}`, text: value, position: i }] : []))).map((o) => this.outcomeStmt(o)),
+      ...(seed.outcomeLinks ?? []).map((link) => this.linkStmt(link)),
+      ...(seed.requirements ?? []).map((r) => this.requirementStmt(r)),
+      ...(seed.completionEvents ?? []).map((e) => this.completionEventStmt(e)),
+      ...(seed.testOuts ?? []).map((t) => this.testOutStmt(t)),
+      ...(seed.testOutAttempts ?? []).map((a) => this.testOutAttemptStmt(a)),
+      ...(seed.certificates ?? []).map((c) => this.certificateStmt(c)),
+      ...(seed.reportingLines ?? []).map((line) => this.reportingLineStmt(line)),
+      ...(seed.managerConsents ?? []).map((c) => this.managerConsentStmt(c)),
       ...seed.assignments.map((assignment) => this.assignmentStmt(assignment)),
       ...seed.submissions.map((submission) => this.submissionStmt(submission)),
       ...seed.tutorSettings.map((s) => this.db.prepare('INSERT INTO tutor_settings (activity_kind,activity_id,mode,max_hints,allowed_source_ids,set_by,set_at) VALUES (?,?,?,?,?,?,?)').bind(s.activityKind,s.activityId,s.mode,s.maxHints,JSON.stringify(s.allowedSourceIds),s.setBy,s.setAt)),
@@ -488,15 +598,17 @@ export class D1Repo implements Repo {
 
   private institutionStmt(institution: Institution): D1PreparedStatement {
     return this.db.prepare(
-      `INSERT INTO institution (id, name, short_name, accent, setup_complete, policy, access_policy)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO institution (id, name, short_name, accent, setup_complete, policy, access_policy, template_id, readiness_policy)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          short_name = excluded.short_name,
          accent = excluded.accent,
          setup_complete = excluded.setup_complete,
          policy = excluded.policy,
-         access_policy = excluded.access_policy`,
+         access_policy = excluded.access_policy,
+         template_id = excluded.template_id,
+         readiness_policy = excluded.readiness_policy`,
     ).bind(
       institution.id,
       institution.name,
@@ -505,6 +617,8 @@ export class D1Repo implements Repo {
       bit(institution.setupComplete),
       JSON.stringify(institution.policy),
       JSON.stringify(institution.accessPolicy),
+      institution.templateId ?? null,
+      jsonOrNull(institution.readinessPolicy),
     );
   }
 
@@ -523,8 +637,8 @@ export class D1Repo implements Repo {
 
   private courseStmt(course: Course): D1PreparedStatement {
     return this.db.prepare(
-      `INSERT INTO courses (id, code, title, term, description, welcome, outcomes, instructor_ids, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO courses (id, code, title, term, description, welcome, outcomes, instructor_ids, status, program_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          code = excluded.code,
          title = excluded.title,
@@ -533,7 +647,8 @@ export class D1Repo implements Repo {
          welcome = excluded.welcome,
          outcomes = excluded.outcomes,
          instructor_ids = excluded.instructor_ids,
-         status = excluded.status`,
+         status = excluded.status,
+         program_id = excluded.program_id`,
     ).bind(
       course.id,
       course.code,
@@ -544,6 +659,7 @@ export class D1Repo implements Repo {
       JSON.stringify(course.outcomes),
       JSON.stringify(course.instructorIds),
       course.status,
+      course.programId ?? null,
     );
   }
 
@@ -553,19 +669,21 @@ export class D1Repo implements Repo {
 
   private moduleStmt(module: Module): D1PreparedStatement {
     return this.db.prepare(
-      `INSERT INTO modules (id, course_id, title, position)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO modules (id, course_id, title, position, objective, template_key)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          course_id = excluded.course_id,
          title = excluded.title,
-         position = excluded.position`,
-    ).bind(module.id, module.courseId, module.title, module.position);
+         position = excluded.position,
+         objective = excluded.objective,
+         template_key = excluded.template_key`,
+    ).bind(module.id, module.courseId, module.title, module.position, module.objective ?? null, module.templateKey ?? null);
   }
 
   private lessonStmt(lesson: Lesson): D1PreparedStatement {
     return this.db.prepare(
-      `INSERT INTO lessons (id, module_id, course_id, title, minutes, position, status, published_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO lessons (id, module_id, course_id, title, minutes, position, status, published_at, template_key, variant_of, variant_audience)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          module_id = excluded.module_id,
          course_id = excluded.course_id,
@@ -573,7 +691,10 @@ export class D1Repo implements Repo {
          minutes = excluded.minutes,
          position = excluded.position,
          status = excluded.status,
-         published_at = excluded.published_at`,
+         published_at = excluded.published_at,
+         template_key = excluded.template_key,
+         variant_of = excluded.variant_of,
+         variant_audience = excluded.variant_audience`,
     ).bind(
       lesson.id,
       lesson.moduleId,
@@ -583,13 +704,16 @@ export class D1Repo implements Repo {
       lesson.position,
       lesson.status,
       lesson.publishedAt,
+      lesson.templateKey ?? null,
+      lesson.variantOf?.lessonId ?? null,
+      lesson.variantOf?.audience ?? null,
     );
   }
 
   private blockStmt(block: Block): D1PreparedStatement {
     return this.db.prepare(
-      `INSERT INTO blocks (id, lesson_id, position, type, content, origin, ai_state, provenance, previous, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO blocks (id, lesson_id, position, type, content, origin, ai_state, provenance, previous, updated_at, template_key, source_block_id, source_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          lesson_id = excluded.lesson_id,
          position = excluded.position,
@@ -599,7 +723,10 @@ export class D1Repo implements Repo {
          ai_state = excluded.ai_state,
          provenance = excluded.provenance,
          previous = excluded.previous,
-         updated_at = excluded.updated_at`,
+         updated_at = excluded.updated_at,
+         template_key = excluded.template_key,
+         source_block_id = excluded.source_block_id,
+         source_hash = excluded.source_hash`,
     ).bind(
       block.id,
       block.lessonId,
@@ -611,6 +738,9 @@ export class D1Repo implements Repo {
       jsonOrNull(block.provenance),
       jsonOrNull(block.previous),
       block.updatedAt,
+      block.templateKey ?? null,
+      block.source?.blockId ?? null,
+      block.source?.hash ?? null,
     );
   }
 
@@ -710,6 +840,71 @@ export class D1Repo implements Repo {
         before_value = excluded.before_value, after_value = excluded.after_value, undone_at = excluded.undone_at`)
       .bind(value.id, value.studentId, value.kind, value.why, JSON.stringify({ value: value.before }), JSON.stringify({ value: value.after }), value.appliedAt, value.undoneAt);
   }
+
+  private programStmt(p: Program): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO programs (id,name,description,template_id,brand,created_at) VALUES (?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,template_id=excluded.template_id,brand=excluded.brand,created_at=excluded.created_at`)
+      .bind(p.id, p.name, p.description, p.templateId, JSON.stringify(p.brand), p.createdAt);
+  }
+  private templateStmt(t: CourseTemplate): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO templates (id,name,description,owner_kind,program_id,body,updated_by,updated_at) VALUES (?,?,?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,owner_kind=excluded.owner_kind,program_id=excluded.program_id,body=excluded.body,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
+      .bind(t.id, t.name, t.description, t.owner.kind, t.owner.kind === 'program' ? t.owner.programId : null,
+        JSON.stringify({ modules: t.modules, tutorDefaults: t.tutorDefaults, accessFloor: t.accessFloor }), t.updatedBy, t.updatedAt);
+  }
+  private rubricStmt(r: Rubric): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO rubrics (id,name,version,attribution,standards,updated_at) VALUES (?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,version=excluded.version,attribution=excluded.attribution,standards=excluded.standards,updated_at=excluded.updated_at`)
+      .bind(r.id, r.name, r.version, r.attribution, JSON.stringify(r.standards), r.updatedAt);
+  }
+  private readinessStmt(item: StoredReadinessItem): D1PreparedStatement {
+    if (!item.finding && !item.attestation) return this.db.prepare('DELETE FROM readiness_items WHERE course_id = ? AND rubric_id = ? AND item_id = ?').bind(item.courseId, item.rubricId, item.itemId);
+    return this.db.prepare(`INSERT INTO readiness_items (course_id,rubric_id,item_id,finding,attestation,updated_at) VALUES (?,?,?,?,?,?)
+      ON CONFLICT(course_id,rubric_id,item_id) DO UPDATE SET finding=excluded.finding,attestation=excluded.attestation,updated_at=excluded.updated_at`)
+      .bind(item.courseId, item.rubricId, item.itemId, jsonOrNull(item.finding), jsonOrNull(item.attestation), item.updatedAt);
+  }
+  private outcomeStmt(o: Outcome): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO outcomes (id,course_id,code,text,position) VALUES (?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET course_id=excluded.course_id,code=excluded.code,text=excluded.text,position=excluded.position`)
+      .bind(o.id, o.courseId, o.code, o.text, o.position);
+  }
+  private linkStmt(link: OutcomeLink): D1PreparedStatement {
+    return this.db.prepare('INSERT INTO outcome_links (outcome_id,target_kind,target_id) VALUES (?,?,?)').bind(link.outcomeId, link.targetKind, link.targetId);
+  }
+  private requirementStmt(r: Requirement): D1PreparedStatement {
+    const targetId = r.target.kind === 'course' ? r.target.courseId : r.target.programId;
+    return this.db.prepare(`INSERT INTO requirements (id,target_kind,target_id,audience,due_at,recurrence,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET target_kind=excluded.target_kind,target_id=excluded.target_id,audience=excluded.audience,due_at=excluded.due_at,recurrence=excluded.recurrence,created_by=excluded.created_by,created_at=excluded.created_at`)
+      .bind(r.id, r.target.kind, targetId, JSON.stringify(r.audience), r.dueAt, r.recurrence, r.createdBy, r.createdAt);
+  }
+  private completionEventStmt(e: CompletionEvent): D1PreparedStatement {
+    return this.db.prepare('INSERT INTO completion_events (id,at,user_id,course_id,requirement_id,kind,actor_id,detail) VALUES (?,?,?,?,?,?,?,?)')
+      .bind(e.id, e.at, e.userId, e.courseId, e.requirementId, e.kind, e.actorId, e.detail);
+  }
+  private testOutStmt(t: TestOut): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO test_outs (course_id,items,pass_percent,updated_by,updated_at) VALUES (?,?,?,?,?)
+      ON CONFLICT(course_id) DO UPDATE SET items=excluded.items,pass_percent=excluded.pass_percent,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
+      .bind(t.courseId, JSON.stringify(t.items), t.passPercent, t.updatedBy, t.updatedAt);
+  }
+  private testOutAttemptStmt(a: TestOutAttempt): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO test_out_attempts (id,course_id,user_id,percent,passed,at) VALUES (?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET course_id=excluded.course_id,user_id=excluded.user_id,percent=excluded.percent,passed=excluded.passed,at=excluded.at`)
+      .bind(a.id, a.courseId, a.userId, a.percent, bit(a.passed), a.at);
+  }
+  private certificateStmt(c: Certificate): D1PreparedStatement {
+    return this.db.prepare('INSERT INTO certificates (id,code,user_id,learner_name,course_id,course_title,issued_at,basis,replaces,replaced_by) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .bind(c.id, c.code, c.userId, c.learnerName, c.courseId, c.courseTitle, c.issuedAt, c.basis, c.replaces, c.replacedBy);
+  }
+  private reportingLineStmt(line: ReportingLine): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO reporting_lines (manager_id,report_id,created_by,created_at) VALUES (?,?,?,?)
+      ON CONFLICT(manager_id,report_id) DO UPDATE SET created_by=excluded.created_by`)
+      .bind(line.managerId, line.reportId, line.createdBy, line.createdAt);
+  }
+  private managerConsentStmt(c: ManagerConsent): D1PreparedStatement {
+    return this.db.prepare(`INSERT INTO manager_consents (manager_id,report_id,sharing,at) VALUES (?,?,?,?)
+      ON CONFLICT(manager_id,report_id) DO UPDATE SET sharing=excluded.sharing,at=excluded.at`)
+      .bind(c.managerId, c.reportId, bit(c.sharing), c.at);
+  }
 }
 
 interface InvitationRow extends Record<string, unknown> { user_id: string; email: string; invited_by: string; invited_at: string; access_granted: number; access_error: string | null; accepted_at: string | null }
@@ -763,7 +958,7 @@ function parseJson<T>(value: unknown): T {
 
 function contentJson(block: Block): string {
   // Every block type: the content is the block minus its metadata columns.
-  const { id: _id, lessonId: _l, position: _p, origin: _o, aiState: _a, provenance: _pr, previous: _pv, updatedAt: _u, ...content } = block;
+  const { id: _id, lessonId: _l, position: _p, origin: _o, aiState: _a, provenance: _pr, previous: _pv, updatedAt: _u, templateKey: _t, source: _s, ...content } = block;
   return JSON.stringify(content);
 }
 
@@ -786,6 +981,37 @@ function tokenFromRow(r: TokenRow): ApiToken & { hash: string } {
   return { id: r.id, name: r.name, prefix: r.prefix, hash: r.hash, scopes: JSON.parse(r.scopes), ownerId: r.owner_id, createdAt: r.created_at, expiresAt: r.expires_at, lastUsedAt: r.last_used_at, revokedAt: r.revoked_at };
 }
 
+interface ProgramRow extends Record<string, unknown> { id: Id; name: string; description: string; template_id: Id | null; brand: string; created_at: string }
+const programFromRow = (r: ProgramRow): Program => ({ id: r.id, name: r.name, description: r.description, templateId: r.template_id, brand: parseJson(r.brand), createdAt: r.created_at });
+interface TemplateRow extends Record<string, unknown> { id: Id; name: string; description: string; owner_kind: CourseTemplate['owner']['kind']; program_id: Id | null; body: string; updated_by: Id; updated_at: string }
+function templateFromRow(r: TemplateRow): CourseTemplate {
+  const body = parseJson<Pick<CourseTemplate, 'modules' | 'tutorDefaults' | 'accessFloor'>>(r.body);
+  return { id: r.id, name: r.name, description: r.description, owner: r.owner_kind === 'program' ? { kind: 'program', programId: r.program_id! } : { kind: 'institution' },
+    ...body, updatedBy: r.updated_by, updatedAt: r.updated_at };
+}
+interface RubricRow extends Record<string, unknown> { id: Id; name: string; version: string; attribution: string | null; standards: string; updated_at: string }
+const rubricFromRow = (r: RubricRow): Rubric => ({ id: r.id, name: r.name, source: 'custom', version: r.version, attribution: r.attribution, builtIn: false, standards: parseJson(r.standards), updatedAt: r.updated_at });
+interface ReadinessRow extends Record<string, unknown> { course_id: Id; rubric_id: Id; item_id: Id; finding: string | null; attestation: string | null; updated_at: string }
+const readinessFromRow = (r: ReadinessRow): StoredReadinessItem => ({ courseId: r.course_id, rubricId: r.rubric_id, itemId: r.item_id, finding: r.finding === null ? null : parseJson(r.finding), attestation: r.attestation === null ? null : parseJson(r.attestation), updatedAt: r.updated_at });
+interface OutcomeRow extends Record<string, unknown> { id: Id; course_id: Id; code: string; text: string; position: number }
+const outcomeFromRow = (r: OutcomeRow): Outcome => ({ id: r.id, courseId: r.course_id, code: r.code, text: r.text, position: r.position });
+interface OutcomeLinkRow extends Record<string, unknown> { outcome_id: Id; target_kind: AlignableKind; target_id: Id }
+const linkFromRow = (r: OutcomeLinkRow): OutcomeLink => ({ outcomeId: r.outcome_id, targetKind: r.target_kind, targetId: r.target_id });
+interface RequirementRow extends Record<string, unknown> { id: Id; target_kind: Requirement['target']['kind']; target_id: Id; audience: string; due_at: string | null; recurrence: Requirement['recurrence']; created_by: Id; created_at: string }
+const requirementFromRow = (r: RequirementRow): Requirement => ({ id: r.id, target: r.target_kind === 'course' ? { kind: 'course', courseId: r.target_id } : { kind: 'program', programId: r.target_id }, audience: parseJson(r.audience), dueAt: r.due_at, recurrence: r.recurrence, createdBy: r.created_by, createdAt: r.created_at });
+interface CompletionEventRow extends Record<string, unknown> { id: Id; at: string; user_id: Id; course_id: Id; requirement_id: Id | null; kind: CompletionEvent['kind']; actor_id: Id | null; detail: string }
+const eventFromRow = (r: CompletionEventRow): CompletionEvent => ({ id: r.id, at: r.at, userId: r.user_id, courseId: r.course_id, requirementId: r.requirement_id, kind: r.kind, actorId: r.actor_id, detail: r.detail });
+interface TestOutRow extends Record<string, unknown> { course_id: Id; items: string; pass_percent: number; updated_by: Id; updated_at: string }
+const testOutFromRow = (r: TestOutRow): TestOut => ({ courseId: r.course_id, items: parseJson(r.items), passPercent: r.pass_percent, updatedBy: r.updated_by, updatedAt: r.updated_at });
+interface TestOutAttemptRow extends Record<string, unknown> { id: Id; course_id: Id; user_id: Id; percent: number; passed: number; at: string }
+const attemptFromRow = (r: TestOutAttemptRow): TestOutAttempt => ({ id: r.id, courseId: r.course_id, userId: r.user_id, percent: r.percent, passed: flag(r.passed), at: r.at });
+interface CertificateRow extends Record<string, unknown> { id: Id; code: string; user_id: Id; learner_name: string; course_id: Id; course_title: string; issued_at: string; basis: Certificate['basis']; replaces: Id | null; replaced_by: Id | null }
+const certificateFromRow = (r: CertificateRow): Certificate => ({ id: r.id, code: r.code, userId: r.user_id, learnerName: r.learner_name, courseId: r.course_id, courseTitle: r.course_title, issuedAt: r.issued_at, basis: r.basis, replaces: r.replaces, replacedBy: r.replaced_by });
+interface ReportingLineRow extends Record<string, unknown> { manager_id: Id; report_id: Id; created_by: Id; created_at: string }
+const reportingFromRow = (r: ReportingLineRow): ReportingLine => ({ managerId: r.manager_id, reportId: r.report_id, createdBy: r.created_by, createdAt: r.created_at });
+interface ConsentRow extends Record<string, unknown> { manager_id: Id; report_id: Id; sharing: number; at: string }
+const consentFromRow = (r: ConsentRow): ManagerConsent => ({ managerId: r.manager_id, reportId: r.report_id, sharing: flag(r.sharing), at: r.at });
+
 interface InstitutionRow extends Record<string, unknown> {
   id: string;
   name: string;
@@ -794,6 +1020,8 @@ interface InstitutionRow extends Record<string, unknown> {
   setup_complete: number;
   policy: string;
   access_policy: string | null;
+  template_id: string | null;
+  readiness_policy: string | null;
 }
 
 interface UserRow extends Record<string, unknown> {
@@ -815,6 +1043,7 @@ interface CourseRow extends Record<string, unknown> {
   outcomes: string;
   instructor_ids: string;
   status: Course['status'];
+  program_id: string | null;
 }
 
 interface EnrollmentRow extends Record<string, unknown> {
@@ -827,6 +1056,8 @@ interface ModuleRow extends Record<string, unknown> {
   course_id: string;
   title: string;
   position: number;
+  objective: string | null;
+  template_key: string | null;
 }
 
 interface LessonRow extends Record<string, unknown> {
@@ -838,6 +1069,9 @@ interface LessonRow extends Record<string, unknown> {
   position: number;
   status: Lesson['status'];
   published_at: string | null;
+  template_key: string | null;
+  variant_of: string | null;
+  variant_audience: NonNullable<Lesson['variantOf']>['audience'] | null;
 }
 
 interface BlockRow extends Record<string, unknown> {
@@ -851,6 +1085,9 @@ interface BlockRow extends Record<string, unknown> {
   provenance: string | null;
   previous: string | null;
   updated_at: string;
+  template_key: string | null;
+  source_block_id: string | null;
+  source_hash: string | null;
 }
 
 interface AnnouncementRow extends Record<string, unknown> {
@@ -898,6 +1135,8 @@ function institutionFromRow(row: InstitutionRow): Institution {
     setupComplete: flag(row.setup_complete),
     policy: parseJson(row.policy),
     accessPolicy: row.access_policy ? parseJson(row.access_policy) : { minimumScore: 0, blockingSeverities: ['critical'] },
+    ...(row.template_id !== null ? { templateId: row.template_id } : {}),
+    ...(row.readiness_policy !== null ? { readinessPolicy: parseJson(row.readiness_policy) } : {}),
   };
 }
 
@@ -923,11 +1162,14 @@ function courseFromRow(row: CourseRow): Course {
     outcomes: parseJson(row.outcomes),
     instructorIds: parseJson(row.instructor_ids),
     status: row.status,
+    ...(row.program_id !== null ? { programId: row.program_id } : {}),
   };
 }
 
 function moduleFromRow(row: ModuleRow): Module {
-  return { id: row.id, courseId: row.course_id, title: row.title, position: row.position };
+  return { id: row.id, courseId: row.course_id, title: row.title, position: row.position,
+    ...(row.objective !== null ? { objective: row.objective } : {}),
+    ...(row.template_key !== null ? { templateKey: row.template_key } : {}) };
 }
 
 function lessonFromRow(row: LessonRow): Lesson {
@@ -940,6 +1182,8 @@ function lessonFromRow(row: LessonRow): Lesson {
     position: row.position,
     status: row.status,
     publishedAt: row.published_at,
+    ...(row.template_key !== null ? { templateKey: row.template_key } : {}),
+    ...(row.variant_of !== null && row.variant_audience !== null ? { variantOf: { lessonId: row.variant_of, audience: row.variant_audience } } : {}),
   };
 }
 
@@ -955,6 +1199,8 @@ function blockFromRow(row: BlockRow): Block {
     provenance: row.provenance == null ? null : parseJson(row.provenance),
     previous: row.previous == null ? null : parseJson(row.previous),
     updatedAt: row.updated_at,
+    ...(row.template_key !== null ? { templateKey: row.template_key } : {}),
+    ...(row.source_block_id !== null && row.source_hash !== null ? { source: { blockId: row.source_block_id, hash: row.source_hash } } : {}),
   };
 }
 

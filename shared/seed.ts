@@ -2,9 +2,9 @@
 // the D1 database (on first request, and on "Reset demo data"). Deterministic: no
 // random ids or clocks, so tests and screenshots are stable.
 import type {
-  Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, Id, Institution, Invitation, Lesson, LessonProgress, Module, Submission, Timestamp, TutorSetting, User,
+  Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Certificate, CompletionEvent, Course, CourseTemplate, FileRecord, Id, Institution, Invitation, Lesson, LessonProgress, ManagerConsent, Module, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, Submission, TestOut, Timestamp, TutorSetting, User,
 } from './domain';
-import type { FileVersion, GenerationJob, StoredFormat, StoredScan, StoredTutorSession } from './repo';
+import type { FileVersion, GenerationJob, StoredFormat, StoredScan, StoredTutorSession, TestOutAttempt } from './repo';
 
 export interface SeedData {
   institution: Institution;
@@ -31,6 +31,18 @@ export interface SeedData {
   fileVersions: FileVersion[];
   scans: StoredScan[];
   formats: StoredFormat[];
+  programs?: Program[];
+  templates?: CourseTemplate[];
+  rubrics?: Rubric[];
+  outcomes?: Outcome[];
+  outcomeLinks?: OutcomeLink[];
+  requirements?: Requirement[];
+  completionEvents?: CompletionEvent[];
+  testOuts?: TestOut[];
+  testOutAttempts?: TestOutAttempt[];
+  certificates?: Certificate[];
+  reportingLines?: ReportingLine[];
+  managerConsents?: ManagerConsent[];
 }
 
 /** Demo "now". The seed's timestamps sit in the week before it. */
