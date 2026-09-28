@@ -153,7 +153,10 @@ export const tutor: Pick<Service, 'getTutorSetting' | 'setTutorSetting' | 'start
         .sort((a,b) => b.at.localeCompare(a.at)).slice(0,40).map(q => q.text);
       const ai = await ctx.ai.run('tutor-summary', { courseTitle:course.title, questions });
       // A summary that reproduces a message verbatim is withheld rather than exposing a transcript.
-      const summary = questions.some(q => q.length >= 12 && ai.output.summary.includes(q))
+      const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+      const summaryText = norm(ai.output.summary);
+      // Withhold a summary that contains any of the student's messages, ignoring case and punctuation (Codex review 5).
+      const summary = questions.some(q => { const n = norm(q); return n.length > 0 && (` ${summaryText} `).includes(` ${n} `); })
         ? 'This student asked for help with course activities. Review hint use and answer requests for context.' : ai.output.summary;
       result.push({ studentId, studentName:student.name, sessions:sessions.length,
         hintsUsed:sessions.reduce((n,s) => n+s.hintsUsed,0), answerRequests:sessions.reduce((n,s) => n+s.answerRequests,0), summary,

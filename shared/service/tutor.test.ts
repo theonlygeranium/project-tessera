@@ -119,3 +119,17 @@ describe('tutor service journey 10', () => {
     await expect(dispatch(service,chen,'getTutorSummaries',{courseId:'c-stat110'})).rejects.toMatchObject({code:'forbidden'});
   });
 });
+
+describe('summary guard (Codex review 5)', () => {
+  it('withholds a summary that repeats a short or re-cased student message', async () => {
+    const { seedData } = await import('../seed');
+    const { MemoryRepo, dispatch, service } = await import('./index');
+    const repo = new MemoryRepo(seedData());
+    const echo = { run: async (task: string, input: { questions?: string[] }) => ({ output: task === 'tutor-summary' ? { summary: `${(input.questions ?? [''])[0].toUpperCase()}!` } : { text: 'A hint.', citeIds: [] }, model: 'echo' }) } as never;
+    const ctx = (id: string) => ({ repo, ai: echo, user: seedData().users.find(u => u.id === id)!, now: () => '2026-09-27T12:00:00.000Z', newId: (p: string) => `${p}-${Math.random().toString(36).slice(2, 8)}` });
+    const s = await dispatch(service, ctx('u-marcus'), 'startTutorSession', { activityKind: 'lesson', activityId: 'l-stat-1' });
+    await dispatch(service, ctx('u-marcus'), 'sendTutorMessage', { sessionId: s.id, text: 'I need help', intent: 'hint' });
+    const [summary] = await dispatch(service, ctx('u-okafor'), 'getTutorSummaries', { courseId: 'c-stat110' });
+    expect(summary.summary.toLowerCase()).not.toContain('i need help');
+  });
+});

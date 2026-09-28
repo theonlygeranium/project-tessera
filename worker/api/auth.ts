@@ -72,9 +72,12 @@ export async function resolvePrincipal(request: Request, env: Env, repo: Repo, r
   }
   const identified = email ? await repo.findUserByEmail(email) : null;
 
-  // 3. Persona cookie: mock/local, or bootstrap before anyone is invited.
+  // 3. Persona cookie (the demo persona picker): local dev, or an owner's verified Access
+  // email (OWNER_EMAILS). Anyone else whose email isn't a Tessera user gets no account;
+  // a caller-chosen user id is never trusted on its own (Codex review 5).
   const personaId = readCookie(cookies, 'tessera_user');
-  const bootstrap = !identified && (env.ENVIRONMENT === 'local' || !(await repo.hasInvitations()));
+  const owners = (env.OWNER_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const bootstrap = !identified && (env.ENVIRONMENT === 'local' || (!!email && owners.includes(email)));
   let user: User | null = identified;
   if (!user && bootstrap && personaId) user = await repo.getUser(personaId);
 

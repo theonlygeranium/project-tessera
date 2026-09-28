@@ -50,6 +50,7 @@
   "migrations": [{ "tag": "v1-ocr", "new_sqlite_classes": ["OcrContainer"] }],
   "vars": {
     "ENVIRONMENT": "production",
+    "OWNER_EMAILS": "jeff@jgeronimo.com",
     "OCR_INSTANCES": "3",
     "ACCESS_TEAM_DOMAIN": "little-brook-5f84.cloudflareaccess.com",
     "ACCESS_AUD": "97c83cba8bf51d22c61e77f174b69318dc2cf542178fd0201443eaebf0f59a4d",
@@ -80,6 +81,7 @@
     ],
     "vars": {
       "ENVIRONMENT": "preview",
+      "OWNER_EMAILS": "jeff@jgeronimo.com",
       "OCR_INSTANCES": "1",
       "ACCESS_TEAM_DOMAIN": "little-brook-5f84.cloudflareaccess.com",
       "ACCESS_AUD": "97c83cba8bf51d22c61e77f174b69318dc2cf542178fd0201443eaebf0f59a4d",

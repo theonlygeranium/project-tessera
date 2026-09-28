@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { AccessIssue, AccessPolicy, AccessReport, AccessSeverity, FileRecord } from '../../../../shared/domain';
 import { Button, DataTable, FormField, Select, StatusChip, StatusNotice, TextInput, TopBar } from '../../components';
-import { useApiMutation, useApiQuery } from '../../data/hooks';
+import { useQuery } from '@tanstack/react-query';
+import type { ApiError } from '../../../../shared/api';
+import { api, useApiMutation, useApiQuery } from '../../data/hooks';
 import { paths } from '../../paths';
 import { renderRouterLink } from '../../shell/RouterLink';
 import { ErrorNotice, Loading } from '../../shell/Status';
@@ -39,7 +41,8 @@ export function CourseAccessPage() {
 }
 export function FileLibraryPage() {
   const { courseId = '' } = useParams();
-  const files = useApiQuery('listFiles', { courseId, limit: 200 }, { enabled: !!courseId });
+  // Every file, following the page cursor (at most 200 per page).
+  const files = useQuery<{ items: FileRecord[] }, ApiError>({ queryKey: ['listFiles', { courseId, all: true }], enabled: !!courseId, queryFn: async () => { const items: FileRecord[] = []; let cursor: string | undefined; do { const page = await api.listFiles({ courseId, limit: 200, cursor }); items.push(...page.items); cursor = page.nextCursor ?? undefined; } while (cursor); return { items }; } });
   const scan = useApiMutation('scanFile'); const remove = useApiMutation('deleteFile');
   const [message, setMessage] = useState(''); const [error, setError] = useState('');
   usePageTitle('File library');

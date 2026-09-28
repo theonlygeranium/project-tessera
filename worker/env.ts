@@ -5,6 +5,8 @@ export interface Env {
   ASSETS: Fetcher;
   ENVIRONMENT: 'production' | 'preview' | 'local';
   ACCESS_TEAM_DOMAIN: string;
+  /** Comma-separated Access emails allowed to use the demo persona picker outside local dev. */
+  OWNER_EMAILS?: string;
   ACCESS_AUD: string;
   WRITER_API_KEY?: string;
   AI_GATEWAY_URL?: string;

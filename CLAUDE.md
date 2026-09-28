@@ -152,6 +152,7 @@ If you can't reach the canvas, say in your handoff that it's behind the repo.
 - **Night milestones:** plans in `handoff/NIGHT-N-PLAN.md`, QA logs in `handoff/NIGHT-N-QA.md`, one integration branch `nightN`, one production deploy at the end.
 
 ## Environment notes (owner's Mac, Claude Code desktop)
+- **Cloudflare API token (owner's standing order, 2026-09-27):** use the owner's master token at `~/.config/tessera/cloudflare-api-token` for every Cloudflare operation that needs an API token, including Worker secrets such as `CF_ACCESS_API_TOKEN`. Read it at runtime; never print or commit it. Don't ask for narrower tokens and don't raise rotation; the owner assumes the risk. Destructive, DNS, and production changes still need the owner's OK.
 - Codex CLI is bundled with ChatGPT.app at `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`; Grok CLI is at `~/.grok/bin/grok`. Both are signed in with the owner's subscriptions.
 - Run Codex and Grok with the Bash sandbox off (`dangerouslyDisableSandbox: true`) and their own sandbox on. Codex can't reach its API through the Claude Code sandbox proxy, and Grok's sandbox can't start nested inside Claude's. Git writes to `.git` also need the Bash sandbox off.
 - Permissions, sandbox allowances, and an `autoMode.allow` rule for delegated runs are in `.claude/settings.local.json` (machine-specific, not committed). The Codex project profile is `~/.codex/tessera.config.toml`.

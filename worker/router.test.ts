@@ -49,6 +49,7 @@ function testEnv(db: object, fetcher: { fetch: (input: RequestInfo | URL) => Pro
     ENVIRONMENT: environment,
     ACCESS_TEAM_DOMAIN: DOMAIN,
     ACCESS_AUD: AUD,
+    OWNER_EMAILS: 'jeff@jgeronimo.com',
   };
 }
 
@@ -461,5 +462,26 @@ describe('wrangler routing', () => {
     const config = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
     const list = /"run_worker_first":\s*\[([^\]]*)\]/.exec(config)?.[1] ?? '';
     for (const path of ['"/api/*"', '"/app/*"', '"/mcp"']) expect(list).toContain(path);
+  });
+});
+
+describe('persona picker outside local (Codex review 5)', () => {
+  let key: Awaited<ReturnType<typeof createTestKey>> | null = null;
+  async function jwtFor(email: string) {
+    key ??= await createTestKey('owner-key');
+    const k = key;
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ keys: [k.jwk] }), { status: 200 }));
+    const now = Math.floor(Date.now() / 1000);
+    return signJwt(k.privateKey, k.kid, { aud: AUD, iss: `https://${DOMAIN}`, exp: now + 3600, email });
+  }
+  it('lets an owner use a persona but not an unknown Access identity', async () => {
+    const env = testEnv(createTestDb(), assetsFor().fetcher, 'production');
+    const owner = await jwtFor('jeff@jgeronimo.com');
+    const asOwner = await (await call(env, '/api/v1/session', { headers: { 'cf-access-jwt-assertion': owner, cookie: 'tessera_user=u-admin' } })).json() as { user: { id: string } | null };
+    expect(asOwner.user?.id).toBe('u-admin');
+    const stranger = await jwtFor('someone@example.org');
+    const asStranger = await (await call(env, '/api/v1/session', { headers: { 'cf-access-jwt-assertion': stranger, cookie: 'tessera_user=u-admin' } })).json() as { user: { id: string } | null };
+    expect(asStranger.user).toBeNull();
+    expect((await call(env, '/api/v1/users', { headers: { 'cf-access-jwt-assertion': stranger, cookie: 'tessera_user=u-admin' } })).status).toBe(401);
   });
 });
