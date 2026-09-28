@@ -11,6 +11,7 @@ import { AnnouncementCards } from './StudentPages';
 import { BlockPlayer } from '../content';
 import { TutorPanel } from '../tutor/TutorPanel';
 import styles from './Student.module.css';
+import { useCourseBrand } from '../templates/brand';
 
 function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]?.toUpperCase()).join(''); }
 
@@ -20,12 +21,13 @@ export function CoursePage() {
   const announcements = useApiQuery('listAnnouncements', { courseId }, { enabled: !!courseId });
   const assignments = useApiQuery('listAssignments', { courseId }, { enabled: !!courseId });
   usePageTitle(outline.data?.course.title ?? 'Course');
+  const { program } = useCourseBrand(courseId);
   const course = outline.data?.course;
   const modules = outline.data?.modules ?? [];
   const lessons = modules.flatMap(module => module.lessons);
   const next = lessons.find(lesson => lesson.progress !== 'completed');
   const current = next?.progress === 'in-progress' ? next.id : undefined;
-  return <div className={styles.page}><TopBar title={course?.title ?? 'Course'} breadcrumbs={[{ label: 'Courses', href: paths.student.courses }, { label: course?.title ?? 'Course' }]} renderLink={renderRouterLink} />
+  return <div className={styles.page}><TopBar title={course?.title ?? 'Course'} eyebrow={[course?.code, program?.name].filter(Boolean).join(' · ') || undefined} breadcrumbs={[{ label: 'Courses', href: paths.student.courses }, { label: course?.title ?? 'Course' }]} renderLink={renderRouterLink} />
     {outline.isPending || announcements.isPending ? <Loading label="Loading course" /> : outline.error ? <ErrorNotice error={outline.error} onRetry={() => outline.refetch()} /> : announcements.error ? <ErrorNotice error={announcements.error} onRetry={() => announcements.refetch()} /> : course && <>
       <p className={styles.intro}>{course.description}</p>
       <section><h2>Welcome from your instructor</h2><PresenceCard name={course.instructorNames.join(', ') || 'Your instructor'} initials={initials(course.instructorNames[0] ?? '') || 'I'} role="Instructor" time="Course welcome">{course.welcome.split(/\n\s*\n/).map((line, i) => <p key={i}>{line}</p>)}</PresenceCard></section>

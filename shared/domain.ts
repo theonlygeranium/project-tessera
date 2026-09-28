@@ -112,6 +112,8 @@ export interface CourseSummary extends Course {
   progress: number | null;
   /** Students only: published lessons in progress or completed (so a card can say "In progress" at 0%). */
   startedLessonCount: number | null;
+  /** Night 3: the course's program and its brand, for every viewer (D-024). */
+  program?: { id: Id; name: string; accent: AccentId | null } | null;
 }
 
 export interface Module {

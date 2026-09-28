@@ -2,13 +2,12 @@ import { useEffect } from 'react';
 import { useApiQuery } from '../../data/hooks';
 import { useSession } from '../../shell/session';
 
-/** Staff course pages can resolve the program through listPrograms. */
-export function useStaffCourseBrand(courseId: string) {
+/** Applies the course's program accent (D-024) on any course page, for every role; returns the course and its program. */
+export function useCourseBrand(courseId: string) {
   const { institution } = useSession();
   const outline = useApiQuery('getCourseOutline', { courseId }, { enabled: !!courseId });
-  const programs = useApiQuery('listPrograms', undefined, { enabled: !!courseId });
-  const program = programs.data?.find(p => p.id === outline.data?.course.programId);
-  const accent = program?.brand.accent ?? institution.accent;
+  const program = outline.data?.course.program ?? undefined;
+  const accent = program?.accent ?? institution.accent;
   useEffect(() => {
     const root = document.documentElement.style;
     const set = (id: string) => {
@@ -25,3 +24,6 @@ export function useStaffCourseBrand(courseId: string) {
   }, [accent, institution.accent]);
   return { course: outline.data?.course, program };
 }
+
+/** Kept for the staff pages that already use it. */
+export const useStaffCourseBrand = useCourseBrand;
