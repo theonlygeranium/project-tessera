@@ -878,6 +878,8 @@ export interface AiFinding {
   provenance: Provenance;
   state: 'draft' | 'accepted' | 'dismissed';
   reviewedBy: Id | null;
+  /** The reviewer's name when they reviewed it. */
+  reviewedByName?: string | null;
   reviewedAt: Timestamp | null;
 }
 

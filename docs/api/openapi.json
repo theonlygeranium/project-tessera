@@ -18916,6 +18916,12 @@
               }
             ]
           },
+          "reviewedByName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "reviewedAt": {
             "anyOf": [
               {
