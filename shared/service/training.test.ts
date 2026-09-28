@@ -1,0 +1,124 @@
+import { describe, expect, it } from 'vitest';
+import { seedData, SEED_NOW } from '../seed';
+import type { Requirement } from '../domain';
+import { dispatch, MemoryRepo, service, type ServiceContext } from './index';
+import { trainingCycle } from './training';
+
+let next=0;
+async function ctx(repo:MemoryRepo,id:string,at=SEED_NOW):Promise<ServiceContext>{return{repo,ai:{run:async()=>{throw Error('AI unused');}} as never,user:await repo.getUser(id),now:()=>at,newId:p=>`${p}-${++next}`};}
+const courseId='c-ops101';
+const answers=[{itemId:'q1',optionId:'a'},{itemId:'q2',optionId:'a'},{itemId:'q3',optionId:'b'},{itemId:'q4',optionId:'a'}];
+
+describe('required training',()=>{
+  it('lists the seed assignment on Today, lets Dana test out, issues one immutable certificate, and keeps the answer key private',async()=>{
+    const repo=new MemoryRepo(seedData()),dana=await ctx(repo,'u-dana');
+    const today=await dispatch(service,dana,'getToday',undefined);
+    expect(today.required?.[0]).toMatchObject({courseId,status:'not-started'});
+    const test=await dispatch(service,dana,'getMyTestOut',{courseId});
+    expect(JSON.stringify(test)).not.toContain('correctOptionId');
+    await expect(dispatch(service,dana,'takeTestOut',{courseId,answers:answers.slice(1)})).rejects.toMatchObject({code:'invalid'});
+    const failed=await dispatch(service,dana,'takeTestOut',{courseId,answers:answers.map(a=>({...a,optionId:'c'}))});
+    expect(failed).toEqual({passed:false,percent:0,certificate:null});
+    const passed=await dispatch(service,dana,'takeTestOut',{courseId,answers});
+    expect(passed).toMatchObject({passed:true,percent:100,certificate:{basis:'tested-out',learnerName:'Dana Whitfield'}});
+    expect(passed.certificate?.code).toMatch(/^TSR-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect((await dispatch(service,dana,'listMyTraining',undefined))[0]).toMatchObject({status:'tested-out',certificateId:passed.certificate?.id});
+    const again=await dispatch(service,dana,'takeTestOut',{courseId,answers});
+    expect(again.certificate?.id).toBe(passed.certificate?.id);
+    expect((await repo.listCertificates({userId:'u-dana',courseId}))).toHaveLength(1);
+    const verify=await dispatch(service,{...dana,user:null},'verifyCertificate',{code:passed.certificate!.code});
+    expect(verify).toMatchObject({valid:true,courseTitle:passed.certificate?.courseTitle});
+    expect(JSON.stringify(verify)).not.toContain('Dana');
+    expect((await dispatch(service,{...dana,user:null},'verifyCertificate',{code:'TSR-NOPE-NOPE'})).valid).toBe(false);
+    const admin=await ctx(repo,'u-admin');const reissued=await dispatch(service,admin,'reissueCertificate',{certificateId:passed.certificate!.id,learnerName:'Dana W.'});
+    expect(reissued.id).not.toBe(passed.certificate!.id);
+    expect((await repo.getCertificate(passed.certificate!.id))?.learnerName).toBe('Dana Whitfield');
+    expect((await repo.getCertificate(passed.certificate!.id))?.replacedBy).toBe(reissued.id);
+    expect((await dispatch(service,admin,'verifyCertificate',{code:passed.certificate!.code})).replaced).toBe(true);
+    expect((await dispatch(service,dana,'listMyCertificates',undefined))).toHaveLength(2);
+  });
+  it('enforces resource access, validates authoring, and uses manager opt-in',async()=>{
+    const repo=new MemoryRepo(seedData()),dana=await ctx(repo,'u-dana'),teacher=await ctx(repo,'u-okafor'),outsider=await ctx(repo,'u-jordan');
+    await expect(dispatch(service,outsider,'getMyTestOut',{courseId})).rejects.toMatchObject({code:'forbidden'});
+    const existing=(await dispatch(service,teacher,'getTestOut',{courseId}))!;
+    await expect(dispatch(service,outsider,'getTestOut',{courseId})).rejects.toMatchObject({code:'forbidden'});
+    await expect(dispatch(service,teacher,'saveTestOut',{courseId,items:[{...existing.items[0],correctOptionId:'missing'}],passPercent:75})).rejects.toMatchObject({code:'invalid'});
+    await dispatch(service,teacher,'saveTestOut',{courseId,items:existing.items,passPercent:80});
+    const result=await dispatch(service,dana,'takeTestOut',{courseId,answers});
+    await expect(dispatch(service,outsider,'getCertificate',{certificateId:result.certificate!.id})).rejects.toMatchObject({code:'forbidden'});
+    const sam=await ctx(repo,'u-sam');
+    await expect(dispatch(service,sam,'getCertificate',{certificateId:result.certificate!.id})).rejects.toMatchObject({code:'forbidden'});
+    await repo.putManagerConsent({managerId:'u-sam',reportId:'u-dana',sharing:true,at:SEED_NOW});
+    expect((await dispatch(service,sam,'getCertificate',{certificateId:result.certificate!.id})).id).toBe(result.certificate!.id);
+    await repo.putManagerConsent({managerId:'u-sam',reportId:'u-dana',sharing:false,at:SEED_NOW});
+    await expect(dispatch(service,sam,'getCertificate',{certificateId:result.certificate!.id})).rejects.toMatchObject({code:'forbidden'});
+  });
+  it('assigns role members once, picks up new members, preserves enrollments on removal, and filters programs',async()=>{
+    const repo=new MemoryRepo(seedData()),admin=await ctx(repo,'u-admin'),r=await dispatch(service,admin,'createRequirement',{target:{kind:'course',courseId},audience:{kind:'role',role:'student'},dueAt:'2026-10-01T00:00:00.000Z'});
+    expect((await repo.listCompletionEvents({courseId})).filter(e=>e.requirementId===r.id&&e.kind==='assigned').length).toBe((await repo.listUsers({role:'student'})).length);
+    const dana=await ctx(repo,'u-dana');await dispatch(service,dana,'listMyTraining',undefined);await dispatch(service,dana,'listMyTraining',undefined);
+    expect((await repo.listCompletionEvents({userId:'u-dana',courseId})).filter(e=>e.requirementId===r.id&&e.kind==='assigned')).toHaveLength(1);
+    const newPerson={...(await repo.getUser('u-dana'))!,id:'u-new',name:'New Employee',email:'new@meridian.example.edu'};await repo.putUser(newPerson);
+    const newcomer=await ctx(repo,'u-new');await dispatch(service,newcomer,'getToday',undefined);
+    expect(await repo.listEnrollments({courseId,userId:'u-new'})).toHaveLength(1);
+    expect((await repo.listCompletionEvents({userId:'u-new',courseId})).filter(e=>e.requirementId===r.id&&e.kind==='assigned')).toHaveLength(1);
+    const updated=await dispatch(service,admin,'updateRequirement',{requirementId:r.id,dueAt:'2026-10-15T00:00:00.000Z'});
+    expect(updated.dueAt).toBe('2026-10-15T00:00:00.000Z');
+    expect((await repo.listCompletionEvents({courseId})).filter(e=>e.requirementId===r.id&&e.kind==='due-date-changed').length).toBe((await repo.listUsers({role:'student'})).length);
+    await dispatch(service,admin,'deleteRequirement',{requirementId:r.id});
+    expect(await repo.listEnrollments({courseId,userId:'u-new'})).toHaveLength(1);
+    expect((await repo.listCompletionEvents({courseId})).some(e=>e.requirementId===r.id&&e.kind==='unassigned')).toBe(true);
+    await expect(dispatch(service,admin,'createRequirement',{target:{kind:'program',programId:'missing'},audience:{kind:'role',role:'student'}})).rejects.toMatchObject({code:'not-found'});
+  });
+  it('completes published lessons once and exports oldest-first escaped CSV',async()=>{
+    const repo=new MemoryRepo(seedData()),dana=await ctx(repo,'u-dana');
+    for(const id of ['l-ops-1','l-ops-2','l-ops-3'])await dispatch(service,dana,'setLessonProgress',{lessonId:id,state:'completed'});
+    await dispatch(service,dana,'setLessonProgress',{lessonId:'l-ops-3',state:'completed'});
+    const events=await repo.listCompletionEvents({userId:'u-dana',courseId});
+    expect(events.filter(e=>e.kind==='started')).toHaveLength(1);expect(events.filter(e=>e.kind==='completed')).toHaveLength(1);expect(events.filter(e=>e.kind==='certificate-issued')).toHaveLength(1);
+    expect((await dispatch(service,dana,'listMyTraining',undefined))[0].status).toBe('completed');
+    expect((await dispatch(service,dana,'takeTestOut',{courseId,answers})).certificate?.basis).toBe('completed');
+    expect((await repo.listCompletionEvents({userId:'u-dana',courseId})).filter(e=>e.kind==='tested-out')).toHaveLength(0);
+    const admin=await ctx(repo,'u-admin');const record=await repo.getUser('u-dana');await repo.putUser({...record!,name:'=PAYLOAD'});
+    const csv=(await dispatch(service,admin,'exportCompletionEvents',{courseId})).csv;
+    expect(csv).toContain('"\'=PAYLOAD"');expect(csv.split('\r\n')[0]).toBe('"at","person","email","course","event","detail","actor"');
+    expect(events.map(e=>e.id)).toEqual((await repo.listCompletionEvents({userId:'u-dana',courseId})).map(e=>e.id));
+  });
+  it('computes annual windows and paginates compliance by severity',async()=>{
+    const r:Requirement={id:'x',target:{kind:'course',courseId},audience:{kind:'users',userIds:['u-dana']},dueAt:'2026-10-15T00:00:00.000Z',recurrence:'annual',createdAt:'2026-09-27T00:00:00.000Z',createdBy:'u-admin'};
+    expect(trainingCycle(r,'2026-10-01T00:00:00.000Z').dueAt).toBe(r.dueAt);
+    expect(trainingCycle(r,'2027-10-16T00:00:00.000Z').dueAt).toBe(r.dueAt);
+    expect(trainingCycle(r,'2027-10-16T00:00:00.000Z','2026-10-01T00:00:00.000Z').dueAt).toBe('2027-10-15T00:00:00.000Z');
+    expect(trainingCycle({...r,dueAt:null},'2026-11-01T00:00:00.000Z','2026-10-01T00:00:00.000Z').dueAt).toBe('2027-10-01T00:00:00.000Z');
+    const repo=new MemoryRepo(seedData()),admin=await ctx(repo,'u-admin','2026-10-16T00:00:00.000Z');
+    const first=await dispatch(service,admin,'getComplianceReport',{limit:1});expect(first.items).toHaveLength(1);expect(first.items[0].training.status).toBe('overdue');
+    expect(first.nextCursor).toBeNull();
+  });
+  it('expands program targets, pages with the next row as cursor, and records one completion per course',async()=>{
+    const repo=new MemoryRepo(seedData()),admin=await ctx(repo,'u-admin'),dana=await ctx(repo,'u-dana');
+    await repo.putProgram({id:'p-ops',name:'Operations',description:'',templateId:null,brand:{accent:null,logo:null},createdAt:SEED_NOW});
+    const c=(await repo.getCourse(courseId))!;await repo.putCourse({...c,programId:'p-ops'});
+    const program=await dispatch(service,admin,'createRequirement',{target:{kind:'program',programId:'p-ops'},audience:{kind:'users',userIds:['u-dana']}});
+    expect((await dispatch(service,admin,'listRequirements',{courseId})).map(r=>r.id)).toContain(program.id);
+    await dispatch(service,dana,'setLessonProgress',{lessonId:'l-ops-1',state:'in-progress'});
+    expect((await repo.listCompletionEvents({userId:'u-dana',courseId})).filter(e=>e.kind==='started')).toHaveLength(1);
+    for(const id of ['l-ops-1','l-ops-2','l-ops-3'])await dispatch(service,dana,'setLessonProgress',{lessonId:id,state:'completed'});
+    const events=await repo.listCompletionEvents({userId:'u-dana',courseId});
+    expect(events.filter(e=>e.kind==='completed')).toHaveLength(1);
+    expect(events.filter(e=>e.kind==='certificate-issued')).toHaveLength(1);
+    const first=await dispatch(service,admin,'getComplianceReport',{limit:1});
+    expect(first.nextCursor).not.toBeNull();
+    const second=await dispatch(service,admin,'getComplianceReport',{limit:1,cursor:first.nextCursor!});
+    expect(second.items[0].training.requirementId).not.toBe(first.items[0].training.requirementId);
+  });
+  it('keeps a replacement in the original annual cycle',async()=>{
+    const repo=new MemoryRepo(seedData()),dana=await ctx(repo,'u-dana');
+    const passed=await dispatch(service,dana,'takeTestOut',{courseId,answers});
+    const later='2028-01-01T00:00:00.000Z';
+    const admin=await ctx(repo,'u-admin',later);
+    const replacement=await dispatch(service,admin,'reissueCertificate',{certificateId:passed.certificate!.id});
+    expect(replacement.replaces).toBe(passed.certificate!.id);
+    const row=(await dispatch(service,await ctx(repo,'u-dana',later),'listMyTraining',undefined))[0];
+    expect(row.certificateId).toBeNull();
+  });
+});

@@ -6,6 +6,7 @@ import { createAccessDirectory } from './identity/access-directory';
 import { lockedDirectory } from './identity/access-lock';
 import { RateLimiter, bearerToken, hasAccessCredential, readCookie, resolvePrincipal } from './api/auth';
 import { findFileRoute } from './api/files';
+import { certificatePdf, verificationPage } from './certificates';
 import { handleMcp } from './mcp';
 import { D1Repo } from './d1-repo';
 import type { Env } from './env';
@@ -42,12 +43,21 @@ function ensureSeeded(db: D1Database, repo: Repo): Promise<void> {
 export default {
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    if (request.method === 'GET' && /^\/verify\/[^/]+$/.test(url.pathname)) return handleVerification(request, env);
     if (url.pathname === '/mcp') return handleMcp(request, env, { ensureSeeded, rateLimiter, createServiceContext });
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return handleApi(request, env);
     if (url.pathname === '/app' || url.pathname.startsWith('/app/')) return handleApp(request, env);
     return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;
+
+
+async function handleVerification(request: Request, env: Env): Promise<Response> {
+  const repo=new D1Repo(env.DB); await ensureSeeded(env.DB,repo);
+  const code=decodeURIComponent(new URL(request.url).pathname.split('/').at(-1)!);
+  const result=await dispatch(service,createServiceContext(env,repo,{user:null,token:null,rateKey:'public'} as never),'verifyCertificate',{code});
+  return verificationPage(result);
+}
 
 // Durable Object classes must be exported from the main module.
 export { OcrContainer } from './ocr';
@@ -74,11 +84,12 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const rel = apiRelativePath(url.pathname);
     const fileRoute = findFileRoute(request.method, rel);
-    const found = fileRoute ? null : findRoute(request.method, rel);
-    if (!found && !fileRoute) return withId(fail(404, 'not-found', `No route matches ${request.method} ${url.pathname}.`));
+    const certificateMatch = request.method === 'GET' ? matchPath('/certificates/:certificateId/pdf', rel) : null;
+    const found = fileRoute || certificateMatch ? null : findRoute(request.method, rel);
+    if (!found && !fileRoute && !certificateMatch) return withId(fail(404, 'not-found', `No route matches ${request.method} ${url.pathname}.`));
     const now = new Date().toISOString();
 
-    const principal = await resolvePrincipal(request, env, repo, fileRoute ? fileRoute.route : ROUTES[found!.op], now);
+    const principal = await resolvePrincipal(request, env, repo, fileRoute ? fileRoute.route : certificateMatch ? ROUTES.getCertificate : ROUTES[found!.op], now);
     const wait = rateLimiter.check(principal.rateKey);
     if (wait > 0) {
       const res = fail(429, 'rate-limited', `Too many requests. Try again in ${wait} seconds.`);
@@ -86,6 +97,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       return withId(res);
     }
     const ctx = createServiceContext(env, repo, principal);
+    if (certificateMatch) { const cert = await dispatch(service, ctx, 'getCertificate', { certificateId: certificateMatch.certificateId }); return withId(await certificatePdf(cert, url.origin)); }
     // Starting or stopping "View as" runs as the administrator, not the person being viewed.
     if (found?.op === 'viewAs' && principal.actingAs) ctx.user = principal.actingAs;
 
