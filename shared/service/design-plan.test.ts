@@ -32,6 +32,64 @@ async function finish(ctx: ServiceContext, sessionId: string) {
 }
 
 describe('syllabus provision plan', () => {
+  it('places STAT 110 occurrences by schedule week and preserves their shares', async () => {
+    const { ctx, sessionId } = await setup();
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const again = await service.previewProvisionPlan(ctx, { sessionId });
+    expect(again.hash).toBe(plan.hash);
+    const entries = plan.modules.flatMap(module => (module.assignments ?? []).map(assignment => ({ module, assignment })));
+    for (const [component, title, weeks, total] of [
+      ['Weekly quizzes', 'Quiz', [3, 5, 7, 10, 12], 15],
+      ['Homework sets', 'HW', [2, 4, 6, 9, 11, 13], 20],
+    ] as const) {
+      const items = entries.filter(entry => entry.assignment.replaces === component);
+      expect(items.map(entry => entry.assignment.title)).toEqual(weeks.map((_, i) => `${title} ${i + 1}`));
+      expect(items.map(entry => entry.module.lessons[0].week)).toEqual(weeks);
+      expect(items.reduce((sum, entry) => sum + entry.assignment.points, 0)).toBeCloseTo(total, 8);
+    }
+    const midterm = entries.find(entry => entry.assignment.replaces === 'Midterm exam')!;
+    expect(midterm.module.lessons[0].week).toBe(7);
+    expect(midterm.assignment.placement).toContain('nearest content module, Week 7');
+    const project = entries.find(entry => entry.assignment.replaces === 'Course project')!;
+    expect(project.module.lessons[0].week).toBe(14);
+    expect(project.assignment.dueAt).toBe('2026-12-04');
+    expect(entries.find(entry => entry.assignment.replaces === 'Participation')?.module.key).toBe('start-here');
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    await finish(ctx, sessionId);
+    const undone = await service.undoProvisionPlan(ctx, { sessionId });
+    expect(undone.session.created.assignmentIds).toEqual([]);
+    expect((await ctx.repo.listAssignments({ courseId: 'c-stat110' })).some(item => item.title === 'Quiz 3')).toBe(false);
+  });
+  it('places numbered labs and discussions, a stated brief week, and final exam', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const row = session.extraction!.schedule[0];
+    session.extraction!.schedule = Array.from({ length: 16 }, (_, index) => ({ ...row, week: index + 1, topic: `Topic ${index + 1}`, due: [index < 10 ? `Lab ${index + 1}` : '', index < 10 ? `Discussion ${index + 1}` : ''].filter(Boolean).join(', '), empty: false }));
+    session.extraction!.schedule[11] = { ...session.extraction!.schedule[11], topic: 'Fall break', due: '' };
+    const template = session.options![0].modules[0];
+    session.options![0].modules = session.extraction!.schedule.map(row => ({ ...template, title: row.topic, weeks: [row.week] }));
+    session.extraction!.assessments = [
+      { id: 'labs', title: 'Analysis labs (10)', weightPercent: 20, dueAt: null, format: 'lab', span: null },
+      { id: 'discussions', title: 'Studio discussions (10)', weightPercent: 15, dueAt: null, format: 'discussion', span: null },
+      { id: 'checkpoints', title: 'Weekly adaptive checkpoints', weightPercent: 15, dueAt: null, format: 'checkpoint', span: null },
+      { id: 'brief', title: 'Applied brief #1 (Week 7)', weightPercent: 20, dueAt: null, format: 'brief', span: null },
+      { id: 'final', title: 'Final exam', weightPercent: 30, dueAt: null, format: 'exam', span: null },
+    ];
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const entries = plan.modules.flatMap(module => (module.assignments ?? []).map(assignment => ({ module, assignment })));
+    for (const name of ['Analysis labs (10)', 'Studio discussions (10)']) {
+      const items = entries.filter(entry => entry.assignment.replaces === name);
+      expect(items).toHaveLength(10);
+      expect(items.map(entry => entry.module.lessons[0].week)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      expect(items.reduce((sum, entry) => sum + entry.assignment.points, 0)).toBeCloseTo(name.startsWith('Analysis') ? 20 : 15, 8);
+    }
+    expect(entries.filter(entry => entry.assignment.replaces === 'Weekly adaptive checkpoints')).toHaveLength(15);
+    expect(entries.some(entry => entry.module.lessons[0].week === 12 && entry.assignment.replaces === 'Weekly adaptive checkpoints')).toBe(false);
+    expect(entries.find(entry => entry.assignment.replaces === 'Applied brief #1 (Week 7)')?.module.lessons[0].week).toBe(7);
+    expect(entries.find(entry => entry.assignment.replaces === 'Final exam')?.module.lessons[0].week).toBe(16);
+    expect(entries.filter(entry => entry.module.lessons[0].week === 16).reduce((sum, entry) => sum + entry.assignment.points, 0)).toBeLessThan(50);
+  });
   it('exports formula-leading plan text as inert CSV cells', async () => {
     const { ctx, sessionId } = await setup();
     await service.previewProvisionPlan(ctx, { sessionId });
@@ -147,12 +205,12 @@ describe('syllabus provision plan', () => {
     expect(await ctx.repo.getBlock(blockId)).not.toBeNull();
     await expect(service.exportDesignRecord(student, { sessionId, format: 'json' })).rejects.toMatchObject({ code: 'forbidden' });
   });
-  it('previews deterministically, places every graded component once, and refuses a stale hash', async () => {
+  it('previews deterministically, covers every graded component, and refuses a stale hash', async () => {
     const { ctx, sessionId } = await setup();
     const a = await service.previewProvisionPlan(ctx, { sessionId });
     const b = await service.previewProvisionPlan(ctx, { sessionId });
     expect(b).toEqual(a);
-    expect(a.modules.flatMap(m => m.assignments ?? []).filter(x => x.replaces).map(x => x.replaces).sort()).toEqual((await ctx.repo.getDesignSession(sessionId))!.extraction!.assessments.map(x => x.title).sort());
+    expect([...new Set(a.modules.flatMap(m => m.assignments ?? []).filter(x => x.replaces).map(x => x.replaces))].sort()).toEqual((await ctx.repo.getDesignSession(sessionId))!.extraction!.assessments.map(x => x.title).sort());
     expect(a.modules.filter(m => m.key.startsWith('module-')).every(m => (m.assignments?.length ?? 0) >= 1)).toBe(true);
     expect(a.readings.every(r => r.span.text)).toBe(true);
     expect(a.summary).toContain('Renames nothing. Removes nothing.');

@@ -534,9 +534,9 @@ export interface ProvisionPlan {
   modules: { key: string; title: string; objective: string; position: number; outcomeCodes: string[]; templateKey: string | null;
     overlaps: { moduleId: Id; title: string } | null;
     lessons: { key: string; title: string; objective: string; minutes: number; week: number | null; skeleton: LessonSkeleton; patternNote?: string; resurface?: boolean; announcementSlot?: boolean; alternativeFormatSlot?: boolean }[];
-    assignment: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null } | null;
+    assignment: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null; placement?: string } | null;
     /** Additional distinct graded components due in the same module. */
-    assignments?: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null }[];
+    assignments?: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null; placement?: string }[];
     hours: number; leastSure: boolean }[];
   readings: { title: string; span: SourceSpan; moduleKey: string; week?: number | null }[];       // only readings with a span
   placeholders: number;                                                     // "[Reading to select]" count

@@ -56,11 +56,40 @@ function dueDate(session: DesignSession, week: number, used: string[]): string |
   }
   return null;
 }
-function assignmentWeek(session: DesignSession, title: string, dueAt: string | null, modules: PlanModule[]): number {
-  const explicit = weekOf(dueAt, session.extraction?.profile.termStart.value ?? null);
-  if (explicit !== null) return explicit;
-  const match = session.extraction?.schedule.find(row => row.due && (row.due.toLowerCase().includes(title.toLowerCase()) || title.toLowerCase().includes(row.due.toLowerCase())));
-  return match?.week ?? Math.max(...modules.flatMap(m => m.lessons.map(l => l.week ?? 0)), 1);
+const aliases: { pattern: RegExp; names: string[] }[] = [
+  { pattern: /\b(?:quiz|quizzes)\b/i, names: ['quiz', 'quizzes'] },
+  { pattern: /\b(?:hw|homework)\b/i, names: ['hw', 'homework'] },
+  { pattern: /\blabs?\b/i, names: ['lab', 'labs'] },
+  { pattern: /\bcheckpoints?\b/i, names: ['checkpoint', 'checkpoints'] },
+  { pattern: /\b(?:discussions?|studio)\b/i, names: ['discussion', 'discussions', 'studio'] },
+  { pattern: /\bbriefs?\b/i, names: ['brief', 'briefs'] },
+  { pattern: /\bessays?\b/i, names: ['essay', 'essays'] },
+  { pattern: /\bpapers?\b/i, names: ['paper', 'papers'] },
+  { pattern: /\b(?:exams?|midterms?|finals?)\b/i, names: ['exam', 'midterm', 'final'] },
+  { pattern: /\b(?:projects?|capstones?)\b/i, names: ['project', 'capstone'] },
+  { pattern: /\b(?:reflections?|journals?)\b/i, names: ['reflection', 'journal'] },
+];
+const escaped = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function occurrenceNames(title: string, due: string, topic: string): string[] {
+  const group = aliases.find(item => item.pattern.test(title));
+  const stems = /\bmidterm\b/i.test(title) ? ['midterm'] : /\bfinal\b/i.test(title) ? ['final'] : group?.names ?? title.toLowerCase().replace(/\b(?:weekly|course|sets?|applied|analysis|adaptive|studio|graded)\b/g, '').match(/[\p{L}]{4,}/gu) ?? [];
+  if (!stems.length) return [];
+  const expression = new RegExp(`\\b(?:${stems.map(escaped).join('|')})(?:\\s*(?:#|no\\.?\\s*)?(\\d+))?\\b`, 'gi');
+  // A due entry is stronger evidence than a topic label; avoid counting a topic twice.
+  const text = expression.test(due) ? due : topic;
+  expression.lastIndex = 0;
+  return [...text.matchAll(expression)].map(match => {
+    const label = match[0].trim();
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  });
+}
+const statedWeek = (text: string) => /\bweek\s*(\d{1,2})\b/i.exec(text)?.[1];
+const countOf = (text: string) => /\(\s*(\d{1,2})\s*\)/.exec(text)?.[1];
+const isBreak = (text: string) => /\b(?:break|holiday|recess|no class)\b/i.test(text);
+function shares(total: number, count: number): number[] {
+  const units = Math.round(total * 10000);
+  const base = Math.floor(units / count);
+  return Array.from({ length: count }, (_, index) => (base + (index < units - base * count ? 1 : 0)) / 10000);
 }
 function sourceSpans(session: DesignSession, module: PlanModule): SourceSpan[] {
   return (session.extraction?.schedule ?? []).filter(row => row.span && module.lessons.some(lesson => lesson.week !== null && coveredWeeks(row).includes(lesson.week))).map(row => row.span!);
@@ -94,34 +123,92 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
     if (!outcomeCodes.length && outcomes.length) outcomeCodes.push(outcomes[index % outcomes.length].code);
     return { key: `module-${index + 1}`, title: item.title, objective: item.objective, position: base + index, outcomeCodes, templateKey: matchedTemplate?.key ?? null, overlaps: matched ? { moduleId: matched.id, title: matched.title } : null, lessons, assignment: null, assignments: [], hours: item.hours, leastSure: false };
   });
-  if (session.selection.overlays.includes('bookends')) {
+  if (session.selection.overlays.includes('bookends') || session.extraction.assessments.some(a => /\b(?:participation|engagement|attendance)\b/i.test(a.title))) {
     const first: PlanModule = { key: 'start-here', title: 'Start here', objective: 'Find your way through the course, contact the instructor, and identify the learning outcomes.', position: base, outcomeCodes: outcomes.map(o => o.code), templateKey: template?.modules.find(m => /start here/i.test(m.title))?.key ?? 'start-here', overlaps: null, lessons: [{ key: 'start-here/lesson-1', title: 'Start here', objective: 'Explain how this course works and how to contact the instructor.', minutes: 20, week: null, skeleton: 'start-here' }], assignment: null, assignments: [], hours: 0.3, leastSure: false };
     const last: PlanModule = { key: 'wrap-up', title: 'Wrap-up', objective: 'Revisit the course outcomes and reflect on progress.', position: base + modules.length + 1, outcomeCodes: outcomes.map(o => o.code), templateKey: null, overlaps: null, lessons: [{ key: 'wrap-up/lesson-1', title: 'Wrap-up and reflect', objective: 'Reflect on your progress toward the course outcomes.', minutes: 30, week: Math.max(...modules.flatMap(m => m.lessons.map(l => l.week ?? 0)), 1), skeleton: 'wrap-up' }], assignment: null, assignments: [], hours: 0.5, leastSure: false };
-    modules.unshift(first); modules.push(last);
+    modules.unshift(first);
+    if (session.selection.overlays.includes('bookends')) modules.push(last);
     modules.forEach((m, i) => { m.position = base + i; });
   }
   const instructional = modules.filter(m => m.key.startsWith('module-'));
+  const moduleWeeks = (module: PlanModule) => spine.modules[Number(module.key.slice('module-'.length)) - 1]?.weeks ?? module.lessons.map(l => l.week).filter((week): week is number => week !== null);
   const usedDates = snapshot.assignments.flatMap(a => a.dueAt ? [a.dueAt.slice(0, 10)] : []);
-  const breakWeeks = new Set(session.extraction.schedule.filter(row => /\bbreak\b|\bexam week\b/i.test(`${row.topic} ${row.due}`)).map(row => row.week));
+  const breakWeeks = new Set(session.extraction.schedule.filter(row => isBreak(`${row.topic} ${row.due}`) || /\bexam week\b/i.test(`${row.topic} ${row.due}`)).map(row => row.week));
   for (const question of session.questions) {
     const answer = question.answer?.value ?? '';
-    if (!/\bbreak\b|\bexam week\b/i.test(answer)) continue;
+    if (!isBreak(answer) && !/\bexam week\b/i.test(answer)) continue;
     for (const match of answer.matchAll(/\bweek\s*(\d+)\b/gi)) breakWeeks.add(Number(match[1]));
   }
+  const contentWeek = (module: PlanModule) => moduleWeeks(module).find(week => !breakWeeks.has(week) && !session.extraction!.schedule.some(row => coveredWeeks(row).includes(week) && isBreak(`${row.topic} ${row.due}`))) ?? null;
+  const content = instructional.filter(m => contentWeek(m) !== null);
+  const moduleForWeek = (week: number) => content.find(m => moduleWeeks(m).includes(week)) ?? content.reduce<PlanModule | null>((best, module) => {
+    const distance = Math.min(...moduleWeeks(module).map(value => Math.abs(value - week)));
+    return !best || distance < Math.min(...moduleWeeks(best).map(value => Math.abs(value - week))) ? module : best;
+  }, null);
+  const scheduledDateWeek = (date: string) => {
+    const day = new Date(date);
+    if (!Number.isFinite(day.getTime())) return null;
+    const month = day.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+    const number = day.getUTCDate();
+    return session.extraction!.schedule.find(row => new RegExp(`\\b${month}\\w*\\s+${number}\\b`, 'i').test(`${row.due} ${row.dates}`))?.week ?? null;
+  };
   for (const [index, item] of session.extraction.assessments.entries()) {
-    const dueWeek = assignmentWeek(session, item.title, item.dueAt, instructional);
-    const target = instructional.find(m => m.lessons.some(l => l.week === dueWeek)) ?? instructional[instructional.length - 1];
-    if (!target) continue;
-    const week = target.lessons.map(l => l.week ?? 0).find(w => w >= dueWeek && !breakWeeks.has(w)) ?? target.lessons.map(l => l.week ?? 0).find(w => !breakWeeks.has(w)) ?? instructional.flatMap(m => m.lessons.map(l => l.week ?? 0)).find(w => w > 0 && !breakWeeks.has(w)) ?? 0;
-    const dueAt = week ? dueDate(session, week, usedDates) : null;
     const answered = session.confirmedPoints?.[item.id] ?? Number(session.questions.find(q => q.id === `question-assessment-points-${item.id}`)?.answer?.value);
     const points = item.weightPercent ?? explicitAssessmentPoints(item.span, item.title) ?? (Number.isFinite(answered) && answered > 0 ? answered : null);
     if (points === null) throw Error(`Confirm the points for ${item.title} before applying this plan.`);
     const total = statedCourseTotal(item.span);
     const weightPercent = item.weightPercent ?? (total && total > 0 ? Math.round(points / total * 10000) / 100 : null);
-    const assignment: PlanAssignment = { key: `${target.key}/assessment-${index + 1}`, title: item.title, points: Math.max(0, points), weightPercent, dueAt, outcomeCodes: target.outcomeCodes, replaces: item.title };
-    target.assignments!.push(assignment);
-    target.assignment ??= assignment;
+    const add = (target: PlanModule, title: string, share: number, weight: number | null, week: number | null, placement: string, dueAt: string | null = null, suffix = 1) => {
+      const assignedDate = dueAt ?? (week && !breakWeeks.has(week) ? dueDate(session, week, usedDates) : null);
+      const assignment: PlanAssignment = { key: `${target.key}/assessment-${index + 1}-${suffix}`, title, points: share, weightPercent: weight, dueAt: assignedDate, outcomeCodes: target.outcomeCodes, replaces: item.title, placement };
+      target.assignments!.push(assignment);
+      target.assignment ??= assignment;
+    };
+    if (/\b(?:participation|engagement|attendance)\b/i.test(item.title)) {
+      const start = modules.find(m => m.key === 'start-here')!;
+      add(start, item.title, points, weightPercent, null, 'Coursewide participation is recorded here; no submission is due.');
+      continue;
+    }
+    const stated = statedWeek(`${item.title} ${item.span?.text ?? ''}`);
+    const dateWeek = item.dueAt ? scheduledDateWeek(item.dueAt) ?? weekOf(item.dueAt, session.extraction.profile.termStart.value) : null;
+    const final = /\bfinal\s*(?:exam|assessment|test)\b/i.test(item.title);
+    if (item.dueAt || stated || final) {
+      const requested = final ? Math.max(...content.flatMap(moduleWeeks)) : stated ? Number(stated) : dateWeek;
+      const target = requested ? moduleForWeek(requested) : content[content.length - 1];
+      if (!target) continue;
+      const actual = requested && moduleWeeks(target).includes(requested) ? requested : contentWeek(target);
+      const note = final ? 'Final exam placed in the last content module.' : requested !== actual ? `Syllabus says Week ${requested}; placed in nearest content module, Week ${actual}.` : item.dueAt ? `Placed by syllabus due date ${item.dueAt}.` : `Placed by syllabus Week ${requested}.`;
+      add(target, item.title, points, weightPercent, actual, note, item.dueAt);
+      continue;
+    }
+    const occurrences = session.extraction.schedule.flatMap(row => row.empty || isBreak(`${row.topic} ${row.due}`) ? [] : occurrenceNames(item.title, row.due, row.topic).map(title => ({ title, week: row.week })));
+    if (occurrences.length) {
+      const pointShares = shares(points, occurrences.length);
+      const weightShares = weightPercent === null ? [] : shares(weightPercent, occurrences.length);
+      occurrences.forEach((occurrence, n) => {
+        const target = moduleForWeek(occurrence.week);
+        if (target) add(target, occurrence.title, pointShares[n], weightShares[n] ?? null, occurrence.week, `Scheduled in Week ${occurrence.week}: ${occurrence.title}.`, null, n + 1);
+      });
+      continue;
+    }
+    const count = Number(countOf(`${item.title} ${item.span?.text ?? ''}`));
+    if (count > 0 || /\b(?:weekly|each week|per module)\b/i.test(`${item.title} ${item.span?.text ?? ''}`)) {
+      const n = count || content.length;
+      const pointShares = shares(points, n);
+      const weightShares = weightPercent === null ? [] : shares(weightPercent, n);
+      Array.from({ length: n }, (_, i) => i).forEach(i => {
+        const target = content[Math.round((i + 0.5) * content.length / n - 0.5)] ?? content[content.length - 1];
+        if (!target) return;
+        const week = contentWeek(target);
+        add(target, `${item.title.replace(/\s*\(\s*\d+\s*\)/, '').trim()} ${i + 1}`, pointShares[i], weightShares[i] ?? null, week, `${count ? `${count} stated instances` : 'Recurring'} spread across content modules; Week ${week}.`, null, i + 1);
+      });
+      continue;
+    }
+    const target = content[content.length - 1];
+    if (target) {
+      const week = contentWeek(target);
+      add(target, item.title, points, weightPercent, week, `No due week found; placed in the last content module, Week ${week}.`);
+    }
   }
   if (selected.slice(1).some(option => option.id === 'case')) for (const module of instructional) {
     const critique: PlanAssignment = { key: `${module.key}/claim-critique`, title: `Claim critique: ${module.title}`, points: 0, dueAt: null, outcomeCodes: module.outcomeCodes, replaces: null };

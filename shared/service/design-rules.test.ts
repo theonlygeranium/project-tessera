@@ -54,7 +54,7 @@ describe('design questions from deterministic rules', () => {
     expect(questions.find(question => question.text.startsWith("Enrolment isn't stated"))).toMatchObject({ kind: 'number', required: false });
   });
   it('does not ask a question for an unobservable outcome', () => { const x = extraction(); const problems = problemsFrom(x).filter(problem => problem.code === 'objective-no-verb'); expect(questionsFrom(problems, x, null).map(question => question.fromProblem)).toEqual([null]); });
-  it('flags a noun phrase with no observable verb', () => { const x = extraction(); x.outcomes[0].text = 'Statistical questions and data'; expect(problemsFrom(x).some(problem => problem.code === 'objective-no-verb' && problem.message.includes(x.outcomes[0].id))).toBe(true); });
+  it('flags a noun phrase with no observable verb', () => { const x = extraction(); x.outcomes[0].text = 'Statistical questions and data'; expect(problemsFrom(x).some(problem => problem.code === 'objective-no-verb' && problem.message.includes('O1'))).toBe(true); });
   it('orders week count and weights first, caps at six, and appends the teaching prompt with prefill', () => {
     const x = extraction(); x.assessments[0].weightPercent = 10;
     const problems = [...problemsFrom(x), ...Array.from({ length: 9 }, (_, i) => ({ code: 'missing-field' as const, message: `credits ${i} is not stated`, spans: [] }))];

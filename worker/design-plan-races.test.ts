@@ -303,7 +303,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
     await expect(service.previewProvisionPlan(ctx, { sessionId })).rejects.toThrow('Confirm the points');
     await service.confirmDesignPoints(ctx, { sessionId, points: { project: 25 } });
     const plan = await service.previewProvisionPlan(ctx, { sessionId });
-    expect(plan.modules.flatMap(m => m.assignments ?? []).find(a => a.replaces === 'Project')?.points).toBe(25);
+    expect(plan.modules.flatMap(m => m.assignments ?? []).filter(a => a.replaces === 'Project').reduce((sum, a) => sum + a.points, 0)).toBe(25);
   });
   it('records a concurrent module position before a failed lesson insert so undo removes it', async () => {
     const { ctx, sessionId, plan } = await setup(kind);
@@ -336,8 +336,9 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
     expect(explicitAssessmentPoints(session.extraction!.assessments[0].span, 'Project')).toBe(1000);
     const plan = await service.previewProvisionPlan(ctx, { sessionId });
     const items = plan.modules.flatMap(m => m.assignments ?? []);
-    expect(items.find(a => a.replaces === 'Project')?.points).toBe(1000);
-    expect(items.find(a => a.replaces === 'Final project')).toMatchObject({ points: 200, weightPercent: 20 });
+    expect(items.filter(a => a.replaces === 'Project').reduce((sum, a) => sum + a.points, 0)).toBe(1000);
+    expect(items.filter(a => a.replaces === 'Final project').reduce((sum, a) => sum + a.points, 0)).toBe(200);
+    expect(items.filter(a => a.replaces === 'Final project').reduce((sum, a) => sum + (a.weightPercent ?? 0), 0)).toBe(20);
   });
   it('confirms every unresolved assessment on preview and hashes the values', async () => {
     const { ctx, sessionId } = await setup(kind);
