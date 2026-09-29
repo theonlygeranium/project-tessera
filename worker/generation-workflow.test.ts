@@ -50,4 +50,14 @@ describe('GenerationWorkflow (carry-over 4)', () => {
     expect(await workflow.run({ payload: { jobId: 'gj-p' } } as never, step as never)).toBe('stopped');
     expect((await repo.getGenerationJob('gj-p'))?.done).toBe(0);
   });
+  it('does not schedule a continuation after a full run without progress', async () => {
+    const db = createTestDb();
+    const repo = new D1Repo(db);
+    await repo.reset(seedData());
+    await repo.putGenerationJob({ id: 'gj-stalled-options', courseId: 'c-stat110', requestedBy: 'u-okafor', kind: 'extract', sessionId: 'missing-session', state: 'running', done: 0, total: 1, lessonIds: [], error: null, work: [], instruction: 'read', failures: [], createdAt: '2026-09-28T12:00:00Z', updatedAt: '2026-09-28T12:00:00Z', runner: 'workflow' });
+    const created: unknown[] = [];
+    const workflow = new GenerationWorkflow({} as never, { DB: db, ENVIRONMENT: 'local', GENERATION: { create: async (value: unknown) => { created.push(value); } } } as never);
+    expect(await workflow.run({ payload: { jobId: 'gj-stalled-options' } } as never, step as never)).toBe('stalled');
+    expect(created).toEqual([]);
+  });
 });

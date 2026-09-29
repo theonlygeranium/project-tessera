@@ -19,17 +19,24 @@ export async function saveCourseOutcomes(ctx: ServiceContext, courseId: string, 
   const outcomes: Outcome[] = input.map((entry, position) => {
     const text = typeof entry.text === 'string' ? entry.text.trim() : '';
     if (!text || text.length > 500) fail('invalid', 'Outcome text must be 1–500 characters.');
-    return { id: entry.id ?? ctx.newId('o'), courseId, code: `O${position + 1}`, text, position };
+    return { id: entry.id ?? ctx.newId('o'), courseId, code: `O${position + 1}`, text, position, ...(old.find(item => item.id === entry.id)?.aiState === 'draft' ? { aiState: 'draft' as const } : {}) };
   });
   await ctx.repo.replaceOutcomes(courseId, outcomes);
-  c.outcomes = outcomes.map(o => o.text);
+  c.outcomes = outcomes.filter(o => o.aiState !== 'draft').map(o => o.text);
   await ctx.repo.putCourse(c);
   return outcomes;
 }
 
-export const outcomes: Pick<Service, 'listOutcomes' | 'saveOutcomes' | 'listOutcomeLinks' | 'setOutcomeLinks'> = {
-  listOutcomes: async (ctx, { courseId }) => { await canReachCourse(ctx, courseId); return ctx.repo.listOutcomes(courseId); },
+export const outcomes: Pick<Service, 'listOutcomes' | 'saveOutcomes' | 'keepDesignOutcome' | 'listOutcomeLinks' | 'setOutcomeLinks'> = {
+  listOutcomes: async (ctx, { courseId }) => { await canReachCourse(ctx, courseId); const rows = await ctx.repo.listOutcomes(courseId); return user(ctx).role === 'student' ? rows.filter(row => row.aiState !== 'draft') : rows; },
   saveOutcomes: async (ctx, { courseId, outcomes }) => saveCourseOutcomes(ctx, courseId, outcomes),
+  keepDesignOutcome: async (ctx, { sessionId, outcomeId }) => {
+    if (ctx.token || ctx.agent) fail('forbidden', 'A person must keep this draft in the app.');
+    const session = await ctx.repo.getDesignSession(sessionId) ?? fail('not-found', 'Design session not found.');
+    await staff(ctx, session.courseId);
+    if (!await ctx.repo.keepDesignOutcome(sessionId, outcomeId)) fail('conflict', 'That outcome is no longer a draft in this session.');
+    return (await ctx.repo.listOutcomes(session.courseId)).find(item => item.id === outcomeId)!;
+  },
   listOutcomeLinks: async (ctx, { courseId }) => { await staff(ctx, courseId); return ctx.repo.listOutcomeLinks({ courseId }); },
   setOutcomeLinks: async (ctx, { courseId, targetKind, targetId, outcomeIds }) => {
     await staff(ctx, courseId);

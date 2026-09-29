@@ -17,7 +17,9 @@ const FORMATS: AccessibleFormat[] = ['reading', 'audio', 'epub', 'ocr'];
 export async function canReadFile(ctx: ServiceContext, f: FileRecord): Promise<void> {
   await canReachCourse(ctx, f.courseId);
   const u = user(ctx);
-  if (u.role !== 'student' || f.uploadedBy === u.id) return;
+  if (u.role !== 'student') return;
+  if (f.visibility === 'staff') throw new ApiError('not-found', 'File not found.');
+  if (f.uploadedBy === u.id) return;
   const uploader = await ctx.repo.getUser(f.uploadedBy);
   if (!uploader || uploader.role === 'student') throw new ApiError('not-found', 'File not found.');
 }
@@ -33,7 +35,7 @@ function status(f: { format: AccessibleFormat; state: FormatStatus['state']; out
   return { format, state: f?.state ?? 'none', outputFileId: f?.state === 'ready' && f.outputKey ? `${fileId}:${format}` : null, generatedAt: f?.generatedAt ?? null };
 }
 
-export const files: Pick<Service, 'listFiles' | 'getFile' | 'deleteFile' | 'getFormats' | 'requestFormat'> = {
+export const files: Pick<Service, 'listFiles' | 'getFile' | 'setFileVisibility' | 'deleteFile' | 'getFormats' | 'requestFormat'> = {
   listFiles: async (ctx, { courseId, limit, cursor }) => {
     await canReachCourse(ctx, courseId);
     const listed = await ctx.repo.listFiles(courseId);
@@ -45,6 +47,14 @@ export const files: Pick<Service, 'listFiles' | 'getFile' | 'deleteFile' | 'getF
     return { items, nextCursor: all[start + size]?.id ?? null };
   },
   getFile: async (ctx, { fileId }) => readableFile(ctx, fileId),
+  setFileVisibility: async (ctx, { fileId, visibility }) => {
+    if (ctx.token || ctx.agent) fail('forbidden', 'Share this file from the course files screen.');
+    const file = await ctx.repo.getFile(fileId) ?? fail('not-found', 'File not found.');
+    await canTeach(ctx, file.courseId);
+    file.visibility = visibility;
+    await ctx.repo.putFile(file);
+    return file;
+  },
   deleteFile: async (ctx, { fileId }) => {
     const f = await ctx.repo.getFile(fileId);
     if (!f) throw new ApiError('not-found', 'File not found.');

@@ -511,6 +511,9 @@ export interface InstructionalRead {
 
 export interface DesignQuestion {
   id: string; text: string; spans: SourceSpan[]; kind: 'choice' | 'number' | 'text';
+  /** The profile field or schedule weeks this answer resolves. */
+  profileField?: 'credits' | 'termWeeks' | 'meeting' | 'modality';
+  weekIds?: number[];
   options: { id: string; text: string }[]; required: false;                   // every question is skippable
   answer: { optionId: string | null; value: string | null; skipped: boolean } | null;
   fromProblem: ExtractionProblemCode | null;
@@ -533,7 +536,7 @@ export interface ProvisionPlan {
   outcomes: { code: string; text: string; source: 'confirmed' | 'rewritten' }[];
   modules: { key: string; title: string; objective: string; position: number; outcomeCodes: string[]; templateKey: string | null;
     overlaps: { moduleId: Id; title: string } | null;
-    lessons: { key: string; title: string; objective: string; minutes: number; week: number | null; skeleton: LessonSkeleton; patternNote?: string; resurface?: boolean; announcementSlot?: boolean; alternativeFormatSlot?: boolean }[];
+    lessons: { key: string; title: string; objective: string; minutes: number; week: number | null; weeks?: number[]; skeleton: LessonSkeleton; patternNote?: string; resurface?: boolean; announcementSlot?: boolean; alternativeFormatSlot?: boolean }[];
     assignment: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null; placement?: string } | null;
     /** Additional distinct graded components due in the same module. */
     assignments?: { key: string; title: string; points: number; weightPercent?: number | null; dueAt: string | null; outcomeCodes: string[]; replaces: string | null; placement?: string }[];
@@ -551,18 +554,26 @@ export type LessonSkeleton = 'gagne' | 'merrill' | 'case' | 'milestone' | 'start
 export interface DesignRecord {
   sessionId: Id; source: Pick<DesignSource, 'name' | 'kind' | 'chars'>;
   extraction: SyllabusExtraction | null; read: InstructionalRead | null; questions: DesignQuestion[];
-  confirmedOutcomes: { code: string; text: string; originalText: string; source?: 'syllabus' | 'instructor' | 'suggested'; suggestedText?: string }[];
+  confirmedOutcomes: ConfirmedDesignOutcome[];
   optionsShown: StructureOption[]; selection: ApproachSelection | null;
   plan: ProvisionPlan | null; appliedAt: Timestamp | null; undoneAt: Timestamp | null;
   decisions: { at: Timestamp; who: Id; what: string }[];                     // per-item keep/revert etc. summarised
 }
 
 export type DesignStage = 'start' | 'read' | 'confirm' | 'approaches' | 'preview' | 'provisioning' | 'review' | 'undoing';
+export interface ConfirmedDesignOutcome {
+  code: string; text: string; originalText: string;
+  source?: 'syllabus' | 'instructor' | 'suggested'; suggestedText?: string;
+  /** The server records the actual submitter, independent of the caller's source claim. */
+  submittedBy?: { kind: 'person' | 'agent' | 'token'; name: string };
+}
 export interface DesignSession {
   id: Id; courseId: Id; mode: 'syllabus'; stage: DesignStage; createdBy: Id; createdAt: Timestamp; updatedAt: Timestamp;
   source: DesignSource; consent: { syllabusOnly: true; at: Timestamp; rememberProfile: boolean };
   extraction: SyllabusExtraction | null; read: InstructionalRead | null; questions: DesignQuestion[];
-  confirmedOutcomes: { code: string; text: string; originalText: string; source?: 'syllabus' | 'instructor' | 'suggested'; suggestedText?: string }[] | null; teachingNote: string;
+  effectiveProfile?: CourseProfile | null;
+  profileCorrections?: Partial<Record<'credits' | 'termWeeks' | 'meeting' | 'modality', string>>;
+  confirmedOutcomes: ConfirmedDesignOutcome[] | null; teachingNote: string;
   suggestedOutcomes?: { text: string; why: string }[];
   /** Per-session assumptions override institution workload rates. */
   workloadRates?: WorkloadRates | null;
@@ -611,6 +622,8 @@ export interface FileRecord {
   version: number;
   uploadedBy: Id;
   uploadedAt: Timestamp;
+  /** Design sources begin staff-only; an instructor may explicitly share them later. Old files are course-visible. */
+  visibility?: 'course' | 'staff';
   /** The latest accessibility scan, when one exists. */
   scan: AccessSummary | null;
 }
@@ -1114,6 +1127,8 @@ export interface Outcome {
   code: string;
   text: string;
   position: number;
+  /** Existing outcomes default to kept. Design apply creates drafts. */
+  aiState?: 'draft' | 'kept';
 }
 
 export type AlignableKind = 'block' | 'assignment';

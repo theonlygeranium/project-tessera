@@ -171,6 +171,8 @@ export interface Repo {
 
   getGenerationJob(id: Id): Promise<GenerationJob | null>;
   putGenerationJob(job: GenerationJob): Promise<void>;
+  claimDesignOptions(session: DesignSession, job: GenerationJob, expectedStage: 'read' | 'approaches', previousJobId: Id): Promise<boolean>;
+  failSupersededDesignJob(jobId: Id, message: string): Promise<void>;
 
   /** Files in R2 (D-019). `listFiles` is newest first. */
   getFile(id: Id): Promise<FileRecord | null>;
@@ -237,6 +239,7 @@ export interface Repo {
 
   /** Ordered by position. */
   listOutcomes(courseId: Id): Promise<Outcome[]>;
+  keepDesignOutcome(sessionId: Id, outcomeId: Id): Promise<boolean>;
   /** Replaces the course's outcomes with these; outcomes not in the list are deleted with their links. */
   replaceOutcomes(courseId: Id, outcomes: Outcome[]): Promise<void>;
   /** Links for a course's outcomes, or for one target. Ordered by outcome id, then target kind and id. */

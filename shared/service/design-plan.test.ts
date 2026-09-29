@@ -17,16 +17,16 @@ async function setup(empty = false): Promise<{ ctx: ServiceContext; sessionId: s
   }
   const ctx: ServiceContext = { repo, ai: fixtureAi, user: await repo.getUser('u-okafor'), now: () => '2026-09-28T12:00:00.000Z', newId: prefix => `${prefix}-plan-${++n}` };
   const started = await service.createDesignSession(ctx, { courseId: empty ? 'c-plan-empty' : 'c-stat110', sourceKind: 'syllabus', sample: true, consent: { syllabusOnly: true, rememberProfile: false } });
-  await service.getDesignSession(ctx, { sessionId: started.id });
-  const read = await service.getDesignSession(ctx, { sessionId: started.id });
+  await service.advanceDesignSession(ctx, { sessionId: started.id });
+  const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
   await service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((item, i) => ({ code: `O${i + 1}`, text: item.text, originalText: item.text })) });
-  const options = await service.getDesignSession(ctx, { sessionId: started.id });
+  const options = await service.advanceDesignSession(ctx, { sessionId: started.id });
   await service.selectApproach(ctx, { sessionId: started.id, optionIds: [options.options![0].id], overlays: ['bookends', 'spaced-review'], rationale: 'Repeated practice fits this group.' });
   return { ctx, sessionId: started.id };
 }
 async function finish(ctx: ServiceContext, sessionId: string) {
-  let state = await service.getDesignSession(ctx, { sessionId });
-  for (let i = 0; i < 40 && state.stage === 'provisioning'; i++) state = await service.getDesignSession(ctx, { sessionId });
+  let state = await service.advanceDesignSession(ctx, { sessionId });
+  for (let i = 0; i < 40 && state.stage === 'provisioning'; i++) state = await service.advanceDesignSession(ctx, { sessionId });
   expect(state.stage).toBe('review');
   return state;
 }
@@ -123,7 +123,7 @@ describe('syllabus provision plan', () => {
     const institution = await ctx.repo.getInstitution();
     await service.updatePolicy(admin, { ...institution.policy, designPartner: { enabled: false, allowedArchitectures: null } });
     expect((await ctx.repo.getGenerationJob(job.id))?.state).toBe('failed');
-    expect((await service.getDesignSession(ctx, { sessionId })).provisioning?.error).toContain('disabled');
+    expect((await service.advanceDesignSession(ctx, { sessionId })).provisioning?.error).toContain('disabled');
     await advanceScaffoldJob(ctx, job);
     expect((await ctx.repo.getDesignSession(sessionId))?.created.blockIds).toEqual(before.created.blockIds);
     await expect(service.flagLessonAlternatives(ctx, { sessionId, lessonId: before.created.lessonIds[0] })).rejects.toMatchObject({ code: 'ai-disabled' });
@@ -161,10 +161,10 @@ describe('syllabus provision plan', () => {
     const repo = new MemoryRepo(seedData()); let n = 0;
     const ctx: ServiceContext = { repo, ai: fixtureAi, user: await repo.getUser('u-okafor'), now: () => '2026-09-28T12:00:00.000Z', newId: prefix => `${prefix}-paste-${++n}` };
     const started = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: sampleSyllabus.sections.map(section => section.text).join('\n\n'), consent: { syllabusOnly: true, rememberProfile: false } });
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
     await service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((item, index) => ({ code: `O${index + 1}`, text: item.text, originalText: item.text })) });
-    const options = await service.getDesignSession(ctx, { sessionId: started.id });
+    const options = await service.advanceDesignSession(ctx, { sessionId: started.id });
     await service.selectApproach(ctx, { sessionId: started.id, optionIds: [options.options![1].id, options.options![2].id], overlays: ['bookends'], rationale: 'Apply each idea to a case, then reflect.' });
     const plan = await service.previewProvisionPlan(ctx, { sessionId: started.id });
     expect(plan.modules).toHaveLength(7);
@@ -229,7 +229,7 @@ describe('syllabus provision plan', () => {
     const plan = await service.previewProvisionPlan(ctx, { sessionId });
     const [a, b] = await Promise.all([service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash }), service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash })]);
     expect(a.id).toBe(b.id);
-    const progress = await service.getDesignSession(ctx, { sessionId });
+    const progress = await service.advanceDesignSession(ctx, { sessionId });
     expect(progress.provisioning?.modules?.[0]).toMatchObject({ done: 1, total: 1 });
     const done = await finish(ctx, sessionId);
     expect(done.created.moduleIds).toHaveLength(plan.counts.modules);
@@ -364,12 +364,12 @@ describe('syllabus provision plan', () => {
     const ctx: ServiceContext = { repo, ai: fixtureAi, user: await repo.getUser('u-okafor'), now: () => '2026-09-28T12:00:00.000Z', newId: prefix => `${prefix}-no-schedule-${++n}` };
     const text = 'ABC 101 · Applied Inquiry\nInstructor: Dr. Rivera · rivera@example.edu\nLearning outcomes\n1. Explain an inquiry question using a course example.\nGrading\nProject 100%';
     const started = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false } });
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
     const term = read.questions.find(q => /term length/i.test(q.text))!;
     await service.answerDesignQuestions(ctx, { sessionId: started.id, answers: [{ questionId: term.id, value: '4', skipped: false }], teachingNote: '' });
     await service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((o, i) => ({ code: `O${i + 1}`, text: o.text, originalText: o.text })) });
-    const options = await service.getDesignSession(ctx, { sessionId: started.id });
+    const options = await service.advanceDesignSession(ctx, { sessionId: started.id });
     expect(options.options?.find(o => o.id === 'weekly')?.modules).toHaveLength(4);
     await service.selectApproach(ctx, { sessionId: started.id, optionIds: ['weekly'], overlays: [], rationale: 'Four weekly steps fit this group.' });
     const plan = await service.previewProvisionPlan(ctx, { sessionId: started.id });

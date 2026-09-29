@@ -42,7 +42,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect(await repo.putDesignModule(session.id, 'rev-1', 'module-key', module)).toBe(true);
       const lesson = { id: 'l-cas', courseId: 'c-stat110', moduleId: module.id, title: 'Draft lesson', objective: 'Learn', minutes: 30, position: 0, status: 'draft' as const, publishedAt: null, templateKey: null };
       expect(await repo.putDesignLesson(session.id, 'rev-1', 'lesson-key', lesson)).toBe(true);
-      const outcome = { id: 'o-cas', courseId: 'c-stat110', code: 'O99', text: 'A new outcome', position: 99 };
+      const outcome = { id: 'o-cas', courseId: 'c-stat110', code: 'O99', text: 'A new outcome', position: 99, aiState: 'draft' as const };
       expect(await repo.appendDesignOutcome(session.id, 'rev-1', outcome)).toBe(true);
       expect((await repo.getDesignSession(session.id))?.planIds?.lessons['lesson-key']).toBe(lesson.id);
       expect((await repo.listOutcomes('c-stat110')).some(o => o.id === outcome.id)).toBe(true);

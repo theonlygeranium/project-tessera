@@ -20,6 +20,7 @@ const TOOLS: Tool[] = [
   { name: 'get_lesson', operation: 'getLesson', description: 'Read a lesson and its blocks.', readOnly: true },
   { name: 'design_session_create', operation: 'createDesignSession', description: 'Read a syllabus into a new design session after instructor consent.', readOnly: false },
   { name: 'design_session_get', operation: 'getDesignSession', description: 'Read a syllabus design session and its review stage.', readOnly: true },
+  { name: 'design_session_advance', operation: 'advanceDesignSession', description: 'Advance a running syllabus design job; requires AI run scope.', readOnly: false },
   { name: 'design_session_answer', operation: 'answerDesignQuestions', description: 'Record the instructor answers for a design session.', readOnly: false },
   { name: 'design_session_confirm', operation: 'confirmOutcomes', description: 'Confirm outcomes supplied by the instructor for a design session.', readOnly: false },
   { name: 'design_session_select', operation: 'selectApproach', description: 'Select approaches and the instructor rationale.', readOnly: false },

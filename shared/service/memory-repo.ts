@@ -145,6 +145,16 @@ export class MemoryRepo implements Repo {
   async getDesignSession(id: string): Promise<DesignSession | null> { const row = copy(this.data.designSessions!.find(x => x.id === id) ?? null); return row && normalizeDesignSession(row); }
   async listDesignSessions(courseId: string): Promise<DesignSession[]> { return copy(this.data.designSessions!.filter(x => x.courseId === courseId).sort((a,b) => b.createdAt.localeCompare(a.createdAt) || cmp(a.id,b.id))).map(normalizeDesignSession); }
   async putDesignSession(value: DesignSession) { this.upsert(this.data.designSessions!, value); }
+  async claimDesignOptions(value: DesignSession, job: GenerationJob, expectedStage: 'read' | 'approaches', previousJobId: string) {
+    const current = this.data.designSessions!.find(x => x.id === value.id);
+    const previous = this.data.generationJobs.find(x => x.id === previousJobId);
+    if (!current || current.stage !== expectedStage || current.provisioning?.jobId !== previousJobId || (expectedStage === 'approaches' && (current.options || previous?.state !== 'failed')) || this.data.generationJobs.some(x => x.id === job.id)) return false;
+    this.upsert(this.data.designSessions!, value); this.upsert(this.data.generationJobs, job); return true;
+  }
+  async failSupersededDesignJob(jobId: string, message: string) {
+    const job = this.data.generationJobs.find(x => x.id === jobId);
+    if (job?.state === 'running') { job.state = 'failed'; job.error = message; }
+  }
   async finishDesignUndo(id: string, revision: string, value: DesignSession) { const current = this.data.designSessions!.find(x => x.id === id); if (current?.stage !== 'undoing' || current.applyRevision !== revision) return false; this.upsert(this.data.designSessions!, value); return true; }
   async revertDesignPreview(id: string) { const s = this.data.designSessions!.find(x => x.id === id); if (s?.stage !== 'preview') return false; s.stage = 'approaches'; s.selection = null; s.plan = null; return true; }
   async saveDesignPoints(id: string, values: Record<string, number>) { const s = this.data.designSessions!.find(x => x.id === id); if (s?.stage !== 'preview') return false; s.confirmedPoints = copy(values); s.plan = null; return true; }
@@ -171,14 +181,14 @@ export class MemoryRepo implements Repo {
   async appendDesignOutcome(id: string, revision: string, value: Outcome) {
     const s = this.activeDesign(id, revision), c = this.data.courses.find(x => x.id === value.courseId); if (!s || !c || this.data.outcomes!.some(o => o.id === value.id) || this.data.outcomes!.filter(o => o.courseId === value.courseId).length >= 30) return false;
     const position = Math.max(-1, ...this.data.outcomes!.filter(o => o.courseId === value.courseId).map(o => o.position)) + 1;
-    this.data.outcomes!.push({ ...copy(value), code: `O${position + 1}`, position }); c.outcomes.push(value.text); s.created.outcomeIds.push(value.id); s.planIds!.outcomes[value.code] = value.id; return true;
+    this.data.outcomes!.push({ ...copy(value), code: `O${position + 1}`, position }); s.created.outcomeIds.push(value.id); s.planIds!.outcomes[value.code] = value.id; return true;
   }
   async appendDesignOutcomes(id: string, revision: string, values: Outcome[]) {
     const s = this.activeDesign(id, revision), c = s && this.data.courses.find(x => x.id === s.courseId);
     if (!s || !c || new Set(values.map(v => v.id)).size !== values.length || values.some(v => v.courseId !== c.id || this.data.outcomes!.some(o => o.id === v.id)) || this.data.outcomes!.filter(o => o.courseId === c.id).length + values.length > 30) return null;
     const start = Math.max(-1, ...this.data.outcomes!.filter(o => o.courseId === c.id).map(o => o.position)) + 1;
     const inserted = values.map((v, i) => ({ ...copy(v), code: `O${start + i + 1}`, position: start + i }));
-    this.data.outcomes!.push(...inserted); c.outcomes.push(...inserted.map(v => v.text));
+    this.data.outcomes!.push(...inserted);
     for (const [i, v] of values.entries()) { s.created.outcomeIds.push(v.id); s.planIds!.outcomes[v.code] = v.id; }
     return copy(inserted);
   }
@@ -253,10 +263,10 @@ export class MemoryRepo implements Repo {
   }
   async deleteDesignOutcomeIfUnused(sessionId: string, revision: string, id: string, text: string) {
     const o = this.data.outcomes!.find(x => x.id === id), c = o && this.data.courses.find(x => x.id === o.courseId);
-    if (!this.undoOwns(sessionId, revision, 'outcomeIds', id) || !o || !c || o.text !== text || this.data.outcomeLinks!.some(x => x.outcomeId === id)) return false;
-    const mirrored = JSON.stringify(c.outcomes) === JSON.stringify(this.data.outcomes!.filter(x => x.courseId === o.courseId).sort(byPosition).map(x => x.text));
+    if (!this.undoOwns(sessionId, revision, 'outcomeIds', id) || !o || !c || o.aiState !== 'draft' || o.text !== text || this.data.outcomeLinks!.some(x => x.outcomeId === id)) return false;
+    const mirrored = JSON.stringify(c.outcomes) === JSON.stringify(this.data.outcomes!.filter(x => x.courseId === o.courseId && x.aiState !== 'draft').sort(byPosition).map(x => x.text));
     this.data.outcomes = this.data.outcomes!.filter(x => x.id !== id);
-    if (mirrored) c.outcomes = this.data.outcomes!.filter(x => x.courseId === o.courseId).sort(byPosition).map(x => x.text);
+    if (mirrored) c.outcomes = this.data.outcomes!.filter(x => x.courseId === o.courseId && x.aiState !== 'draft').sort(byPosition).map(x => x.text);
     return true;
   }
   async getInstructorProfile(userId: string): Promise<InstructorProfile | null> { return copy(this.data.instructorProfiles!.find(x => x.userId === userId) ?? null); }
@@ -266,7 +276,7 @@ export class MemoryRepo implements Repo {
   // Like D1Repo, a file's `scan` is derived from its latest stored scan.
   private withScan(f: FileRecord): FileRecord {
     const s = this.data.scans.filter(x => x.target.kind === 'file' && x.target.fileId === f.id).sort((a, b) => b.scannedAt.localeCompare(a.scannedAt))[0];
-    return copy({ ...f, scan: s ? { score: s.score, grade: s.grade, issueCount: s.issueCount, bySeverity: s.bySeverity, scannedAt: s.scannedAt } : null });
+    return copy({ ...f, visibility: f.visibility ?? 'course', scan: s ? { score: s.score, grade: s.grade, issueCount: s.issueCount, bySeverity: s.bySeverity, scannedAt: s.scannedAt } : null });
   }
   async getFile(id: string) { const f = this.data.files.find(x => x.id === id); return f ? this.withScan(f) : null; }
   async listFiles(courseId: string) { return this.data.files.filter(x => x.courseId === courseId).sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt) || a.id.localeCompare(b.id)).map(f => this.withScan(f)); }
@@ -328,6 +338,15 @@ export class MemoryRepo implements Repo {
     }
   }
   async listOutcomes(courseId: string) { return copy(this.data.outcomes!.filter(x => x.courseId === courseId).sort((a, b) => a.position - b.position || cmp(a.id, b.id))); }
+  async keepDesignOutcome(sessionId: string, outcomeId: string) {
+    const s = this.data.designSessions!.find(x => x.id === sessionId);
+    const o = this.data.outcomes!.find(x => x.id === outcomeId && x.courseId === s?.courseId);
+    const c = this.data.courses.find(x => x.id === s?.courseId);
+    if (!s || !['provisioning', 'review'].includes(s.stage) || !o || !c || !s.created.outcomeIds.includes(outcomeId) || o.aiState !== 'draft') return false;
+    delete o.aiState;
+    c.outcomes = this.data.outcomes!.filter(x => x.courseId === c.id && x.aiState !== 'draft').sort(byPosition).map(x => x.text);
+    return true;
+  }
   async replaceOutcomes(courseId: string, outcomes: Outcome[]) {
     if (outcomes.some(x => !this.data.courses.some(c => c.id === x.courseId))) throw new Error('Unknown course id');
     const removed = new Set(this.data.outcomes!.filter(x => x.courseId === courseId && !outcomes.some(y => y.id === x.id)).map(x => x.id));

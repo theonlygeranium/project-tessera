@@ -47,6 +47,7 @@ export interface ApiSpec {
   createDesignSession: { input: { courseId: Id; sourceKind: DesignSourceKind; fileId?: Id; text?: string; sample?: true; name?: string; consent: { syllabusOnly: true; rememberProfile: boolean } }; output: DesignSession };
   listDesignSessions: { input: { courseId: Id }; output: DesignSession[] };
   getDesignSession: { input: { sessionId: Id }; output: DesignSession };
+  advanceDesignSession: { input: { sessionId: Id }; output: DesignSession };
   answerDesignQuestions: { input: { sessionId: Id; answers: { questionId: Id; optionId?: Id; value?: string; skipped: boolean }[]; teachingNote: string }; output: DesignSession };
   contestDesignField: { input: { sessionId: Id; field: string; correction: string }; output: DesignSession };
   updateDesignRates: { input: { sessionId: Id; rates: WorkloadRates }; output: DesignSession };
@@ -179,6 +180,7 @@ export interface ApiSpec {
   listFiles: { input: { courseId: Id } & PageInput; output: Page<FileRecord> };
   /** Multipart upload is handled by the Worker; this records the file after the bytes are stored. */
   getFile: { input: { fileId: Id }; output: FileRecord };
+  setFileVisibility: { input: { fileId: Id; visibility: 'course' | 'staff' }; output: FileRecord };
   deleteFile: { input: { fileId: Id }; output: Ok };
   getFormats: { input: { fileId: Id }; output: FormatStatus[] };
   requestFormat: { input: { fileId: Id; format: AccessibleFormat }; output: FormatStatus };
@@ -285,6 +287,7 @@ export interface ApiSpec {
   listOutcomes: { input: { courseId: Id }; output: Outcome[] };
   /** Replaces the course's outcomes in order (existing ones keep their id); mirrors the text into `Course.outcomes`. Removing an outcome removes its links. */
   saveOutcomes: { input: { courseId: Id; outcomes: { id?: Id; text: string }[] }; output: Outcome[] };
+  keepDesignOutcome: { input: { sessionId: Id; outcomeId: Id }; output: Outcome };
   listOutcomeLinks: { input: { courseId: Id }; output: OutcomeLink[] };
   /** Replaces the outcomes a check, scenario, or assignment is tagged with. */
   setOutcomeLinks: { input: { courseId: Id; targetKind: AlignableKind; targetId: Id; outcomeIds: Id[] }; output: OutcomeLink[] };
@@ -392,6 +395,7 @@ export const ROUTES: { [K in Operation]: Route } = {
   createDesignSession: { method: 'POST', path: '/courses/:courseId/design', access: INSTRUCTOR, scope: 'ai:run' },
   listDesignSessions: { method: 'GET', path: '/courses/:courseId/design', access: INSTRUCTOR, scope: 'content:read' },
   getDesignSession: { method: 'GET', path: '/design/:sessionId', access: INSTRUCTOR, scope: 'content:read' },
+  advanceDesignSession: { method: 'POST', path: '/design/:sessionId/advance', access: INSTRUCTOR, scope: 'ai:run' },
   answerDesignQuestions: { method: 'PATCH', path: '/design/:sessionId/answers', access: INSTRUCTOR, scope: 'content:write' },
   contestDesignField: { method: 'POST', path: '/design/:sessionId/contest', access: INSTRUCTOR, scope: 'content:write' },
   updateDesignRates: { method: 'PUT', path: '/design/:sessionId/rates', access: INSTRUCTOR, scope: 'content:write' },
@@ -475,6 +479,7 @@ export const ROUTES: { [K in Operation]: Route } = {
 
   listFiles: { method: 'GET', path: '/courses/:courseId/files', access: 'signed-in', scope: 'content:read' },
   getFile: { method: 'GET', path: '/files/:fileId', access: 'signed-in', scope: 'content:read' },
+  setFileVisibility: { method: 'POST', path: '/files/:fileId/visibility', access: INSTRUCTOR, scope: 'content:write' },
   deleteFile: { method: 'DELETE', path: '/files/:fileId', access: INSTRUCTOR, scope: 'content:write' },
   getFormats: { method: 'GET', path: '/files/:fileId/formats', access: 'signed-in', scope: 'content:read' },
   requestFormat: { method: 'POST', path: '/files/:fileId/formats', access: 'signed-in', scope: 'content:read' },
@@ -552,6 +557,7 @@ export const ROUTES: { [K in Operation]: Route } = {
   clearAttestation: { method: 'DELETE', path: '/courses/:courseId/readiness/items/:itemId/attestation', access: STAFF, scope: 'content:write' },
   listOutcomes: { method: 'GET', path: '/courses/:courseId/outcomes', access: 'signed-in', scope: 'courses:read' },
   saveOutcomes: { method: 'PUT', path: '/courses/:courseId/outcomes', access: STAFF, scope: 'courses:write' },
+  keepDesignOutcome: { method: 'POST', path: '/design/:sessionId/outcomes/:outcomeId/keep', access: INSTRUCTOR, scope: 'courses:write' },
   listOutcomeLinks: { method: 'GET', path: '/courses/:courseId/outcome-links', access: STAFF, scope: 'content:read' },
   setOutcomeLinks: { method: 'PUT', path: '/courses/:courseId/outcome-links', access: INSTRUCTOR, scope: 'content:write' },
 

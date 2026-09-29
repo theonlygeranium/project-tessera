@@ -45,7 +45,7 @@ describe('/mcp', () => {
     const body = await (await post(env, secret, rpc('tools/list'))).json() as { result: { tools: { name: string; inputSchema: { type: string } }[] } };
     expect(body.result.tools.map(t => t.name)).toEqual([
       'list_courses', 'get_course_outline', 'import_course', 'create_course', 'create_module', 'create_lesson', 'get_lesson',
-      'design_session_create', 'design_session_get', 'design_session_answer', 'design_session_confirm', 'design_session_select', 'design_session_preview', 'design_session_apply', 'design_session_undo', 'save_blocks',
+      'design_session_create', 'design_session_get', 'design_session_advance', 'design_session_answer', 'design_session_confirm', 'design_session_select', 'design_session_preview', 'design_session_apply', 'design_session_undo', 'save_blocks',
       'get_course_access', 'get_lesson_access', 'list_files', 'get_file_access', 'generate_at_scope', 'get_generation_job', 'generate_element',
       'list_assignments', 'get_assignment', 'create_assignment', 'list_announcements', 'create_announcement',
     ]);
@@ -99,18 +99,18 @@ describe('/mcp and D-003', () => {
     const secret = await token(env, 'u-okafor', ['ai:run', 'content:read', 'content:write']);
     const started = await designTool<{ id: string }>(env, secret, 'design_session_create', { courseId: 'c-stat110', sourceKind: 'syllabus', sample: true, consent: { syllabusOnly: true, rememberProfile: false } });
     let session: { stage: string; extraction: { outcomes: { text: string }[] }; options: { id: string }[] };
-    for (let i = 0; i < 3; i++) session = await designTool(env, secret, 'design_session_get', { sessionId: started.id });
+    for (let i = 0; i < 3; i++) session = await designTool(env, secret, 'design_session_advance', { sessionId: started.id });
     expect(session!.stage).toBe('read');
     await designTool(env, secret, 'design_session_answer', { sessionId: started.id, answers: [], teachingNote: 'Use cases that students can discuss.' });
     await designTool(env, secret, 'design_session_confirm', { sessionId: started.id, outcomes: session!.extraction.outcomes.map((item, index) => ({ code: `O${index + 1}`, text: item.text, originalText: item.text })) });
-    session = await designTool(env, secret, 'design_session_get', { sessionId: started.id });
+    session = await designTool(env, secret, 'design_session_advance', { sessionId: started.id });
     expect(session.options.length).toBeGreaterThanOrEqual(2);
     await designTool(env, secret, 'design_session_select', { sessionId: started.id, optionIds: [session.options[1].id], overlays: ['bookends'], rationale: 'This structure fits students who need repeated examples.' });
     const plan = await designTool<{ hash: string; modules: unknown[] }>(env, secret, 'design_session_preview', { sessionId: started.id });
     expect(plan.modules.length).toBeGreaterThan(2);
     await designTool(env, secret, 'design_session_apply', { sessionId: started.id, hash: plan.hash });
     let stage = '';
-    for (let i = 0; i < 50 && stage !== 'review'; i++) stage = (await designTool<{ stage: string }>(env, secret, 'design_session_get', { sessionId: started.id })).stage;
+    for (let i = 0; i < 50 && stage !== 'review'; i++) stage = (await designTool<{ stage: string }>(env, secret, 'design_session_advance', { sessionId: started.id })).stage;
     expect(stage).toBe('review');
     const undone = await designTool<{ session: { stage: string }; kept: unknown[] }>(env, secret, 'design_session_undo', { sessionId: started.id });
     expect(undone.session.stage).toBe('approaches');
@@ -127,8 +127,15 @@ describe('/mcp and D-003', () => {
     const created = await (await post(env, instructor, rpc('tools/call', { name: 'design_session_create', arguments: args }))).json() as { result: { structuredContent: { id: string; stage: string } } };
     expect(created.result.structuredContent.stage).toBe('start');
     const sessionId = created.result.structuredContent.id;
-    const read = await (await post(env, instructor, rpc('tools/call', { name: 'design_session_get', arguments: { sessionId } }))).json() as { result: { structuredContent: { id: string } } };
+    const read = await (await post(env, readOnly, rpc('tools/call', { name: 'design_session_get', arguments: { sessionId } }))).json() as { result: { structuredContent: { id: string; provisioning: { done: number } } } };
     expect(read.result.structuredContent.id).toBe(sessionId);
+    expect(read.result.structuredContent.provisioning.done).toBe(0);
+    const stillRead = await designTool<{ provisioning: { done: number } }>(env, readOnly, 'design_session_get', { sessionId });
+    expect(stillRead.provisioning.done).toBe(0);
+    const cannotAdvance = await (await post(env, readOnly, rpc('tools/call', { name: 'design_session_advance', arguments: { sessionId } }))).json() as { result: { isError: boolean; content: { text: string }[] } };
+    expect(cannotAdvance.result.isError).toBe(true);
+    expect(cannotAdvance.result.content[0].text).toContain('forbidden');
+    expect((await designTool<{ provisioning: { done: number } }>(env, instructor, 'design_session_advance', { sessionId })).provisioning.done).toBe(1);
     const admin = await token(env, 'u-admin', ['content:read']);
     const other = await (await post(env, admin, rpc('tools/call', { name: 'design_session_get', arguments: { sessionId } }))).json() as { result: { isError: boolean } };
     expect(other.result.isError).toBe(true);

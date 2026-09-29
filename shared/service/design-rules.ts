@@ -91,7 +91,9 @@ export function questionsFrom(problems: Problem[], extraction: SyllabusExtractio
       }
       case 'objective-no-verb': continue;
     }
-    questions.push({ id: `question-${problem.code}-${index}`, text, spans: problem.spans, kind, options, required: false, answer: null, fromProblem: problem.code });
+    const field = problem.code === 'week-count-mismatch' ? 'termWeeks' : problem.code === 'missing-field' ? /^(credits|termWeeks|modality)\b/.exec(problem.message)?.[1] : undefined;
+    const weekIds = problem.code === 'empty-week' ? [...problem.message.matchAll(/\bweek\s+(\d+)\b/gi)].slice(0, 1).map(match => Number(match[1])) : undefined;
+    questions.push({ id: `question-${problem.code}-${index}`, text, spans: problem.spans, kind, ...(field ? { profileField: field as 'credits' | 'termWeeks' | 'modality' } : {}), ...(weekIds?.length ? { weekIds } : {}), options, required: false, answer: null, fromProblem: problem.code });
   }
   if (read) {
     for (const audit of read.outcomeAudits.filter(item => !item.assessedBy.length)) {

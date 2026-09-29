@@ -33,6 +33,8 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 const upload: FileHandler = async (request, ctx, bucket, { courseId }) => {
   await canReachCourse(ctx, courseId);
+  const visibility = new URL(request.url).searchParams.get('visibility') === 'staff' ? 'staff' : 'course';
+  if (visibility === 'staff' && ctx.user?.role === 'student') throw new ApiError('forbidden', 'Staff only.');
   const declared = Number(request.headers.get('content-length') ?? 0);
   if (declared > MAX_UPLOAD_BYTES + 64 * 1024) throw new ApiError('too-large', 'Files can be up to 25 MB.');
   if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('multipart/form-data')) {
@@ -48,7 +50,7 @@ const upload: FileHandler = async (request, ctx, bucket, { courseId }) => {
   const now = ctx.now();
   const record: FileRecord = {
     id: ctx.newId('file'), courseId, name, kind, mime, size: file.size, key: '', version: 1,
-    uploadedBy: user(ctx).id, uploadedAt: now, scan: null,
+    uploadedBy: user(ctx).id, uploadedAt: now, visibility, scan: null,
   };
   record.key = fileKeys.version(record, 1);
   await bucket.put(record.key, file.stream(), { httpMetadata: { contentType: mime } });

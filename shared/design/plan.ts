@@ -45,10 +45,10 @@ const weekOf = (date: string | null, start: string | null): number | null => {
 };
 const dayIndex = (day: string) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].findIndex(s => day.toLowerCase().startsWith(s));
 function dueDate(session: DesignSession, week: number, used: string[]): string | null {
-  const start = session.extraction?.profile.termStart.value;
+  const start = (session.effectiveProfile ?? session.extraction?.profile)?.termStart.value;
   if (!start || !Number.isFinite(Date.parse(start))) return null;
   const base = new Date(Date.parse(start) + (week - 1) * 604800000);
-  const meeting = session.extraction?.profile.meeting.value?.days.map(dayIndex).filter(d => d >= 0) ?? [];
+  const meeting = (session.effectiveProfile ?? session.extraction?.profile)?.meeting.value?.days.map(dayIndex).filter(d => d >= 0) ?? [];
   const candidates = Array.from({ length: 7 }, (_, i) => new Date(base.getTime() + i * 86400000)).filter(d => !meeting.length || meeting.includes(d.getUTCDay())).reverse();
   for (const date of candidates) {
     const iso = date.toISOString().slice(0, 10);
@@ -92,7 +92,7 @@ function shares(total: number, count: number): number[] {
   return Array.from({ length: count }, (_, index) => (base + (index < units - base * count ? 1 : 0)) / 10000);
 }
 function sourceSpans(session: DesignSession, module: PlanModule): SourceSpan[] {
-  return (session.extraction?.schedule ?? []).filter(row => row.span && module.lessons.some(lesson => lesson.week !== null && coveredWeeks(row).includes(lesson.week))).map(row => row.span!);
+  return (session.extraction?.schedule ?? []).filter(row => row.span && module.lessons.some(lesson => (lesson.weeks ?? (lesson.week === null ? [] : [lesson.week])).some(week => coveredWeeks(row).includes(week)))).map(row => row.span!);
 }
 export function previewProvisionPlan(session: DesignSession, snapshot: CourseSnapshot, instructorProfile: InstructorProfile | null = null, defaultDisclosure = DEFAULT_AI_DISCLOSURE): ProvisionPlan {
   if (!session.selection || !session.options || !session.confirmedOutcomes || !session.extraction) throw Error('Choose an approach and confirm outcomes first.');
@@ -112,10 +112,12 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
     const rows = session.extraction!.schedule.filter(row => weeks.some(week => coveredWeeks(row).includes(week)) && !row.empty);
     const lessonCount = Math.max(1, Math.round(item.lessons));
     const lessons = Array.from({ length: lessonCount }, (_, n) => {
-      const week = weeks[Math.min(n, weeks.length - 1)] ?? rows[n]?.week ?? null;
-      const row = rows.find(candidate => week !== null && coveredWeeks(candidate).includes(week)) ?? rows[Math.min(n, rows.length - 1)];
-      const topic = row?.topic?.trim() || item.title;
-      return { key: `module-${index + 1}/lesson-${n + 1}`, title: lessonCount === 1 ? topic : `${topic}${n >= rows.length ? ` · part ${n + 1}` : ''}`, objective: item.objective || session.confirmedOutcomes![0]?.text || topic, minutes: Math.max(1, Math.round(item.lessonMinutes)), week, skeleton, ...(patternNote ? { patternNote } : {}), resurface: session.selection!.overlays.includes('spaced-review'), announcementSlot: session.selection!.overlays.includes('teaching-presence') && (n === 0 || week !== weeks[Math.min(n - 1, weeks.length - 1)]), alternativeFormatSlot: session.selection!.overlays.includes('udl-choice') } as PlanModule['lessons'][number];
+      const lessonWeeks = weeks.slice(Math.floor(n * weeks.length / lessonCount), Math.floor((n + 1) * weeks.length / lessonCount));
+      if (!lessonWeeks.length && weeks.length) lessonWeeks.push(weeks[Math.min(n, weeks.length - 1)]);
+      const week = lessonWeeks[0] ?? rows[n]?.week ?? null;
+      const topics = [...new Set(rows.filter(row => lessonWeeks.some(value => coveredWeeks(row).includes(value))).map(row => row.topic.trim()).filter(Boolean))];
+      const topic = topics.join(' / ') || item.title;
+      return { key: `module-${index + 1}/lesson-${n + 1}`, title: lessonCount === 1 ? topic : `${topic}${n >= rows.length ? ` · part ${n + 1}` : ''}`, objective: item.objective || session.confirmedOutcomes![0]?.text || topic, minutes: Math.max(1, Math.round(item.lessonMinutes)), week, weeks: lessonWeeks, skeleton, ...(patternNote ? { patternNote } : {}), resurface: session.selection!.overlays.includes('spaced-review'), announcementSlot: session.selection!.overlays.includes('teaching-presence') && (n === 0 || week !== weeks[Math.min(n - 1, weeks.length - 1)]), alternativeFormatSlot: session.selection!.overlays.includes('udl-choice') } as PlanModule['lessons'][number];
     });
     const matched = snapshot.modules.find(m => titleOverlap(item.title, m.title));
     const matchedTemplate = template?.modules.find(m => titleOverlap(item.title, m.title));
@@ -135,9 +137,10 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
   const usedDates = snapshot.assignments.flatMap(a => a.dueAt ? [a.dueAt.slice(0, 10)] : []);
   const breakWeeks = new Set(session.extraction.schedule.filter(row => isBreak(`${row.topic} ${row.due}`) || /\bexam week\b/i.test(`${row.topic} ${row.due}`)).map(row => row.week));
   for (const question of session.questions) {
-    const answer = question.answer?.value ?? '';
-    if (!isBreak(answer) && !/\bexam week\b/i.test(answer)) continue;
-    for (const match of answer.matchAll(/\bweek\s*(\d+)\b/gi)) breakWeeks.add(Number(match[1]));
+    const answer = question.answer;
+    if (!answer || answer.skipped || (!['break', 'exam'].includes(answer.optionId ?? '') && !isBreak(answer.value ?? '') && !/\bexam week\b/i.test(answer.value ?? ''))) continue;
+    for (const week of question.weekIds ?? []) breakWeeks.add(week);
+    for (const match of (answer.value ?? '').matchAll(/\bweek\s*(\d+)\b/gi)) breakWeeks.add(Number(match[1]));
   }
   const contentWeek = (module: PlanModule) => moduleWeeks(module).find(week => !breakWeeks.has(week) && !session.extraction!.schedule.some(row => coveredWeeks(row).includes(week) && isBreak(`${row.topic} ${row.due}`))) ?? null;
   const content = instructional.filter(m => contentWeek(m) !== null);
@@ -159,7 +162,8 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
     const total = statedCourseTotal(item.span);
     const weightPercent = item.weightPercent ?? (total && total > 0 ? Math.round(points / total * 10000) / 100 : null);
     const add = (target: PlanModule, title: string, share: number, weight: number | null, week: number | null, placement: string, dueAt: string | null = null, suffix = 1) => {
-      const assignedDate = dueAt ?? (week && !breakWeeks.has(week) ? dueDate(session, week, usedDates) : null);
+      const sourceWeek = dueAt ? scheduledDateWeek(dueAt) ?? weekOf(dueAt, (session.effectiveProfile ?? session.extraction!.profile).termStart.value) : null;
+      const assignedDate = week && !breakWeeks.has(week) ? (dueAt && !breakWeeks.has(sourceWeek ?? -1) ? dueAt : dueDate(session, week, usedDates)) : null;
       const assignment: PlanAssignment = { key: `${target.key}/assessment-${index + 1}-${suffix}`, title, points: share, weightPercent: weight, dueAt: assignedDate, outcomeCodes: target.outcomeCodes, replaces: item.title, placement };
       target.assignments!.push(assignment);
       target.assignment ??= assignment;
@@ -170,13 +174,13 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
       continue;
     }
     const stated = statedWeek(`${item.title} ${item.span?.text ?? ''}`);
-    const dateWeek = item.dueAt ? scheduledDateWeek(item.dueAt) ?? weekOf(item.dueAt, session.extraction.profile.termStart.value) : null;
+    const dateWeek = item.dueAt ? scheduledDateWeek(item.dueAt) ?? weekOf(item.dueAt, (session.effectiveProfile ?? session.extraction.profile).termStart.value) : null;
     const final = /\bfinal\s*(?:exam|assessment|test)\b/i.test(item.title);
     if (item.dueAt || stated || final) {
       const requested = final ? Math.max(...content.flatMap(moduleWeeks)) : stated ? Number(stated) : dateWeek;
       const target = requested ? moduleForWeek(requested) : content[content.length - 1];
       if (!target) continue;
-      const actual = requested && moduleWeeks(target).includes(requested) ? requested : contentWeek(target);
+      const actual = requested && moduleWeeks(target).includes(requested) && !breakWeeks.has(requested) ? requested : contentWeek(target);
       const note = final ? 'Final exam placed in the last content module.' : requested !== actual ? `Syllabus says Week ${requested}; placed in nearest content module, Week ${actual}.` : item.dueAt ? `Placed by syllabus due date ${item.dueAt}.` : `Placed by syllabus Week ${requested}.`;
       add(target, item.title, points, weightPercent, actual, note, item.dueAt);
       continue;
@@ -220,8 +224,8 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
     module.assignments!.push(practice);
     module.assignment = practice;
   }
-  const readings = modules.filter(m => m.key.startsWith('module-')).flatMap(m => session.extraction!.schedule.filter(row => row.span && row.reading.trim()).flatMap(row => m.lessons.filter(l => l.week !== null && coveredWeeks(row).includes(l.week)).map(l => ({ title: row.reading.trim(), span: row.span!, moduleKey: m.key, week: l.week }))));
-  const placeholders = modules.reduce((sum, m) => sum + m.lessons.filter(l => l.skeleton !== 'start-here' && !readings.some(r => r.moduleKey === m.key && r.week === l.week)).length, 0);
+  const readings = modules.filter(m => m.key.startsWith('module-')).flatMap(m => session.extraction!.schedule.filter(row => row.span && row.reading.trim()).flatMap(row => m.lessons.flatMap(l => (l.weeks ?? (l.week === null ? [] : [l.week])).filter(week => coveredWeeks(row).includes(week)).map(week => ({ title: row.reading.trim(), span: row.span!, moduleKey: m.key, week })))));
+  const placeholders = modules.reduce((sum, m) => sum + m.lessons.filter(l => l.skeleton !== 'start-here' && !readings.some(r => r.moduleKey === m.key && (l.weeks ?? [l.week]).includes(r.week ?? null))).length, 0);
   const citedCount = (module: PlanModule) => new Set([
     ...sourceSpans(session, module),
     ...session.extraction!.assessments.filter(a => module.assignments?.some(item => item.replaces === a.title)).map(a => a.span).filter((span): span is SourceSpan => !!span),

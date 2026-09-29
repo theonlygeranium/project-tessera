@@ -162,7 +162,7 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
   let session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', fileId: file.id, consent: { syllabusOnly: true, rememberProfile: false } });
   let extractedAt = 0;
   while (Date.now() - t0 < 600_000) {
-    session = await service.getDesignSession(ctx, { sessionId: session.id });
+    session = await service.advanceDesignSession(ctx, { sessionId: session.id });
     if (!extractedAt && session.extraction) extractedAt = Date.now();
     if (session.stage !== 'start' || session.provisioning?.error) break;
   }
@@ -181,7 +181,7 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
         outcomes = suggestions.map((s, i) => ({ code: `O${i + 1}`, text: s.text, originalText: '', source: 'suggested' as const, suggestedText: s.text })) as never;
       }
       session = await service.confirmOutcomes(ctx, { sessionId: session.id, outcomes });
-      while (Date.now() - t1 < 400_000 && !session.options && !session.provisioning?.error) session = await service.getDesignSession(ctx, { sessionId: session.id });
+      while (Date.now() - t1 < 400_000 && !session.options && !session.provisioning?.error) session = await service.advanceDesignSession(ctx, { sessionId: session.id });
       const options = session.options ?? [];
       const confirmed = session.confirmedOutcomes ?? [];
       checks.push({ id: 'P1', pass: options.length === 3 && options.every(o => o.fits.some(f => f.span) && o.evidence.trim() && o.modules.length), detail: `${options.length} options (${options.map(o => o.id).join(', ')}) in ${Math.round((Date.now() - t1) / 1000)} s${session.provisioning?.error ? `; error: ${session.provisioning.error}` : ''}; cited: ${options.map(o => o.fits.filter(f => f.span).length).join('/')}` });
@@ -209,7 +209,7 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
         detail: `${plan.modules.length} modules, ${plan.counts.lessons} lessons, ${plan.counts.assignments} assignments; outcomes ${plan.outcomes.length}/${(session.confirmedOutcomes ?? []).length}; graded components placed ${placed.length}/${components.length}; readings ${plan.readings.length} (all cited: ${readingsCited}); placeholders ${plan.placeholders}` });
       session = await service.applyProvisionPlan(ctx, { sessionId: session.id, hash: plan.hash });
       // A failed lesson is recorded and the job goes on: poll until provisioning ends.
-      while (Date.now() - t2 < 1_800_000 && session.stage === 'provisioning') session = await service.getDesignSession(ctx, { sessionId: session.id });
+      while (Date.now() - t2 < 1_800_000 && session.stage === 'provisioning') session = await service.advanceDesignSession(ctx, { sessionId: session.id });
       const modules = (await repo.listModules('c-stat110')).length - before.modules;
       const lessons = await Promise.all(session.created.lessonIds.map(id => repo.getLesson(id)));
       const blocks = (await Promise.all(session.created.lessonIds.map(id => repo.listBlocks(id)))).flat();

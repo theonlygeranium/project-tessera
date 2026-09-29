@@ -48,11 +48,11 @@ describe('design partner service', () => {
     await expect(service.createDesignSession(ctx, sample)).rejects.toMatchObject({ code: 'ai-disabled' });
     await service.updatePolicy({ ...ctx, user: await ctx.repo.getUser('u-admin') }, { ...policy, designPartner: { ...policy.designPartner, enabled: true } });
     const started = await service.createDesignSession(ctx, sample);
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
     expect(read.read?.workload.rates).toEqual(policy.workloadRates);
     await service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((outcome, index) => ({ code: `O${index + 1}`, text: outcome.text, originalText: outcome.text })) });
-    const options = await service.getDesignSession(ctx, { sessionId: started.id });
+    const options = await service.advanceDesignSession(ctx, { sessionId: started.id });
     expect(options.options?.map(option => option.id)).toEqual(['project']);
     expect((await ctx.repo.getInstitution()).policy.defaultAiDisclosure).toBe(policy.defaultAiDisclosure);
   });
@@ -68,25 +68,25 @@ describe('design partner service', () => {
   it('denies new suggestions and approach generation in an existing session after policy is disabled', async () => {
     const ctx = await context();
     const started = await service.createDesignSession(ctx, sample);
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
     const admin = { ...ctx, user: await ctx.repo.getUser('u-admin') };
     const institution = await ctx.repo.getInstitution();
     await service.updatePolicy(admin, { ...institution.policy, designPartner: { enabled: false, allowedArchitectures: null } });
     await expect(service.suggestDesignOutcomes(ctx, { sessionId: started.id })).rejects.toMatchObject({ code: 'ai-disabled' });
     await expect(service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((item, index) => ({ code: `O${index + 1}`, text: item.text, originalText: item.text })) })).rejects.toMatchObject({ code: 'ai-disabled' });
-    expect((await service.getDesignSession(ctx, { sessionId: started.id })).read).not.toBeNull();
+    expect((await service.advanceDesignSession(ctx, { sessionId: started.id })).read).not.toBeNull();
   });
   it('stores a sample source and advances extraction and questions on two polls', async () => {
     const ctx = await context();
     const started = await service.createDesignSession(ctx, sample);
     expect(started).toMatchObject({ stage: 'start', source: { name: 'STAT110_Syllabus_Fall2026.pdf', fileId: null, ocr: false }, consent: { syllabusOnly: true, at } });
     expect(await service.listDesignSessions(ctx, { courseId: sample.courseId })).toHaveLength(1);
-    const first = await service.getDesignSession(ctx, { sessionId: started.id });
+    const first = await service.advanceDesignSession(ctx, { sessionId: started.id });
     expect(first).toMatchObject({ stage: 'start', provisioning: { done: 1, total: 2 } });
     expect(first.extraction?.outcomes).toHaveLength(6);
     expect(first.questions).toHaveLength(0);
-    const done = await service.getDesignSession(ctx, { sessionId: started.id });
+    const done = await service.advanceDesignSession(ctx, { sessionId: started.id });
     expect(done).toMatchObject({ stage: 'read', read: { provenance: { task: 'syllabus-analyze' } }, provisioning: { done: 2, total: 2 } });
     expect(done.questions.some(question => question.fromProblem === 'empty-week' && question.text.includes('week 8'))).toBe(true);
     expect(done.questions.at(-1)?.id).toBe('question-teaching-approach');
@@ -105,23 +105,23 @@ describe('design partner service', () => {
       return result;
     } } as ServiceContext['ai'];
     const started = await service.createDesignSession({ ...ctx, ai }, sample);
-    await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
-    const read = await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    await service.advanceDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    const read = await service.advanceDesignSession({ ...ctx, ai }, { sessionId: started.id });
     expect(read.read?.deficiencies[0].rubricRefs).toEqual([]);
     const rubric = (await ctx.repo.getRubric('rubric-tessera'))!;
     await ctx.repo.putRubric({ ...rubric, id: 'rubric-qm-test', name: 'Quality Matters local copy', source: 'custom', builtIn: false });
     const institution = await ctx.repo.getInstitution(); institution.readinessPolicy = { rubricId: 'rubric-qm-test', minimumPercent: null }; await ctx.repo.putInstitution(institution);
     const second = await service.createDesignSession({ ...ctx, ai }, sample);
-    await service.getDesignSession({ ...ctx, ai }, { sessionId: second.id });
-    const allowed = await service.getDesignSession({ ...ctx, ai }, { sessionId: second.id });
+    await service.advanceDesignSession({ ...ctx, ai }, { sessionId: second.id });
+    const allowed = await service.advanceDesignSession({ ...ctx, ai }, { sessionId: second.id });
     expect(allowed.read?.deficiencies[0].rubricRefs).toEqual([{ rubric: 'qm', item: '2.1' }]);
   });
   it('rejects malformed analysis without writing a read', async () => {
     const ctx = await context();
     const ai = { run: async (task: never, input: never) => task === 'syllabus-analyze' ? { output: { summary: 'bad' }, model: 'broken' } : fixtureAi.run(task, input) } as ServiceContext['ai'];
     const started = await service.createDesignSession({ ...ctx, ai }, sample);
-    await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
-    const failed = await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    await service.advanceDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    const failed = await service.advanceDesignSession({ ...ctx, ai }, { sessionId: started.id });
     expect(failed.read).toBeNull();
     expect(failed.provisioning?.error).toMatch(/expected shape/);
   });
@@ -129,8 +129,8 @@ describe('design partner service', () => {
     const ctx = await context();
     const ai = { run: async (task: never, input: never) => task === 'objective-rewrite' ? { output: { text: 'Explain it.' }, model: 'broken' } : fixtureAi.run(task, input) } as ServiceContext['ai'];
     const started = await service.createDesignSession({ ...ctx, ai }, sample);
-    await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
-    const failed = await service.getDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    await service.advanceDesignSession({ ...ctx, ai }, { sessionId: started.id });
+    const failed = await service.advanceDesignSession({ ...ctx, ai }, { sessionId: started.id });
     expect(failed.read).toBeNull();
     expect(failed.provisioning?.error).toMatch(/expected shape/);
   });
@@ -138,8 +138,8 @@ describe('design partner service', () => {
     const ctx = await context();
     const started = await service.createDesignSession(ctx, sample);
     await expect(service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: [] })).rejects.toMatchObject({ code: 'invalid' });
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const ready = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const ready = await service.advanceDesignSession(ctx, { sessionId: started.id });
     await expect(service.confirmOutcomes(ctx, { sessionId: ready.id, outcomes: [] })).rejects.toMatchObject({ code: 'invalid' });
     const contested = await service.contestDesignField(ctx, { sessionId: ready.id, field: 'meeting', correction: 'Wednesday only' });
     expect(contested.questions.find(question => question.id === 'question-contest-meeting')?.answer?.value).toBe('Wednesday only');
@@ -156,12 +156,12 @@ describe('design partner service', () => {
   it('advances options on a poll, validates selection, and records the choice', async () => {
     const ctx = await context();
     const started = await service.createDesignSession(ctx, sample);
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
     const outcome = read.extraction!.outcomes[0];
     const confirmed = await service.confirmOutcomes(ctx, { sessionId: read.id, outcomes: [{ code: 'O1', text: outcome.text, originalText: outcome.text }] });
     expect(confirmed).toMatchObject({ stage: 'approaches', options: null, provisioning: { done: 0, total: 1 } });
-    const options = await service.getDesignSession(ctx, { sessionId: read.id });
+    const options = await service.advanceDesignSession(ctx, { sessionId: read.id });
     expect(options.options).toHaveLength(3);
     expect(options.record.optionsShown).toEqual(options.options);
     await expect(service.selectApproach(ctx, { sessionId: read.id, optionIds: ['micro'], overlays: [], rationale: 'These students need repeated practice.' })).rejects.toMatchObject({ code: 'invalid' });
@@ -174,13 +174,13 @@ describe('design partner service', () => {
   it('keeps confirmed outcomes when options fail and retries only options', async () => {
     const ctx = await context();
     const started = await service.createDesignSession(ctx, sample);
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
     const outcome = read.extraction!.outcomes[0];
     await service.confirmOutcomes(ctx, { sessionId: read.id, outcomes: [{ code: 'O1', text: outcome.text, originalText: outcome.text }] });
     const broken = { ...ctx, ai: { run: async (task: never, input: never) => task === 'structure-options' ? { output: [], model: 'broken' } : fixtureAi.run(task, input) } as ServiceContext['ai'] };
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const failed = await service.getDesignSession(broken, { sessionId: read.id });
+    const failed = await service.advanceDesignSession(broken, { sessionId: read.id });
     spy.mockRestore();
     expect(failed.options).toBeNull();
     expect(failed.confirmedOutcomes).toHaveLength(1);
@@ -188,14 +188,14 @@ describe('design partner service', () => {
     expect((await ctx.repo.getGenerationJob(failed.provisioning!.jobId!))?.state).toBe('failed');
     const retried = await service.retryDesignOptions(ctx, { sessionId: read.id });
     expect(retried.provisioning?.jobId).not.toBe(failed.provisioning?.jobId);
-    const done = await service.getDesignSession(ctx, { sessionId: read.id });
+    const done = await service.advanceDesignSession(ctx, { sessionId: read.id });
     expect(done.options).toHaveLength(3);
   });
   it('accepts instructor-written outcomes and requires a click for suggested ones', async () => {
     const ctx = await context();
     const started = await service.createDesignSession(ctx, sample);
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
     const suggestions = await service.suggestDesignOutcomes(ctx, { sessionId: read.id });
     expect(suggestions.suggestions).toHaveLength(3);
     await expect(service.confirmOutcomes(ctx, { sessionId: read.id, outcomes: [{ code: 'O1', text: 'Explain the topic.', originalText: '', source: 'suggested' }] })).rejects.toMatchObject({ code: 'invalid' });
@@ -206,14 +206,14 @@ describe('design partner service', () => {
   it('asks before suggesting when a syllabus lists no outcomes', async () => {
     const ctx = await context();
     const started = await service.createDesignSession(ctx, { ...sample, sample: undefined, text: 'Course title: Community inquiry\n3 credits, 10 weeks\nCourse schedule\n1 Sep 1–5 Question design Ch. 1 Quiz 1' });
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
     expect(read.extraction?.outcomes).toHaveLength(0);
     expect(read.questions.some(question => question.text.includes("doesn't list course outcomes"))).toBe(true);
     expect(read.confirmedOutcomes).toBeNull();
     const suggested = await service.suggestDesignOutcomes(ctx, { sessionId: read.id });
     expect(suggested.suggestions).toHaveLength(3);
-    expect((await service.getDesignSession(ctx, { sessionId: read.id })).confirmedOutcomes).toBeNull();
+    expect((await service.advanceDesignSession(ctx, { sessionId: read.id })).confirmedOutcomes).toBeNull();
   });
   it('accepts pasted text and refuses fileId without a document engine', async () => {
     const ctx = await context();
@@ -226,8 +226,8 @@ describe('design partner service', () => {
     const ctx = await context();
     const started = await service.createDesignSession(ctx, { ...sample, sample: undefined, text: `Course notes\n${'A'.repeat(61_000)}` });
     expect(started.source.chars).toBeLessThanOrEqual(60_000);
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const ready = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const ready = await service.advanceDesignSession(ctx, { sessionId: started.id });
     expect(ready.extraction?.problems.some(problem => problem.code === 'missing-field' && problem.message.includes('60,000'))).toBe(true);
   });
   it('removes roster-like table rows before they reach the AI', async () => {
@@ -235,15 +235,15 @@ describe('design partner service', () => {
     const text = 'Course notes\nStudent | ID\nAvery Smith | 1001\nBlair Jones | 1002\nCasey Brown | 1003\nPolicies\nAttendance required.';
     const started = await service.createDesignSession(ctx, { ...sample, sample: undefined, text });
     expect(started.source.sections[0].text).not.toContain('Avery Smith');
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const ready = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const ready = await service.advanceDesignSession(ctx, { sessionId: started.id });
     expect(ready.extraction?.problems.some(problem => problem.message.includes('student names'))).toBe(true);
   });
   it('uses the document engine and records OCR when textless files are read', async () => {
     const ctx = await context(); await ctx.repo.putFile(file);
     const documents = { extract: vi.fn(async () => ({ sections: [{ page: 1, heading: '', level: 0, text: 'A syllabus', lines: ['A syllabus'] }], ocr: true })) } as unknown as ServiceContext['documents'];
     const started = await service.createDesignSession({ ...ctx, documents }, { ...sample, sample: undefined, fileId: file.id });
-    expect(documents!.extract).toHaveBeenCalledWith(file);
+    expect(documents!.extract).toHaveBeenCalledWith({ ...file, visibility: 'course' });
     expect(started.source).toMatchObject({ fileId: file.id, version: 1, ocr: true });
   });
   it('removes page furniture repeated on at least half of three PDF pages', async () => {
@@ -253,33 +253,33 @@ describe('design partner service', () => {
     const started = await service.createDesignSession({ ...ctx, documents }, { ...sample, sample: undefined, fileId: file.id });
     expect(started.source.sections.flatMap(section => section.lines)).toEqual(['Unique alpha content', 'Unique beta content', 'Unique gamma content']);
   });
-  it('logs the underlying cause and stores a short reason for extract and read failures', async () => {
+  it('logs only safe metadata and stores a short reason for extract and read failures', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const ctx = await context();
       const broken = { run: async () => { throw new ApiError('ai-failed', 'The AI draft could not be created. Try again.', { cause: 'Error: cut off at length limit' }); } } as ServiceContext['ai'];
       const first = await service.createDesignSession({ ...ctx, ai: broken }, sample);
-      const failed = await service.getDesignSession({ ...ctx, ai: broken }, { sessionId: first.id });
+      const failed = await service.advanceDesignSession({ ...ctx, ai: broken }, { sessionId: first.id });
       expect(failed.provisioning?.error).toContain('(cut off at the length limit)');
-      expect(log).toHaveBeenCalledWith('syllabus-extract failed:', 'Error: cut off at length limit');
+      expect(log).toHaveBeenCalledWith('design AI failed', { task: 'syllabus-extract', status: null, category: 'ai-failed', sessionId: first.id, jobId: first.provisioning!.jobId });
       const next = await service.createDesignSession(ctx, sample);
-      await service.getDesignSession(ctx, { sessionId: next.id });
+      await service.advanceDesignSession(ctx, { sessionId: next.id });
       const readAi = { run: async (task: never, input: never) => task === 'syllabus-analyze' ? Promise.reject(new Error('request timed out')) : fixtureAi.run(task, input) } as ServiceContext['ai'];
-      const readFailed = await service.getDesignSession({ ...ctx, ai: readAi }, { sessionId: next.id });
+      const readFailed = await service.advanceDesignSession({ ...ctx, ai: readAi }, { sessionId: next.id });
       expect(readFailed.provisioning?.error).toContain('(timed out)');
-      expect(log).toHaveBeenCalledWith('syllabus-analyze failed:', 'request timed out');
+      expect(log).toHaveBeenCalledWith('design AI failed', { task: 'syllabus-analyze', status: null, category: 'unexpected', sessionId: next.id, jobId: next.provisioning!.jobId });
     } finally { log.mockRestore(); }
   });
   it('rejects another course file and session access', async () => {
     const ctx = await context(); await ctx.repo.putFile({ ...file, courseId: 'c-comm120' });
     await expect(service.createDesignSession(ctx, { ...sample, sample: undefined, fileId: file.id })).rejects.toMatchObject({ code: 'forbidden' });
     const started = await service.createDesignSession(ctx, sample);
-    await expect(service.getDesignSession({ ...ctx, user: await ctx.repo.getUser('u-priya') }, { sessionId: started.id })).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(service.advanceDesignSession({ ...ctx, user: await ctx.repo.getUser('u-priya') }, { sessionId: started.id })).rejects.toMatchObject({ code: 'forbidden' });
   });
   it('records invalid model output as a job error without writing extraction', async () => {
     const ctx = await context();
     const started = await service.createDesignSession({ ...ctx, ai: { run: async () => ({ output: { profile: null }, model: 'broken' }) } as ServiceContext['ai'] }, sample);
-    const after = await service.getDesignSession({ ...ctx, ai: { run: async () => ({ output: { profile: null }, model: 'broken' }) } as ServiceContext['ai'] }, { sessionId: started.id });
+    const after = await service.advanceDesignSession({ ...ctx, ai: { run: async () => ({ output: { profile: null }, model: 'broken' }) } as ServiceContext['ai'] }, { sessionId: started.id });
     expect(after.extraction).toBeNull();
     expect(after.provisioning?.error).toMatch(/expected shape/);
     expect((await ctx.repo.getGenerationJob(started.provisioning!.jobId!))?.state).toBe('failed');
@@ -287,8 +287,8 @@ describe('design partner service', () => {
   it('validates answers and saves an opted-in teaching note to a default profile', async () => {
     const ctx = await context();
     const started = await service.createDesignSession(ctx, { ...sample, consent: { syllabusOnly: true, rememberProfile: true } });
-    await service.getDesignSession(ctx, { sessionId: started.id });
-    const ready = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.advanceDesignSession(ctx, { sessionId: started.id });
+    const ready = await service.advanceDesignSession(ctx, { sessionId: started.id });
     await expect(service.answerDesignQuestions(ctx, { sessionId: started.id, answers: [{ questionId: 'unknown', skipped: true }], teachingNote: '' })).rejects.toMatchObject({ code: 'invalid' });
     await expect(service.answerDesignQuestions(ctx, { sessionId: started.id, answers: [], teachingNote: 'x'.repeat(2001) })).rejects.toMatchObject({ code: 'invalid' });
     const answered = await service.answerDesignQuestions(ctx, { sessionId: started.id, answers: [{ questionId: ready.questions[0].id, optionId: ready.questions[0].options[0].id, skipped: false }], teachingNote: 'I use practice and cases.' });
@@ -299,9 +299,9 @@ describe('design partner service', () => {
     const ctx = await context(); const background = { startGeneration: vi.fn(async () => {}) };
     const started = await service.createDesignSession({ ...ctx, background }, sample);
     expect(background.startGeneration).toHaveBeenCalledWith(started.provisioning!.jobId);
-    expect((await service.getDesignSession(ctx, { sessionId: started.id })).provisioning?.done).toBe(0);
+    expect((await service.advanceDesignSession(ctx, { sessionId: started.id })).provisioning?.done).toBe(0);
     clock += WORKFLOW_STALL_MS + 1000;
-    const polled = await service.getDesignSession(ctx, { sessionId: started.id });
+    const polled = await service.advanceDesignSession(ctx, { sessionId: started.id });
     expect(polled.provisioning?.done).toBe(1);
     expect((await ctx.repo.getGenerationJob(started.provisioning!.jobId!))?.runner).toBe('poll');
     const stale = await ctx.repo.getGenerationJob(started.provisioning!.jobId!);
