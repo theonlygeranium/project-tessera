@@ -122,6 +122,7 @@ async function keepAllAiBlocks(page, timeout = 20000) {
 }
 
 const readinessSection = (page) => page.locator('section', { has: page.getByRole('heading', { name: 'Publish readiness' }) });
+const syllabusFixture = JSON.parse(await readFile(join(ROOT, 'shared', 'seed-syllabus.json'), 'utf8'));
 
 // =======================================================================================
 // Journey 1 — Administrator: setup, create a course, assign instructor, enroll a student.
@@ -838,6 +839,80 @@ await journey('Journey 18 · An instructor completes assigned required training 
     await page.getByRole('link', { name: 'View certificate' }).first().click();
     await waitForIncludes(page.locator('main'), 'Dr. Amara Okafor');
     await waitForIncludes(page.locator('main'), 'Lockout/tagout essentials');
+  });
+});
+
+await journey('Journey 19 · Design partner: syllabus to reviewed draft and selective undo', async (page) => {
+  await step('Paste the sample syllabus and read it', async () => {
+    await page.goto(`${BASE}app/teach/courses/c-stat110/design?data=mock&as=u-okafor`);
+    await page.getByRole('radio', { name: 'Paste text instead' }).check();
+    await page.getByRole('textbox', { name: 'Paste syllabus or brief text' }).fill(syllabusFixture.sections.map(section => section.text).join('\n\n'));
+    await page.getByRole('checkbox', { name: /I understand\. Read this syllabus/ }).check();
+    await page.getByRole('button', { name: 'Read my syllabus' }).click();
+    await page.getByRole('heading', { name: 'Course profile' }).waitFor();
+  });
+  await step('Answer two questions and confirm the outcomes', async () => {
+    const questions = page.getByRole('heading', { name: 'What I need from you' }).locator('..').locator('fieldset');
+    for (let index = 0; index < 2; index++) {
+      const question = questions.nth(index);
+      const radios = question.locator('input[type="radio"]');
+      if (await radios.count()) await radios.first().check();
+      else {
+        const input = question.locator('input:not([type="checkbox"]),textarea').first();
+        await input.fill((await input.getAttribute('type')) === 'number' ? '10' : 'Use a supported practice example from the syllabus.');
+      }
+    }
+    await page.getByRole('button', { name: 'Confirm and show approaches' }).click();
+    await page.getByRole('heading', { name: 'Three ways to structure this course' }).waitFor();
+  });
+  await step('Choose approaches B and C with bookends and a rationale', async () => {
+    await page.getByRole('checkbox', { name: /Use approach B:/ }).check();
+    await page.getByRole('checkbox', { name: /Use approach C:/ }).check();
+    await page.getByRole('checkbox', { name: /Bookends/ }).check();
+    await page.locator('#approach-why').fill('The sequence lets students apply each idea to a case and reflect at the end.');
+    await page.getByRole('button', { name: 'Use this approach' }).click();
+    await page.getByRole('heading', { name: 'Preview the draft course' }).waitFor();
+  });
+  await step('Confirm any missing assessment points, then apply the change set', async () => {
+    if (await page.getByRole('heading', { name: 'Confirm points' }).count()) {
+      const inputs = page.locator('input[id^="points-"]');
+      for (let index = 0; index < await inputs.count(); index++) await inputs.nth(index).fill('10');
+      await page.getByRole('button', { name: 'Save points and preview' }).click();
+      await page.getByRole('heading', { name: 'Preview the draft course' }).waitFor();
+    }
+    await page.getByRole('button', { name: 'Apply and draft the course' }).click();
+    await page.getByRole('heading', { name: /Your draft course is ready/ }).waitFor({ timeout: 60_000 });
+    await page.getByRole('button', { name: 'Download design record (JSON)' }).waitFor();
+  });
+  await step('Review the seven new draft modules and keep one block', async () => {
+    await page.getByRole('link', { name: 'Open the course outline' }).click();
+    await page.getByRole('heading', { name: 'Built from your syllabus · review progress' }).waitFor();
+    const outline = page.getByRole('heading', { name: 'Outline', exact: true }).locator('..');
+    const count = await outline.locator(':scope > div').count();
+    if (count !== 9) throw new Error(`Expected 2 original and 7 new modules; found ${count}.`);
+    await outline.getByRole('link', { name: 'Start here', exact: true }).click();
+    await page.getByRole('heading', { name: 'Review with Design partner' }).waitFor();
+    await page.getByRole('button', { name: 'Keep', exact: true }).first().click();
+    await waitForIncludes(readinessSection(page), '1 of');
+  });
+  await step('Undo untouched drafts while keeping the reviewed block, lesson and module', async () => {
+    await page.getByRole('link', { name: 'Course workspace' }).click();
+    await page.getByRole('link', { name: 'Open Design partner session' }).click();
+    await page.getByRole('button', { name: 'Undo everything this plan added' }).click();
+    await page.getByRole('dialog', { name: 'Undo this plan?' }).getByRole('button', { name: 'Undo the plan' }).click();
+    await page.getByRole('heading', { name: 'Three ways to structure this course' }).waitFor();
+    await page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Course workspace' }).click();
+    // Wait for the outline to load, then for it to settle on the original modules plus the kept one.
+    await page.getByRole('heading', { name: 'Asking statistical questions' }).waitFor();
+    const outline = page.getByRole('heading', { name: 'Outline', exact: true }).locator('..');
+    let count = 0;
+    for (let tries = 0; tries < 40; tries++) { count = await outline.locator(':scope > div').count(); if (count === 3) break; await page.waitForTimeout(250); }
+    if (count !== 3) throw new Error(`Expected 2 original modules and the kept module after undo; found ${count}.`);
+    await outline.getByRole('link', { name: 'Start here', exact: true }).waitFor();
+    if (await page.getByRole('heading', { name: 'Built from your syllabus · review progress' }).count()) throw new Error('The review-progress card should go away after undo.');
+    await outline.getByRole('link', { name: 'Start here', exact: true }).click();
+    await page.getByRole('heading', { name: 'Publish readiness' }).waitFor();
+    await waitForIncludes(readinessSection(page), '1 of');
   });
 });
 

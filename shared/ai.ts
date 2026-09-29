@@ -155,7 +155,7 @@ const FIXTURES: { [K in AiTaskName]: (input: AiTasks[K]['input']) => AiTasks[K][
   'structure-options': input => input.candidates.map(id => {
     const schedule = input.schedule.filter(row => !row.empty);
     const rows = schedule.length ? schedule : Array.from({ length: input.weeks }, (_, index) => ({ week: index + 1, topic: `Session ${index + 1}`, reading: '', due: '', span: null, dates: '', empty: false }));
-    const chunk = ['case', 'project', 'thematic', 'performance', 'competency'].includes(id) ? 2 : 1;
+    const chunk = id === 'project' ? 3 : ['case', 'thematic', 'performance', 'competency'].includes(id) ? 2 : 1;
     const modules = Array.from({ length: Math.ceil(rows.length / chunk) }, (_, index) => {
       const part = rows.slice(index * chunk, (index + 1) * chunk);
       return { title: `${id[0].toUpperCase()}${id.slice(1)}: ${part[0].topic}`, objective: input.confirmedOutcomes[index % input.confirmedOutcomes.length]?.text ?? 'Explain the topic.', outcomeIds: input.confirmedOutcomes.map(o => o.code), weeks: part.map(row => row.week), lessons: 2, lessonMinutes: 20, assessment: part.map(row => row.due).filter(Boolean).join('; ') || 'Retrieval check', hours: 0 };

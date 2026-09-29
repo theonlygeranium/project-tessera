@@ -1,8 +1,8 @@
 // Field errors, policy shaping, and short bits of copy shared by the admin pages.
 // The service stays the source of truth; this only places its messages on fields.
 import { ApiError } from '../../../../shared/api';
-import type { AiPolicy, Role, TutorMode } from '../../../../shared/domain';
-import { isEmail, isRole, ROLE_LABELS, TUTOR_MODES } from '../../../../shared/policy';
+import type { AiPolicy, Role, TutorMode, ArchitectureId, WorkloadRates } from '../../../../shared/domain';
+import { DEFAULT_AI_DISCLOSURE, RICE_DEFAULTS, isEmail, isRole, ROLE_LABELS, TUTOR_MODES } from '../../../../shared/policy';
 
 export type FieldErrors = Partial<Record<string, string>>;
 
@@ -31,6 +31,10 @@ export interface PolicyValue {
   aiAuthoring: boolean;
   graded: TutorMode[];
   practice: TutorMode[];
+  designEnabled: boolean;
+  allowedArchitectures: ArchitectureId[] | null;
+  workloadRates: WorkloadRates;
+  defaultAiDisclosure: string;
 }
 
 export function hasErrors(errors: FieldErrors): boolean {
@@ -125,6 +129,10 @@ export function policyValueFrom(policy: AiPolicy): PolicyValue {
     aiAuthoring: policy.aiAuthoring,
     graded: modesFrom(policy.tutorModes.graded, 'graded'),
     practice: modesFrom(policy.tutorModes.practice, 'practice'),
+    designEnabled: policy.designPartner?.enabled ?? true,
+    allowedArchitectures: policy.designPartner?.allowedArchitectures ?? null,
+    workloadRates: policy.workloadRates ?? RICE_DEFAULTS,
+    defaultAiDisclosure: policy.defaultAiDisclosure ?? DEFAULT_AI_DISCLOSURE,
   };
 }
 
@@ -135,6 +143,9 @@ export function toAiPolicy(value: PolicyValue): AiPolicy {
       graded: modesFrom(value.graded, 'graded'),
       practice: modesFrom(value.practice, 'practice'),
     },
+    designPartner: { enabled: value.designEnabled, allowedArchitectures: value.allowedArchitectures },
+    workloadRates: value.workloadRates,
+    defaultAiDisclosure: value.defaultAiDisclosure.trim() || DEFAULT_AI_DISCLOSURE,
   };
 }
 

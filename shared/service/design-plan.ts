@@ -3,12 +3,12 @@ import type { GenerationJob } from '../repo';
 import type { Service, ServiceContext } from './context';
 import { coveredWeeks, explicitAssessmentPoints, previewProvisionPlan as buildPlan } from '../design/plan';
 import { courseSnapshot } from './readiness';
-import { aiEnabled, canTeach, fail, provenance, user } from './helpers';
+import { aiEnabled, canTeach, designPartnerEnabled, fail, provenance, user } from './helpers';
 import { validateBlockContent } from './validate';
 import { validateNoLearningStyles } from './validate-design';
 import { validateGeneratedElement } from './generation';
 import { fixtureAi } from '../ai';
-import { DEFAULT_AI_DISCLOSURE, lessonReadiness } from '../policy';
+import { DEFAULT_AI_DISCLOSURE, designPartnerPolicy, lessonReadiness } from '../policy';
 
 const STALE = 'The course or template changed since the preview. Review the changes again.';
 async function sessionFor(ctx: ServiceContext, id: string): Promise<DesignSession> {
@@ -67,6 +67,7 @@ function rubricFor(id: string, objective: string, outcomes: string[], points: nu
 }
 const tiltTexts = (objective: string, title: string) => [`Purpose\n${objective}`, `Task\nCreate a draft response to ${title}. [Your course-specific directions]`, `Criteria\nShow evidence for ${objective}. Use the rubric below.`];
 async function alternatives(ctx: ServiceContext, session: DesignSession, lessonId: string) {
+  await designPartnerEnabled(ctx);
   const lesson = await ctx.repo.getLesson(lessonId) ?? fail('not-found', 'Lesson not found.');
   if (!session.created.lessonIds.includes(lessonId)) fail('invalid', 'Choose a lesson created by this plan.');
   const plannedModule = session.plan?.modules.find(module => session.planIds?.modules[module.key] === lesson.moduleId);
@@ -84,6 +85,10 @@ async function alternatives(ctx: ServiceContext, session: DesignSession, lessonI
 /** One lesson per durable step. Validate before the conditional scaffold commit. */
 export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob): Promise<GenerationJob> {
   if (job.kind !== 'scaffold' || job.state !== 'running' || !job.sessionId) return job;
+  if (!designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) {
+    await ctx.repo.stopDesignJob(job.sessionId, job.id, 'Design partner was disabled by your administrator. Your saved work remains available; undo is still available.');
+    return await ctx.repo.getGenerationJob(job.id) ?? job;
+  }
   const item = job.work[0];
   if (!item) return job;
   const session = await ctx.repo.getDesignSession(job.sessionId);
@@ -107,7 +112,7 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
         { type: 'heading', level: 2, text: 'Start here' },
         { type: 'callout', tone: 'info', title: 'Before you begin', text: 'Find the course outline and note how to contact your instructor.' },
         { type: 'text', text: `Open the course outline to find each module and lesson. Work through the lessons in order, then review the draft assignments. Your instructor can be reached at ${contact}.\n\n[Your welcome and course navigation example]` },
-        { type: 'text', text: `Course outcomes:\n${session.plan.outcomes.map(o => `${o.code}: ${o.text}`).join('\n')}\n\n${(await ctx.repo.getInstructorProfile(session.createdBy))?.disclosureText ?? DEFAULT_AI_DISCLOSURE}\n\n[Your AI-use guidance]` },
+        { type: 'text', text: `Course outcomes:\n${session.plan.outcomes.map(o => `${o.code}: ${o.text}`).join('\n')}\n\n${(await ctx.repo.getInstructorProfile(session.createdBy))?.disclosureText ?? (await ctx.repo.getInstitution()).policy.defaultAiDisclosure ?? DEFAULT_AI_DISCLOSURE}\n\n[Your AI-use guidance]` },
         ...Array.from({ length: 5 }, (_, i) => ({ ...baseline, question: `Baseline ${i + 1}: ${baseline.type === 'check' ? baseline.question : planLesson.objective}` } as BlockContent)),
       ];
     } else {
@@ -139,6 +144,10 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
     drafted.forEach(validateBlockContent);
   } catch (cause) { error = cause instanceof Error ? cause.message : 'Scaffold validation failed.'; }
   const current = await ctx.repo.getGenerationJob(job.id);
+  if (!designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) {
+    await ctx.repo.stopDesignJob(job.sessionId, job.id, 'Design partner was disabled by your administrator. Your saved work remains available; undo is still available.');
+    return await ctx.repo.getGenerationJob(job.id) ?? job;
+  }
   const latest = await ctx.repo.getDesignSession(job.sessionId);
   if (!current || current.done !== job.done || current.state !== 'running' || (current.runner ?? 'poll') !== (job.runner ?? 'poll') || latest?.stage !== 'provisioning' || latest.applyRevision !== session.applyRevision) return current ?? job;
   const next: GenerationJob = { ...current, work: current.work.slice(1), done: current.done + 1, lessonIds: [...current.lessonIds], failures: [...current.failures], ...(fallbackNote ? { notes: [...(current.notes ?? []), { lessonId: item.lessonId, message: fallbackNote }] } : {}), updatedAt: ctx.now() };
@@ -171,7 +180,7 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
     const moduleId = fresh?.planIds?.modules[current.instruction];
     const planned = fresh?.plan?.modules.find(m => m.key === current.instruction);
     const firstId = planned?.lessons[0] && fresh?.planIds?.lessons[planned.lessons[0].key];
-    if (fresh && moduleId && firstId) await alternatives(ctx, fresh, firstId);
+    if (fresh && moduleId && firstId && designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) await alternatives(ctx, fresh, firstId);
   }
   return next;
 }
@@ -189,16 +198,17 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
   previewProvisionPlan: async (ctx, { sessionId }) => {
     const session = await sessionFor(ctx, sessionId);
     if (session.stage !== 'preview') fail('invalid', 'Choose an approach first.');
-    const plan = buildPlan(session, await courseSnapshot(ctx, session.courseId), await ctx.repo.getInstructorProfile(session.createdBy));
+    const plan = buildPlan(session, await courseSnapshot(ctx, session.courseId), await ctx.repo.getInstructorProfile(session.createdBy), (await ctx.repo.getInstitution()).policy.defaultAiDisclosure);
     if (!await ctx.repo.saveDesignPreview(session.id, session.confirmedPoints ?? {}, plan, ctx.now())) fail('conflict', STALE);
     return plan;
   },
   applyProvisionPlan: async (ctx, { sessionId, hash, leastSureModuleKey }) => {
     const session = await sessionFor(ctx, sessionId);
+    await designPartnerEnabled(ctx);
     if ((session.stage === 'provisioning' || session.stage === 'review') && session.plan?.hash === hash) return session;
     if (session.stage !== 'preview') fail('conflict', STALE);
     await aiEnabled(ctx);
-    const plan = buildPlan(session, await courseSnapshot(ctx, session.courseId), await ctx.repo.getInstructorProfile(session.createdBy));
+    const plan = buildPlan(session, await courseSnapshot(ctx, session.courseId), await ctx.repo.getInstructorProfile(session.createdBy), (await ctx.repo.getInstitution()).policy.defaultAiDisclosure);
     if (plan.hash !== hash || session.plan?.hash !== hash || plan.courseId !== session.courseId) {
       const latest = await sessionFor(ctx, sessionId);
       if ((latest.stage === 'provisioning' || latest.stage === 'review') && latest.plan?.hash === hash) return latest;
@@ -324,7 +334,7 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
     return { session, kept };
   },
   flagLessonAlternatives: async (ctx, { sessionId, lessonId }) => {
-    const session = await sessionFor(ctx, sessionId); await aiEnabled(ctx);
+    const session = await sessionFor(ctx, sessionId); await designPartnerEnabled(ctx);
     if (session.stage !== 'review') fail('invalid', 'Wait for the course draft.');
     await alternatives(ctx, session, lessonId);
     const lesson = await ctx.repo.getLesson(lessonId) ?? fail('not-found', 'Lesson not found.');

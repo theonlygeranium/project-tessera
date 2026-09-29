@@ -83,3 +83,11 @@
 .accents label:has(input[value='blue'])::before { background: var(--accent-option-blue); }
 .accents label:has(input[value='plum'])::before { background: var(--accent-option-plum); }
 .accents label:has(input[value='rust'])::before { background: var(--accent-option-rust); }
+.policyChoice { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.policyChoice input { width: 20px; height: 20px; flex: none; }
+.policyFieldset { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 16px; margin: 12px 0; }
+.policyFieldset p { margin-top: 4px; }
+.policyGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 12px 0; }
+.policyGrid label, .policyDisclosure { display: grid; gap: 5px; }
+.policyGrid input, .policyDisclosure textarea { min-height: 36px; padding: 7px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.policyDisclosure textarea { min-height: 96px; }

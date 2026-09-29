@@ -7,6 +7,24 @@ import type { StoredReadinessItem } from '../repo';
 /** Shared behavioral contract for MemoryRepo and the Worker's D1Repo. */
 export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>) {
   describe(name, () => {
+    it('appends concurrent design decisions without losing either entry', async () => {
+      const repo = await makeRepo();
+      const at = '2026-09-28T12:00:00Z';
+      const session = { id: 'ds-decisions', courseId: 'c-stat110', mode: 'syllabus', stage: 'review', createdBy: 'u-okafor', createdAt: at, updatedAt: at,
+        source: { kind: 'syllabus', fileId: null, version: null, name: 'Fictional', sections: [], chars: 0, ocr: false }, consent: { syllabusOnly: true, at, rememberProfile: false },
+        extraction: null, read: null, questions: [], confirmedOutcomes: null, teachingNote: '', options: null, selection: null, plan: null, provisioning: null,
+        created: { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] },
+        record: { sessionId: 'ds-decisions', source: { name: 'Fictional', kind: 'syllabus', chars: 0 }, extraction: null, read: null, questions: [], confirmedOutcomes: [], optionsShown: [], selection: null, plan: null, appliedAt: null, undoneAt: null, decisions: [] },
+      } as DesignSession;
+      await repo.putDesignSession(session);
+      expect(await Promise.all(['Kept A', 'Kept B'].map(what => repo.appendDesignDecision(session.id, { at, who: 'u-okafor', what })))).toEqual([true, true]);
+      expect((await repo.getDesignSession(session.id))?.record.decisions.map(item => item.what)).toEqual(['Kept A', 'Kept B']);
+      await repo.putDesignSession({ ...session, stage: 'provisioning', provisioning: { jobId: 'gj-stop', done: 0, total: 1, error: null } });
+      await repo.putGenerationJob({ id: 'gj-stop', courseId: 'c-stat110', requestedBy: 'u-okafor', kind: 'scaffold', sessionId: session.id, state: 'running', done: 0, total: 1, lessonIds: [], error: null, work: [], instruction: '', failures: [], createdAt: at, updatedAt: at });
+      expect(await repo.stopDesignJob(session.id, 'gj-stop', 'Policy disabled.')).toBe(true);
+      expect((await repo.getGenerationJob('gj-stop'))?.state).toBe('failed');
+      expect((await repo.getDesignSession(session.id))?.provisioning?.error).toBe('Policy disabled.');
+    });
     it('commits design creations and exact conditional undo under a session revision', async () => {
       const repo = await makeRepo();
       const at = '2026-09-28T12:00:00Z';

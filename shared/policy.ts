@@ -4,6 +4,9 @@ import type { AccentId, AiPolicy, Block, ReadinessIssue, ReadinessReport, Role, 
 
 /** D-034: Rice CTE planning rates, editable through institution policy. */
 export const RICE_DEFAULTS: WorkloadRates = { readingPagesPerHour: 34, problemSetHours: 2, writingHoursPerPage: 1, projectHours: 30, quizMinutes: 20, discussionMinutes: 45 };
+export const MAX_WORKLOAD_RATE = 1000;
+export const validWorkloadRate = (value: number): boolean => Number.isFinite(value) && value > 0 && value <= MAX_WORKLOAD_RATE;
+export const validWorkloadRates = (rates: WorkloadRates): boolean => Object.values(rates).every(validWorkloadRate);
 export const DEFAULT_DESIGN_PARTNER: NonNullable<AiPolicy['designPartner']> = { enabled: true, allowedArchitectures: null };
 export const DEFAULT_AI_DISCLOSURE = 'Some starter content in this course was drafted with AI from the syllabus. I reviewed that content and am responsible for what appears in the course.';
 

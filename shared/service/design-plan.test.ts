@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { fixtureAi } from '../ai';
 import { automaticCheck } from '../quality/evaluate';
 import { seedData } from '../seed';
+import sampleSyllabus from '../seed-syllabus.json';
 import type { ServiceContext } from './context';
 import { courseSnapshot } from './readiness';
 import { MemoryRepo, service } from './index';
-import { scaffoldBlocks } from './design-plan';
+import { advanceScaffoldJob, scaffoldBlocks } from './design-plan';
 import { explicitAssessmentPoints, titleOverlap } from '../design/plan';
 
 async function setup(empty = false): Promise<{ ctx: ServiceContext; sessionId: string }> {
@@ -31,6 +32,121 @@ async function finish(ctx: ServiceContext, sessionId: string) {
 }
 
 describe('syllabus provision plan', () => {
+  it('exports formula-leading plan text as inert CSV cells', async () => {
+    const { ctx, sessionId } = await setup();
+    await service.previewProvisionPlan(ctx, { sessionId });
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const module = session.record.plan!.modules[0];
+    module.title = '=1+1'; module.objective = ' +1+1'; module.lessons[0].title = '\t-1+1'; module.outcomeCodes = ['@SUM(1,1)'];
+    await ctx.repo.putDesignSession(session);
+    const csv = (await service.exportDesignRecord(ctx, { sessionId, format: 'csv' })).content;
+    expect(csv).toContain('"\'=1+1"');
+    expect(csv).toContain('"\' +1+1"');
+    expect(csv).toContain('"\'\t-1+1"');
+    expect(csv).toContain('"\'@SUM(1,1)"');
+  });
+  it('blocks apply when design partner is disabled after preview', async () => {
+    const { ctx, sessionId } = await setup();
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const admin = { ...ctx, user: await ctx.repo.getUser('u-admin') };
+    const institution = await ctx.repo.getInstitution();
+    await service.updatePolicy(admin, { ...institution.policy, designPartner: { enabled: false, allowedArchitectures: null } });
+    await expect(service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash })).rejects.toMatchObject({ code: 'ai-disabled' });
+    expect(await ctx.repo.listLessons({ courseId: 'c-stat110' })).toHaveLength(3);
+    expect((await service.exportDesignRecord(ctx, { sessionId, format: 'json' })).content).toContain(sessionId);
+  });
+  it('stops an active scaffold job with a session message when policy turns off', async () => {
+    const { ctx, sessionId } = await setup();
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const before = (await ctx.repo.getDesignSession(sessionId))!;
+    const job = (await ctx.repo.getGenerationJob(before.provisioning!.jobId!))!;
+    const admin = { ...ctx, user: await ctx.repo.getUser('u-admin') };
+    const institution = await ctx.repo.getInstitution();
+    await service.updatePolicy(admin, { ...institution.policy, designPartner: { enabled: false, allowedArchitectures: null } });
+    expect((await ctx.repo.getGenerationJob(job.id))?.state).toBe('failed');
+    expect((await service.getDesignSession(ctx, { sessionId })).provisioning?.error).toContain('disabled');
+    await advanceScaffoldJob(ctx, job);
+    expect((await ctx.repo.getDesignSession(sessionId))?.created.blockIds).toEqual(before.created.blockIds);
+    await expect(service.flagLessonAlternatives(ctx, { sessionId, lessonId: before.created.lessonIds[0] })).rejects.toMatchObject({ code: 'ai-disabled' });
+    await service.undoProvisionPlan(ctx, { sessionId });
+  });
+  it('records quick drafts and Move it in without making them plan-owned for undo', async () => {
+    const { ctx, sessionId } = await setup();
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const done = await finish(ctx, sessionId);
+    const lessonId = done.created.lessonIds[0];
+    const { jobId } = await service.generateAtScope(ctx, { courseId: 'c-stat110', scope: { lessonIds: [lessonId], elementTypes: ['document'] }, instruction: 'Draft a worked example.' });
+    await service.getGenerationJob(ctx, { jobId });
+    const drafted = (await ctx.repo.listBlocks(lessonId)).find(block => !done.created.blockIds.includes(block.id))!;
+    await service.keepBlock(ctx, { blockId: drafted.id });
+    await service.updateLesson(ctx, { lessonId: 'l-stat-1', moduleId: done.created.moduleIds[0] });
+    const record = JSON.parse((await service.exportDesignRecord(ctx, { sessionId, format: 'json' })).content);
+    expect(record.decisions.map((entry: { what: string }) => entry.what)).toEqual(expect.arrayContaining([expect.stringContaining(`Drafted document block for lesson ${lessonId}`), expect.stringContaining(`Kept block ${drafted.id}`), expect.stringContaining('Moved existing lesson l-stat-1')]));
+    expect((await ctx.repo.getDesignSession(sessionId))?.created.blockIds).not.toContain(drafted.id);
+    await service.undoProvisionPlan(ctx, { sessionId });
+    expect(await ctx.repo.getBlock(drafted.id)).not.toBeNull();
+    expect((await ctx.repo.getLesson('l-stat-1'))?.moduleId).toBe(done.created.moduleIds[0]);
+  });
+  it('keeps both simultaneous review decisions in the design record', async () => {
+    const { ctx, sessionId } = await setup();
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
+    const done = await finish(ctx, sessionId);
+    const ids = (await ctx.repo.listBlocks(done.created.lessonIds[0])).filter(block => block.aiState === 'draft').slice(0, 2).map(block => block.id);
+    await Promise.all(ids.map(blockId => service.keepBlock(ctx, { blockId })));
+    const decisions = JSON.parse((await service.exportDesignRecord(ctx, { sessionId, format: 'json' })).content).decisions as { what: string }[];
+    for (const id of ids) expect(decisions.some(entry => entry.what.includes(`Kept block ${id}`))).toBe(true);
+  });
+  it('builds the seven-module B and C plan from the pasted demo syllabus', async () => {
+    const repo = new MemoryRepo(seedData()); let n = 0;
+    const ctx: ServiceContext = { repo, ai: fixtureAi, user: await repo.getUser('u-okafor'), now: () => '2026-09-28T12:00:00.000Z', newId: prefix => `${prefix}-paste-${++n}` };
+    const started = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: sampleSyllabus.sections.map(section => section.text).join('\n\n'), consent: { syllabusOnly: true, rememberProfile: false } });
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((item, index) => ({ code: `O${index + 1}`, text: item.text, originalText: item.text })) });
+    const options = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.selectApproach(ctx, { sessionId: started.id, optionIds: [options.options![1].id, options.options![2].id], overlays: ['bookends'], rationale: 'Apply each idea to a case, then reflect.' });
+    const plan = await service.previewProvisionPlan(ctx, { sessionId: started.id });
+    expect(plan.modules).toHaveLength(7);
+  });
+  it('builds seven draft modules from sample approaches B and C with bookends', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    session.selection = { optionIds: [session.options![1].id, session.options![2].id], overlays: ['bookends'], rationale: 'Case practice and a project fit these students.', combinationNote: null };
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    expect(plan.modules).toHaveLength(7);
+  });
+  it('exposes cited review guidance and exports the applied design record to the instructor', async () => {
+    const { ctx, sessionId } = await setup();
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash, leastSureModuleKey: plan.modules.find(module => module.leastSure)?.key });
+    const done = await finish(ctx, sessionId);
+    const outline = await service.getCourseOutline(ctx, { courseId: 'c-stat110' });
+    expect(outline.designSession).toEqual({ id: sessionId, stage: 'review' });
+    const student = { ...ctx, user: await ctx.repo.getUser('u-priya') };
+    expect((await service.getCourseOutline(student, { courseId: 'c-stat110', asLearner: true })).designSession).toBeUndefined();
+    const lessonId = done.planIds!.lessons[plan.modules.find(module => module.leastSure)!.lessons[0].key];
+    const detail = await service.getLesson(ctx, { lessonId });
+    expect(detail.design?.moduleWhy.text).toContain('Repeated practice fits this group.');
+    expect(detail.design?.nextSteps.some(step => step.action === 'add-example')).toBe(true);
+    expect(detail.blocks.filter(block => block.type === 'document' && /^Alternative opening [AB]$/.test(block.title))).toHaveLength(2);
+    const json = await service.exportDesignRecord(ctx, { sessionId, format: 'json' });
+    expect(JSON.parse(json.content).plan.hash).toBe(plan.hash);
+    const csv = await service.exportDesignRecord(ctx, { sessionId, format: 'csv' });
+    expect(csv.content.split('\r\n')[0]).toContain('source page or section');
+    expect(csv.content.split('\r\n')).toHaveLength(plan.modules.length + 2);
+    const blockId = detail.blocks.find(block => block.origin === 'ai' && block.aiState === 'draft')!.id;
+    await service.keepBlock(ctx, { blockId });
+    const keptRecord = await service.exportDesignRecord(ctx, { sessionId, format: 'json' });
+    expect(JSON.parse(keptRecord.content).decisions.some((decision: { what: string }) => decision.what.includes(`Kept block ${blockId}`))).toBe(true);
+    const undo = await service.undoProvisionPlan(ctx, { sessionId });
+    expect(undo.kept).toContainEqual(expect.objectContaining({ kind: 'block', id: blockId }));
+    expect(await ctx.repo.getBlock(blockId)).not.toBeNull();
+    await expect(service.exportDesignRecord(student, { sessionId, format: 'json' })).rejects.toMatchObject({ code: 'forbidden' });
+  });
   it('previews deterministically, places every graded component once, and refuses a stale hash', async () => {
     const { ctx, sessionId } = await setup();
     const a = await service.previewProvisionPlan(ctx, { sessionId });

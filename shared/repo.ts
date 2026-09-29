@@ -155,6 +155,10 @@ export interface Repo {
   /** An owned, empty lesson gets blocks, links and progress in one operation. */
   commitDesignScaffold(sessionId: Id, revision: Id, expectedJob: GenerationJob, nextJob: GenerationJob, lesson: Lesson | null, blocks: Block[], outcomeIds: Id[], nextSession: DesignSession): Promise<boolean>;
   appendDesignAlternatives(sessionId: Id, revision: Id, lessonId: Id, blocks: Block[]): Promise<boolean>;
+  /** Append one record entry without replacing a possibly stale session snapshot. */
+  appendDesignDecision(sessionId: Id, decision: DesignSession['record']['decisions'][number]): Promise<boolean>;
+  /** Stop an active design job and display the reason on its session. */
+  stopDesignJob(sessionId: Id, jobId: Id, message: string): Promise<boolean>;
   deleteDesignBlockIfDraft(sessionId: Id, revision: Id, expected: Block, expectedOutcomeIds: Id[]): Promise<boolean>;
   deleteDesignAssignmentIfUnchanged(sessionId: Id, revision: Id, expected: Assignment, expectedOutcomeIds: Id[]): Promise<boolean>;
   deleteDesignLessonIfUnchanged(sessionId: Id, revision: Id, expected: Lesson): Promise<boolean>;

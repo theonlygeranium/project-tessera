@@ -55,6 +55,44 @@ const adminReadinessSteps = (path) => async (page) => {
   await page.evaluate((next) => { history.pushState({}, '', next); dispatchEvent(new PopStateEvent('popstate')); }, `/app${path}?data=mock&as=u-admin`);
   await page.waitForTimeout(900);
 };
+const designReadSteps = async (page) => {
+  await page.getByRole('checkbox', { name: /I understand\. Read this syllabus/ }).check();
+  await page.getByRole('button', { name: 'Read my syllabus' }).click();
+  await page.getByRole('heading', { name: 'Course profile' }).waitFor();
+};
+const designApproachSteps = async (page) => {
+  await designReadSteps(page);
+  await page.getByRole('button', { name: 'Confirm and show approaches' }).click();
+  await page.getByRole('heading', { name: 'Three ways to structure this course' }).waitFor();
+};
+const designPreviewSteps = async (page) => {
+  await designApproachSteps(page);
+  await page.getByRole('checkbox', { name: /Use approach A/ }).check();
+  await page.locator('#approach-why').fill('This sequence gives students steady practice.');
+  await page.getByRole('button', { name: 'Use this approach' }).click();
+  await page.getByRole('heading', { name: 'Preview the draft course' }).waitFor();
+};
+const designReviewSteps = async (page) => {
+  await designPreviewSteps(page);
+  await page.getByRole('button', { name: 'Apply and draft the course' }).click();
+  await page.getByRole('heading', { name: /Your draft course is ready/ }).waitFor({ timeout: 60_000 });
+};
+const designLessonSteps = async (page) => {
+  await designReviewSteps(page);
+  await page.getByRole('link', { name: 'Open the course outline' }).click();
+  await page.getByRole('link', { name: 'Start here', exact: true }).click();
+  await page.getByRole('heading', { name: 'Review with Design partner' }).waitFor();
+};
+const designAlternativesSteps = async (page) => {
+  await designPreviewSteps(page);
+  await page.locator('#least-sure').selectOption({ index: 1 });
+  const moduleName = (await page.locator('#least-sure option:checked').textContent())?.trim();
+  await page.getByRole('button', { name: 'Apply and draft the course' }).click();
+  await page.getByRole('heading', { name: /Your draft course is ready/ }).waitFor({ timeout: 60_000 });
+  await page.getByRole('link', { name: 'Open the course outline' }).click();
+  await page.getByRole('heading', { name: moduleName, exact: true }).locator('..').locator('..').getByRole('link').first().click();
+  await page.getByRole('heading', { name: 'Alternative openings' }).waitFor();
+};
 const APP = [
   { name: 'App · Choose a persona', url: 'app/sign-in?data=mock' },
   { name: 'App · Design tokens', url: 'app/tokens?data=mock' },
@@ -91,6 +129,8 @@ const APP = [
   { name: 'App · Design partner · Approaches', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: async (page) => { await page.getByRole('checkbox', { name: /I understand\. Read this syllabus/ }).check(); await page.getByRole('button', { name: 'Read my syllabus' }).click(); await page.getByRole('heading', { name: 'Course profile' }).waitFor(); await page.getByRole('button', { name: 'Confirm and show approaches' }).click(); await page.getByRole('heading', { name: 'Three ways to structure this course' }).waitFor(); } },
   { name: 'App · Design partner · Preview', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: async (page) => { await page.getByRole('checkbox', { name: /I understand\. Read this syllabus/ }).check(); await page.getByRole('button', { name: 'Read my syllabus' }).click(); await page.getByRole('heading', { name: 'Course profile' }).waitFor(); await page.getByRole('button', { name: 'Confirm and show approaches' }).click(); await page.getByRole('checkbox', { name: /Use approach A/ }).check(); await page.locator('#approach-why').fill('This sequence gives students steady practice.'); await page.getByRole('button', { name: 'Use this approach' }).click(); await page.getByRole('heading', { name: 'Preview the draft course' }).waitFor(); } },
   { name: 'App · Design partner · Draft ready', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: async (page) => { await page.getByRole('checkbox', { name: /I understand\. Read this syllabus/ }).check(); await page.getByRole('button', { name: 'Read my syllabus' }).click(); await page.getByRole('heading', { name: 'Course profile' }).waitFor(); await page.getByRole('button', { name: 'Confirm and show approaches' }).click(); await page.getByRole('checkbox', { name: /Use approach A/ }).check(); await page.locator('#approach-why').fill('This sequence gives students steady practice.'); await page.getByRole('button', { name: 'Use this approach' }).click(); await page.getByRole('heading', { name: 'Preview the draft course' }).waitFor(); await page.getByRole('button', { name: 'Apply and draft the course' }).click(); await page.getByRole('heading', { name: /Your draft course is ready/ }).waitFor({ timeout: 60_000 }); } },
+  { name: 'App · Design partner · Lesson review', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: designLessonSteps },
+  { name: 'App · Design partner · Alternative openings', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: designAlternativesSteps },
   { name: 'Story · Design partner · Citation', url: 'storybook/iframe.html?id=components-citation--page&viewMode=story' },
   { name: 'Story · Design partner · Alignment matrix', url: 'storybook/iframe.html?id=components-alignmentmatrix--audit&viewMode=story' },
   { name: 'Story · Design partner · Workload chart', url: 'storybook/iframe.html?id=components-workloadchart--weekly&viewMode=story' },
@@ -206,7 +246,7 @@ for (const t of targets) {
 }
 // ---- reflow: WCAG 1.4.10 (content usable at 320 CSS px without horizontal scrolling) ----
 // Screens under docs/screens/ are fixed-size design artboards and are exempt; site pages and the prototype are not.
-const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/sign-in?data=mock', 'app/?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-3?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor', { url: 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor', steps: async (p) => { await p.getByRole('button', { name: 'Create plain-language version' }).click(); await p.getByRole('link', { name: 'Compare with master' }).click(); await p.getByRole('link', { name: 'Compare', exact: true }).click(); } }, 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', 'app/today?data=mock&as=u-marcus', 'app/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-marcus', 'app/teach/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-okafor', 'app/onboarding?data=mock&as=u-priya', 'app/team?data=mock&as=u-sam', 'app/sharing?data=mock&as=u-dana', { url: 'app/admin/setup?data=mock&as=u-admin', steps: async (p) => { await p.getByRole('button', { name: 'Finish setup' }).click(); await p.getByRole('heading', { name: 'Overview', level: 1 }).waitFor(); await p.evaluate(() => { history.pushState({}, '', '/app/admin/reporting-lines?data=mock&as=u-admin'); dispatchEvent(new PopStateEvent('popstate')); }); await p.getByRole('heading', { name: 'Reporting lines', level: 1 }).waitFor(); } }, 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
+const REFLOW = ['index.html', 'research.html', 'explorations/ai-voice.html', '404.html', 'app/sign-in?data=mock', 'app/?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-3?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor', { url: 'app/teach/courses/c-stat110/lessons/l-stat-1/variants?data=mock&as=u-okafor', steps: async (p) => { await p.getByRole('button', { name: 'Create plain-language version' }).click(); await p.getByRole('link', { name: 'Compare with master' }).click(); await p.getByRole('link', { name: 'Compare', exact: true }).click(); } }, 'app/teach/courses/c-stat110/build?data=mock&as=u-okafor', 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', 'app/today?data=mock&as=u-marcus', 'app/courses/c-stat110/lessons/l-stat-1?data=mock&as=u-marcus', 'app/teach/courses/c-stat110/assignments/asg-stat-1?data=mock&as=u-okafor', 'app/onboarding?data=mock&as=u-priya', 'app/team?data=mock&as=u-sam', 'app/sharing?data=mock&as=u-dana', { url: 'app/admin/setup?data=mock&as=u-admin', steps: async (p) => { await p.getByRole('button', { name: 'Finish setup' }).click(); await p.getByRole('heading', { name: 'Overview', level: 1 }).waitFor(); await p.evaluate(() => { history.pushState({}, '', '/app/admin/reporting-lines?data=mock&as=u-admin'); dispatchEvent(new PopStateEvent('popstate')); }); await p.getByRole('heading', { name: 'Reporting lines', level: 1 }).waitFor(); } }, { url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: designReadSteps }, { url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: designApproachSteps }, { url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: designPreviewSteps }, { url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: designReviewSteps }, { url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: designLessonSteps }, { url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: designAlternativesSteps }, 'prototype/#today', 'prototype/#lesson', 'prototype/#result'];
 for (const destination of ['course', 'lesson', 'test-out']) REFLOW.push({ url: 'app/admin/setup?data=mock&as=u-admin', steps: p => staffTraining(p, destination) });
 for (const target of REFLOW) {
   const u = typeof target === 'string' ? target : target.url;

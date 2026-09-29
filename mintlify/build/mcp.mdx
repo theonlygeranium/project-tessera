@@ -25,16 +25,19 @@ In an MCP client that supports remote servers with bearer headers, configure:
 | Area | Tools |
 |---|---|
 | Courses | `list_courses`, `get_course_outline`, `import_course`, `create_course` |
+| Syllabus design | `design_session_create`, `design_session_get`, `design_session_answer`, `design_session_confirm`, `design_session_select`, `design_session_preview`, `design_session_apply`, `design_session_undo` |
 | Lessons | `create_module`, `create_lesson`, `get_lesson`, `save_blocks` |
 | Accessibility and files | `get_course_access`, `get_lesson_access`, `list_files`, `get_file_access` |
 | AI drafts | `generate_at_scope`, `get_generation_job`, `generate_element` |
 | Assignments | `list_assignments`, `get_assignment`, `create_assignment` |
 | Announcements | `list_announcements`, `create_announcement` |
 
+Design session tools use `ai:run` to create, confirm outcomes, and apply drafts; `content:read` to get or preview; and `content:write` to answer, select, or undo. The token owner must teach the course. The external assistant should show the preview hash and rationale to the instructor before applying the plan.
+
 `create_announcement` always saves a draft, even if a caller asks to publish it. AI generated content remains a draft for a person to review.
 
 ## What agents can't do and why
 
-Tessera does not expose tools for publishing or unpublishing lessons and assignments, keeping or reverting AI blocks, grading or releasing grades, deleting anything, managing tokens, people, or institution settings, or using the tutor. These are decisions a person must make; AI work stays reviewable before learners see it.
+Tessera does not expose tools for publishing or unpublishing lessons and assignments, keeping or reverting AI blocks, grading or releasing grades, deleting course content outside a design-plan undo, managing tokens, people, or institution settings, or using the tutor. These are decisions a person must make; AI work stays reviewable before learners see it.
 
 Content an assistant writes through these tools arrives as an **AI draft**: lesson blocks it saves or changes, lessons it imports, and announcements it drafts are marked as written by "Assistant via MCP" with the token's name, and a lesson can't be published until a person has reviewed and kept each draft. List results come back in `structuredContent` as `{ "items": [...] }`.

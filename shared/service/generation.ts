@@ -93,6 +93,10 @@ export async function advanceGenerationJob(ctx: ServiceContext, job: GenerationJ
       if (result.status === 'fulfilled') {
         try {
           if (!await insert(ctx, item, result.value, undefined, `b-${job.id}-${job.done}`)) return await ctx.repo.getGenerationJob(job.id) ?? job;
+          const sessions = await ctx.repo.listDesignSessions(job.courseId);
+          for (const session of sessions.filter(s => s.stage === 'review' && Object.values(s.planIds?.lessons ?? {}).includes(item.lessonId))) {
+            await ctx.repo.appendDesignDecision(session.id, { at: ctx.now(), who: job.requestedBy, what: `Drafted ${item.variant ?? item.type} block for lesson ${item.lessonId} in job ${job.id}.` });
+          }
           if (!job.lessonIds.includes(item.lessonId)) job.lessonIds.push(item.lessonId);
         } catch (error) { job.failures.push({ ...item, message: error instanceof Error ? error.message : 'Could not save the draft.' }); }
       } else job.failures.push({ ...item, message: result.reason instanceof Error ? result.reason.message : 'Could not create the draft.' });
