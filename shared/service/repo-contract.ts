@@ -7,6 +7,39 @@ import type { StoredReadinessItem } from '../repo';
 /** Shared behavioral contract for MemoryRepo and the Worker's D1Repo. */
 export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>) {
   describe(name, () => {
+    it('stores LTI registrations, contexts, links and replay claims consistently', async () => {
+      const repo = await makeRepo();
+      const at = '2026-09-29T00:00:00.000Z';
+      const platform = {id:'lp-meridian',name:'Meridian State Canvas',issuer:'https://canvas.meridian.example',clientId:'tessera-test',deploymentIds:['deployment-1'],authLoginUrl:'https://canvas.meridian.example/login',authTokenUrl:'https://canvas.meridian.example/token',jwksUrl:'https://canvas.meridian.example/jwks',registeredVia:'manual' as const,status:'active' as const,services:{ags:false,nrps:false,deepLinking:false},createdBy:'u-admin',createdAt:at,lastLaunchAt:null};
+      await repo.putLtiPlatform(platform);
+      expect(await repo.getLtiPlatform(platform.issuer,platform.clientId)).toEqual(platform);
+      platform.deploymentIds.push('deployment-2');
+      expect((await repo.getLtiPlatform(platform.issuer,platform.clientId))?.deploymentIds).toEqual(['deployment-1']);
+      expect((await repo.listLtiPlatforms()).map(x=>x.id)).toContain(platform.id);
+      const context = {id:'lc-meridian',platformId:platform.id,deploymentId:'deployment-1',contextId:'stat110',title:'Statistics 110',label:'STAT 110',courseId:null,linkedBy:null,linkedAt:null,nrpsUrl:null,agsLineItemsUrl:null,lastRosterSyncAt:null};
+      await repo.putLtiContext(context);
+      expect(await repo.getLtiContext(platform.id,'deployment-1','stat110')).toEqual(context);
+      expect(await repo.getLtiContextById(context.id)).toEqual(context);
+      expect((await repo.listLtiContexts(platform.id)).map(x=>x.id)).toEqual([context.id]);
+      await repo.addCourseInstructor('c-stat110','u-priya');
+      await repo.addCourseInstructor('c-stat110','u-priya');
+      expect((await repo.getCourse('c-stat110'))?.instructorIds.filter(x=>x==='u-priya')).toEqual(['u-priya']);
+      expect(await repo.linkLtiContext(context.id,'c-stat110','u-admin',at)).toBe(true);
+      expect(await repo.linkLtiContext(context.id,'c-comm120','u-admin',at)).toBe(false);
+      expect((await repo.getLtiContextById(context.id))?.courseId).toBe('c-stat110');
+      await repo.putLtiContext({...context,title:'Updated LMS title'});
+      expect((await repo.getLtiContextById(context.id))?.courseId).toBe('c-stat110');
+      expect((await repo.getLtiContextById(context.id))?.title).toBe('Updated LMS title');
+      await repo.touchLtiPlatform(platform.id,at);
+      expect((await repo.getLtiPlatform(platform.issuer,platform.clientId))?.lastLaunchAt).toBe(at);
+      expect(await repo.claimLtiReplay('nonce','meridian:nonce','2026-09-29T01:00:00.000Z',at)).toBe(true);
+      expect(await repo.claimLtiReplay('nonce','meridian:nonce','2026-09-29T01:00:00.000Z',at)).toBe(false);
+      expect(await repo.claimLtiReplay('state','meridian:nonce','2026-09-29T01:00:00.000Z',at)).toBe(true);
+      const ticket = {tokenHash:'hash-1',contextId:context.id,userId:'u-okafor',resourceLinkId:'resource-1',expiresAt:'2026-09-29T01:00:00.000Z',usedAt:null};
+      await repo.putLtiLinkTicket(ticket);
+      expect(await repo.consumeLtiLinkTicket(ticket.tokenHash,at)).toEqual({...ticket,usedAt:at});
+      expect(await repo.consumeLtiLinkTicket(ticket.tokenHash,at)).toBeNull();
+    });
     it('round trips entities and isolates both reads and writes', async () => {
       const repo = await makeRepo();
       const institution = await repo.getInstitution(); institution.name = 'Changed'; await repo.putInstitution(institution);

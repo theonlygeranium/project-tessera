@@ -9,12 +9,13 @@ import type {
 } from '../shared/repo';
 import type { SeedData } from '../shared/seed';
 import { ApiError } from '../shared/api';
-import type { IdentityKind, IdentityLinkSuggestion, ToolSession, UserIdentity } from '../shared/domain';
+import type { IdentityKind, IdentityLinkSuggestion, LtiContext, LtiLinkTicket, LtiPlatform, ToolSession, UserIdentity } from '../shared/domain';
 import { asciiLower } from '../shared/service/interop/ascii';
 
 type SqlBind = string | number | null;
 
 const DELETE_ORDER = [
+  'lti_replay', 'lti_link_tickets', 'lti_contexts', 'lti_platforms',
   'identity_link_suggestions', 'tool_sessions', 'user_identities',
   'manager_consents', 'reporting_lines', 'certificates', 'test_out_attempts', 'test_outs',
   'completion_events', 'requirements', 'outcome_links', 'outcomes', 'readiness_items', 'rubrics', 'templates', 'programs',
@@ -111,6 +112,10 @@ export class D1Repo implements Repo {
   }
   async addEnrollment(courseId: Id, userId: Id): Promise<void> {
     await this.db.prepare('INSERT OR IGNORE INTO enrollments (course_id, user_id) VALUES (?, ?)').bind(courseId, userId).run();
+  }
+  async addCourseInstructor(courseId: Id, userId: Id): Promise<void> {
+    await this.db.prepare(`UPDATE courses SET instructor_ids=json_insert(instructor_ids,'$[#]',?)
+      WHERE id=? AND NOT EXISTS (SELECT 1 FROM json_each(instructor_ids) WHERE value=?)`).bind(userId,courseId,userId).run();
   }
 
   async getModule(id: Id): Promise<Module | null> {
@@ -981,7 +986,67 @@ export class D1Repo implements Repo {
       .bind(now,filter.userId,filter.platformId ?? null,filter.platformId ?? null,filter.contextId,exceptId ?? '').run();
     return result.meta.changes;
   }
+  async getLtiPlatform(issuer: string, clientId: string): Promise<LtiPlatform | null> {
+    const row = await this.first<LtiPlatformRow>('SELECT * FROM lti_platforms WHERE issuer=? AND client_id=?',[issuer,clientId]);
+    return row ? ltiPlatformFromRow(row) : null;
+  }
+  async listLtiPlatforms(): Promise<LtiPlatform[]> { return (await this.all<LtiPlatformRow>('SELECT * FROM lti_platforms ORDER BY name,id')).map(ltiPlatformFromRow); }
+  async putLtiPlatform(p: LtiPlatform): Promise<void> {
+    await this.db.prepare(`INSERT INTO lti_platforms (id,name,issuer,client_id,deployment_ids,auth_login_url,auth_token_url,jwks_url,registered_via,status,services,created_by,created_at,last_launch_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET name=excluded.name,deployment_ids=excluded.deployment_ids,auth_login_url=excluded.auth_login_url,auth_token_url=excluded.auth_token_url,jwks_url=excluded.jwks_url,status=excluded.status,services=excluded.services,last_launch_at=excluded.last_launch_at`)
+      .bind(p.id,p.name,p.issuer,p.clientId,JSON.stringify(p.deploymentIds),p.authLoginUrl,p.authTokenUrl,p.jwksUrl,p.registeredVia,p.status,JSON.stringify(p.services),p.createdBy,p.createdAt,p.lastLaunchAt).run();
+  }
+  async touchLtiPlatform(id: Id, at: string): Promise<void> { await this.db.prepare('UPDATE lti_platforms SET last_launch_at=? WHERE id=?').bind(at,id).run(); }
+  async getLtiContext(platformId: Id, deploymentId: string, contextId: string): Promise<LtiContext | null> {
+    const row = await this.first<LtiContextRow>('SELECT * FROM lti_contexts WHERE platform_id=? AND deployment_id=? AND context_id=?',[platformId,deploymentId,contextId]);
+    return row ? ltiContextFromRow(row) : null;
+  }
+  async getLtiContextById(id: Id): Promise<LtiContext | null> {
+    const row = await this.first<LtiContextRow>('SELECT * FROM lti_contexts WHERE id=?',[id]);
+    return row ? ltiContextFromRow(row) : null;
+  }
+  async listLtiContexts(platformId: Id): Promise<LtiContext[]> { return (await this.all<LtiContextRow>('SELECT * FROM lti_contexts WHERE platform_id=? ORDER BY title,id',[platformId])).map(ltiContextFromRow); }
+  async putLtiContext(c: LtiContext): Promise<void> {
+    await this.db.prepare(`INSERT INTO lti_contexts (id,platform_id,deployment_id,context_id,title,label,course_id,linked_by,linked_at,nrps_url,ags_line_items_url,last_roster_sync_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(platform_id,deployment_id,context_id) DO UPDATE SET title=excluded.title,label=excluded.label,nrps_url=excluded.nrps_url,ags_line_items_url=excluded.ags_line_items_url`)
+      .bind(c.id,c.platformId,c.deploymentId,c.contextId,c.title,c.label,c.courseId,c.linkedBy,c.linkedAt,c.nrpsUrl,c.agsLineItemsUrl,c.lastRosterSyncAt).run();
+  }
+  async linkLtiContext(id: Id, courseId: Id, actorId: Id, now: string): Promise<boolean> {
+    const result = await this.db.prepare('UPDATE lti_contexts SET course_id=?,linked_by=?,linked_at=? WHERE id=? AND course_id IS NULL')
+      .bind(courseId,actorId,now,id).run();
+    return result.meta.changes === 1;
+  }
+  async claimLtiReplay(kind: 'state' | 'nonce', key: string, expiresAt: string, now: string): Promise<boolean> {
+    await this.db.prepare('DELETE FROM lti_replay WHERE expires_at<=?').bind(now).run();
+    const result = await this.db.prepare('INSERT OR IGNORE INTO lti_replay (kind,key,expires_at) VALUES (?,?,?)').bind(kind,key,expiresAt).run();
+    return result.meta.changes === 1;
+  }
+  async putLtiLinkTicket(t: LtiLinkTicket): Promise<void> {
+    await this.db.prepare('INSERT INTO lti_link_tickets (token_hash,context_id,user_id,resource_link_id,expires_at,used_at) VALUES (?,?,?,?,?,?)')
+      .bind(t.tokenHash,t.contextId,t.userId,t.resourceLinkId,t.expiresAt,t.usedAt).run();
+  }
+  async consumeLtiLinkTicket(hash: string, now: string): Promise<LtiLinkTicket | null> {
+    const row = await this.db.prepare('UPDATE lti_link_tickets SET used_at=? WHERE token_hash=? AND used_at IS NULL AND expires_at>? RETURNING *').bind(now,hash,now).first<LtiLinkTicketRow>();
+    return row ? {tokenHash:row.token_hash,contextId:row.context_id,userId:row.user_id,resourceLinkId:row.resource_link_id,expiresAt:row.expires_at,usedAt:row.used_at} : null;
+  }
 }
+
+interface LtiLinkTicketRow extends Record<string,unknown> {token_hash:string;context_id:Id;user_id:Id;resource_link_id:string;expires_at:string;used_at:string|null}
+
+interface LtiPlatformRow extends Record<string, unknown> {
+  id: Id; name: string; issuer: string; client_id: string; deployment_ids: string;
+  auth_login_url: string; auth_token_url: string; jwks_url: string; registered_via: LtiPlatform['registeredVia'];
+  status: LtiPlatform['status']; services: string; created_by: Id; created_at: string; last_launch_at: string | null;
+}
+const ltiPlatformFromRow = (r: LtiPlatformRow): LtiPlatform => ({ id:r.id,name:r.name,issuer:r.issuer,clientId:r.client_id,deploymentIds:JSON.parse(r.deployment_ids),authLoginUrl:r.auth_login_url,authTokenUrl:r.auth_token_url,jwksUrl:r.jwks_url,registeredVia:r.registered_via,status:r.status,services:JSON.parse(r.services),createdBy:r.created_by,createdAt:r.created_at,lastLaunchAt:r.last_launch_at });
+interface LtiContextRow extends Record<string, unknown> {
+  id: Id; platform_id: Id; deployment_id: string; context_id: string; title: string; label: string;
+  course_id: Id | null; linked_by: Id | null; linked_at: string | null; nrps_url: string | null;
+  ags_line_items_url: string | null; last_roster_sync_at: string | null;
+}
+const ltiContextFromRow = (r: LtiContextRow): LtiContext => ({ id:r.id,platformId:r.platform_id,deploymentId:r.deployment_id,contextId:r.context_id,title:r.title,label:r.label,courseId:r.course_id,linkedBy:r.linked_by,linkedAt:r.linked_at,nrpsUrl:r.nrps_url,agsLineItemsUrl:r.ags_line_items_url,lastRosterSyncAt:r.last_roster_sync_at });
 
 interface IdentityRow extends Record<string, unknown> { user_id: Id; kind: IdentityKind; key: string; linked_at: string; linked_by: UserIdentity['linkedBy']; last_seen_at: string | null }
 const identityFromRow = (r: IdentityRow): UserIdentity => ({ userId:r.user_id,kind:r.kind,key:r.key,linkedAt:r.linked_at,linkedBy:r.linked_by,lastSeenAt:r.last_seen_at });

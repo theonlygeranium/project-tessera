@@ -17,9 +17,17 @@ import { TokensPage } from './pages/TokensPage';
 import { AppShell } from './shell/AppShell';
 import { RequireRole } from './shell/RequireRole';
 import { Root } from './shell/Root';
+import { EmbedCourse, EmbedRoot } from './embed/Embed';
 
+const embedded = location.pathname === '/embed' || location.pathname.startsWith('/embed/');
 export const router = createBrowserRouter(
-  [
+  embedded ? [
+    { element: <EmbedRoot />, children: [
+      { index: true, element: <p>Launch this course from your LMS.</p> },
+      { path: 'courses/:courseId', element: <EmbedCourse /> },
+      { path: 'teach/courses/:courseId', element: <EmbedCourse /> },
+    ] },
+  ] : [
     {
       element: <Root />,
       children: [
@@ -41,5 +49,5 @@ export const router = createBrowserRouter(
       ],
     },
   ],
-  { basename: '/app' },
+  { basename: embedded ? '/embed' : '/app' },
 );

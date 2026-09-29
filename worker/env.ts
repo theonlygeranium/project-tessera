@@ -26,4 +26,6 @@ export interface Env {
   CF_ACCESS_API_TOKEN?: string;
   CLOUDFLARE_ACCOUNT_ID?: string;
   ACCESS_GROUP_ID?: string;
+  /** RSA private JWK JSON for Tessera's public LTI JWKS. */
+  LTI_PRIVATE_JWK?: string;
 }

@@ -1163,3 +1163,21 @@ export interface ToolSession {
   revokedAt: Timestamp | null;
 }
 export interface SsoSettings { domains: string[]; defaultRole: 'student' }
+
+// ---- LTI 1.3 core (D-045, D-046, D-048) ----
+export interface LtiPlatform {
+  id: Id; name: string; issuer: string; clientId: string; deploymentIds: string[];
+  authLoginUrl: string; authTokenUrl: string; jwksUrl: string;
+  registeredVia: 'dynamic' | 'manual'; status: 'pending' | 'active' | 'disabled';
+  services: { ags: boolean; nrps: boolean; deepLinking: boolean };
+  createdBy: Id; createdAt: Timestamp; lastLaunchAt: Timestamp | null;
+}
+export interface LtiContext {
+  id: Id; platformId: Id; deploymentId: string; contextId: string;
+  title: string; label: string; courseId: Id | null; linkedBy: Id | null; linkedAt: Timestamp | null;
+  nrpsUrl: string | null; agsLineItemsUrl: string | null; lastRosterSyncAt: Timestamp | null;
+}
+export interface LtiLinkTicket {
+  tokenHash: string; contextId: Id; userId: Id; resourceLinkId: string;
+  expiresAt: Timestamp; usedAt: Timestamp | null;
+}

@@ -8,7 +8,7 @@ import type {
   AiFinding, AlignableKind, Attestation, Certificate, CompletionEvent, CourseTemplate, ManagerConsent, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, TestOut,
 } from './domain';
 import type { SeedData } from './seed';
-import type { IdentityKind, IdentityLinkSuggestion, ToolSession, UserIdentity } from './domain';
+import type { IdentityKind, IdentityLinkSuggestion, LtiContext, LtiLinkTicket, LtiPlatform, ToolSession, UserIdentity } from './domain';
 
 /** One element to draft; `variant: 'video-script'` is a document written as scenes with narration. */
 export interface GenerationItem { lessonId: Id; type: Block['type']; variant?: 'video-script' }
@@ -63,6 +63,8 @@ export interface Repo {
   setEnrollments(courseId: Id, userIds: Id[]): Promise<void>;
   /** Idempotent: adds one enrollment; never removes any. */
   addEnrollment(courseId: Id, userId: Id): Promise<void>;
+  /** Add a single course instructor without replacing concurrent changes. */
+  addCourseInstructor(courseId: Id, userId: Id): Promise<void>;
 
   getModule(id: Id): Promise<Module | null>;
   listModules(courseId: Id): Promise<Module[]>;
@@ -264,4 +266,20 @@ export interface Repo {
   extendToolSession(id: Id, expiresAt: Timestamp, now: Timestamp): Promise<boolean>;
   /** Revoke unrevoked sessions in one user's context; platformId narrows the legacy explicit-revocation call. */
   revokeToolSessions(filter: { userId: Id; platformId?: Id; contextId: Id }, now: Timestamp, exceptId?: Id): Promise<number>;
+  getLtiPlatform(issuer: string, clientId: string): Promise<LtiPlatform | null>;
+  listLtiPlatforms(): Promise<LtiPlatform[]>;
+  putLtiPlatform(platform: LtiPlatform): Promise<void>;
+  touchLtiPlatform(id: Id, at: Timestamp): Promise<void>;
+  getLtiContext(platformId: Id, deploymentId: string, contextId: string): Promise<LtiContext | null>;
+  getLtiContextById(id: Id): Promise<LtiContext | null>;
+  listLtiContexts(platformId: Id): Promise<LtiContext[]>;
+  /** Refresh metadata without changing a link made by an administrator. */
+  putLtiContext(context: LtiContext): Promise<void>;
+  /** Link an unlinked context once. Returns false when another link won. */
+  linkLtiContext(id: Id, courseId: Id, actorId: Id, now: Timestamp): Promise<boolean>;
+  /** One-time nonce and state storage; false means a duplicate or expired transaction. */
+  claimLtiReplay(kind: 'state' | 'nonce', key: string, expiresAt: Timestamp, now: Timestamp): Promise<boolean>;
+  putLtiLinkTicket(ticket: LtiLinkTicket): Promise<void>;
+  /** One-time, expiry-checked claim. */
+  consumeLtiLinkTicket(hash: string, now: Timestamp): Promise<LtiLinkTicket | null>;
 }

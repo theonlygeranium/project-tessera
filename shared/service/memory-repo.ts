@@ -2,7 +2,7 @@ import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Cours
 import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt } from '../repo';
 import type { SeedData } from '../seed';
 import { ApiError } from '../api';
-import type { IdentityKind, IdentityLinkSuggestion, ToolSession, UserIdentity } from '../domain';
+import type { IdentityKind, IdentityLinkSuggestion, LtiContext, LtiLinkTicket, LtiPlatform, ToolSession, UserIdentity } from '../domain';
 import { asciiLower } from './interop/ascii';
 
 declare const structuredClone: <T>(value: T) => T;
@@ -28,6 +28,10 @@ export class MemoryRepo implements Repo {
   private userIdentities: UserIdentity[] = [];
   private identityLinkSuggestions: IdentityLinkSuggestion[] = [];
   private toolSessions: ToolSession[] = [];
+  private ltiPlatforms: LtiPlatform[] = [];
+  private ltiContexts: LtiContext[] = [];
+  private ltiReplay = new Map<string, string>();
+  private ltiLinkTickets: LtiLinkTicket[] = [];
   constructor(seed: SeedData) { this.data = this.withNight3(seed); }
   async getInstitution(): Promise<Institution> { return normalized(this.data.institution); }
   async putInstitution(value: Institution) { this.data.institution = normalized(value); }
@@ -50,6 +54,10 @@ export class MemoryRepo implements Repo {
   }
   async addEnrollment(courseId: string, userId: string) {
     if (!this.data.enrollments.some(x => x.courseId === courseId && x.userId === userId)) this.data.enrollments.push({ courseId, userId });
+  }
+  async addCourseInstructor(courseId: string, userId: string) {
+    const course = this.data.courses.find(x=>x.id===courseId);
+    if (course && !course.instructorIds.includes(userId)) course.instructorIds.push(userId);
   }
   async getModule(id: string): Promise<Module | null> { return copy(this.data.modules.find(x => x.id === id) ?? null); }
   async listModules(courseId: string): Promise<Module[]> { return copy(this.data.modules.filter(x => x.courseId === courseId).sort(byPosition)); }
@@ -258,7 +266,7 @@ export class MemoryRepo implements Repo {
   async listManagerConsents(filter: { managerId?: string; reportId?: string }) { return copy(this.data.managerConsents!.filter(x => (!filter.managerId || x.managerId === filter.managerId) && (!filter.reportId || x.reportId === filter.reportId)).sort((a, b) => cmp(a.managerId, b.managerId) || cmp(a.reportId, b.reportId))); }
   async putManagerConsent(value: ManagerConsent) { const i = this.data.managerConsents!.findIndex(x => x.managerId === value.managerId && x.reportId === value.reportId); if (i < 0) this.data.managerConsents!.push(copy(value)); else this.data.managerConsents![i] = copy(value); }
   async isEmpty(): Promise<boolean> { return this.data.users.length === 0; }
-  async reset(seed: SeedData) { this.data = this.withNight3(seed); this.userIdentities = []; this.identityLinkSuggestions = []; this.toolSessions = []; }
+  async reset(seed: SeedData) { this.data = this.withNight3(seed); this.userIdentities = []; this.identityLinkSuggestions = []; this.toolSessions = []; this.ltiPlatforms = []; this.ltiContexts = []; this.ltiReplay.clear(); this.ltiLinkTickets = []; }
   private withNight3(seed: SeedData): SeedData & { readinessItems: StoredReadinessItem[] } {
     return copy({ ...seed, programs: seed.programs ?? [], templates: seed.templates ?? [], rubrics: (seed.rubrics ?? []).map(r => ({ ...r, source: 'custom' as const, builtIn: false })), readinessItems: [],
       outcomes: seed.outcomes ?? seed.courses.flatMap(course => course.outcomes.flatMap((value, i) => value.trim() ? [{ id: `${course.id}-o${i + 1}`, courseId: course.id, code: `O${i + 1}`, text: value, position: i }] : [])),
@@ -327,5 +335,45 @@ export class MemoryRepo implements Repo {
     const rows = this.toolSessions.filter(x => x.userId === filter.userId && (filter.platformId === undefined || x.platformId === filter.platformId) && x.contextId === filter.contextId && x.revokedAt === null && x.id !== exceptId);
     for (const row of rows) row.revokedAt = now;
     return rows.length;
+  }
+  async getLtiPlatform(issuer: string, clientId: string): Promise<LtiPlatform | null> { return copy(this.ltiPlatforms.find(x => x.issuer === issuer && x.clientId === clientId) ?? null); }
+  async listLtiPlatforms(): Promise<LtiPlatform[]> { return copy(this.ltiPlatforms.slice().sort((a,b) => cmp(a.name,b.name) || cmp(a.id,b.id))); }
+  async putLtiPlatform(platform: LtiPlatform): Promise<void> {
+    if (this.ltiPlatforms.some(x => x.id !== platform.id && x.issuer === platform.issuer && x.clientId === platform.clientId)) throw new Error('Duplicate LTI issuer and client ID.');
+    this.upsert(this.ltiPlatforms,platform);
+  }
+  async touchLtiPlatform(id: string, at: string): Promise<void> { const platform = this.ltiPlatforms.find(x=>x.id===id); if (platform) platform.lastLaunchAt = at; }
+  async getLtiContext(platformId: string, deploymentId: string, contextId: string): Promise<LtiContext | null> { return copy(this.ltiContexts.find(x => x.platformId === platformId && x.deploymentId === deploymentId && x.contextId === contextId) ?? null); }
+  async getLtiContextById(id: string): Promise<LtiContext | null> { return copy(this.ltiContexts.find(x => x.id === id) ?? null); }
+  async listLtiContexts(platformId: string): Promise<LtiContext[]> { return copy(this.ltiContexts.filter(x => x.platformId === platformId).sort((a,b) => cmp(a.title,b.title) || cmp(a.id,b.id))); }
+  async putLtiContext(context: LtiContext): Promise<void> {
+    const existing = this.ltiContexts.find(x => x.platformId === context.platformId && x.deploymentId === context.deploymentId && x.contextId === context.contextId);
+    if (existing) {
+      existing.title = context.title; existing.label = context.label;
+      existing.nrpsUrl = context.nrpsUrl; existing.agsLineItemsUrl = context.agsLineItemsUrl;
+      return;
+    }
+    if (this.ltiContexts.some(x => x.id === context.id)) throw new Error('Duplicate LTI context id.');
+    this.ltiContexts.push(copy(context));
+  }
+  async linkLtiContext(id: string, courseId: string, actorId: string, now: string): Promise<boolean> {
+    const context = this.ltiContexts.find(x => x.id === id && x.courseId === null);
+    if (!context || !this.data.courses.some(x => x.id === courseId)) return false;
+    context.courseId = courseId; context.linkedBy = actorId; context.linkedAt = now; return true;
+  }
+  async claimLtiReplay(kind: 'state' | 'nonce', key: string, expiresAt: string, now: string): Promise<boolean> {
+    const lookup = kind + ':' + key;
+    if (this.ltiReplay.has(lookup)) return false;
+    for (const [k, expiry] of this.ltiReplay) if (expiry <= now) this.ltiReplay.delete(k);
+    this.ltiReplay.set(lookup,expiresAt); return true;
+  }
+  async putLtiLinkTicket(ticket: LtiLinkTicket): Promise<void> {
+    if (this.ltiLinkTickets.some(x=>x.tokenHash===ticket.tokenHash)) throw new Error('Duplicate LTI link ticket.');
+    this.ltiLinkTickets.push(copy(ticket));
+  }
+  async consumeLtiLinkTicket(hash: string, now: string): Promise<LtiLinkTicket | null> {
+    const found = this.ltiLinkTickets.find(x=>x.tokenHash===hash && x.usedAt===null && x.expiresAt>now);
+    if (!found) return null;
+    found.usedAt = now; return copy(found);
   }
 }

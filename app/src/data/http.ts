@@ -6,6 +6,10 @@ async function call(op: Operation, input: Record<string, unknown> | undefined): 
   const { path, rest } = fillPath(route.path, input ?? {});
   let url = API_PREFIX + path;
   const init: RequestInit = { method: route.method, credentials: 'same-origin', headers: { accept: 'application/json' } };
+  // A launch supplies the token in page memory. On refresh the partitioned,
+  // HttpOnly cookie supplies the same course-bound credential.
+  const toolToken = (window as Window & {__TESSERA_TOOL_SESSION__?:string}).__TESSERA_TOOL_SESSION__;
+  if (toolToken) init.headers = { ...init.headers, authorization: 'Bearer ' + toolToken };
   if (route.method === 'GET' || route.method === 'DELETE') {
     const query = new URLSearchParams();
     for (const [k, v] of Object.entries(rest)) if (v !== undefined && v !== null) query.set(k, String(v));

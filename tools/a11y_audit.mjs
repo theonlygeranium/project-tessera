@@ -27,10 +27,13 @@ const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascrip
 // ---- static server for docs/ ------------------------------------------------
 const server = createServer(async (req, res) => {
   let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  // The embed shell uses the same app bundle at a second basename.
+  if (path.startsWith('/embed/assets/')) path = path.replace(/^\/embed\//, '/app/');
   if (path.endsWith('/')) path += 'index.html';
   let file = normalize(join(DOCS, path));
   // Single-page app fallback, as the Worker does in production (D-014): /app/<route> → /app/index.html.
   if (!existsSync(file) && path.startsWith('/app/') && !extname(path)) file = join(DOCS, 'app', 'index.html');
+  if (!existsSync(file) && path.startsWith('/embed/') && !extname(path)) file = join(DOCS, 'app', 'index.html');
   if (!file.startsWith(DOCS) || !existsSync(file)) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
   res.end(await readFile(file));
@@ -56,6 +59,8 @@ const adminReadinessSteps = (path) => async (page) => {
   await page.waitForTimeout(900);
 };
 const APP = [
+  { name: 'Embed · Learner course', url: 'embed/courses/c-stat110?data=mock&as=u-marcus' },
+  { name: 'Embed · Instructor course', url: 'embed/teach/courses/c-stat110?data=mock&as=u-okafor' },
   { name: 'App · Choose a persona', url: 'app/sign-in?data=mock' },
   { name: 'App · Design tokens', url: 'app/tokens?data=mock' },
   { name: 'App · Administrator home', url: 'app/?data=mock&as=u-admin' },

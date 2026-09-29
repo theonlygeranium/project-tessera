@@ -17,6 +17,7 @@ import { dispatch, service, type ServiceContext } from '../shared/service';
 import { coerceQuery, validateInput } from '../shared/schema';
 import { isToolSessionBearerAttempt, toolSessionCookie, toolSessionCredential } from './identity/tool-session';
 import { TOOL_SESSION_OPERATIONS, toolSessionCourse } from './identity/tool-session-scope';
+import { handleLti } from './lti';
 
 const SESSION_COOKIE = 'tessera_user';
 const VIEW_AS_COOKIE = 'tessera_view_as';
@@ -47,6 +48,7 @@ export default {
     const url = new URL(request.url);
     if (request.method === 'GET' && /^\/verify\/[^/]+$/.test(url.pathname)) return handleVerification(request, env);
     if (url.pathname === '/mcp') return handleMcp(request, env, { ensureSeeded, rateLimiter, createServiceContext });
+    if (url.pathname.startsWith('/lti/') || url.pathname.startsWith('/embed/')) return handleLti(request, env, ensureSeeded);
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return handleApi(request, env);
     if (url.pathname === '/app' || url.pathname.startsWith('/app/')) return handleApp(request, env);
     return env.ASSETS.fetch(request);
