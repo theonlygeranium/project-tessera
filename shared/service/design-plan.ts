@@ -107,7 +107,7 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
         { type: 'heading', level: 2, text: 'Start here' },
         { type: 'callout', tone: 'info', title: 'Before you begin', text: 'Find the course outline and note how to contact your instructor.' },
         { type: 'text', text: `Open the course outline to find each module and lesson. Work through the lessons in order, then review the draft assignments. Your instructor can be reached at ${contact}.\n\n[Your welcome and course navigation example]` },
-        { type: 'text', text: `Course outcomes:\n${session.plan.outcomes.map(o => `${o.code}: ${o.text}`).join('\n')}\n\n${(await ctx.repo.getInstructorProfile(session.createdBy))?.disclosureText ?? DEFAULT_AI_DISCLOSURE}\n\n[Your AI-use guidance]` },
+        { type: 'text', text: `Course outcomes:\n${session.plan.outcomes.map(o => `${o.code}: ${o.text}`).join('\n')}\n\n${(await ctx.repo.getInstructorProfile(session.createdBy))?.disclosureText ?? (await ctx.repo.getInstitution()).policy.defaultAiDisclosure ?? DEFAULT_AI_DISCLOSURE}\n\n[Your AI-use guidance]` },
         ...Array.from({ length: 5 }, (_, i) => ({ ...baseline, question: `Baseline ${i + 1}: ${baseline.type === 'check' ? baseline.question : planLesson.objective}` } as BlockContent)),
       ];
     } else {
@@ -189,7 +189,7 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
   previewProvisionPlan: async (ctx, { sessionId }) => {
     const session = await sessionFor(ctx, sessionId);
     if (session.stage !== 'preview') fail('invalid', 'Choose an approach first.');
-    const plan = buildPlan(session, await courseSnapshot(ctx, session.courseId), await ctx.repo.getInstructorProfile(session.createdBy));
+    const plan = buildPlan(session, await courseSnapshot(ctx, session.courseId), await ctx.repo.getInstructorProfile(session.createdBy), (await ctx.repo.getInstitution()).policy.defaultAiDisclosure);
     if (!await ctx.repo.saveDesignPreview(session.id, session.confirmedPoints ?? {}, plan, ctx.now())) fail('conflict', STALE);
     return plan;
   },
@@ -198,7 +198,7 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
     if ((session.stage === 'provisioning' || session.stage === 'review') && session.plan?.hash === hash) return session;
     if (session.stage !== 'preview') fail('conflict', STALE);
     await aiEnabled(ctx);
-    const plan = buildPlan(session, await courseSnapshot(ctx, session.courseId), await ctx.repo.getInstructorProfile(session.createdBy));
+    const plan = buildPlan(session, await courseSnapshot(ctx, session.courseId), await ctx.repo.getInstructorProfile(session.createdBy), (await ctx.repo.getInstitution()).policy.defaultAiDisclosure);
     if (plan.hash !== hash || session.plan?.hash !== hash || plan.courseId !== session.courseId) {
       const latest = await sessionFor(ctx, sessionId);
       if ((latest.stage === 'provisioning' || latest.stage === 'review') && latest.plan?.hash === hash) return latest;

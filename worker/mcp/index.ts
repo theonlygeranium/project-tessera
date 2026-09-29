@@ -18,6 +18,14 @@ const TOOLS: Tool[] = [
   { name: 'create_module', operation: 'createModule', description: 'Add a module to a course.', readOnly: false },
   { name: 'create_lesson', operation: 'createLesson', description: 'Add an unpublished lesson to a module.', readOnly: false },
   { name: 'get_lesson', operation: 'getLesson', description: 'Read a lesson and its blocks.', readOnly: true },
+  { name: 'design_session_create', operation: 'createDesignSession', description: 'Read a syllabus into a new design session after instructor consent.', readOnly: false },
+  { name: 'design_session_get', operation: 'getDesignSession', description: 'Read a syllabus design session and its review stage.', readOnly: true },
+  { name: 'design_session_answer', operation: 'answerDesignQuestions', description: 'Record the instructor answers for a design session.', readOnly: false },
+  { name: 'design_session_confirm', operation: 'confirmOutcomes', description: 'Confirm outcomes supplied by the instructor for a design session.', readOnly: false },
+  { name: 'design_session_select', operation: 'selectApproach', description: 'Select approaches and the instructor rationale.', readOnly: false },
+  { name: 'design_session_preview', operation: 'previewProvisionPlan', description: 'Preview the course draft change set and hash.', readOnly: true },
+  { name: 'design_session_apply', operation: 'applyProvisionPlan', description: 'Apply the confirmed plan as unpublished drafts.', readOnly: false },
+  { name: 'design_session_undo', operation: 'undoProvisionPlan', description: 'Undo untouched drafts from the plan, preserving human edits.', readOnly: false },
   { name: 'save_blocks', operation: 'saveBlocks', description: 'Save lesson blocks as content a person reviews before publication.', readOnly: false },
   { name: 'get_course_access', operation: 'getCourseAccess', description: 'Read a course accessibility report.', readOnly: true },
   { name: 'get_lesson_access', operation: 'getLessonAccess', description: 'Read a lesson accessibility report.', readOnly: true },
@@ -34,7 +42,8 @@ const TOOLS: Tool[] = [
 ];
 
 // D-003: agents cannot publish or unpublish lessons or assignments, keep or
-// revert AI blocks, grade or release grades, delete anything, manage tokens,
+// revert AI blocks, grade or release grades, delete course content outside
+// the bounded design-plan undo, manage tokens,
 // people or institution settings, or operate the tutor. People retain those decisions.
 
 const supported = new Set(['2025-06-18', '2025-03-26']);
@@ -102,7 +111,7 @@ async function processMessage(value: unknown, request: Request, env: Env, repo: 
       const schema = OPERATIONS[tool.operation].input;
       const inputSchema = schema.def.type === 'void' ? { type: 'object', properties: {} } : z.toJSONSchema(schema, { io: 'input' });
       const { $schema: _schema, ...shape } = inputSchema as Record<string, unknown>;
-      return { name: tool.name, description: tool.description, inputSchema: shape, annotations: { readOnlyHint: tool.readOnly, destructiveHint: false } };
+      return { name: tool.name, description: tool.description, inputSchema: shape, annotations: { readOnlyHint: tool.readOnly, destructiveHint: tool.operation === 'undoProvisionPlan' } };
     }) });
     case 'tools/call': {
       const params = message.params;

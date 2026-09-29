@@ -62,6 +62,7 @@ export interface AiPolicy {
   tutorModes: { graded: TutorMode[]; practice: TutorMode[] };
   workloadRates?: WorkloadRates;
   designPartner?: { enabled: boolean; allowedArchitectures: ArchitectureId[] | null };
+  defaultAiDisclosure?: string;
 }
 
 /** Brand accents an institution can pick. Each maps to a contrast-checked token set. */

@@ -74,3 +74,44 @@
 .dialogButton { min-height: 44px; padding: 8px 16px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
 .dialogButton:focus-visible, .previewGrid select:focus-visible { outline: 3px solid var(--focus); }
 @media (max-width: 950px) { .previewGrid, .previewNotes { grid-template-columns: minmax(0, 1fr); } }
+
+.reviewPanel { padding: 14px; gap: 12px; }
+.reviewPanel h2, .reviewPanel h3 { margin: 0; }
+.reviewSteps { display: grid; gap: 10px; padding-left: 22px; margin: 0; }
+.reviewSteps li { min-width: 0; }
+.reviewSteps li > span { display: block; margin-bottom: 5px; }
+.reviewMove { display: grid; gap: 6px; }
+.reviewMove select { width: 100%; min-height: 36px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.reviewAlternatives ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.reviewAlternatives li { padding: 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.reviewAlternatives p { overflow-wrap: anywhere; }
+.reviewPanel button { min-height: 32px; }
+
+.reviewOutline { min-width: 0; padding: 14px; background: var(--surface-sunk); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.reviewOutline h2 { margin: 0 0 12px; font: 500 18px/1.2 var(--font-display); }
+.reviewOutline h3 { margin: 12px 0 4px; font-size: 13px; overflow-wrap: anywhere; }
+.reviewOutline ul { list-style: none; margin: 0; padding: 0; }
+.reviewOutline li { display: grid; gap: 2px; padding: 5px 0; font-size: 12px; }
+.reviewOutline a { display: block; padding: 6px; border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.reviewOutline a[aria-current='page'] { background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
+.reviewOutline li span { color: var(--ink-3); padding-left: 6px; }
+/* Five-stage layout follows the artboards while allowing the app rail and 320px reflow. */
+.page { gap: 16px; }
+.columns { grid-template-columns: minmax(0, 2.1fr) minmax(310px, 1fr); gap: 20px; }
+.uploadCard { border: 1px dashed var(--line-dashed); background: var(--surface-sunk); text-align: center; justify-items: center; padding: 26px 22px; }
+.readSplit { grid-template-columns: minmax(280px, 300px) minmax(0, 1fr); }
+.profileWide { grid-column: 1 / -1; }
+.profileList dd { overflow-wrap: break-word; }
+.readSplit > .card { padding: 14px 16px; }
+.optionGrid { gap: 16px; }
+.previewGrid { gap: 20px; }
+@media (max-width: 950px) { .columns { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) {
+  .page { gap: 12px; }
+  .card { padding: 14px; }
+  .readSplit { grid-template-columns: minmax(0, 1fr); }
+  .profileList { grid-template-columns: minmax(0, 1fr); }
+  .previewGrid { grid-template-columns: minmax(0, 1fr); }
+  .previewGrid h1, .readToolbar h1 { font-size: 24px; }
+}
+@media (max-width: 700px) { .reviewOutline { max-height: 240px; overflow-y: auto; } }

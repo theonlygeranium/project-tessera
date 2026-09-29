@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fixtureAi } from '../ai';
 import { automaticCheck } from '../quality/evaluate';
 import { seedData } from '../seed';
+import sampleSyllabus from '../seed-syllabus.json';
 import type { ServiceContext } from './context';
 import { courseSnapshot } from './readiness';
 import { MemoryRepo, service } from './index';
@@ -31,6 +32,54 @@ async function finish(ctx: ServiceContext, sessionId: string) {
 }
 
 describe('syllabus provision plan', () => {
+  it('builds the seven-module B and C plan from the pasted demo syllabus', async () => {
+    const repo = new MemoryRepo(seedData()); let n = 0;
+    const ctx: ServiceContext = { repo, ai: fixtureAi, user: await repo.getUser('u-okafor'), now: () => '2026-09-28T12:00:00.000Z', newId: prefix => `${prefix}-paste-${++n}` };
+    const started = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: sampleSyllabus.sections.map(section => section.text).join('\n\n'), consent: { syllabusOnly: true, rememberProfile: false } });
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((item, index) => ({ code: `O${index + 1}`, text: item.text, originalText: item.text })) });
+    const options = await service.getDesignSession(ctx, { sessionId: started.id });
+    await service.selectApproach(ctx, { sessionId: started.id, optionIds: [options.options![1].id, options.options![2].id], overlays: ['bookends'], rationale: 'Apply each idea to a case, then reflect.' });
+    const plan = await service.previewProvisionPlan(ctx, { sessionId: started.id });
+    expect(plan.modules).toHaveLength(7);
+  });
+  it('builds seven draft modules from sample approaches B and C with bookends', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    session.selection = { optionIds: [session.options![1].id, session.options![2].id], overlays: ['bookends'], rationale: 'Case practice and a project fit these students.', combinationNote: null };
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    expect(plan.modules).toHaveLength(7);
+  });
+  it('exposes cited review guidance and exports the applied design record to the instructor', async () => {
+    const { ctx, sessionId } = await setup();
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash, leastSureModuleKey: plan.modules.find(module => module.leastSure)?.key });
+    const done = await finish(ctx, sessionId);
+    const outline = await service.getCourseOutline(ctx, { courseId: 'c-stat110' });
+    expect(outline.designSession).toEqual({ id: sessionId, stage: 'review' });
+    const student = { ...ctx, user: await ctx.repo.getUser('u-priya') };
+    expect((await service.getCourseOutline(student, { courseId: 'c-stat110', asLearner: true })).designSession).toBeUndefined();
+    const lessonId = done.planIds!.lessons[plan.modules.find(module => module.leastSure)!.lessons[0].key];
+    const detail = await service.getLesson(ctx, { lessonId });
+    expect(detail.design?.moduleWhy.text).toContain('Repeated practice fits this group.');
+    expect(detail.design?.nextSteps.some(step => step.action === 'add-example')).toBe(true);
+    expect(detail.blocks.filter(block => block.type === 'document' && /^Alternative opening [AB]$/.test(block.title))).toHaveLength(2);
+    const json = await service.exportDesignRecord(ctx, { sessionId, format: 'json' });
+    expect(JSON.parse(json.content).plan.hash).toBe(plan.hash);
+    const csv = await service.exportDesignRecord(ctx, { sessionId, format: 'csv' });
+    expect(csv.content.split('\r\n')[0]).toContain('source page or section');
+    expect(csv.content.split('\r\n')).toHaveLength(plan.modules.length + 2);
+    const blockId = detail.blocks.find(block => block.origin === 'ai' && block.aiState === 'draft')!.id;
+    await service.keepBlock(ctx, { blockId });
+    const keptRecord = await service.exportDesignRecord(ctx, { sessionId, format: 'json' });
+    expect(JSON.parse(keptRecord.content).decisions.some((decision: { what: string }) => decision.what.includes(`Kept block ${blockId}`))).toBe(true);
+    const undo = await service.undoProvisionPlan(ctx, { sessionId });
+    expect(undo.kept).toContainEqual(expect.objectContaining({ kind: 'block', id: blockId }));
+    expect(await ctx.repo.getBlock(blockId)).not.toBeNull();
+    await expect(service.exportDesignRecord(student, { sessionId, format: 'json' })).rejects.toMatchObject({ code: 'forbidden' });
+  });
   it('previews deterministically, places every graded component once, and refuses a stale hash', async () => {
     const { ctx, sessionId } = await setup();
     const a = await service.previewProvisionPlan(ctx, { sessionId });

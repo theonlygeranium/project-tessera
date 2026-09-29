@@ -65,7 +65,7 @@ function assignmentWeek(session: DesignSession, title: string, dueAt: string | n
 function sourceSpans(session: DesignSession, module: PlanModule): SourceSpan[] {
   return (session.extraction?.schedule ?? []).filter(row => row.span && module.lessons.some(lesson => lesson.week !== null && coveredWeeks(row).includes(lesson.week))).map(row => row.span!);
 }
-export function previewProvisionPlan(session: DesignSession, snapshot: CourseSnapshot, instructorProfile: InstructorProfile | null = null): ProvisionPlan {
+export function previewProvisionPlan(session: DesignSession, snapshot: CourseSnapshot, instructorProfile: InstructorProfile | null = null, defaultDisclosure = DEFAULT_AI_DISCLOSURE): ProvisionPlan {
   if (!session.selection || !session.options || !session.confirmedOutcomes || !session.extraction) throw Error('Choose an approach and confirm outcomes first.');
   const selected = session.selection.optionIds.map(id => session.options!.find(option => option.id === id)).filter((v): v is StructureOption => !!v);
   if (!selected.length) throw Error('The selected approach is unavailable.');
@@ -153,7 +153,7 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
     const contact = session.extraction.profile.instructor.value?.email || session.extraction.profile.instructor.value?.officeHours || 'Contact your instructor through the course message tool.';
     planned.blocks[startLesson.key] = [
       `Open the course outline to find each module and lesson. Work through the lessons in order, then review the draft assignments. Your instructor can be reached at ${contact}.\n\n[Your welcome and course navigation example]`,
-      `Course outcomes:\n${outcomes.map(o => `${o.code}: ${o.text}`).join('\n')}\n\n${instructorProfile?.disclosureText ?? DEFAULT_AI_DISCLOSURE}\n\n[Your AI-use guidance]`,
+      `Course outcomes:\n${outcomes.map(o => `${o.code}: ${o.text}`).join('\n')}\n\n${instructorProfile?.disclosureText ?? defaultDisclosure}\n\n[Your AI-use guidance]`,
     ].map((text, position) => ({ id: `forecast-start-${position}`, lessonId: startLesson.key, position, type: 'text', text, origin: 'ai', aiState: 'draft', provenance: null, previous: null, updatedAt: session.updatedAt } as Block));
   }
   for (const module of modules) for (const lesson of module.lessons) {
@@ -170,5 +170,5 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
   }
   const readinessForecast = (Object.keys(AUTOMATIC_CHECKS) as (keyof typeof AUTOMATIC_CHECKS)[]).map(check => ({ check, expected: automaticCheck(planned, check).status === 'met' ? 'met' as const : 'not-met' as const }));
   const plan = { sessionId: session.id, courseId: session.courseId, outcomes, modules, readings, placeholders, counts, summary, template: template ? { name: template.name, satisfied, missing } : null, readinessForecast };
-  return { ...plan, hash: stableHash({ plan, confirmedPoints: session.confirmedPoints ?? {}, instructorDisclosure: instructorProfile?.disclosureText ?? DEFAULT_AI_DISCLOSURE, existing: { course: snapshot.course, modules: snapshot.modules, lessons: snapshot.lessons, blocks: snapshot.blocks, assignments: snapshot.assignments, outcomes: snapshot.outcomes, links: snapshot.outcomeLinks, access: snapshot.access, template: snapshot.template?.updatedAt } }) };
+  return { ...plan, hash: stableHash({ plan, confirmedPoints: session.confirmedPoints ?? {}, instructorDisclosure: instructorProfile?.disclosureText ?? defaultDisclosure, existing: { course: snapshot.course, modules: snapshot.modules, lessons: snapshot.lessons, blocks: snapshot.blocks, assignments: snapshot.assignments, outcomes: snapshot.outcomes, links: snapshot.outcomeLinks, access: snapshot.access, template: snapshot.template?.updatedAt } }) };
 }

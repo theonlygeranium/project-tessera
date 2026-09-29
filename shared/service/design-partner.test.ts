@@ -19,6 +19,22 @@ const sample = { courseId: 'c-stat110', sourceKind: 'syllabus' as const, sample:
 const file: FileRecord = { id: 'f-test', courseId: 'c-stat110', name: 'Syllabus.pdf', kind: 'pdf', mime: 'application/pdf', size: 100, key: 'files/test', version: 1, uploadedBy: 'u-okafor', uploadedAt: at, scan: null };
 
 describe('design partner service', () => {
+  it('persists institution design controls and applies them to new sessions', async () => {
+    const ctx = await context();
+    const institution = await ctx.repo.getInstitution();
+    const policy = { ...institution.policy, designPartner: { enabled: false, allowedArchitectures: ['project' as const] }, workloadRates: { readingPagesPerHour: 25, problemSetHours: 3, writingHoursPerPage: 2, projectHours: 35, quizMinutes: 15, discussionMinutes: 30 }, defaultAiDisclosure: 'Our instructor reviews each draft before learners see it.' };
+    await service.updatePolicy({ ...ctx, user: await ctx.repo.getUser('u-admin') }, policy);
+    await expect(service.createDesignSession(ctx, sample)).rejects.toMatchObject({ code: 'ai-disabled' });
+    await service.updatePolicy({ ...ctx, user: await ctx.repo.getUser('u-admin') }, { ...policy, designPartner: { ...policy.designPartner, enabled: true } });
+    const started = await service.createDesignSession(ctx, sample);
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    expect(read.read?.workload.rates).toEqual(policy.workloadRates);
+    await service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((outcome, index) => ({ code: `O${index + 1}`, text: outcome.text, originalText: outcome.text })) });
+    const options = await service.getDesignSession(ctx, { sessionId: started.id });
+    expect(options.options?.map(option => option.id)).toEqual(['project']);
+    expect((await ctx.repo.getInstitution()).policy.defaultAiDisclosure).toBe(policy.defaultAiDisclosure);
+  });
   it('requires the instructor, consent, and enabled policy', async () => {
     const ctx = await context();
     await expect(service.createDesignSession({ ...ctx, user: await ctx.repo.getUser('u-priya') }, sample)).rejects.toMatchObject({ code: 'forbidden' });

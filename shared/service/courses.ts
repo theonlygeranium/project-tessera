@@ -47,7 +47,8 @@ export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseO
       }
       out.push({ ...m, lessons: summaries });
     }
-    return { course: await summary(ctx, c, asLearner), modules: out };
+    const designSession = learnerView ? undefined : (await ctx.repo.listDesignSessions(courseId)).find(session => session.stage === 'review');
+    return { course: await summary(ctx, c, asLearner), modules: out, ...(!learnerView && designSession ? { designSession: { id: designSession.id, stage: designSession.stage } } : {}) };
   },
   updateCourse: async (ctx, input) => {
     const c = await canReachCourse(ctx, input.courseId);

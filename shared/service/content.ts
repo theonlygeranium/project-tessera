@@ -1,6 +1,6 @@
 import { logError } from './log';
 import { ApiError } from '../api';
-import type { Block, BlockContent, LessonDetail } from '../domain';
+import type { Block, BlockContent, LessonDetail, SourceSpan } from '../domain';
 import { lessonReadiness } from '../policy';
 import { lessonAccessReport } from '../access/blocks';
 import { policyBlocks } from '../access/score';
@@ -13,7 +13,27 @@ import { readiness } from './readiness';
 async function detail(ctx: ServiceContext, lessonId: string): Promise<LessonDetail> {
   const lesson = await lessonFor(ctx, lessonId), module = await moduleFor(ctx, lesson.moduleId), course = await canReachCourse(ctx, lesson.courseId);
   const blocks = await ctx.repo.listBlocks(lessonId);
-  return { lesson, moduleTitle: module.title, courseTitle: course.title, blocks, readiness: lessonReadiness(blocks) };
+  const detail: LessonDetail = { lesson, moduleTitle: module.title, courseTitle: course.title, blocks, readiness: lessonReadiness(blocks) };
+  const sessions = await ctx.repo.listDesignSessions(course.id);
+  const session = sessions.find(item => item.stage === 'review' && item.plan && Object.values(item.planIds?.lessons ?? {}).includes(lessonId));
+  const planned = session?.plan?.modules.find(item => session.planIds?.modules[item.key] === module.id);
+  if (session && planned) {
+    const selected = session.selection?.optionIds.map(id => session.options?.find(option => option.id === id)).filter((option): option is NonNullable<typeof option> => !!option) ?? [];
+    const weeks = new Set(planned.lessons.map(item => item.week).filter((week): week is number => week !== null));
+    const cites: SourceSpan[] = [...(session.extraction?.schedule.filter(row => weeks.has(row.week) && row.span).map(row => row.span!) ?? []), ...selected.flatMap(option => option.fits.map(fit => fit.span).filter((span): span is SourceSpan => !!span))].filter((span, index, all) => all.findIndex(other => other.page === span.page && other.section === span.section && other.text === span.text) === index);
+    const nextSteps: NonNullable<LessonDetail['design']>['nextSteps'] = [];
+    const reading = blocks.find(block => block.type === 'callout' && block.text.includes('[Reading to select]'));
+    if (reading) nextSteps.push({ text: 'Choose the reading. A placeholder was left rather than inventing one.', action: 'choose-reading', target: { kind: 'block', lessonId, blockId: reading.id } });
+    const example = blocks.find(block => block.type === 'text' && /\[Your\s+[^\]]+\]/i.test(block.text));
+    if (example) nextSteps.push({ text: 'Add your example in the lesson draft.', action: 'add-example', target: { kind: 'block', lessonId, blockId: example.id } });
+    if (planned.overlaps) nextSteps.push({ text: `Your module “${planned.overlaps.title}” overlaps this topic. Move a lesson in if it belongs here; your content stays unchanged.`, action: 'move-lesson', target: { kind: 'module', moduleId: planned.overlaps.moduleId } });
+    for (const replacement of (planned.assignments?.length ? planned.assignments : planned.assignment ? [planned.assignment] : []).filter(item => item.replaces)) {
+      const assignmentId = session.planIds?.assignments[replacement.key];
+      if (assignmentId) nextSteps.push({ text: `Confirm the weight for ${replacement.title}, which replaces ${replacement.replaces}.`, action: 'confirm-weight', target: { kind: 'assignment', assignmentId } });
+    }
+    detail.design = { moduleWhy: { text: `This module supports the objective “${planned.objective}”. You chose this structure because: ${session.selection?.rationale ?? 'Review how this module fits your students.'}`, cites, frameworks: [...new Set(selected.flatMap(option => option.frameworks))] }, nextSteps };
+  }
+  return detail;
 }
 function metadata(b: Block) {
   return { id: b.id, lessonId: b.lessonId, position: b.position, origin: b.origin, aiState: b.aiState, provenance: b.provenance, previous: b.previous, updatedAt: b.updatedAt, source: b.source, templateKey: b.templateKey };
@@ -21,6 +41,16 @@ function metadata(b: Block) {
 async function blockForTeaching(ctx: ServiceContext, blockId: string): Promise<Block> {
   const b = await ctx.repo.getBlock(blockId) ?? fail('not-found', 'Block not found.');
   await teachLesson(ctx, b.lessonId); return b;
+}
+async function recordDesignDecision(ctx: ServiceContext, block: Block, decision: string): Promise<void> {
+  const lesson = await ctx.repo.getLesson(block.lessonId);
+  if (!lesson) return;
+  const sessions = await ctx.repo.listDesignSessions(lesson.courseId);
+  for (const session of sessions.filter(item => item.created.blockIds.includes(block.id))) {
+    session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `${decision} block ${block.id} in lesson ${block.lessonId}.` });
+    session.updatedAt = ctx.now();
+    await ctx.repo.putDesignSession(session);
+  }
 }
 export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBlock' | 'revertBlock' | 'regenerateBlock' | 'publishLesson' | 'unpublishLesson'> = {
   getLesson: async (ctx, { lessonId }) => {
@@ -52,7 +82,7 @@ export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBl
   keepBlock: async (ctx, { blockId }) => {
     const b = await blockForTeaching(ctx, blockId);
     if (b.origin !== 'ai' || b.aiState !== 'draft') fail('invalid', 'Only an AI draft can be kept.');
-    b.aiState = 'kept'; b.previous = null; b.updatedAt = ctx.now(); await ctx.repo.putBlock(b); return detail(ctx, b.lessonId);
+    b.aiState = 'kept'; b.previous = null; b.updatedAt = ctx.now(); await ctx.repo.putBlock(b); await recordDesignDecision(ctx, b, 'Kept'); return detail(ctx, b.lessonId);
   },
   revertBlock: async (ctx, { blockId }) => {
     const b = await blockForTeaching(ctx, blockId);
@@ -62,6 +92,7 @@ export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBl
       const previous = b.previous;
       await ctx.repo.putBlock({ ...metadata(b), ...previous, previous: null, aiState: 'draft', updatedAt: ctx.now() } as Block);
     }
+    await recordDesignDecision(ctx, b, 'Reverted');
     return detail(ctx, b.lessonId);
   },
   regenerateBlock: async (ctx, { blockId, instruction }) => {

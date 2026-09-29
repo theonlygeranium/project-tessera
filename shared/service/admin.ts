@@ -18,7 +18,9 @@ export const admin: Pick<Service, 'updateInstitution' | 'updatePolicy' | 'getOve
   },
   updatePolicy: async (ctx, input) => {
     const institution = await ctx.repo.getInstitution();
-    institution.policy = { aiAuthoring: input.aiAuthoring, tutorModes: normalizePolicyModes(input.tutorModes.graded, input.tutorModes.practice) };
+    if (input.designPartner?.allowedArchitectures?.length === 0) fail('invalid', 'Allow at least one design approach.');
+    if (input.workloadRates && Object.values(input.workloadRates).some(value => !Number.isFinite(value) || value <= 0 || value > 1000)) fail('invalid', 'Workload rates must be positive numbers.');
+    institution.policy = { aiAuthoring: input.aiAuthoring, tutorModes: normalizePolicyModes(input.tutorModes.graded, input.tutorModes.practice), workloadRates: input.workloadRates, designPartner: input.designPartner, defaultAiDisclosure: input.defaultAiDisclosure };
     await ctx.repo.putInstitution(institution); return institution;
   },
   getOverview: async ctx => {

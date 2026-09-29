@@ -47,5 +47,12 @@ function UndoPlan({ session, label = 'Undo everything this plan added' }: { sess
 }
 
 export function DraftReady({ session }: { session: DesignSession }) {
-  return <section className={styles.card}><h1>Your draft course is ready: open the course outline</h1><p>{session.plan?.counts.lessons ?? 0} lessons were added as drafts. Review each before publishing.</p><Link to={paths.teach.course(session.courseId)}>Open the course outline</Link>{session.provisioning?.error && <StatusNotice tone="error">{session.provisioning.error}</StatusNotice>}<UndoPlan session={session} /></section>;
+  const exportRecord = useApiMutation('exportDesignRecord');
+  const download = async (format: 'json' | 'csv') => {
+    const result = await exportRecord.mutateAsync({ sessionId: session.id, format });
+    const url = URL.createObjectURL(new Blob([result.content], { type: format === 'json' ? 'application/json' : 'text/csv' }));
+    const link = document.createElement('a'); link.href = url; link.download = `design-record-${session.id}.${format}`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return <section className={styles.card}><h1>Your draft course is ready: open the course outline</h1><p>{session.plan?.counts.lessons ?? 0} lessons were added as drafts. Review each before publishing.</p><Link to={paths.teach.course(session.courseId)}>Open the course outline</Link><div className={styles.actions}><Button onClick={() => void download('json')} disabled={exportRecord.isPending}>Download design record (JSON)</Button><Button onClick={() => void download('csv')} disabled={exportRecord.isPending}>Download course map (CSV)</Button></div>{exportRecord.error && <StatusNotice tone="error">{exportRecord.error.message}</StatusNotice>}{session.provisioning?.error && <StatusNotice tone="error">{session.provisioning.error}</StatusNotice>}<UndoPlan session={session} /></section>;
 }

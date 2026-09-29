@@ -256,7 +256,9 @@ async function advanceOptionsJob(ctx: ServiceContext, job: GenerationJob): Promi
   }
 }
 
-export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSession' | 'listDesignSessions' | 'answerDesignQuestions' | 'contestDesignField' | 'updateDesignRates' | 'confirmOutcomes' | 'suggestDesignOutcomes' | 'retryDesignOptions' | 'selectApproach' | 'getInstructorProfile' | 'updateInstructorProfile'> = {
+const csvCell = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+
+export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSession' | 'listDesignSessions' | 'answerDesignQuestions' | 'contestDesignField' | 'updateDesignRates' | 'confirmOutcomes' | 'suggestDesignOutcomes' | 'retryDesignOptions' | 'selectApproach' | 'exportDesignRecord' | 'getInstructorProfile' | 'updateInstructorProfile'> = {
   createDesignSession: async (ctx, input) => {
     await canTeach(ctx, input.courseId);
     await aiEnabled(ctx);
@@ -321,7 +323,7 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     session.updatedAt = ctx.now();
     if (session.consent.rememberProfile && session.teachingNote) {
       const existing = await ctx.repo.getInstructorProfile(user(ctx).id);
-      await ctx.repo.putInstructorProfile({ userId: user(ctx).id, teachingApproach: session.teachingNote, voice: existing?.voice ?? '', assessmentPreferences: existing?.assessmentPreferences ?? { formativeEveryModule: false, prefers: [] }, disclosureText: existing?.disclosureText ?? DEFAULT_AI_DISCLOSURE, updatedAt: ctx.now() });
+      await ctx.repo.putInstructorProfile({ userId: user(ctx).id, teachingApproach: session.teachingNote, voice: existing?.voice ?? '', assessmentPreferences: existing?.assessmentPreferences ?? { formativeEveryModule: false, prefers: [] }, disclosureText: existing?.disclosureText ?? (await ctx.repo.getInstitution()).policy.defaultAiDisclosure ?? DEFAULT_AI_DISCLOSURE, updatedAt: ctx.now() });
     }
     await ctx.repo.putDesignSession(session);
     return session;
@@ -413,6 +415,23 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     session.stage = 'preview'; session.updatedAt = ctx.now();
     await ctx.repo.putDesignSession(session);
     return session;
+  },
+  exportDesignRecord: async (ctx, { sessionId, format }) => {
+    const session = await sessionFor(ctx, sessionId);
+    if (format === 'json') return { format, content: JSON.stringify(session.record, null, 2) };
+    const plan = session.record.plan;
+    const headings = ['module', 'objective', 'outcomes', 'lessons', 'assessment', 'hours', 'source page or section'];
+    const rows = plan?.modules.map(module => {
+      const weeks = new Set(module.lessons.map(lesson => lesson.week).filter((week): week is number => week !== null));
+      const spans = [
+        ...(session.extraction?.schedule.filter(row => weeks.has(row.week) && row.span).map(row => row.span!) ?? []),
+        ...(module.key === 'start-here' ? session.extraction?.profile.instructor.spans ?? [] : []),
+        ...(session.extraction?.outcomes.filter(outcome => outcome.span && module.outcomeCodes.some(code => plan.outcomes.find(item => item.code === code)?.text === outcome.text)).map(outcome => outcome.span!) ?? []),
+      ];
+      const sources = [...new Set(spans.map(span => span.page ? `p. ${span.page}` : span.section ? `§ ${span.section}` : '').filter(Boolean))];
+      return [module.title, module.objective, module.outcomeCodes.join('; '), module.lessons.map(lesson => lesson.title).join('; '), (module.assignments?.length ? module.assignments : module.assignment ? [module.assignment] : []).map(item => item.title).join('; '), module.hours, sources.join('; ')];
+    }) ?? [];
+    return { format, content: [headings, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n' };
   },
   getInstructorProfile: async ctx => ctx.repo.getInstructorProfile(user(ctx).id),
   updateInstructorProfile: async (ctx, input) => { const profile = { ...input, userId: user(ctx).id, updatedAt: ctx.now() }; await ctx.repo.putInstructorProfile(profile); return profile; },
