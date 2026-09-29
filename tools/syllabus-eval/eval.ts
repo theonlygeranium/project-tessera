@@ -212,7 +212,7 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
       const totalPoints = graded.reduce((n, g) => n + g.items.reduce((k, a) => k + a.points, 0), 0);
       const content = graded.filter(g => !/^(start here|wrap-up)$/i.test(g.m.title));
       const lastShare = totalPoints ? (content.at(-1)?.items.reduce((k, a) => k + a.points, 0) ?? 0) / totalPoints : 0;
-      const recurring = components.filter(a => /\(\d+\)|weekly|each week|labs?\b|checkpoints|discussions|quizzes|homework/i.test(a.title));
+      const recurring = components.filter(a => /\(\s*\d+\s*\)|\d+\s*@\s*\d+|weekly|each week|labs?\b|checkpoints|discussions|quizzes|homework/i.test(a.title));
       const split = recurring.filter(a => graded.flatMap(g => g.items).filter(i => i.replaces === a.title).length >= 2);
       checks.push({ id: 'P7', pass: lastShare <= 0.5 && split.length === recurring.length,
         detail: `last content module holds ${Math.round(lastShare * 100)}% of graded points; recurring components split ${split.length}/${recurring.length}; graded assignments ${graded.flatMap(g => g.items).length}` });
