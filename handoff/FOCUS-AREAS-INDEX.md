@@ -1,6 +1,6 @@
 # Focus areas index: build specs from the LMS gap research
 
-*Status: approved by owner for build planning (2026-09-28); proposed decisions still await owner ruling. Drafted by the assistant chief strategist for the owner and Claude Code. Research: `research/lms-best-practices-gaps-2026-09-28.md` (the gap report). Gradebook mockups (approved by owner 2026-09-28): `design/explorations/gradebook/`. Nothing here has been built or claimed: no migration or journey numbers are taken, and every decision below is a proposal until the owner rules on it.*
+*Status: approved by owner for build planning (2026-09-28); D-045, D-046, D-048 and D-052 approved by owner 2026-09-28; the other proposed decisions still await owner ruling. Drafted by the assistant chief strategist for the owner and Claude Code. Research: `research/lms-best-practices-gaps-2026-09-28.md` (the gap report). Gradebook mockups (approved by owner 2026-09-28): `design/explorations/gradebook/`. Nothing here has been built or claimed: no migration or journey numbers are taken, and every decision below is a proposal until the owner rules on it (the register in §4 marks the ones approved).*
 
 This page is the map for the ten focus areas: the research ranking, one paragraph per spec, how the specs depend on each other, every proposed decision in one register, and a recommended build order.
 
@@ -25,7 +25,7 @@ This page is the map for the ten focus areas: the research ranking, one paragrap
 
 ## 2. The specs in one paragraph each
 
-**1. Interoperability (`INTEROP-LTI-SPEC.md`, D-045 to D-052).** Tessera becomes an LTI 1.3 tool with dynamic registration, Deep Linking, NRPS rosters and AGS grade return for released grades; administrators get OneRoster 1.2 CSV import with a dry run; instructors can add SCORM 1.2 and cmi5 packages as a block played from an isolated origin, with a minimal xAPI store; an Integrations page shows every sync error with its cause, resolution and a retry (backlog #26). It proposes superseding decisions for identity (D-045 over D-021 and D-014's sign-in line), for LTI routes outside Cloudflare Access with a tool session (D-046, amending D-014 and D-020), and for SSO with just-in-time provisioning through Access (D-052). No code before the owner approves those.
+**1. Interoperability (`INTEROP-LTI-SPEC.md`, D-045 to D-052).** Tessera becomes an LTI 1.3 tool with dynamic registration, Deep Linking, NRPS rosters and AGS grade return for released grades; administrators get OneRoster 1.2 CSV import with a dry run; instructors can add SCORM 1.2 and cmi5 packages as a block played from an isolated origin, with a minimal xAPI store; an Integrations page shows every sync error with its cause, resolution and a retry (backlog #26). It proposes superseding decisions for identity (D-045 over D-021 and D-014's sign-in line), for LTI routes outside Cloudflare Access with a tool session (D-046, amending D-014 and D-020), and for SSO with just-in-time provisioning through Access (D-052). No code before the owner approves those. *(Approved by owner 2026-09-28, with D-048; the Access bypass itself still needs the owner's OK when it is made.)*
 
 **2. Gradebook (`GRADEBOOK-SPEC.md`, D-039 to D-044).** Written separately. The other specs assume it provides one grade engine, release and held states, missing, late and excused handling, accommodations, a student "how this was calculated" view with exact what-if, grade-by-question, and export. See that spec for its decisions and mockups.
 
@@ -75,19 +75,19 @@ Shared building blocks: Night 4's `ChangeSetTable` (used by specs 1, 3, 4, 9); t
 
 ## 4. Proposed decision register
 
-Numbering: D-039 to D-044 are reserved for the gradebook spec. This set starts at D-045. None is written into `design/DECISIONS.md`; each goes there only after the owner approves it (PARALLEL-AGENTS §5).
+Numbering: D-039 to D-044 are reserved for the gradebook spec. This set starts at D-045. None is written into `design/DECISIONS.md`; each goes there only after the owner approves it (PARALLEL-AGENTS §5). *(2026-09-28: D-045, D-046, D-048 and D-052 approved by owner and written into `design/DECISIONS.md`.)*
 
 | ID | Spec | Decision (short) | Relation to existing decisions | Why the owner specifically |
 |---|---|---|---|---|
 | D-039 to D-044 | 2 | See `GRADEBOOK-SPEC.md` | | |
-| **D-045** | 1 | Identity v2: one user, several linked identities (Access email, LTI) | **Supersedes** D-021's "Access is the identity provider" and D-014's sign-in line | Changes a settled identity decision |
-| **D-046** | 1 | `/lti/*` and `/embed/*` outside Access; tool session as a third API credential | **Amends** D-014 (Access guards `/app`) and D-020 (credential list) | Cloudflare Access change; security boundary |
+| **D-045** | 1 | *Approved by owner 2026-09-28.* Identity v2: one user, several linked identities (Access email, LTI) | **Supersedes** D-021's "Access is the identity provider" and D-014's sign-in line | Changes a settled identity decision |
+| **D-046** | 1 | *Approved by owner 2026-09-28.* `/lti/*` and `/embed/*` outside Access; tool session as a third API credential | **Amends** D-014 (Access guards `/app`) and D-020 (credential list) | Cloudflare Access change; security boundary |
 | D-047 | 1 | LTI tool first (Core, Deep Linking, AGS, NRPS, dynamic registration); platform mode out | New | Scope; certification cost later |
-| **D-048** | 1 | Provisioning by (platform, sub); email only suggests links; LIS role mapping | New | Account-takeover risk trade-off |
+| **D-048** | 1 | *Approved by owner 2026-09-28.* Provisioning by (platform, sub); email only suggests links; LIS role mapping | New | Account-takeover risk trade-off |
 | D-049 | 1 | OneRoster 1.2 CSV is the SIS MVP | New | |
 | **D-050** | 1 | SCORM 1.2 and cmi5 as a `package` block on an isolated content origin | New | DNS and Worker route change; possible `blocks.type` rebuild |
 | D-051 | 1 | AGS passback of released grades only | Builds on D-003-style release discipline and `GRADEBOOK-SPEC.md` | |
-| **D-052** | 1 | SSO through Access plus just-in-time provisioning for allow-listed domains | **Supersedes** D-021's invite-only rule for those domains | Changes a settled identity decision |
+| **D-052** | 1 | *Approved by owner 2026-09-28.* SSO through Access plus just-in-time provisioning for allow-listed domains | **Supersedes** D-021's invite-only rule for those domains | Changes a settled identity decision |
 | D-053 | 3 | A quiz is a kind of assignment | Keeps D-002 | Possible `submission_type` rebuild |
 | D-054 | 3 | Versioned banks at course, program, institution scope; six item types; draw sections | New | |
 | D-055 | 3 | QTI 2.1 import and export in the MVP | New | |
@@ -134,7 +134,7 @@ Bold rows need the owner's attention before any related code starts.
 ## 5. Recommended build order (waves)
 
 **Wave 0: decisions and preconditions (no product code).**
-- The owner decides the bold rows above, starting with identity (D-045, D-046, D-048, D-052) and the gradebook decisions.
+- The owner decides the bold rows above, starting with identity (D-045, D-046, D-048, D-052) and the gradebook decisions. *(Identity decisions D-045, D-046, D-048 and D-052 approved by owner 2026-09-28.)*
 - `night4` merges to `main`.
 - One read-only check of `migrations/0002_night2.sql` and `0003_block_types.sql` for `CHECK` lists on `assignments.submission_type`, `blocks.type`, `requirements.audience` and `completion_events.kind`. That decides whether specs 1, 3 and 4 can add types additively on the shared preview database.
 - One owner decision covering Cron Triggers, any KV or Durable Object binding, the content-origin hostname and the Access bypass.

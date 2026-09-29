@@ -257,3 +257,32 @@ Approved 2026-09-27 (#50 D5). Plain-language and micro-path (at most 15 minutes)
 
 ### D-029 · Readiness and publishing
 Approved 2026-09-27 (#50 D6). The rubric result is advisory by default; an administrator can require a minimum result to publish, enforced by the server like the accessibility policy (D-022).
+
+### D-045 · Identity v2: one Tessera user, several linked identities
+Supersedes in part D-021 ("Cloudflare Access is the identity provider") and D-014's sign-in line; the rest of D-021 (invitations through an Access group, the persona picker and "View as") stands, and D-014's remaining points stand. Tessera must be usable inside an institution's existing LMS through LTI 1.3 (`handoff/INTEROP-LTI-SPEC.md` §1), where the LMS, not Access, vouches for the person. Approved by owner 2026-09-28.
+**Decision:**
+- A Tessera user can have **several linked identities**: an Access identity (the email in the Access JWT, as today) and one LTI identity per platform (`iss` and `sub`, stored as `platformId|sub`). Identities live in a new `user_identities` table.
+- The Worker resolves a request to a user from either an **Access JWT** (as today) or a **Tessera tool session** (D-046), in `worker/identity/`.
+- Tessera still stores **no passwords**. The persona picker in mock mode and "View as" for administrators stay as in D-021.
+
+### D-046 · LTI routes outside Access; the tool session as a third credential
+Supersedes in part D-014 (Cloudflare Access guards `/app` and the rest of the app) and D-020 (the API accepts an Access JWT or a token). An LTI launch arrives from the institution's LMS inside a frame, where Access sign-in can't run. Approved by owner 2026-09-28; the Cloudflare Access change it needs is approved separately, when it is made.
+**Decision:**
+- **`/lti/*` and `/embed/*` sit outside Cloudflare Access.** They are protected by LTI message verification instead: the platform's JWKS, `nonce`, `state`, `aud`, and the deployment id. `/app/*` stays behind Access.
+- A verified launch mints a **Tessera tool session**: a short-lived bearer token held in page memory (never in a URL or local storage), with a `Partitioned; SameSite=None; Secure; HttpOnly` cookie as a fallback. It is stored hashed.
+- The API accepts a **third credential**, the tool session, alongside the Access JWT and scoped tokens (D-020). A tool session is limited to the one launched course and the role the launch established.
+- The Access bypass rule for `/lti/*` and `/embed/*` on production and previews is a Cloudflare Access change and needs the owner's explicit OK before anyone makes it (PARALLEL-AGENTS §6).
+
+### D-048 · LTI provisioning and linking rules
+New. A platform can assert any email, so email alone must never decide who a launch signs in as. Approved by owner 2026-09-28.
+**Decision:**
+- A first launch provisions a user keyed by **(`platformId`, `sub`)**, never by email alone.
+- An email that matches an existing Tessera user only **suggests a link**; an administrator confirms it. Until then, the launch uses its own LTI-keyed user.
+- **LIS role mapping:** `Instructor`, `TeachingAssistant` and `ContentDeveloper` → instructor for the linked course only; `Learner` → student; the institution role `Administrator` → no automatic Tessera admin. There is no TA role; the role union is unchanged.
+
+### D-052 · Institutional SSO through Access, with just-in-time provisioning
+Supersedes in part D-021 (invitation is the only way in) for allow-listed domains; D-021's use of Access for SSO stands. Institutions that run Tessera directly need their people to sign in with the institution's own identity provider without an invitation per person. Approved by owner 2026-09-28.
+**Decision:**
+- Institutional SSO for direct use **stays in Cloudflare Access** (a SAML or OIDC identity provider configured per institution in Access). Tessera doesn't implement SAML itself in the MVP.
+- **Just-in-time provisioning** for allow-listed email domains: the first Access sign-in from an allow-listed domain creates the user with the default role **student**. Institution setting `sso: { domains: string[]; defaultRole: 'student' }`.
+- Instructors and administrators are still invited or promoted by an administrator. SCIM is later.

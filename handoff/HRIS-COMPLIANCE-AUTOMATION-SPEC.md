@@ -1,6 +1,6 @@
 # Build spec: HRIS-driven compliance automation
 
-*Status: approved by owner for build planning (2026-09-28); proposed decisions still await owner ruling. Decisions D-085 to D-089 below are proposals; they extend D-026 and D-027 and supersede none. **Sequenced after the identity decisions in `handoff/INTEROP-LTI-SPEC.md` (D-045, D-048, D-052)**, because HRIS records must attach to users by the same linking rules. Research: `research/lms-best-practices-gaps-2026-09-28.md` (the gap report; §2.5, §2.7, §3 rank 9, §6.1, §6.2 item 5, §7 area 9). Builds on required training, test-out, certificates, completion events and managers (Night 3: `shared/service/training.ts`, `shared/service/managers.ts`). Related: `handoff/ANALYTICS-COMPLIANCE-REPORTING-SPEC.md` (as-of reports). Artboard: `design/canvas/AssignmentRules.dc.html` proposed (§8).*
+*Status: approved by owner for build planning (2026-09-28); proposed decisions still await owner ruling. Decisions D-085 to D-089 below are proposals; they extend D-026 and D-027 and supersede none. **Sequenced after the identity decisions in `handoff/INTEROP-LTI-SPEC.md` (D-045, D-048, D-052; approved by owner 2026-09-28)**, because HRIS records must attach to users by the same linking rules. Research: `research/lms-best-practices-gaps-2026-09-28.md` (the gap report; §2.5, §2.7, §3 rank 9, §6.1, §6.2 item 5, §7 area 9). Builds on required training, test-out, certificates, completion events and managers (Night 3: `shared/service/training.ts`, `shared/service/managers.ts`). Related: `handoff/ANALYTICS-COMPLIANCE-REPORTING-SPEC.md` (as-of reports). Artboard: `design/canvas/AssignmentRules.dc.html` proposed (§8).*
 
 This document is written for the implementing agent. It assumes `CLAUDE.md`, `AGENTS.md`, `handoff/PARALLEL-AGENTS.md`, `design/DECISIONS.md`, `handoff/NIGHT-3-PLAN.md` §3.4 and the interop spec are known. Where it says "as today", the existing code is the reference and must not be rewritten.
 
@@ -170,7 +170,7 @@ None. (A later helper that turns a plain sentence into a rule would produce a dr
 5. **Definition of done:** CLAUDE.md full lane; preview D1 migrated first; owner reviews the rules artboard before build; the owner merges.
 
 ## 11. Milestones (suggested worktrees; Sol implements, Astra reviews, Claude verifies and commits)
-0. **Gate:** spec 1 D-045 and D-048 approved and `interop/identity` merged; D-085 to D-089 approved.
+0. **Gate:** spec 1 D-045 and D-048 approved (done: approved by owner 2026-09-28) and `interop/identity` merged; D-085 to D-089 approved.
 1. `compliance/hr-records` in `../tessera-compliance-hr`: records, map, CSV preview and apply, push API, linking.
 2. `compliance/rules`: rule model, preview, activation, due rules, recurrence, learner reason line.
 3. `compliance/sync`: nightly sync, transfers, removals queue, leave and termination (Astra review: state changes on people).
