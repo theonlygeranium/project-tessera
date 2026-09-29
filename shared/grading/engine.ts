@@ -1,26 +1,90 @@
 import type { CalcInput, CalcItem, CalculationTrace, CellState, GradeCategory, TraceCategory, TraceCode, TraceItem, TraceReason, TraceStep } from './types';
-import { R, Rational, ZERO, sum } from './rational';
+import { R as exactR, Rational, ZERO, sum } from './rational';
 import { compareDropCandidate, selectJointDrops, type DropCandidate, type DropGroup } from './drops';
 import { parseTimestamp } from './timestamp';
 
 export const ENGINE_VERSION = '1.0.0';
+// Valid timestamps recur across students in a course. Invalid values retain their contextual error label.
+const validTimestampCache = new Map<string, number>();
+const validNumberCache = new Map<number, Rational>();
+function cachedNumber(value: number): Rational {
+  const previous = validNumberCache.get(value);
+  if (previous) return previous;
+  const parsed = exactR(value);
+  if (validNumberCache.size >= 2048) validNumberCache.delete(validNumberCache.keys().next().value!);
+  validNumberCache.set(value, parsed);
+  return parsed;
+}
+function cachedTimestamp(value: string, label: string): number {
+  const previous = validTimestampCache.get(value);
+  if (previous !== undefined) return previous;
+  const parsed = parseTimestamp(value, label);
+  if (validTimestampCache.size >= 256) validTimestampCache.delete(validTimestampCache.keys().next().value!);
+  validTimestampCache.set(value, parsed);
+  return parsed;
+}
 type Work = { source: CalcItem; trace: TraceItem; score: Rational | null; raw: Rational | null };
 function valid(value: number | null | undefined, label: string): void {
   if (value != null && (!Number.isFinite(value) || value < 0)) throw new RangeError(`${label} must be finite and non-negative`);
 }
-function time(value: string | null | undefined, label: string): number | null {
+function timeExact(value: string | null | undefined, label: string): number | null {
   if (value == null) return null;
   return parseTimestamp(value, label);
 }
-function bandFor(setup: CalcInput['setup'], rounded: number | null): CalculationTrace['totals']['band'] {
+function bandFor(setup: CalcInput['setup'], rounded: number | null, fast: boolean): CalculationTrace['totals']['band'] {
   if (rounded === null) return null;
   const bands = [...setup.scheme.bands].sort((a, b) => b.min - a.min || stringCompare(a.letter, b.letter));
   const index = bands.findIndex(b => rounded >= b.min);
   if (index < 0) return null;
-  return { letter: bands[index].letter, min: bands[index].min, max: index ? R(bands[index - 1].min).sub(R(0.1)).toNumber() : 100 };
+  const maximum = index ? exactR(bands[index - 1].min).sub(exactR(0.1)) : null;
+  return { letter: bands[index].letter, min: bands[index].min, max: maximum === null ? 100 : fast ? maximum.toNumber() : maximum.toNumberExact() };
 }
 function stringCompare(a: string, b: string): number { return a < b ? -1 : a > b ? 1 : 0; }
-export function calculate(input: CalcInput): CalculationTrace {
+/** The accelerated path changes only redundant work; all arithmetic remains Rational. */
+export function calculationPath(input: CalcInput): 'fast' | 'exact' {
+  try {
+    // The exact engine also accepts some incomplete JSON-shaped inputs. Keep its
+    // coercion, ordering, and error behavior for those rather than optimizing them.
+    const timestamp = (value: unknown): boolean => value === null || typeof value === 'string';
+    if (typeof input.now !== 'string' || (input.finalOverride != null && (!timestamp(input.finalOverride.at)
+      || (input.finalOverride.percent !== null && typeof input.finalOverride.percent !== 'number')))) return 'exact';
+    if (typeof input.setup.late.percentPerPeriod !== 'number' || typeof input.setup.late.graceMinutes !== 'number'
+      || (input.setup.late.maxPeriods !== null && typeof input.setup.late.maxPeriods !== 'number')
+      || (input.setup.extraCredit.categoryCapPercent !== null && typeof input.setup.extraCredit.categoryCapPercent !== 'number')
+      || (input.setup.extraCredit.courseCapPoints !== null && typeof input.setup.extraCredit.courseCapPoints !== 'number')
+      || input.setup.scheme.bands.some(b => typeof b.min !== 'number')) return 'exact';
+    if (input.setup.categories.some(c => typeof c.id !== 'string' || typeof c.position !== 'number' || typeof c.weight !== 'number')) return 'exact';
+    if (input.items.some(i => typeof i.assignmentId !== 'string' || (i.categoryId !== null && typeof i.categoryId !== 'string')
+      || typeof i.points !== 'number' || typeof i.position !== 'number' || !timestamp(i.dueAt)
+      || (i.hypothetical !== null && typeof i.hypothetical !== 'number')
+      || (i.submission !== null && (i.submission === undefined || typeof i.submission.state !== 'string'
+        || typeof i.submission.released !== 'boolean' || !timestamp(i.submission.submittedAt)
+        || (i.submission.score !== null && typeof i.submission.score !== 'number')))
+      || (i.itemState !== null && (i.itemState === undefined
+        || !('missing' in i.itemState) || !('override' in i.itemState)
+        || !('excused' in i.itemState) || !('lateWaived' in i.itemState)
+        || (i.itemState.override != null && (!timestamp(i.itemState.override.at) || typeof i.itemState.override.score !== 'number'))
+        || (i.itemState.excused != null && !timestamp(i.itemState.excused.at))
+        || (i.itemState.lateWaived != null && !timestamp(i.itemState.lateWaived.at)))))) return 'exact';
+    const numbers = [input.setup.late.percentPerPeriod, input.setup.late.graceMinutes, input.setup.late.maxPeriods,
+      input.setup.extraCredit.categoryCapPercent, input.setup.extraCredit.courseCapPoints, input.finalOverride?.percent,
+      ...input.setup.categories.flatMap(c => [c.weight, c.position]), ...input.setup.scheme.bands.map(b => b.min),
+      ...input.items.flatMap(i => [i.points, i.position, i.hypothetical, i.submission?.score, i.itemState?.override?.score])];
+    for (const value of numbers) if (value != null && (!Number.isFinite(value) || Math.abs(value) > 1e9 || !/^-?\d+(?:\.\d{1,6})?$/.test(String(value)))) return 'exact';
+    return 'fast';
+  } catch { return 'exact'; }
+}
+export function calculate(input: CalcInput, options?: { arithmetic?: 'exact' | 'fast' }): CalculationTrace {
+  return calculateCore(input, options?.arithmetic === 'exact' ? false : calculationPath(input) === 'fast');
+}
+export function calculateExact(input: CalcInput): CalculationTrace { return calculateCore(input, false); }
+function calculateCore(input: CalcInput, fast: boolean): CalculationTrace {
+  const asNumber = fast ? (value: Rational) => value.toNumber() : (value: Rational) => value.toNumberExact();
+  const R = fast ? cachedNumber : exactR;
+  const time = fast ? (value: string | null | undefined, label: string): number | null => {
+    if (value == null) return null;
+    return cachedTimestamp(value, label);
+  } : timeExact;
   const { setup } = input;
   const now = time(input.now, 'now')!;
   valid(setup.late.percentPerPeriod, 'percentPerPeriod'); valid(setup.late.graceMinutes, 'graceMinutes');
@@ -54,7 +118,9 @@ export function calculate(input: CalcInput): CalculationTrace {
   const reason = (step: TraceStep['step'], code: TraceCode, target: TraceStep['target'], params: TraceReason['params'], bucket: TraceReason[]): void => {
     bucket.push({ code, params }); steps.push({ step, code, target, params });
   };
-  const ordered = [...input.items].sort((a, b) => compareDropCandidate({ assignmentId: a.assignmentId, score: ZERO, points: ZERO, dueAt: a.dueAt, position: a.position }, { assignmentId: b.assignmentId, score: ZERO, points: ZERO, dueAt: b.dueAt, position: b.position }));
+  const ordered = [...input.items].sort((a, b) => fast
+    ? ((a.dueAt === b.dueAt ? 0 : a.dueAt === null ? 1 : b.dueAt === null ? -1 : time(a.dueAt, 'dueAt')! - time(b.dueAt, 'dueAt')!) || a.position - b.position || stringCompare(a.assignmentId, b.assignmentId))
+    : compareDropCandidate({ assignmentId: a.assignmentId, score: ZERO, points: ZERO, dueAt: a.dueAt, position: a.position }, { assignmentId: b.assignmentId, score: ZERO, points: ZERO, dueAt: b.dueAt, position: b.position }));
   const works: Work[] = ordered.map(source => ({ source, trace: { assignmentId: source.assignmentId, title: source.title, points: source.points, raw: null, adjusted: null, state: 'not-submitted', counted: false, reasons: [] }, score: null, raw: null }));
   // Phase 1: release visibility. An override without a submission remains visible.
   for (const w of works) {
@@ -115,7 +181,7 @@ export function calculate(input: CalcInput): CalculationTrace {
     const penalty = penaltyBase.mul(R(setup.late.percentPerPeriod)).mul(R(applied)).div(R(100));
     w.score = w.score!.sub(penalty).max(ZERO);
     w.trace.state = 'late';
-    reason(4, 'late-penalty', { assignmentId: i.assignmentId }, { periods: applied, period: setup.late.period, percent: R(setup.late.percentPerPeriod).mul(R(applied)).toNumber() }, w.trace.reasons);
+    reason(4, 'late-penalty', { assignmentId: i.assignmentId }, { periods: applied, period: setup.late.period, percent: asNumber(R(setup.late.percentPerPeriod).mul(R(applied))) }, w.trace.reasons);
   }
   // Phase 5: explicit missing, pending, and hypothetical states.
   for (const w of works) {
@@ -155,8 +221,15 @@ export function calculate(input: CalcInput): CalculationTrace {
   const exact = new Map<string, { earned: Rational; possible: Rational; percent: Rational | null; weight: Rational }>();
   // Phase 7: drops, then phase 8: category totals.
   const droppedCategories: { category: GradeCategory; inCategory: Work[]; bucket: TraceReason[]; earned: Rational; possible: Rational; group: DropGroup }[] = [];
+  const workGroups = fast ? new Map<string, Work[]>() : null;
+  if (workGroups) for (const work of works) {
+    const id = categoryId(work.source);
+    const group = workGroups.get(id);
+    if (group) group.push(work);
+    else workGroups.set(id, [work]);
+  }
   for (const category of categories) {
-    const inCategory = works.filter(w => categoryId(w.source) === category.id);
+    const inCategory = workGroups ? workGroups.get(category.id) ?? [] : works.filter(w => categoryId(w.source) === category.id);
     const bucket: TraceReason[] = [];
     const counted = inCategory.filter(w => w.trace.counted);
     let earned = sum(counted.map(w => w.score!));
@@ -176,16 +249,18 @@ export function calculate(input: CalcInput): CalculationTrace {
   const jointEarned = sum(droppedCategories.map(c => c.earned)).sub(totalEC).add(cappedEC);
   const jointPossible = sum(droppedCategories.map(c => c.possible));
   const selections = setup.mode === 'points'
-    ? selectJointDrops(droppedCategories.map(c => c.group), jointEarned, jointPossible)
-    : droppedCategories.map(c => selectJointDrops([c.group], c.earned, c.possible)[0]);
+    ? selectJointDrops(droppedCategories.map(c => c.group), jointEarned, jointPossible, fast)
+    : droppedCategories.map(c => selectJointDrops([c.group], c.earned, c.possible, fast)[0]);
   for (let index = 0; index < droppedCategories.length; index++) {
     const entry = droppedCategories[index];
     const { category, inCategory, bucket, group } = entry;
     const drops = selections[index];
     if (drops.lowest.length < group.lowest) reason(7, 'drop-not-beneficial', { categoryId: category.id }, { requested: group.lowest, applied: drops.lowest.length }, bucket);
-    const equalPoints = group.candidates.every(c => c.points.compare(group.candidates[0]?.points ?? ZERO) === 0) ? 1 : 0;
+    const hasDrops = drops.lowest.length + drops.highest.length > 0;
+    const equalPoints = fast && !hasDrops ? 0 : group.candidates.every(c => c.points.compare(group.candidates[0]?.points ?? ZERO) === 0) ? 1 : 0;
+    const workById = fast && hasDrops ? new Map(inCategory.map(w => [w.source.assignmentId, w])) : null;
     for (const [rule, ids] of [['lowest', drops.lowest], ['highest', drops.highest]] as const) for (const id of ids) {
-      const w = inCategory.find(x => x.source.assignmentId === id)!;
+      const w = workById?.get(id) ?? inCategory.find(x => x.source.assignmentId === id)!;
       entry.earned = entry.earned.sub(w.score!); entry.possible = entry.possible.sub(R(w.source.points));
       w.trace.state = 'dropped'; w.trace.counted = false;
       reason(7, 'dropped', { assignmentId: id }, { rule, equalPoints }, w.trace.reasons);
@@ -198,11 +273,11 @@ export function calculate(input: CalcInput): CalculationTrace {
       percent = R(cap); reason(8, 'extra-credit-capped', { categoryId: category.id }, { cap }, bucket);
     }
     if (percent === null && setup.mode === 'weighted' && category.id !== '__uncategorized') reason(8, 'category-empty-shared', { categoryId: category.id }, { weight: category.weight }, bucket);
-    if (percent !== null) reason(8, 'category-total', { categoryId: category.id }, { earned: earned.toNumber(), possible: possible.toNumber(), percent: percent.toNumber() }, bucket);
-    const traceCategory: TraceCategory = { categoryId: category.id, name: category.name, weight: category.weight, effectiveWeight: 0, earned: earned.toNumber(), possible: possible.toNumber(), percent: percent?.toNumber() ?? null, contribution: null, items: inCategory.map(w => w.trace), reasons: bucket };
+    if (percent !== null) reason(8, 'category-total', { categoryId: category.id }, { earned: asNumber(earned), possible: asNumber(possible), percent: asNumber(percent) }, bucket);
+    const traceCategory: TraceCategory = { categoryId: category.id, name: category.name, weight: category.weight, effectiveWeight: 0, earned: asNumber(earned), possible: asNumber(possible), percent: percent === null ? null : asNumber(percent), contribution: null, items: inCategory.map(w => w.trace), reasons: bucket };
     traceCategories.push(traceCategory); exact.set(category.id, { earned, possible, percent, weight: R(category.weight) });
   }
-  for (const w of works) if (w.trace.state !== 'excused') w.trace.adjusted = w.score?.toNumber() ?? null;
+  for (const w of works) if (w.trace.state !== 'excused') w.trace.adjusted = w.score === null ? null : asNumber(w.score);
   const courseReasons: TraceReason[] = [];
   let weightedEarned = ZERO, weightedPossible = ZERO, coursePercent: Rational | null = null;
   if (setup.mode === 'weighted') {
@@ -211,8 +286,8 @@ export function calculate(input: CalcInput): CalculationTrace {
     weightedEarned = sum(present.map(c => exact.get(c.categoryId)!.weight.mul(exact.get(c.categoryId)!.percent!).div(R(100))));
     for (const c of present) {
       const data = exact.get(c.categoryId)!;
-      c.effectiveWeight = weightedPossible.n === 0n ? 0 : data.weight.div(weightedPossible).mul(R(100)).toNumber();
-      c.contribution = data.weight.mul(data.percent!).div(R(100)).toNumber();
+      c.effectiveWeight = weightedPossible.n === 0n ? 0 : asNumber(data.weight.div(weightedPossible).mul(R(100)));
+      c.contribution = asNumber(data.weight.mul(data.percent!).div(R(100)));
     }
     coursePercent = weightedPossible.n === 0n ? null : weightedEarned.div(weightedPossible).mul(R(100));
   } else {
@@ -229,32 +304,32 @@ export function calculate(input: CalcInput): CalculationTrace {
     const contribution = bonus.mul(weightedPossible).div(R(100));
     weightedEarned = weightedEarned.add(contribution);
     const synthetic = traceCategories.find(c => c.categoryId === '__uncategorized');
-    if (synthetic) synthetic.contribution = contribution.toNumber();
+    if (synthetic) synthetic.contribution = asNumber(contribution);
     coursePercent = weightedEarned.div(weightedPossible).mul(R(100));
   } else if (setup.mode === 'points' && cappedEC.compare(totalEC) < 0) {
     reason(9, 'extra-credit-capped', {}, { cap: courseCap! }, courseReasons);
   }
-  if (coursePercent !== null) reason(9, 'course-total', {}, { percent: coursePercent.toNumber(), earned: weightedEarned.toNumber(), possible: weightedPossible.toNumber() }, courseReasons);
-  const computedRounded = coursePercent?.roundHalfUp(1).toNumber() ?? null;
-  if (coursePercent !== null && R(computedRounded!).compare(coursePercent) !== 0) reason(10, 'rounding', {}, { from: coursePercent.toNumber(), to: computedRounded! }, courseReasons);
-  const computedBand = bandFor(setup, computedRounded);
-  let percent = coursePercent?.toNumber() ?? null;
+  if (coursePercent !== null) reason(9, 'course-total', {}, { percent: asNumber(coursePercent), earned: asNumber(weightedEarned), possible: asNumber(weightedPossible) }, courseReasons);
+  const computedRounded = coursePercent === null ? null : asNumber(coursePercent.roundHalfUp(1));
+  if (coursePercent !== null && R(computedRounded!).compare(coursePercent) !== 0) reason(10, 'rounding', {}, { from: asNumber(coursePercent), to: computedRounded! }, courseReasons);
+  const computedBand = bandFor(setup, computedRounded, fast);
+  let percent = coursePercent === null ? null : asNumber(coursePercent);
   let rounded = computedRounded;
   let letter = computedBand?.letter ?? null;
   let band = computedBand;
   if (input.finalOverride) {
     if (input.finalOverride.percent !== null) {
       percent = input.finalOverride.percent;
-      rounded = R(percent).roundHalfUp(1).toNumber();
-      band = bandFor(setup, rounded);
+      rounded = asNumber(R(percent).roundHalfUp(1));
+      band = bandFor(setup, rounded, fast);
       letter = band?.letter ?? null;
     }
     if (input.finalOverride.letter !== null) {
       letter = input.finalOverride.letter;
       const explicit = setup.scheme.bands.find(b => b.letter === letter);
-      if (explicit) band = bandFor(setup, explicit.min);
+      if (explicit) band = bandFor(setup, explicit.min, fast);
     }
     reason(11, 'final-override', {}, input.view === 'held' ? { reason: input.finalOverride.reason } : {}, courseReasons);
   }
-  return { studentId: input.studentId, view: input.view, mode: setup.mode, rulesVersion: setup.rulesVersion, setupVersion: setup.version, computedAt: input.now, engineVersion: ENGINE_VERSION, categories: traceCategories, steps, totals: { weightedEarned: weightedEarned.toNumber(), weightedPossible: weightedPossible.toNumber(), percent, rounded, letter, computed: { percent: coursePercent?.toNumber() ?? null, rounded: computedRounded, letter: computedBand?.letter ?? null }, band }, reasons: courseReasons };
+  return { studentId: input.studentId, view: input.view, mode: setup.mode, rulesVersion: setup.rulesVersion, setupVersion: setup.version, computedAt: input.now, engineVersion: ENGINE_VERSION, categories: traceCategories, steps, totals: { weightedEarned: asNumber(weightedEarned), weightedPossible: asNumber(weightedPossible), percent, rounded, letter, computed: { percent: coursePercent === null ? null : asNumber(coursePercent), rounded: computedRounded, letter: computedBand?.letter ?? null }, band }, reasons: courseReasons };
 }

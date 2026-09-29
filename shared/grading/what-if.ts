@@ -2,9 +2,9 @@ import type { CalcInput, CalculationTrace } from './types';
 import { calculate } from './engine';
 import { R } from './rational';
 
-export function whatIf(input: CalcInput, scores: { assignmentId: string; score: number }[]): { trace: CalculationTrace; base: CalculationTrace; delta: number | null; changedReasons: string[]; finalOverrideActive: boolean } {
+export function whatIf(input: CalcInput, scores: { assignmentId: string; score: number }[], options?: { arithmetic?: 'exact' | 'fast' }): { trace: CalculationTrace; base: CalculationTrace; delta: number | null; changedReasons: string[]; finalOverrideActive: boolean } {
   const student = { ...input, view: 'student' as const, finalOverride: null };
-  const base = calculate(student);
+  const base = calculate(student, options);
   const seen = new Set<string>();
   for (const entry of scores) {
     if (!Number.isFinite(entry.score) || entry.score < 0) throw new RangeError(`Invalid hypothetical score for ${entry.assignmentId}`);
@@ -17,21 +17,21 @@ export function whatIf(input: CalcInput, scores: { assignmentId: string; score: 
     if (!item.submission && item.itemState?.override) throw new RangeError(`Recorded score already counts for ${entry.assignmentId}`);
   }
   const byId = new Map(scores.map(s => [s.assignmentId, s.score]));
-  const trace = calculate({ ...student, items: input.items.map(i => ({ ...i, hypothetical: byId.get(i.assignmentId) ?? i.hypothetical })) });
+  const trace = calculate({ ...student, items: input.items.map(i => ({ ...i, hypothetical: byId.get(i.assignmentId) ?? i.hypothetical })) }, options);
   const baseReasons = new Set(base.steps.map(s => `${s.code}:${s.target.assignmentId ?? s.target.categoryId ?? ''}`));
   const changedReasons = [...new Set(trace.steps.map(s => `${s.code}:${s.target.assignmentId ?? s.target.categoryId ?? ''}`).filter(x => !baseReasons.has(x)))];
   const delta = trace.totals.rounded === null || base.totals.rounded === null ? null : R(trace.totals.rounded).sub(R(base.totals.rounded)).toNumber();
   return { trace, base, delta, changedReasons, finalOverrideActive: input.finalOverride !== null };
 }
 
-export function solveNeeded(input: CalcInput, scores: { assignmentId: string; score: number }[], solveFor: string, target: { letter: string } | { percent: number }): { score: number; finalOverrideActive: boolean } | { unreachable: true; finalOverrideActive: boolean } {
+export function solveNeeded(input: CalcInput, scores: { assignmentId: string; score: number }[], solveFor: string, target: { letter: string } | { percent: number }, options?: { arithmetic?: 'exact' | 'fast' }): { score: number; finalOverrideActive: boolean } | { unreachable: true; finalOverrideActive: boolean } {
   const item = input.items.find(i => i.assignmentId === solveFor);
   if (!item) throw new RangeError(`Unknown assignment ${solveFor}`);
   const other = scores.filter(s => s.assignmentId !== solveFor);
   const finalOverrideActive = input.finalOverride !== null;
   const reaches = (tenths: bigint): boolean => {
     const score = Number(`${tenths / 10n}.${tenths % 10n}`);
-    const result = whatIf(input, [...other, { assignmentId: solveFor, score }]).trace;
+    const result = whatIf(input, [...other, { assignmentId: solveFor, score }], options).trace;
     const rounded = result.totals.rounded;
     if (rounded === null) return false;
     if ('percent' in target) return rounded >= target.percent;

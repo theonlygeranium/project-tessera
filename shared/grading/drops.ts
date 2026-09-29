@@ -20,30 +20,39 @@ function removedRatio(earned: Rational, possible: Rational, removed: DropCandida
   return ratio(earned.sub(sum(removed.map(c => c.score))), possible.sub(sum(removed.map(c => c.points))));
 }
 function weight(c: DropCandidate, r: Rational): Rational { return c.score.sub(r.mul(c.points)); }
-function order(a: DropCandidate, b: DropCandidate, r: Rational, ascending: boolean): number {
-  return (ascending ? weight(a, r).compare(weight(b, r)) : weight(b, r).compare(weight(a, r))) || compareDropCandidate(a, b);
+function order(a: DropCandidate, b: DropCandidate, r: Rational, ascending: boolean, keys?: Map<DropCandidate, Rational>): number {
+  const left = keys?.get(a) ?? weight(a, r), right = keys?.get(b) ?? weight(b, r);
+  return (ascending ? left.compare(right) : right.compare(left)) || compareDropCandidate(a, b);
+}
+function keysFor(groups: DropGroup[], r: Rational): Map<DropCandidate, Rational> {
+  const keys = new Map<DropCandidate, Rational>();
+  for (const group of groups) for (const candidate of group.candidates) keys.set(candidate, weight(candidate, r));
+  return keys;
 }
 function flatten(groups: DropGroup[], selections: DropCandidate[][]): DropCandidate[] { return selections.flat(); }
-function worstHigh(groups: DropGroup[], lows: DropCandidate[][], earned: Rational, possible: Rational): { highs: DropCandidate[][]; value: Rational } {
+function worstHigh(groups: DropGroup[], lows: DropCandidate[][], earned: Rational, possible: Rational, fast = false): { highs: DropCandidate[][]; value: Rational } {
   const low = flatten(groups, lows);
   const lowIds = new Set(low.map(c => c.assignmentId));
   let q = removedRatio(earned, possible, low);
   for (let iteration = 0; iteration < 100000; iteration++) {
-    const highs = groups.map(g => g.candidates.filter(c => !lowIds.has(c.assignmentId)).sort((a, b) => order(a, b, q, false)).slice(0, g.highest));
+    const keys = fast ? keysFor(groups, q) : undefined;
+    const highs = groups.map(g => g.candidates.filter(c => !lowIds.has(c.assignmentId)).sort((a, b) => order(a, b, q, false, keys)).slice(0, g.highest));
     const next = removedRatio(earned, possible, [...low, ...flatten(groups, highs)]);
     if (next.compare(q) === 0) return { highs, value: next };
     q = next;
   }
   throw new Error('Highest drop selection did not converge');
 }
-function bestLows(groups: DropGroup[], r: Rational): DropCandidate[][] {
+function bestLows(groups: DropGroup[], r: Rational, fast = false): DropCandidate[][] {
+  const keys = fast ? keysFor(groups, r) : undefined;
   return groups.map(g => {
-    const sorted = [...g.candidates].sort((a, b) => order(a, b, r, true));
+    const sorted = [...g.candidates].sort((a, b) => order(a, b, r, true, keys));
+    const highOrder = fast ? [...g.candidates].sort((a, b) => order(a, b, r, false, keys)) : null;
     let best: DropCandidate[] = [], bestCost: Rational | null = null;
     for (let count = 0; count <= g.lowest; count++) {
       const low = sorted.slice(0, count);
-      const high = sorted.slice(count).sort((a, b) => order(a, b, r, false)).slice(0, g.highest);
-      const cost = sum([...low, ...high].map(c => weight(c, r)));
+      const high = highOrder ? highOrder.filter(c => !low.includes(c)).slice(0, g.highest) : sorted.slice(count).sort((a, b) => order(a, b, r, false)).slice(0, g.highest);
+      const cost = sum([...low, ...high].map(c => keys?.get(c) ?? weight(c, r)));
       if (bestCost === null || cost.compare(bestCost) < 0 || (cost.compare(bestCost) === 0 && count > best.length)) {
         best = low; bestCost = cost;
       }
@@ -52,12 +61,19 @@ function bestLows(groups: DropGroup[], r: Rational): DropCandidate[][] {
   });
 }
 /** Exact max-low/min-high ratio over one or more independent drop-budget groups. */
-export function selectJointDrops(groupsInput: DropGroup[], earned: Rational, possible: Rational): DropSelection[] {
+export function selectJointDrops(groupsInput: DropGroup[], earned: Rational, possible: Rational, fast = false): DropSelection[] {
+  if (fast && groupsInput.some(g => g.lowest === 0 && g.highest === 0)) {
+    const active = groupsInput.filter(g => g.lowest !== 0 || g.highest !== 0);
+    if (active.length === 0) return groupsInput.map(() => ({ lowest: [], highest: [] }));
+    const selected = selectJointDrops(active, earned, possible, true);
+    let index = 0;
+    return groupsInput.map(g => g.lowest === 0 && g.highest === 0 ? { lowest: [], highest: [] } : selected[index++]);
+  }
   const groups = groupsInput.map(g => ({ ...g, candidates: [...g.candidates].sort(compareDropCandidate) }));
-  let r = worstHigh(groups, groups.map(() => []), earned, possible).value;
+  let r = worstHigh(groups, groups.map(() => []), earned, possible, fast).value;
   for (let iteration = 0; iteration < 100000; iteration++) {
-    const lows = bestLows(groups, r);
-    const { highs, value } = worstHigh(groups, lows, earned, possible);
+    const lows = bestLows(groups, r, fast);
+    const { highs, value } = worstHigh(groups, lows, earned, possible, fast);
     if (value.compare(r) <= 0) return groups.map((_, i) => ({ lowest: lows[i].sort(compareDropCandidate).map(c => c.assignmentId), highest: highs[i].sort(compareDropCandidate).map(c => c.assignmentId) }));
     r = value;
   }

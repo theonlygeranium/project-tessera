@@ -5,6 +5,8 @@ export class Rational {
     let a = BigInt(n), b = BigInt(d);
     if (b === 0n) throw new RangeError('Zero denominator');
     if (b < 0n) { a = -a; b = -b; }
+    if (a === 0n) { this.n = 0n; this.d = 1n; return; }
+    if (b === 1n) { this.n = a; this.d = 1n; return; }
     const gcd = (x: bigint, y: bigint): bigint => { x = x < 0n ? -x : x; while (y) [x, y] = [y, x % y]; return x || 1n; };
     const g = gcd(a, b); this.n = a / g; this.d = b / g;
   }
@@ -19,14 +21,19 @@ export class Rational {
     const signed = BigInt(digits) * (negative ? -1n : 1n);
     return scale <= 0 ? new Rational(signed * 10n ** BigInt(-scale)) : new Rational(signed, 10n ** BigInt(scale));
   }
-  add(b: Rational): Rational { return new Rational(this.n * b.d + b.n * this.d, this.d * b.d); }
-  sub(b: Rational): Rational { return new Rational(this.n * b.d - b.n * this.d, this.d * b.d); }
+  add(b: Rational): Rational { return this.d === b.d ? new Rational(this.n + b.n, this.d) : new Rational(this.n * b.d + b.n * this.d, this.d * b.d); }
+  sub(b: Rational): Rational { return this.d === b.d ? new Rational(this.n - b.n, this.d) : new Rational(this.n * b.d - b.n * this.d, this.d * b.d); }
   mul(b: Rational): Rational { return new Rational(this.n * b.n, this.d * b.d); }
   div(b: Rational): Rational { return new Rational(this.n * b.d, this.d * b.n); }
-  compare(b: Rational): number { const x = this.n * b.d - b.n * this.d; return x < 0n ? -1 : x > 0n ? 1 : 0; }
+  compare(b: Rational): number { const x = this.d === b.d ? this.n - b.n : this.n * b.d - b.n * this.d; return x < 0n ? -1 : x > 0n ? 1 : 0; }
   min(b: Rational): Rational { return this.compare(b) <= 0 ? this : b; }
   max(b: Rational): Rational { return this.compare(b) >= 0 ? this : b; }
   toNumber(): number {
+    // Exact integer operands convert without loss; IEEE division then rounds the fraction once.
+    if (this.n !== 0n && this.n >= -9007199254740991n && this.n <= 9007199254740991n && this.d <= 9007199254740991n) return Number(this.n) / Number(this.d);
+    return this.toNumberExact();
+  }
+  toNumberExact(): number {
     if (this.n === 0n) return 0;
     const negative = this.n < 0n;
     const numerator = negative ? -this.n : this.n;
