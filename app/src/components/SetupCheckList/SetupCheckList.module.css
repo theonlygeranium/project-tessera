@@ -1,0 +1,12 @@
+.root { color: var(--ink); }
+.root h2 { margin: 0 0 10px; font: 600 22px var(--font-serif); }
+.root h3 { margin: 12px 0 6px; font: 600 14px var(--font-sans); }
+.root h3 span { color: var(--muted); }
+.list { display: grid; gap: 8px; }
+.item { padding: 8px; background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.item p { margin: 4px 0; }
+.item button { min-height: 28px; margin: 4px 6px 0 0; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); cursor: pointer; }
+.item button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.compact { display: flex; flex-wrap: wrap; gap: 4px; }
+.compact .item { padding: 4px 7px; font-size: 11px; }
+.empty { color: var(--muted); margin: 0; }

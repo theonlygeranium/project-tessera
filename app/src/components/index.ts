@@ -38,3 +38,7 @@ export type { PresenceCardProps } from './PresenceCard/PresenceCard';
 export { StateLabel } from './StateLabel/StateLabel';
 export { GradeCell } from './GradeCell/GradeCell';
 export { DataGrid } from './DataGrid/DataGrid';
+export { CalculationTrace } from './CalculationTrace/CalculationTrace';
+export { SetupCheckList } from './SetupCheckList/SetupCheckList';
+export { WeightMeter } from './WeightMeter/WeightMeter';
+export { ChangeSetTable } from './ChangeSetTable/ChangeSetTable';

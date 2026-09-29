@@ -1,0 +1,8 @@
+.root { color: var(--ink); }
+.track { display: flex; height: 18px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--surface-sunk); }
+.segment { background: var(--accent); }
+.alt { background: var(--accent-soft); }
+.root p { margin: 7px 0; font-size: 12px; }
+.invalid { color: var(--error-text); }
+.valid { color: var(--accent-dark); }
+@media (forced-colors: active) { .track, .segment, .alt { border: 1px solid CanvasText; } }

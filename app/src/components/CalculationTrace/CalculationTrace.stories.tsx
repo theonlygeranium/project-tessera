@@ -1,0 +1,11 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { calculate } from '../../../../shared/grading/engine';
+import { goldenInput } from '../../../../shared/grading/golden.fixture';
+import { CalculationTrace } from './CalculationTrace';
+const trace = calculate(goldenInput('u-priya'));
+const meta = { title: 'Components/CalculationTrace', component: CalculationTrace, args: { trace, name: 'Priya Natarajan' } } satisfies Meta<typeof CalculationTrace>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Released: Story = {};
+export const WithHeld: Story = { args: { trace: calculate(goldenInput('u-priya', 'held')) } };
+export const WithProvenance: Story = { args: { provenance: 'Priya sees this same breakdown. AI never calculates grades.' } };

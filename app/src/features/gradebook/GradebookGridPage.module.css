@@ -10,6 +10,11 @@
 .pageActions .primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
 .pageActions .primary:disabled { background: var(--surface-sunk); color: var(--disabled-text); border-color: var(--line); }
 .pageActions .next { padding: 5px 8px; border-radius: var(--radius-sm); color: var(--warning-text); background: var(--warning-soft); font-size: 12px; }
+.pageActions a { min-height: 28px; box-sizing: border-box; border: 1px solid var(--control-line); text-decoration: none; }
+.pageActions a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.gridOnly { min-width: 0; }
+.withPanel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); gap: 12px; min-width: 0; }
+.withPanel > :first-child { min-width: 0; }
 .toolbar { padding: 8px 0; }
 .search { display: grid; gap: 2px; color: var(--muted); font-size: 11px; }
 .search input { min-height: 32px; width: 210px; box-sizing: border-box; padding: 6px 9px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: 13.5px var(--font-sans); }
@@ -32,6 +37,7 @@
 .modal { width: min(90vw, 420px); padding: 20px; border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 8px 30px color-mix(in srgb, var(--ink) 20%, transparent); }
 .modal h3 { margin-top: 0; }
 @media (max-width: 719px) {
+  .withPanel { grid-template-columns: 1fr; }
   .heading { align-items: flex-start; }
   .pageActions { justify-content: flex-start; }
   .toolbar { display: grid; }

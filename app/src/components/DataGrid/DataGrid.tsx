@@ -12,6 +12,7 @@ export interface DataGridProps<Row> {
   caption: string; rows: Row[]; columns: GridColumn<Row>[]; rowKey: (row: Row) => string;
   rowName: (row: Row) => string; density?: 'compact' | 'comfortable';
   selectedRows?: Set<string>; onSelectRow?: (key: string) => void;
+  onOpenRow?: (key: string, opener: HTMLElement) => void;
   onCommit?: (row: Row, column: GridColumn<Row>, value: string) => Promise<boolean> | boolean;
   onAction?: (action: 'excuse' | 'missing' | 'override' | 'fill' | 'select' | 'shortcuts' | 'undo', selection: { row: number; col: number; fromRow: number; fromCol: number }) => void;
   onSelectionChange?: (selection: { row: number; col: number; fromRow: number; fromCol: number }) => void;
@@ -21,16 +22,16 @@ type Selection = { row: number; col: number; fromRow: number; fromCol: number };
 type EditState = { rowKey: string; columnKey: string; value: string };
 interface GridRowProps<Row> {
   row: Row; rowIndex: number; columns: GridColumn<Row>[]; rowKey: (row: Row) => string; rowName: (row: Row) => string;
-  selected: boolean; onSelectRow?: (key: string) => void; active: Selection; edit: EditState | null;
+  selected: boolean; onSelectRow?: (key: string) => void; onOpenRow?: (key: string, opener: HTMLElement) => void; active: Selection; edit: EditState | null;
   setCell: (value: Selection) => void; cancelEdit: () => void; setEditValue: (value: string) => void; setMessage: (value: string) => void;
   keyDown: (event: KeyboardEvent<HTMLTableCellElement>) => void; commit: (row: number, col: number) => Promise<void>;
   focus: RefObject<HTMLTableCellElement | null>; input: RefObject<HTMLInputElement | null>; beginEdit: (rowIndex: number, colIndex: number, seed?: string) => void;
 }
-const GridRow = memo(function GridRow<Row>({ row, rowIndex, columns, rowKey, rowName, selected, onSelectRow, active, edit, setCell, cancelEdit, setEditValue, setMessage, keyDown, commit, focus, input, beginEdit }: GridRowProps<Row>) {
+const GridRow = memo(function GridRow<Row>({ row, rowIndex, columns, rowKey, rowName, selected, onSelectRow, onOpenRow, active, edit, setCell, cancelEdit, setEditValue, setMessage, keyDown, commit, focus, input, beginEdit }: GridRowProps<Row>) {
   const id = rowKey(row);
   return <tr className={selected ? styles.selectedRow : ''} aria-selected={selected}>
     <td className={styles.check}><input type="checkbox" tabIndex={-1} aria-label={`Select ${rowName(row)}`} checked={selected} onChange={() => onSelectRow?.(id)} /></td>
-    <th scope="row" className={styles.student}>{rowName(row)}</th>
+    <th scope="row" className={styles.student}>{onOpenRow ? <button type="button" className={styles.openRow} onClick={event => onOpenRow(id, event.currentTarget)} aria-label={`Open ${rowName(row)} grade details`}>{rowName(row)}</button> : rowName(row)}</th>
     {columns.map((column, colIndex) => {
       const here = active.row === rowIndex && active.col === colIndex;
       const editingHere = !!edit && edit.rowKey === id && edit.columnKey === column.key;
@@ -47,7 +48,7 @@ const GridRow = memo(function GridRow<Row>({ row, rowIndex, columns, rowKey, row
   </tr>;
 }) as <Row>(props: GridRowProps<Row>) => ReactNode;
 
-function DataGridInner<Row>({ caption, rows, columns, rowKey, rowName, density = 'compact', selectedRows, onSelectRow, onCommit, onAction, onSelectionChange }: DataGridProps<Row>) {
+function DataGridInner<Row>({ caption, rows, columns, rowKey, rowName, density = 'compact', selectedRows, onSelectRow, onOpenRow, onCommit, onAction, onSelectionChange }: DataGridProps<Row>) {
   const [cell, setCell] = useState({ row: 0, col: 0, fromRow: 0, fromCol: 0 });
   const [edit, setEdit] = useState<EditState | null>(null);
   const [message, setMessage] = useState('Use arrow keys to move. Enter edits a score.');
@@ -107,7 +108,7 @@ function DataGridInner<Row>({ caption, rows, columns, rowKey, rowName, density =
   return <div className={styles.frame}>
     <div className={styles.scroll}><table role="grid" aria-label={caption} aria-rowcount={rows.length + 2} aria-colcount={columns.length + 2} className={[styles.grid, styles[density]].join(' ')}>
       <caption className={styles.sr}>{caption}</caption><thead><tr className={styles.bandRow}><th scope="col" rowSpan={2} className={styles.check}>Select</th><th scope="col" rowSpan={2} className={styles.student}>Student</th>{bands.map(b => <th key={b.key} scope="colgroup" colSpan={b.count}>{b.label}</th>)}</tr><tr className={styles.itemRow}>{columns.map((c, i) => <th key={c.key} scope="col" className={[c.tint && styles.bandAlt, i === columns.length - 1 && styles.current].filter(Boolean).join(' ')}>{c.header}</th>)}</tr></thead>
-      <tbody>{rows.map((row, i) => <GridRow key={rowKey(row)} row={row} rowIndex={i} columns={columns} rowKey={rowKey} rowName={rowName} selected={!!selectedRows?.has(rowKey(row))} onSelectRow={onSelectRow} active={active} edit={edit} setCell={setCell} cancelEdit={cancelEdit} setEditValue={setEditValue} setMessage={setMessage} keyDown={keyDown} commit={commit} focus={focus} input={input} beginEdit={beginEdit} />)}</tbody>
+      <tbody>{rows.map((row, i) => <GridRow key={rowKey(row)} row={row} rowIndex={i} columns={columns} rowKey={rowKey} rowName={rowName} selected={!!selectedRows?.has(rowKey(row))} onSelectRow={onSelectRow} onOpenRow={onOpenRow} active={active} edit={edit} setCell={setCell} cancelEdit={cancelEdit} setEditValue={setEditValue} setMessage={setMessage} keyDown={keyDown} commit={commit} focus={focus} input={input} beginEdit={beginEdit} />)}</tbody>
     </table></div><span className={styles.sr} aria-live="polite">{message}</span>
     {!visible && <p>No students match this view.</p>}
   </div>;

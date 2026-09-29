@@ -8,6 +8,8 @@
 .itemRow th { position: sticky; top: 32px; z-index: 3; height: 70px; min-width: 94px; padding: 7px 8px; background: var(--surface); text-align: center; font-size: 12px; }
 .check { position: sticky !important; left: 0; z-index: 5 !important; width: 36px; min-width: 36px; background: var(--surface) !important; text-align: center !important; }
 .student { position: sticky !important; left: 36px; z-index: 5 !important; min-width: 190px; max-width: 190px; padding: 8px 12px; background: var(--surface) !important; }
+.openRow { min-height: 28px; padding: 2px 4px; border: 0; background: transparent; color: var(--accent-dark); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.openRow:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .current { position: sticky !important; right: 0; z-index: 4 !important; min-width: 112px; background: var(--surface-alt) !important; }
 .value { min-width: 94px; padding: 0; outline: none; background: var(--surface); }
 .bandAlt { background: var(--surface-alt) !important; }
