@@ -841,6 +841,135 @@ await journey('Journey 18 · An instructor completes assigned required training 
   });
 });
 
+// Gradebook M6: one tab keeps the mock store across instructor and student personas.
+await journey('Journey 21 · An instructor sets up weights, grades, explains and releases; a student understands and plans', async (page) => {
+  const grid = page.getByRole('grid', { name: 'Faculty gradebook' });
+  const snapshot = async (name) => {
+    await mkdir(SHOTS, { recursive: true });
+    await page.screenshot({ path: join(SHOTS, `journey-21-${name}.png`), fullPage: true });
+  };
+  await step('Open the mock gradebook and keyboard-edit a held Project draft score', async () => {
+    await page.goto(`${BASE}app/teach/courses/stat110-04/grades?data=mock&as=u-okafor`);
+    await page.getByRole('tab', { name: 'Gradebook' }).click();
+    await grid.waitFor();
+    await page.getByRole('radio', { name: 'Include held' }).check();
+    // Grid rows are alphabetical by given name; Kwame Asante sits above Lin Zhao (Tomás Aguilar is last).
+    const cell = page.locator('#grade-grid-u-asante-draft');
+    await cell.focus();
+    await cell.press('Enter');
+    await page.getByRole('textbox', { name: 'Edit Kwame Asante, draft' }).fill('32');
+    await page.getByRole('textbox', { name: 'Edit Kwame Asante, draft' }).press('Enter');
+    await waitForIncludes(page.locator('main'), 'Kwame Asante: Project draft saved as 32.');
+    await snapshot('grid');
+  });
+  await step('Fill that score down to the next student by keyboard', async () => {
+    const source = page.locator('#grade-grid-u-asante-draft');
+    const next = page.locator('#grade-grid-u-zhao-draft');
+    await source.focus();
+    await page.waitForFunction(() => document.getElementById('grade-grid-u-asante-draft')?.tabIndex === 0);
+    await source.press('Shift+ArrowDown');
+    await page.waitForFunction(() => {
+      const from = document.getElementById('grade-grid-u-asante-draft');
+      const to = document.getElementById('grade-grid-u-zhao-draft');
+      return from?.getAttribute('aria-selected') === 'true' && to?.getAttribute('aria-selected') === 'true' && to?.tabIndex === 0;
+    });
+    await page.keyboard.press('ControlOrMeta+d');
+    await waitForIncludes(page.locator('main'), 'Filled 1 cells from Kwame Asante.');
+    await waitForIncludes(next, '32');
+  });
+  await step('Excuse another item with a private reason, then undo the excusal', async () => {
+    page.once('dialog', dialog => dialog.accept('Documented course accommodation'));
+    const cell = page.locator('#grade-grid-u-aguilar-hw2');
+    await cell.focus();
+    await page.waitForFunction(() => document.getElementById('grade-grid-u-aguilar-hw2')?.tabIndex === 0);
+    await cell.press('e');
+    await waitForIncludes(page.locator('main'), 'Tomás Aguilar: HW 2 excused.');
+    // Live cells announce excused as "EX" (display.label), not the word "excused".
+    await page.waitForFunction(() => /,?\s*EX\b/.test(document.querySelector('#grade-grid-u-aguilar-hw2')?.getAttribute('aria-label') ?? ''));
+    await page.getByRole('button', { name: 'Undo (⌘Z)' }).click();
+    await waitForIncludes(page.locator('main'), 'Last change undone.');
+    await page.waitForFunction(() => !/,?\s*EX\b/.test(document.querySelector('#grade-grid-u-aguilar-hw2')?.getAttribute('aria-label') ?? ''));
+  });
+  await step('Open Priya’s panel and read the grade calculation', async () => {
+    await page.getByRole('button', { name: 'Open Priya Natarajan grade details' }).first().click();
+    const panel = page.getByRole('complementary', { name: 'Priya Natarajan grade details' });
+    await panel.getByRole('heading', { name: 'How this grade was calculated' }).waitFor();
+    await panel.getByRole('table', { name: 'Category contributions for Priya Natarajan' }).waitFor();
+    await snapshot('priya-panel');
+    await panel.getByRole('button', { name: 'Close student panel' }).click();
+  });
+  await step('Change Midterm and Project weights, review the setup check and impact, then save', async () => {
+    await page.getByRole('link', { name: 'Setup check' }).click();
+    await page.getByRole('heading', { name: 'Grade setup' }).waitFor();
+    await page.getByRole('spinbutton', { name: 'Midterm weight percent' }).fill('25');
+    await page.getByRole('spinbutton', { name: 'Project weight percent' }).fill('35');
+    const check = page.getByRole('region', { name: 'Setup check' });
+    await check.getByRole('heading', { name: 'Setup check' }).waitFor();
+    await check.getByRole('heading', { name: /To fix 0/ }).waitFor();
+    await waitForIncludes(page.getByRole('region', { name: 'If you save' }), 'current grades change');
+    await page.getByRole('button', { name: /^Save setup/ }).waitFor({ state: 'visible' });
+    await snapshot('setup-impact');
+    await page.getByRole('button', { name: /^Save setup/ }).click();
+    await page.getByText('Grade setup saved.').waitFor();
+  });
+  await step('Preview and release the held Project draft', async () => {
+    await page.getByRole('link', { name: 'Back to grades' }).click();
+    await page.getByRole('tab', { name: 'Gradebook' }).click();
+    await grid.waitFor();
+    await page.getByRole('button', { name: 'Release …' }).click();
+    const dialog = page.getByRole('dialog', { name: /Release/ });
+    await dialog.getByRole('combobox', { name: 'Assignment' }).selectOption({ label: 'Project draft' });
+    await waitForIncludes(dialog, 'Priya Natarajan');
+    await snapshot('release-preview');
+    await dialog.getByRole('button', { name: /^Release \d+ grades?$/ }).click();
+    await waitForIncludes(dialog, 'Grades released.');
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  });
+  let staffTrace = '';
+  await step('Read Priya’s released trace as the instructor', async () => {
+    // The first step left the grid on Include held; Priya sees released work only.
+    await page.getByRole('radio', { name: 'Released only' }).check();
+    await page.getByRole('button', { name: 'Open Priya Natarajan grade details' }).first().click();
+    const panel = page.getByRole('complementary', { name: 'Priya Natarajan grade details' });
+    await panel.getByRole('heading', { name: 'How this grade was calculated' }).waitFor();
+    const table = panel.getByRole('table', { name: 'Category contributions for Priya Natarajan' });
+    // The panel may paint the cached trace from before setup/release, then refetch.
+    await page.waitForFunction(() => {
+      const caption = [...document.querySelectorAll('table caption')].find(c => c.textContent.includes('Priya Natarajan'));
+      const text = caption?.closest('table')?.innerText ?? '';
+      return text.includes('25%') && text.includes('35%') && text.includes('52.00');
+    });
+    staffTrace = JSON.stringify(await table.locator('tbody td').allTextContents());
+    if (!staffTrace) throw new Error('Instructor trace was empty');
+  });
+  await step('As Priya, see the released draft and the same calculation', async () => {
+    await switchTo(page, 'Priya Natarajan');
+    // Priya has no learning profile yet, so the shell redirects to onboarding (D-004).
+    await page.getByRole('heading', { level: 1, name: 'Set up your learning profile' }).waitFor();
+    await page.getByRole('checkbox', { name: 'Finish my degree' }).check();
+    await page.getByRole('button', { name: 'Save profile' }).click();
+    await page.getByRole('heading', { name: 'Suggested setup' }).waitFor();
+    await page.getByRole('link', { name: 'Continue to Today' }).click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Courses' }).click();
+    await page.getByRole('link', { name: /Statistics · Section 04/ }).click();
+    await page.getByRole('link', { name: 'See your grade and try what-if scores' }).click();
+    await page.getByRole('heading', { name: 'Your grade', level: 1 }).waitFor();
+    await waitForIncludes(page.getByRole('listitem').filter({ hasText: 'Project draft' }), '34 of 40');
+    const studentTrace = JSON.stringify(await page.getByRole('table', { name: 'Category contributions for your grade' }).locator('tbody td').allTextContents());
+    if (studentTrace !== staffTrace) throw new Error('Priya’s trace differs from the instructor’s released trace: staff=' + staffTrace + ' student=' + studentTrace);
+    await snapshot('student-grade');
+  });
+  await step('Try a private what-if score and ask what is needed for an A-', async () => {
+    await page.getByRole('radio', { name: 'What-if' }).check();
+    await page.getByRole('spinbutton', { name: 'What-if score for Homework 5' }).fill('9');
+    await page.getByRole('heading', { name: 'Your what-if grade' }).waitFor();
+    await page.getByRole('combobox', { name: 'Letter' }).selectOption('A-');
+    await page.getByRole('combobox', { name: 'On this item' }).selectOption({ label: 'Final report' });
+    await page.getByText(/You’d need|That letter is not reachable|already within reach/).waitFor();
+    await snapshot('what-if');
+  });
+});
+
 // ---- summary --------------------------------------------------------------------------
 await browser.close();
 server.close();

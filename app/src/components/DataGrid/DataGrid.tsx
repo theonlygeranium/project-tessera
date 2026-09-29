@@ -49,13 +49,23 @@ const GridRow = memo(function GridRow<Row>({ row, rowIndex, columns, rowKey, row
 }) as <Row>(props: GridRowProps<Row>) => ReactNode;
 
 function DataGridInner<Row>({ caption, rows, columns, rowKey, rowName, density = 'compact', selectedRows, onSelectRow, onOpenRow, onCommit, onAction, onSelectionChange }: DataGridProps<Row>) {
-  const [cell, setCell] = useState({ row: 0, col: 0, fromRow: 0, fromCol: 0 });
+  const [cell, setCellState] = useState<Selection>({ row: 0, col: 0, fromRow: 0, fromCol: 0 });
+  const cellRef = useRef(cell);
+  const setCell = (next: Selection) => { cellRef.current = next; setCellState(next); };
   const [edit, setEdit] = useState<EditState | null>(null);
+  const editRef = useRef(edit);
+  editRef.current = edit;
   const [message, setMessage] = useState('Use arrow keys to move. Enter edits a score.');
   const focus = useRef<HTMLTableCellElement | null>(null);
   const input = useRef<HTMLInputElement | null>(null);
   const visible = rows.length > 0 && columns.length > 0;
-  const active = { row: Math.min(cell.row, Math.max(0, rows.length - 1)), col: Math.min(cell.col, Math.max(0, columns.length - 1)), fromRow: Math.min(cell.fromRow, Math.max(0, rows.length - 1)), fromCol: Math.min(cell.fromCol, Math.max(0, columns.length - 1)) };
+  const clamp = (sel: Selection): Selection => ({
+    row: Math.min(sel.row, Math.max(0, rows.length - 1)),
+    col: Math.min(sel.col, Math.max(0, columns.length - 1)),
+    fromRow: Math.min(sel.fromRow, Math.max(0, rows.length - 1)),
+    fromCol: Math.min(sel.fromCol, Math.max(0, columns.length - 1)),
+  });
+  const active = clamp(cell);
   useEffect(() => { if (edit) input.current?.focus(); }, [edit?.rowKey, edit?.columnKey]);
   useEffect(() => { onSelectionChange?.(active); }, [active.row, active.col, active.fromRow, active.fromCol]);
   useEffect(() => {
@@ -72,8 +82,9 @@ function DataGridInner<Row>({ caption, rows, columns, rowKey, rowName, density =
     setMessage('Editing. Enter saves and moves down; Tab saves and moves right; Escape cancels.');
   }
   function move(row: number, col: number, extend = false) {
-    if (edit) cancelEdit();
-    const next = { row: Math.max(0, Math.min(rows.length - 1, row)), col: Math.max(0, Math.min(columns.length - 1, col)), fromRow: extend ? active.fromRow : Math.max(0, Math.min(rows.length - 1, row)), fromCol: extend ? active.fromCol : Math.max(0, Math.min(columns.length - 1, col)) };
+    if (editRef.current) cancelEdit();
+    const current = clamp(cellRef.current);
+    const next = { row: Math.max(0, Math.min(rows.length - 1, row)), col: Math.max(0, Math.min(columns.length - 1, col)), fromRow: extend ? current.fromRow : Math.max(0, Math.min(rows.length - 1, row)), fromCol: extend ? current.fromCol : Math.max(0, Math.min(columns.length - 1, col)) };
     setCell(next);
     requestAnimationFrame(() => document.getElementById(`grade-grid-${rowKey(rows[next.row])}-${columns[next.col].key}`)?.focus());
   }
@@ -87,21 +98,23 @@ function DataGridInner<Row>({ caption, rows, columns, rowKey, rowName, density =
     cancelEdit(); setMessage('Score saved.');
     const rowIndex = rows.findIndex(r => rowKey(r) === edit.rowKey);
     const colIndex = columns.findIndex(c => c.key === edit.columnKey);
-    move(nextRow === active.row + 1 ? rowIndex + 1 : rowIndex, nextCol === active.col + 1 ? colIndex + 1 : colIndex);
+    const current = clamp(cellRef.current);
+    move(nextRow === current.row + 1 ? rowIndex + 1 : rowIndex, nextCol === current.col + 1 ? colIndex + 1 : colIndex);
   }
   function keyDown(event: KeyboardEvent<HTMLTableCellElement>) {
-    if (!visible || edit) return;
+    if (!visible || editRef.current) return;
+    const current = clamp(cellRef.current);
     const key = event.key;
-    if (key.startsWith('Arrow')) { event.preventDefault(); move(active.row + (key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0), active.col + (key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0), event.shiftKey); }
-    else if (key === 'Enter' && !columns[active.col].readOnly) { event.preventDefault(); beginEdit(active.row, active.col); }
-    else if (key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey && /[\d.%-]/.test(key) && !columns[active.col].readOnly) { event.preventDefault(); beginEdit(active.row, active.col, key); }
-    else if ((event.metaKey || event.ctrlKey) && key.toLowerCase() === 'd') { event.preventDefault(); onAction?.('fill', active); }
-    else if ((event.metaKey || event.ctrlKey) && key.toLowerCase() === 'z') { event.preventDefault(); onAction?.('undo', active); }
-    else if (key.toLowerCase() === 'e') { event.preventDefault(); onAction?.('excuse', active); }
-    else if (key.toLowerCase() === 'm') { event.preventDefault(); onAction?.('missing', active); }
-    else if (key.toLowerCase() === 'o') { event.preventDefault(); onAction?.('override', active); }
-    else if (key === ' ') { event.preventDefault(); onAction?.('select', active); }
-    else if (key === '?') { event.preventDefault(); onAction?.('shortcuts', active); }
+    if (key.startsWith('Arrow')) { event.preventDefault(); move(current.row + (key === 'ArrowDown' ? 1 : key === 'ArrowUp' ? -1 : 0), current.col + (key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0), event.shiftKey); }
+    else if (key === 'Enter' && !columns[current.col].readOnly) { event.preventDefault(); beginEdit(current.row, current.col); }
+    else if (key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey && /[\d.%-]/.test(key) && !columns[current.col].readOnly) { event.preventDefault(); beginEdit(current.row, current.col, key); }
+    else if ((event.metaKey || event.ctrlKey) && key.toLowerCase() === 'd') { event.preventDefault(); onAction?.('fill', current); }
+    else if ((event.metaKey || event.ctrlKey) && key.toLowerCase() === 'z') { event.preventDefault(); onAction?.('undo', current); }
+    else if (key.toLowerCase() === 'e') { event.preventDefault(); onAction?.('excuse', current); }
+    else if (key.toLowerCase() === 'm') { event.preventDefault(); onAction?.('missing', current); }
+    else if (key.toLowerCase() === 'o') { event.preventDefault(); onAction?.('override', current); }
+    else if (key === ' ') { event.preventDefault(); onAction?.('select', current); }
+    else if (key === '?') { event.preventDefault(); onAction?.('shortcuts', current); }
   }
   const bands: { key: string; label: string; count: number }[] = [];
   for (const c of columns) { const last = bands.at(-1); if (last?.key === c.band) last.count++; else bands.push({ key: c.band, label: c.bandLabel, count: 1 }); }

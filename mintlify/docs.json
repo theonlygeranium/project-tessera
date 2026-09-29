@@ -68,6 +68,7 @@
           "product/access",
           "product/authoring",
           "product/grading",
+          "product/gradebook",
           "product/templates",
           "product/readiness",
           "product/variants",
