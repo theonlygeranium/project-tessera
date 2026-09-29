@@ -1,0 +1,25 @@
+.frame { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+.scroll { overflow: auto; max-height: min(70vh, 900px); }
+.grid { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; table-layout: fixed; font: var(--size-text-compact) var(--font-sans); color: var(--ink); }
+.grid th, .grid td { box-sizing: border-box; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+.grid th { text-align: left; }
+.bandRow th { position: sticky; top: 0; z-index: 4; height: 32px; padding: 5px 10px; background: var(--surface-alt); font-size: 12px; }
+.bandRow th:nth-child(even) { background: var(--paper); }
+.itemRow th { position: sticky; top: 32px; z-index: 3; height: 70px; min-width: 94px; padding: 7px 8px; background: var(--surface); text-align: center; font-size: 12px; }
+.check { position: sticky !important; left: 0; z-index: 5 !important; width: 36px; min-width: 36px; background: var(--surface) !important; text-align: center !important; }
+.student { position: sticky !important; left: 36px; z-index: 5 !important; min-width: 190px; max-width: 190px; padding: 8px 12px; background: var(--surface) !important; }
+.current { position: sticky !important; right: 0; z-index: 4 !important; min-width: 112px; background: var(--surface-alt) !important; }
+.value { min-width: 94px; padding: 0; outline: none; background: var(--surface); }
+.bandAlt { background: var(--surface-alt) !important; }
+.value:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.range { background: var(--accent-soft) !important; }
+.selectedRow > * { background: var(--accent-soft) !important; }
+.compact tbody tr { height: 44px; }
+.comfortable tbody tr { height: 56px; }
+.grid input[type='checkbox'] { width: 18px; height: 18px; min-width: 28px; min-height: 28px; accent-color: var(--accent); }
+.editor { display: grid; gap: 2px; min-width: 94px; padding: 2px; }
+.editor input { width: 100%; min-height: 28px; box-sizing: border-box; border: 1px solid var(--control-line); border-radius: var(--radius-sm); font: inherit; }
+.editor input:focus-visible { outline: 3px solid var(--focus); }
+.editor small { font-size: 10px; white-space: nowrap; }
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 719px) { .frame { display: none; } }

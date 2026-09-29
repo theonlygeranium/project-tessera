@@ -2,12 +2,12 @@ import type { CalcItem, CalculationTrace, CellState, CourseGradeResult } from '.
 import { R } from './rational';
 
 export function toCourseGradeResult(trace: CalculationTrace): CourseGradeResult { return { studentId: trace.studentId, percent: trace.totals.rounded, letter: trace.totals.letter, rulesVersion: trace.rulesVersion, trace }; }
-export function cellDisplays(trace: CalculationTrace): { assignmentId: string; state: CellState; adjusted: number | null; label: string }[] {
+export function cellDisplays(trace: CalculationTrace): { assignmentId: string; state: CellState; adjusted: number | null; raw: number | null; label: string }[] {
   return trace.categories.flatMap(c => c.items.map(i => {
     const late = i.reasons.find(r => r.code === 'late-penalty');
     const lateLabel = late ? `late ${late.params.periods}${late.params.period === 'hour' ? 'h' : 'd'}` : '';
     const label = i.state === 'excused' ? 'EX' : i.state === 'missing' ? 'MISSING' : i.state === 'not-due' ? 'Not due' : i.state === 'not-submitted' ? 'Not submitted' : i.state === 'to-grade' ? 'To grade' : i.state === 'held' ? 'Held' : i.state === 'dropped' ? (late ? `${lateLabel}, dropped` : 'Dropped') : i.state === 'override' ? 'Override' : i.state === 'what-if' ? 'What-if' : i.state === 'extra-credit' ? 'Extra credit' : i.state === 'late' ? lateLabel : '';
-    return { assignmentId: i.assignmentId, state: i.state, adjusted: i.adjusted, label };
+    return { assignmentId: i.assignmentId, state: i.state, adjusted: i.adjusted, raw: i.raw, label };
   }));
 }
 function csvValue(value: string | number | null): string { const text = value === null ? '' : typeof value === 'string' && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; }

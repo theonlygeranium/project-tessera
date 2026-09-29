@@ -625,7 +625,7 @@ export interface Grade {
 
 export interface GradebookRow {
   student: Pick<User, 'id' | 'name' | 'email'>;
-  cells: { assignmentId: Id; score: number | null; state: SubmissionState | 'missing'; released: boolean; submissionVersion?: number; itemStateVersion?: number; display?: { state: import('./grading/types').CellState; adjusted: number | null; label: string } }[];
+  cells: { assignmentId: Id; score: number | null; state: SubmissionState | 'missing'; released: boolean; submissionVersion?: number; itemStateVersion?: number; display?: { state: import('./grading/types').CellState; adjusted: number | null; raw?: number | null; label: string } }[];
   total: number;
   possible: number;
   result?: { percent: number | null; letter: string | null };

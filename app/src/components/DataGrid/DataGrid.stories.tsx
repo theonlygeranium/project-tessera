@@ -1,0 +1,11 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { DataGrid, type GridColumn } from './DataGrid';
+type Row = { id: string; name: string; hw1: number; current: string };
+const rows: Row[] = [{ id: 'priya', name: 'Priya Natarajan', hw1: 9, current: '88.1% B+' }, { id: 'lin', name: 'Lin Zhao', hw1: 10, current: '94.2% A' }];
+const columns: GridColumn<Row>[] = [{ key: 'hw1', band: 'homework', bandLabel: 'Homework 15% · drop lowest 1', header: 'HW 1 · 10 pts', render: row => row.hw1, editValue: row => String(row.hw1) }, { key: 'current', band: 'course', bandLabel: 'Course', header: 'Current · released only', readOnly: true, render: row => row.current }];
+const meta = { title: 'Components/DataGrid', component: DataGrid<Row>, args: { caption: 'Statistics gradebook', rows, columns, rowKey: row => row.id, rowName: row => row.name } } satisfies Meta<typeof DataGrid<Row>>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const Compact: Story = {};
+export const Comfortable: Story = { args: { density: 'comfortable' } };
+export const Empty: Story = { args: { rows: [] } };

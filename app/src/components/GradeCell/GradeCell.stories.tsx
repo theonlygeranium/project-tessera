@@ -1,0 +1,11 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { CellState } from '../../../../shared/grading/types';
+import { GradeCell } from './GradeCell';
+const states: CellState[] = ['graded', 'late', 'missing', 'excused', 'dropped', 'override', 'held', 'to-grade', 'extra-credit', 'not-submitted', 'not-due', 'what-if'];
+const meta = { title: 'Components/GradeCell', component: GradeCell, args: { student: 'Priya Natarajan', item: 'Quiz 3', points: 20, display: { state: 'graded', adjusted: 16, label: 'graded' } } } satisfies Meta<typeof GradeCell>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const AllStates: Story = { render: () => <div style={{ display: 'grid', gap: 8, maxWidth: 220 }}>{states.map(state => <GradeCell key={state} student="Priya Natarajan" item="Quiz 3" points={20} display={{ state, adjusted: state === 'excused' || state === 'to-grade' ? null : 16, label: state.replaceAll('-', ' ') }} />)}<GradeCell student="Priya Natarajan" item="Quiz 3" points={20} feedbackDraft display={{ state: 'graded', adjusted: 16, label: 'graded' }} /></div> };
+export const Active: Story = { args: { active: true } };
+export const Editing: Story = { args: { editing: true } };
+export const ReadOnly: Story = { args: { readOnly: true } };

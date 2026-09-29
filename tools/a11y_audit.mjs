@@ -146,6 +146,9 @@ for (const destination of ['course', 'lesson', 'test-out']) APP.push({
   url: 'app/admin/setup?data=mock&as=u-admin',
   steps: p => staffTraining(p, destination),
 });
+APP.push({ name: 'App · Faculty gradebook grid', url: 'app/teach/courses/stat110-04/grades?data=mock&as=u-okafor', steps: async (page) => { await page.getByRole('tab', { name: 'Gradebook' }).click(); await page.getByRole('grid', { name: 'Faculty gradebook' }).waitFor(); } });
+APP.push({ name: 'App · Faculty gradebook held', url: 'app/teach/courses/stat110-04/grades?data=mock&as=u-okafor', steps: async (page) => { await page.getByRole('tab', { name: 'Gradebook' }).click(); await page.getByRole('radio', { name: 'Include held' }).check(); await page.getByRole('grid', { name: 'Faculty gradebook' }).waitFor(); } });
+APP.push({ name: 'App · Faculty gradebook editing', url: 'app/teach/courses/stat110-04/grades?data=mock&as=u-okafor', steps: async (page) => { await page.getByRole('tab', { name: 'Gradebook' }).click(); const cell = page.getByRole('grid', { name: 'Faculty gradebook' }).locator('[id^="grade-grid-"]').first(); await cell.focus(); await cell.press('Enter'); } });
 for (const a of APP) targets.push({ ...a, settle: 900 });
 for (const s of screens) {
   const styles = AI_SCREENS.has(s.slug) ? STYLES : ['marginalia'];

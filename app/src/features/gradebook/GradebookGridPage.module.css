@@ -1,0 +1,49 @@
+.page { display: grid; gap: 12px; min-width: 0; color: var(--ink); font: 13.5px/1.4 var(--font-sans); }
+.heading, .pageActions, .toolbar, .filters, .bulk, .status, .last { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.heading { justify-content: space-between; }
+.heading h2 { margin: 0; font: 600 28px/1.15 var(--font-serif); }
+.heading p { margin: 4px 0 0; color: var(--muted); }
+.pageActions { justify-content: flex-end; }
+.pageActions button, .filters button, .bulk button, .last button, .conflict button, .studentCard button, .modal button { min-height: 28px; padding: 5px 10px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.pageActions button:focus-visible, .filters button:focus-visible, .bulk button:focus-visible, .last button:focus-visible, .conflict button:focus-visible, .studentCard button:focus-visible, .modal button:focus-visible, .search input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.pageActions button:disabled { color: var(--disabled-text); cursor: default; }
+.pageActions .primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.pageActions .primary:disabled { background: var(--surface-sunk); color: var(--disabled-text); border-color: var(--line); }
+.pageActions .next { padding: 5px 8px; border-radius: var(--radius-sm); color: var(--warning-text); background: var(--warning-soft); font-size: 12px; }
+.toolbar { padding: 8px 0; }
+.search { display: grid; gap: 2px; color: var(--muted); font-size: 11px; }
+.search input { min-height: 32px; width: 210px; box-sizing: border-box; padding: 6px 9px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: 13.5px var(--font-sans); }
+.filters { flex: 1; }
+.filters > span { color: var(--muted); font-weight: 600; }
+.filters button { border-radius: var(--radius-pill); }
+.filters button[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); }
+.bulk { padding: 8px; background: var(--accent-soft); border-radius: var(--radius-sm); }
+.conflict { padding: 10px; background: var(--warning-soft); border-radius: var(--radius-sm); }
+.conflict p { margin: 0 0 8px; }
+.conflict button { margin-right: 8px; }
+.itemHead { display: grid; gap: 3px; }
+.itemHead small { color: var(--muted); font-size: 10px; font-weight: 400; }
+.currentValue { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 6px 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.status { justify-content: space-between; padding: 8px 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; }
+.last { margin-left: auto; }
+.mobile { display: none; }
+.modalBackdrop { position: fixed; inset: 0; display: grid; place-items: center; z-index: 50; background: color-mix(in srgb, var(--ink) 45%, transparent); }
+.modal { width: min(90vw, 420px); padding: 20px; border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 8px 30px color-mix(in srgb, var(--ink) 20%, transparent); }
+.modal h3 { margin-top: 0; }
+@media (max-width: 719px) {
+  .heading { align-items: flex-start; }
+  .pageActions { justify-content: flex-start; }
+  .toolbar { display: grid; }
+  .search input { width: min(100%, 280px); }
+  .mobile { display: grid; gap: 12px; }
+  .studentCard { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); }
+  .studentCard > label { font-weight: 700; }
+  .studentCard > label input { min-width: 28px; min-height: 28px; }
+  .studentCard dl { margin: 0; }
+  .studentCard dl > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; border-top: 1px solid var(--line-soft); padding: 4px 0; }
+  .studentCard dt { font-weight: 600; }
+  .studentCard dd { margin: 0; }
+  .studentCard button { grid-column: 1 / -1; justify-self: end; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .page * { scroll-behavior: auto; } }

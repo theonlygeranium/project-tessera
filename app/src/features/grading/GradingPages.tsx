@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { Assignment, BlockContent, Grade, Provenance, RubricCriterion, Submission } from '../../../../shared/domain';
-import { AiContent, Button, DataTable, FormField, Select, StatusNotice, TextArea, TextInput, TopBar } from '../../components';
+import { AiContent, Button, FormField, Select, StatusNotice, TextArea, TextInput, TopBar } from '../../components';
 import { useQuery } from '@tanstack/react-query';
 import type { ApiError } from '../../../../shared/api';
 import { api, useApiMutation, useApiQuery } from '../../data/hooks';
@@ -14,6 +14,7 @@ import { TutorPanel } from '../tutor/TutorPanel';
 import { TutorSettingsPanel } from '../tutor/TutorSettingsPanel';
 import styles from './Grading.module.css';
 import { OutcomeTags } from '../readiness/OutcomeTags';
+import { GradebookGridPage } from '../gradebook/GradebookGridPage';
 
 function Field({ label, value, set, type = 'text', error }: { label:string; value:string; set:(v:string)=>void; type?:'text'|'number'|'url'; error?:string }) {
   return <FormField label={label} error={error}>{p => <TextInput {...p} type={type} value={value} onChange={e => set(e.target.value)} />}</FormField>;
@@ -28,17 +29,16 @@ function Instructions({ blocks }: { blocks:Assignment['instructions'] }) {
 
 export function GradesPage() {
   const { courseId='' }=useParams(); const navigate=useNavigate(); usePageTitle('Grades');
-  const outline=useApiQuery('getCourseOutline',{courseId}); const book=useApiQuery('getGradebook',{courseId}); const list=useApiQuery('listAssignments',{courseId});
-  const create=useApiMutation('createAssignment'); const exporting=useApiMutation('exportGradebook');
+  const outline=useApiQuery('getCourseOutline',{courseId}); const list=useApiQuery('listAssignments',{courseId});
+  const create=useApiMutation('createAssignment');
   const [tab,setTab]=useState<'assignments'|'gradebook'>('assignments'); const [moduleId,setModuleId]=useState(''); const [title,setTitle]=useState(''); const [kind,setKind]=useState<Assignment['submissionType']>('text'); const [points,setPoints]=useState('10'); const [dueAt,setDueAt]=useState(''); const [message,setMessage]=useState(''); const [error,setError]=useState('');
   const modules=outline.data?.modules ?? [];
   useEffect(() => { if (!moduleId && modules[0]) setModuleId(modules[0].id); },[moduleId,modules]);
-  const run=async (action:()=>Promise<unknown>, success:string)=>{ try { setError(''); await action(); setMessage(success); } catch(e) { setError(e instanceof Error ? e.message : 'Action failed.'); } };
   return <div className={styles.page}><TopBar title="Grades" breadcrumbs={[{label:'My courses',href:paths.teach.courses},{label:outline.data?.course.title ?? 'Course',href:paths.teach.course(courseId)},{label:'Grades'}]} renderLink={renderRouterLink}/>
-    {outline.isPending || book.isPending ? <Loading/> : outline.error ? <ErrorNotice error={outline.error} onRetry={()=>void outline.refetch()}/> : book.error ? <ErrorNotice error={book.error} onRetry={()=>void book.refetch()}/> : <><Notice message={message} error={error}/><div className={styles.row} role="tablist" aria-label="Grades sections"><Button id="assignments-tab" role="tab" aria-controls="assignments-panel" aria-selected={tab==='assignments'} onClick={()=>setTab('assignments')}>Assignments</Button><Button id="gradebook-tab" role="tab" aria-controls="gradebook-panel" aria-selected={tab==='gradebook'} onClick={()=>setTab('gradebook')}>Gradebook</Button></div>
+    {outline.isPending ? <Loading/> : outline.error ? <ErrorNotice error={outline.error} onRetry={()=>void outline.refetch()}/> : <><Notice message={message} error={error}/><div className={styles.row} role="tablist" aria-label="Grades sections"><Button id="assignments-tab" role="tab" aria-controls="assignments-panel" aria-selected={tab==='assignments'} onClick={()=>setTab('assignments')}>Assignments</Button><Button id="gradebook-tab" role="tab" aria-controls="gradebook-panel" aria-selected={tab==='gradebook'} onClick={()=>setTab('gradebook')}>Gradebook</Button></div>
       {tab==='assignments' ? <section id="assignments-panel" role="tabpanel" aria-labelledby="assignments-tab" className={styles.stack}><h2>Assignments</h2>{!list.data?.length ? <p>No assignments yet.</p> : <ul className={styles.list}>{list.data.map(a=><li key={a.id} className={styles.panel}><Link to={paths.teach.assignment(courseId,a.id)}>{a.title}</Link><p>{a.status==='published'?'Published':'Draft'} · {a.points} points · Due {date(a.dueAt)}</p></li>)}</ul>}
         <div className={styles.panel}><h3>Create assignment</h3><form className={styles.stack} onSubmit={e=>{e.preventDefault(); void (async()=>{try { const a=await create.mutateAsync({moduleId,title,submissionType:kind,points:Number(points),dueAt:iso(dueAt)}); navigate(paths.teach.assignment(courseId,a.id)); } catch(err) { setError(err instanceof Error ? err.message : 'Could not create assignment.'); }})();}}><FormField label="Module" required>{p=><Select {...p} value={moduleId} onChange={e=>setModuleId(e.target.value)}>{modules.map(m=><option key={m.id} value={m.id}>{m.title}</option>)}</Select>}</FormField><Field label="Title" value={title} set={setTitle} error={error && !title.trim() ? 'Enter a title.' : undefined}/><FormField label="Submission type">{p=><Select {...p} value={kind} onChange={e=>setKind(e.target.value as Assignment['submissionType'])}><option value="text">Text</option><option value="file">File</option><option value="link">Link</option></Select>}</FormField><Field label="Points" type="number" value={points} set={setPoints}/><FormField label="Due date">{p=><input {...p} type="datetime-local" value={dueAt} onChange={e=>setDueAt(e.target.value)}/>}</FormField><Button type="submit" variant="primary" disabled={create.isPending||!moduleId}>Create</Button></form></div></section>
-      : <section id="gradebook-panel" role="tabpanel" aria-labelledby="gradebook-tab" className={styles.stack}><h2>Gradebook</h2><Button onClick={()=>void run(async()=>{const result=await exporting.mutateAsync({courseId}); const csv='csv' in result?result.csv:''; const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); const a=document.createElement('a'); a.href=url; a.download='gradebook.csv'; a.click(); URL.revokeObjectURL(url);},'CSV downloaded.')}>Download CSV</Button><DataTable caption="Course gradebook" density="compact" rows={book.data?.rows ?? []} rowKey={r=>r.student.id} columns={[{key:'student',header:'Student',render:r=>r.student.name},...(book.data?.assignments ?? []).map(a=>({key:a.id,header:`${a.title} (${a.points})`,render:(r:NonNullable<typeof book.data>['rows'][number])=>{const c=r.cells.find(x=>x.assignmentId===a.id); return c?.released ? String(c.score) : c?.state ?? 'Missing';}})),{key:'total',header:'Total',render:r=>`${r.total} / ${r.possible}`}]}/></section>}</>}
+      : <section id="gradebook-panel" role="tabpanel" aria-labelledby="gradebook-tab" className={styles.stack}><GradebookGridPage courseId={courseId}/></section>}</>}
   </div>;
 }
 

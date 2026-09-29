@@ -136,8 +136,8 @@ describe('fast and exact gradebook differential', () => {
     expect(trace.steps.filter(step => step.code === 'base-score').map(step => step.target.assignmentId)).toEqual(['a', 'b']);
     expect(explain(trace, 'student', 'Learner').slice(0, 2)).toEqual(['a: 8 of 10 recorded.', 'b: 8 of 10 recorded.']);
     expect(cellDisplays(trace)).toEqual([
-      { assignmentId: 'a', state: 'graded', adjusted: 8, label: '' },
-      { assignmentId: 'b', state: 'graded', adjusted: 8, label: '' },
+      { assignmentId: 'a', state: 'graded', adjusted: 8, raw: 8, label: '' },
+      { assignmentId: 'b', state: 'graded', adjusted: 8, raw: 8, label: '' },
     ]);
     expect(exportRow(trace, input.items)).toEqual([8, 8, 80, 80, 'B-', input.setup.rulesVersion]);
   });

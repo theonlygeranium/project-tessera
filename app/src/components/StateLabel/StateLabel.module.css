@@ -1,0 +1,7 @@
+.label { display: inline-flex; align-items: center; gap: 3px; color: var(--muted); font: 600 11px/1.25 var(--font-sans); white-space: nowrap; }
+.label svg { flex: none; }
+.late { color: var(--warning-text); }
+.missing { color: var(--error-text); }
+.tograde { color: var(--accent-hover); }
+.feedbackdraft { color: var(--ai-strong); }
+@media (forced-colors: active) { .label, .label svg { color: CanvasText; stroke: CanvasText; } }

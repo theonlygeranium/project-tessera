@@ -35,3 +35,6 @@ export { CourseCard } from './CourseCard/CourseCard';
 export type { CourseCardProps } from './CourseCard/CourseCard';
 export { PresenceCard } from './PresenceCard/PresenceCard';
 export type { PresenceCardProps } from './PresenceCard/PresenceCard';
+export { StateLabel } from './StateLabel/StateLabel';
+export { GradeCell } from './GradeCell/GradeCell';
+export { DataGrid } from './DataGrid/DataGrid';

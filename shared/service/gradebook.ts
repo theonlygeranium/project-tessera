@@ -382,6 +382,7 @@ function cellResult(data: Data, studentId: string, assignmentId: string, version
     display: {
       state: d.state,
       adjusted: d.adjusted,
+      raw: d.raw,
       label: d.label
     }
   };
@@ -657,6 +658,7 @@ export const gradebook: Pick<Service,
             display: {
               state: d.state,
               adjusted: d.adjusted,
+              raw: d.raw,
               label: d.label
             }
           };
