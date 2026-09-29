@@ -3,7 +3,7 @@
 // `dispatch`, so they behave the same by construction.
 import type { AiClient } from '../ai';
 import { ApiError, ROUTES, type Input, type Operation, type Output } from '../api';
-import type { AccessReport, AccessibleFormat, ApiToken, Block, FileRecord, Id, PageTranscription, Provenance, Timestamp, User } from '../domain';
+import type { AccessReport, AccessibleFormat, ApiToken, Block, FileRecord, Id, PageTranscription, Provenance, Timestamp, ToolSession, User } from '../domain';
 import { allows } from '../policy';
 import type { Repo } from '../repo';
 
@@ -28,6 +28,8 @@ export interface ServiceContext {
   background?: { startGeneration(jobId: Id): Promise<void> } | null;
   /** Set when an assistant calls through the MCP server: content it writes is an AI draft a person keeps (D-003). */
   agent?: { name: string } | null;
+  /** Course membership and effective role established by a verified LTI launch. */
+  toolSession?: ToolSession | null;
 }
 
 export interface Directory {

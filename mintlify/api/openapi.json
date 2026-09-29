@@ -18459,6 +18459,115 @@
           }
         ]
       }
+    },
+    "/api/v1/institution/sso": {
+      "put": {
+        "operationId": "updateSsoSettings",
+        "tags": [
+          "people"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Institution"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "domains": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/SsoDomain"
+                    }
+                  }
+                },
+                "required": [
+                  "domains"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -23952,6 +24061,16 @@
           },
           "readinessPolicy": {
             "$ref": "#/components/schemas/ReadinessPolicy"
+          },
+          "sso": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SsoSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -23990,6 +24109,31 @@
           "minimumPercent"
         ],
         "additionalProperties": false
+      },
+      "SsoSettings": {
+        "type": "object",
+        "properties": {
+          "domains": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SsoDomain"
+            }
+          },
+          "defaultRole": {
+            "type": "string",
+            "const": "student"
+          }
+        },
+        "required": [
+          "domains",
+          "defaultRole"
+        ],
+        "additionalProperties": false
+      },
+      "SsoDomain": {
+        "type": "string",
+        "pattern": "^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
       },
       "Invitation": {
         "type": "object",

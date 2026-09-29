@@ -312,5 +312,90 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect(await repo.getTestOut('c-stat110')).toBeNull(); expect(await repo.listTestOutAttempts('u-priya', 'c-stat110')).toEqual([]);
       expect(await repo.listCertificates({})).toEqual([]); expect(await repo.listReportingLines({})).toEqual(fresh.reportingLines); expect(await repo.listManagerConsents({})).toEqual([]);
     });
+    it('keeps identity creation atomic and identity lookups normalized', async () => {
+      const repo = await makeRepo();
+      const base = { name:'Interop Student',email:'interop@example.test',role:'student' as const,initials:'IS',profile:null };
+      const at = '2026-09-28T00:00:00.000Z';
+      const identity = { kind:'access-email' as const,key:'INTEROP@EXAMPLE.TEST',linkedAt:at,linkedBy:'first-sign-in' as const,lastSeenAt:null };
+      const [a,b] = await Promise.all([
+        repo.insertUserWithIdentity({ ...base,id:'u-interop-a' },{ ...identity,userId:'u-interop-a' }),
+        repo.insertUserWithIdentity({ ...base,id:'u-interop-b' },{ ...identity,userId:'u-interop-b' }),
+      ]);
+      expect([a.inserted,b.inserted].sort()).toEqual([false,true]);
+      expect(a.user.id).toBe(b.user.id);
+      expect((await repo.listUsers()).filter(u => u.email === base.email)).toHaveLength(1);
+      expect(await repo.getUserIdentity('access-email','interop@example.test')).toEqual({ ...identity,key:'interop@example.test',userId:a.user.id });
+      expect((await repo.listUserIdentities(a.user.id)).map(i => i.key)).toEqual(['interop@example.test']);
+      await repo.touchUserIdentity('access-email','INTEROP@EXAMPLE.TEST','2026-09-29T00:00:00.000Z');
+      expect((await repo.getUserIdentity('access-email','interop@example.test'))?.lastSeenAt).toBe('2026-09-29T00:00:00.000Z');
+      const existingEmail = await repo.insertUserWithIdentity({ ...base,id:'u-interop-c' },{ ...identity,userId:'u-interop-c',key:'different@example.test' });
+      expect(existingEmail).toEqual({ inserted:false,user:a.user });
+      const seeded = (await repo.getUser('u-priya'))!;
+      expect(await repo.insertUserWithIdentity(seeded,{ ...identity,userId:seeded.id,key:'seeded@example.test' })).toEqual({inserted:false,user:seeded});
+      expect(await repo.getUserIdentity('access-email','seeded@example.test')).toBeNull();
+      await expect(repo.insertUserWithIdentity({ ...base,id:'u-lti-clash' },{ ...identity,userId:'u-lti-clash',kind:'lti',key:'platform|sub' })).rejects.toThrow();
+      expect(await repo.getUserIdentity('lti','platform|sub')).toBeNull();
+    });
+    it('P1 — Unicode email case-folding diverges between MemoryRepo and D1Repo', async () => {
+      const repo = await makeRepo();
+      const at = '2026-09-28T00:00:00.000Z';
+      const user = { id:'u-unicode-a',name:'Émile',email:'Émile@meridian.edu',role:'instructor' as const,initials:'É',profile:null };
+      const identity = { userId:user.id,kind:'access-email' as const,key:'Émile@MERIDIAN.EDU',linkedAt:at,linkedBy:'admin' as const,lastSeenAt:null };
+      expect(await repo.insertUserWithIdentity(user,identity)).toEqual({inserted:true,user});
+      expect(await repo.getUserIdentity('access-email','Émile@meridian.edu')).toMatchObject({userId:user.id,key:'Émile@meridian.edu'});
+      expect(await repo.getUserIdentity('access-email','émile@meridian.edu')).toBeNull();
+      await repo.touchUserIdentity('access-email','Émile@MERIDIAN.EDU','2026-09-29T00:00:00.000Z');
+      expect((await repo.getUserIdentity('access-email','Émile@meridian.edu'))?.lastSeenAt).toBe('2026-09-29T00:00:00.000Z');
+      const distinct = { ...user,id:'u-unicode-b',email:'émile@meridian.edu' };
+      expect(await repo.insertUserWithIdentity(distinct,{...identity,userId:distinct.id,key:distinct.email})).toEqual({inserted:true,user:distinct});
+      expect((await repo.listUsers()).filter(u=>u.email.endsWith('@meridian.edu'))).toHaveLength(2);
+    });
+    it('P2 — Concurrent launches can revoke both new sessions', async () => {
+      const repo = await makeRepo();
+      const at = '2026-09-28T00:00:00.000Z';
+      const base = {userId:'u-priya',courseId:'c-stat110',role:'student' as const,platformId:'p',contextId:'same',resourceLinkId:null,createdAt:at,expiresAt:'2026-09-28T02:00:00.000Z',returnUrl:null,revokedAt:null};
+      const a = {...base,id:'tts-concurrent-a',tokenHash:'hash-concurrent-a'};
+      const b = {...base,id:'tts-concurrent-b',tokenHash:'hash-concurrent-b'};
+      await Promise.all([repo.replaceToolSession(a),repo.replaceToolSession(b)]);
+      const stored = await Promise.all([repo.getToolSessionByHash(a.tokenHash),repo.getToolSessionByHash(b.tokenHash)]);
+      expect(stored.filter(s=>s?.revokedAt===null)).toHaveLength(1);
+      expect(stored.filter(s=>s?.revokedAt!==null)).toHaveLength(1);
+    });
+    it('P2 — Relaunch revocation conflates contexts from different platforms', async () => {
+      const repo = await makeRepo();
+      const at = '2026-09-28T00:00:00.000Z';
+      const base = {userId:'u-priya',courseId:'c-stat110',role:'student' as const,contextId:'shared',resourceLinkId:null,createdAt:at,expiresAt:'2026-09-28T02:00:00.000Z',returnUrl:null,revokedAt:null};
+      const a = {...base,id:'tts-platform-a',tokenHash:'hash-platform-a',platformId:'platform-a'};
+      const b = {...base,id:'tts-platform-b',tokenHash:'hash-platform-b',platformId:'platform-b'};
+      const next = {...a,id:'tts-platform-a-next',tokenHash:'hash-platform-a-next'};
+      await repo.replaceToolSession(a);
+      await repo.replaceToolSession(b);
+      expect((await repo.getToolSessionByHash(a.tokenHash))?.revokedAt).toBeNull();
+      expect((await repo.getToolSessionByHash(b.tokenHash))?.revokedAt).toBeNull();
+      await repo.replaceToolSession(next);
+      expect((await repo.getToolSessionByHash(a.tokenHash))?.revokedAt).toBe(at);
+      expect((await repo.getToolSessionByHash(b.tokenHash))?.revokedAt).toBeNull();
+      expect((await repo.getToolSessionByHash(next.tokenHash))?.revokedAt).toBeNull();
+    });
+    it('keeps suggestions and tool sessions ordered, conditional, and resettable', async () => {
+      const repo = await makeRepo();
+      const at = '2026-09-28T00:00:00.000Z';
+      const suggestion = { id:'ils-one',identityKind:'lti' as const,identityKey:'p|s',fromUserId:'u-priya',targetUserId:'u-admin',email:'admin@example.test',createdAt:at,resolvedAt:null };
+      await repo.putIdentityLinkSuggestion(suggestion);
+      await repo.putIdentityLinkSuggestion({ ...suggestion,id:'ils-two',email:'changed@example.test' });
+      expect(await repo.listIdentityLinkSuggestions({ open:true })).toEqual([suggestion]);
+      const session = { id:'tts-one',tokenHash:'hash-one',userId:'u-priya',courseId:'c-stat110',role:'student' as const,platformId:'p',contextId:'ctx',resourceLinkId:null,createdAt:at,expiresAt:'2026-09-28T02:00:00.000Z',returnUrl:null,revokedAt:null };
+      await repo.insertToolSession(session);
+      expect(await repo.getToolSessionByHash(session.tokenHash)).toEqual(session);
+      expect(await repo.extendToolSession(session.id,'2026-09-28T01:00:00.000Z',at)).toBe(false);
+      expect(await repo.extendToolSession(session.id,'2026-09-28T03:00:00.000Z',at)).toBe(true);
+      expect((await repo.getToolSessionByHash(session.tokenHash))?.expiresAt).toBe('2026-09-28T03:00:00.000Z');
+      expect(await repo.revokeToolSessions({userId:'u-priya',contextId:'ctx'},at)).toBe(1);
+      expect(await repo.revokeToolSessions({userId:'u-priya',contextId:'ctx'},at)).toBe(0);
+      expect(await repo.extendToolSession(session.id,'2026-09-28T04:00:00.000Z',at)).toBe(false);
+      await repo.reset(seedData());
+      expect(await repo.getToolSessionByHash(session.tokenHash)).toBeNull();
+      expect(await repo.listIdentityLinkSuggestions({})).toEqual([]);
+    });
   });
 }

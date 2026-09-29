@@ -2,6 +2,8 @@ import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Cours
 import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt } from '../repo';
 import type { SeedData } from '../seed';
 import { ApiError } from '../api';
+import type { IdentityKind, IdentityLinkSuggestion, ToolSession, UserIdentity } from '../domain';
+import { asciiLower } from './interop/ascii';
 
 declare const structuredClone: <T>(value: T) => T;
 const copy = <T>(value: T): T => structuredClone(value);
@@ -9,7 +11,7 @@ const copy = <T>(value: T): T => structuredClone(value);
  * Night 3 optional fields are omitted when null, as D1 omits NULL columns, so both repos
  * return identical objects (including through `toEqual`).
  */
-const OPTIONAL_NIGHT3 = ['templateId', 'readinessPolicy', 'programId', 'objective', 'templateKey', 'variantOf', 'source'] as const;
+const OPTIONAL_NIGHT3 = ['templateId', 'readinessPolicy', 'programId', 'objective', 'templateKey', 'variantOf', 'source', 'sso'] as const;
 function normalized<T extends object>(value: T): T {
   const out = copy(value) as Record<string, unknown>;
   for (const key of OPTIONAL_NIGHT3) if (key in out && (out[key] === null || out[key] === undefined)) delete out[key];
@@ -23,8 +25,11 @@ const byNewest = (a: { publishedAt: string | null; createdAt: string }, b: { pub
 
 export class MemoryRepo implements Repo {
   private data: SeedData & { readinessItems: StoredReadinessItem[] };
+  private userIdentities: UserIdentity[] = [];
+  private identityLinkSuggestions: IdentityLinkSuggestion[] = [];
+  private toolSessions: ToolSession[] = [];
   constructor(seed: SeedData) { this.data = this.withNight3(seed); }
-  async getInstitution(): Promise<Institution> { return copy(this.data.institution); }
+  async getInstitution(): Promise<Institution> { return normalized(this.data.institution); }
   async putInstitution(value: Institution) { this.data.institution = normalized(value); }
   async getUser(id: string): Promise<User | null> { return copy(this.data.users.find(x => x.id === id) ?? null); }
   async listUsers(filter?: { role?: User['role'] }): Promise<User[]> {
@@ -253,7 +258,7 @@ export class MemoryRepo implements Repo {
   async listManagerConsents(filter: { managerId?: string; reportId?: string }) { return copy(this.data.managerConsents!.filter(x => (!filter.managerId || x.managerId === filter.managerId) && (!filter.reportId || x.reportId === filter.reportId)).sort((a, b) => cmp(a.managerId, b.managerId) || cmp(a.reportId, b.reportId))); }
   async putManagerConsent(value: ManagerConsent) { const i = this.data.managerConsents!.findIndex(x => x.managerId === value.managerId && x.reportId === value.reportId); if (i < 0) this.data.managerConsents!.push(copy(value)); else this.data.managerConsents![i] = copy(value); }
   async isEmpty(): Promise<boolean> { return this.data.users.length === 0; }
-  async reset(seed: SeedData) { this.data = this.withNight3(seed); }
+  async reset(seed: SeedData) { this.data = this.withNight3(seed); this.userIdentities = []; this.identityLinkSuggestions = []; this.toolSessions = []; }
   private withNight3(seed: SeedData): SeedData & { readinessItems: StoredReadinessItem[] } {
     return copy({ ...seed, programs: seed.programs ?? [], templates: seed.templates ?? [], rubrics: (seed.rubrics ?? []).map(r => ({ ...r, source: 'custom' as const, builtIn: false })), readinessItems: [],
       outcomes: seed.outcomes ?? seed.courses.flatMap(course => course.outcomes.flatMap((value, i) => value.trim() ? [{ id: `${course.id}-o${i + 1}`, courseId: course.id, code: `O${i + 1}`, text: value, position: i }] : [])),
@@ -262,5 +267,65 @@ export class MemoryRepo implements Repo {
   private upsert<T extends { id: string }>(items: T[], value: T) {
     const i = items.findIndex(x => x.id === value.id);
     if (i < 0) items.push(copy(value)); else items[i] = copy(value);
+  }
+  async getUserIdentity(kind: IdentityKind, key: string): Promise<UserIdentity | null> {
+    const normalizedKey = kind === 'access-email' ? asciiLower(key) : key;
+    return copy(this.userIdentities.find(x => x.kind === kind && x.key === normalizedKey) ?? null);
+  }
+  async listUserIdentities(userId: string): Promise<UserIdentity[]> {
+    return copy(this.userIdentities.filter(x => x.userId === userId).sort((a, b) => cmp(a.kind, b.kind) || cmp(a.key, b.key)));
+  }
+  async insertUserWithIdentity(user: User, identity: UserIdentity): Promise<{ inserted: true; user: User } | { inserted: false; user: User }> {
+    const key = identity.kind === 'access-email' ? asciiLower(identity.key) : identity.key;
+    const existing = this.userIdentities.find(x => x.kind === identity.kind && x.key === key);
+    if (existing) return { inserted: false, user: copy(this.data.users.find(x => x.id === existing.userId)!) };
+    const emailOwner = this.data.users.find(x => asciiLower(x.email) === asciiLower(user.email));
+    if (emailOwner) {
+      if (identity.kind === 'lti') throw new Error('LTI synthetic email collided with an existing user.');
+      return { inserted: false, user: copy(emailOwner) };
+    }
+    if (this.data.users.some(x => x.id === user.id)) throw new Error('Duplicate user id.');
+    this.data.users.push(copy(user));
+    this.userIdentities.push(copy({ ...identity, key, userId: user.id }));
+    return { inserted: true, user: copy(user) };
+  }
+  async touchUserIdentity(kind: IdentityKind, key: string, now: string): Promise<void> {
+    const row = this.userIdentities.find(x => x.kind === kind && x.key === (kind === 'access-email' ? asciiLower(key) : key));
+    if (row) row.lastSeenAt = now;
+  }
+  async putIdentityLinkSuggestion(s: IdentityLinkSuggestion): Promise<void> {
+    if (this.identityLinkSuggestions.some(x => x.id === s.id || x.identityKind === s.identityKind && x.identityKey === s.identityKey && x.targetUserId === s.targetUserId)) return;
+    if (!this.data.users.some(x => x.id === s.fromUserId) || !this.data.users.some(x => x.id === s.targetUserId)) throw new Error('Unknown suggestion user.');
+    this.identityLinkSuggestions.push(copy(s));
+  }
+  async listIdentityLinkSuggestions(filter: { open?: boolean }): Promise<IdentityLinkSuggestion[]> {
+    return copy(this.identityLinkSuggestions.filter(x => filter.open === undefined || (x.resolvedAt === null) === filter.open).sort((a, b) => cmp(a.createdAt, b.createdAt) || cmp(a.id, b.id)));
+  }
+  async insertToolSession(session: ToolSession): Promise<void> {
+    if (this.toolSessions.some(x => x.id === session.id || x.tokenHash === session.tokenHash)) throw new Error('Duplicate tool session.');
+    if (session.role !== 'instructor' && session.role !== 'student') throw new Error('Invalid tool session role.');
+    if (!this.data.users.some(x => x.id === session.userId) || !this.data.courses.some(x => x.id === session.courseId)) throw new Error('Unknown tool session user or course.');
+    this.toolSessions.push(copy(session));
+  }
+  async replaceToolSession(session: ToolSession): Promise<void> {
+    // No await between validation, revocation and insertion: concurrent launches
+    // serialize in the same order as this in-memory transaction.
+    if (this.toolSessions.some(x => x.id === session.id || x.tokenHash === session.tokenHash)) throw new Error('Duplicate tool session.');
+    if (session.role !== 'instructor' && session.role !== 'student') throw new Error('Invalid tool session role.');
+    if (!this.data.users.some(x => x.id === session.userId) || !this.data.courses.some(x => x.id === session.courseId)) throw new Error('Unknown tool session user or course.');
+    for (const row of this.toolSessions) if (row.userId === session.userId && row.platformId === session.platformId && row.contextId === session.contextId && row.revokedAt === null) row.revokedAt = session.createdAt;
+    this.toolSessions.push(copy(session));
+  }
+  async getToolSessionByHash(hash: string): Promise<ToolSession | null> { return copy(this.toolSessions.find(x => x.tokenHash === hash) ?? null); }
+  async extendToolSession(id: string, expiresAt: string, now: string): Promise<boolean> {
+    const row = this.toolSessions.find(x => x.id === id && x.revokedAt === null && x.expiresAt > now && expiresAt > x.expiresAt);
+    if (!row) return false;
+    row.expiresAt = expiresAt;
+    return true;
+  }
+  async revokeToolSessions(filter: { userId: string; platformId?: string; contextId: string }, now: string, exceptId?: string): Promise<number> {
+    const rows = this.toolSessions.filter(x => x.userId === filter.userId && (filter.platformId === undefined || x.platformId === filter.platformId) && x.contextId === filter.contextId && x.revokedAt === null && x.id !== exceptId);
+    for (const row of rows) row.revokedAt = now;
+    return rows.length;
   }
 }

@@ -128,5 +128,6 @@ export const OPERATIONS: { [K in Operation]: { input: z.ZodType<Input<K>>; outpu
  setManagerSharing:{input:z.object({managerId:id,sharing:z.boolean()}),output:S.MyVisibilitySchema},
  getManagerView:{input:z.void(),output:S.ManagerViewSchema},
  listTranscriptions:{input:by('fileId'),output:z.array(S.PageTranscriptionSchema)},
- reviewTranscription:{input:z.object({fileId:id,page:integer.min(1),decision:z.enum(['keep','discard'])}),output:z.array(S.PageTranscriptionSchema)}
+ reviewTranscription:{input:z.object({fileId:id,page:integer.min(1),decision:z.enum(['keep','discard'])}),output:z.array(S.PageTranscriptionSchema)},
+ updateSsoSettings:{input:z.object({domains:z.array(S.SsoDomainSchema).max(50)}),output:S.InstitutionSchema}
 };

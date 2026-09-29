@@ -8,6 +8,7 @@ import type {
   AiFinding, AlignableKind, Attestation, Certificate, CompletionEvent, CourseTemplate, ManagerConsent, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, TestOut,
 } from './domain';
 import type { SeedData } from './seed';
+import type { IdentityKind, IdentityLinkSuggestion, ToolSession, UserIdentity } from './domain';
 
 /** One element to draft; `variant: 'video-script'` is a document written as scenes with narration. */
 export interface GenerationItem { lessonId: Id; type: Block['type']; variant?: 'video-script' }
@@ -242,4 +243,25 @@ export interface Repo {
   isEmpty(): Promise<boolean>;
   /** Deletes everything and loads the seed. */
   reset(seed: SeedData): Promise<void>;
+  /** Exact LTI key; access-email lookups fold ASCII case only. */
+  getUserIdentity(kind: IdentityKind, key: string): Promise<UserIdentity | null>;
+  /** Ordered by kind, then key. */
+  listUserIdentities(userId: Id): Promise<UserIdentity[]>;
+  /** Atomic first identity wins; access-email can return an existing email owner without linking. */
+  insertUserWithIdentity(user: User, identity: UserIdentity): Promise<{ inserted: true; user: User } | { inserted: false; user: User }>;
+  /** Record a successful identity use. */
+  touchUserIdentity(kind: IdentityKind, key: string, now: Timestamp): Promise<void>;
+  /** Insert once for the identity and candidate target; preserve the first suggestion. */
+  putIdentityLinkSuggestion(suggestion: IdentityLinkSuggestion): Promise<void>;
+  /** Ordered by createdAt, then id. */
+  listIdentityLinkSuggestions(filter: { open?: boolean }): Promise<IdentityLinkSuggestion[]>;
+  /** Store a hashed credential. */
+  insertToolSession(session: ToolSession): Promise<void>;
+  /** Atomically revoke previous sessions for this user, platform and context, then insert this one. */
+  replaceToolSession(session: ToolSession): Promise<void>;
+  getToolSessionByHash(hash: string): Promise<ToolSession | null>;
+  /** Extend a live session only when the proposed expiry is later. */
+  extendToolSession(id: Id, expiresAt: Timestamp, now: Timestamp): Promise<boolean>;
+  /** Revoke unrevoked sessions in one user's context; platformId narrows the legacy explicit-revocation call. */
+  revokeToolSessions(filter: { userId: Id; platformId?: Id; contextId: Id }, now: Timestamp, exceptId?: Id): Promise<number>;
 }

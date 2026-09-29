@@ -9,12 +9,14 @@ export const user = (ctx: ServiceContext): User => ctx.user ?? fail('unauthentic
 export async function course(ctx: ServiceContext, id: string): Promise<Course> { return await ctx.repo.getCourse(id) ?? fail('not-found', 'Course not found.'); }
 export async function canReachCourse(ctx: ServiceContext, id: string): Promise<Course> {
   const c = await course(ctx, id); const u = user(ctx);
+  if (ctx.toolSession) return ctx.toolSession.courseId === id && (ctx.toolSession.role === 'instructor' || c.status === 'active') ? c : fail('forbidden', 'You cannot reach this course.');
   if (u.role === 'administrator' || (u.role === 'instructor' && c.instructorIds.includes(u.id))) return c;
   if (u.role === 'student' && c.status === 'active' && (await ctx.repo.listEnrollments({ courseId: id, userId: u.id })).length) return c;
   return fail('forbidden', 'You cannot reach this course.');
 }
 export async function canTeach(ctx: ServiceContext, id: string): Promise<Course> {
   const c = await course(ctx, id);
+  if (ctx.toolSession) return ctx.toolSession.courseId === id && ctx.toolSession.role === 'instructor' ? c : fail('forbidden', 'You do not teach this course.');
   return c.instructorIds.includes(user(ctx).id) ? c : fail('forbidden', 'You do not teach this course.');
 }
 export async function moduleFor(ctx: ServiceContext, id: string): Promise<Module> { return await ctx.repo.getModule(id) ?? fail('not-found', 'Module not found.'); }

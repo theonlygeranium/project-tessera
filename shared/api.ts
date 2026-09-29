@@ -317,6 +317,8 @@ export interface ApiSpec {
   setManagerSharing: { input: { managerId: Id; sharing: boolean }; output: MyVisibility };
   /** Completion only, for people who opted in (shared/managers/policy.ts). */
   getManagerView: { input: void; output: ManagerView };
+  /** Configure exact email domains eligible for student SSO JIT. An empty list disables JIT. */
+  updateSsoSettings: { input: { domains: string[] }; output: Institution };
 }
 
 /** Template fields an administrator edits. */
@@ -546,6 +548,7 @@ export const ROUTES: { [K in Operation]: Route } = {
   getMyVisibility: { method: 'GET', path: '/me/visibility', access: 'signed-in', scope: null },
   setManagerSharing: { method: 'PUT', path: '/me/visibility/:managerId', access: 'signed-in', scope: null, browserOnly: true },
   getManagerView: { method: 'GET', path: '/me/team', access: 'signed-in', scope: 'people:read' },
+  updateSsoSettings: { method: 'PUT', path: '/institution/sso', access: ADMIN, scope: 'people:write' },
 };
 
 /** All scopes, for the token form and the docs. */

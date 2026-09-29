@@ -21,8 +21,10 @@ export const AiPolicySchema = z.object({ aiAuthoring:z.boolean(), tutorModes:z.o
 export const AccessPolicySchema = z.object({ minimumScore:integer.min(0).max(100), blockingSeverities:z.array(z.enum(['critical','serious','moderate','minor'])) });
 export const AccentSchema = z.enum(['teal','blue','plum','rust']);
 export const ReadinessPolicySchema = z.object({ rubricId:id, minimumPercent:integer.min(0).max(100).nullable() });
+export const SsoDomainSchema = z.string().trim().toLowerCase().regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/);
+export const SsoSettingsSchema = z.object({ domains:z.array(SsoDomainSchema).max(50), defaultRole:z.literal('student') });
 export const VariantAudienceSchema = z.enum(['plain','micro']);
-export const InstitutionSchema = z.object({ id, name:required, shortName:required, accent:AccentSchema, setupComplete:z.boolean(), policy:AiPolicySchema, accessPolicy:AccessPolicySchema, templateId:id.nullable().optional(), readinessPolicy:ReadinessPolicySchema.optional() });
+export const InstitutionSchema = z.object({ id, name:required, shortName:required, accent:AccentSchema, setupComplete:z.boolean(), policy:AiPolicySchema, accessPolicy:AccessPolicySchema, templateId:id.nullable().optional(), readinessPolicy:ReadinessPolicySchema.optional(), sso:SsoSettingsSchema.nullable().optional() });
 export const CourseSchema = z.object({ id, code:required, title:required, term:required, description:string, welcome:string, outcomes:z.array(required), instructorIds:z.array(id), status:z.enum(['active','archived']), programId:id.nullable().optional() });
 export const CourseSummarySchema = CourseSchema.extend({ instructorNames:z.array(required), moduleCount:nonnegative, lessonCount:nonnegative, publishedLessonCount:nonnegative, studentCount:nonnegative, progress:z.number().min(0).max(1).nullable(), startedLessonCount:nonnegative.nullable(), program:z.object({ id, name:required, accent:AccentSchema.nullable() }).nullable().optional() });
 export const ModuleSchema = z.object({ id, courseId:id, title:required, position:integer.min(0), objective:string.nullable().optional(), templateKey:string.nullable().optional() });

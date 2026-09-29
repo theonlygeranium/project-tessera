@@ -12,6 +12,7 @@ import { readiness } from './readiness';
 
 async function detail(ctx: ServiceContext, lessonId: string): Promise<LessonDetail> {
   const lesson = await lessonFor(ctx, lessonId), module = await moduleFor(ctx, lesson.moduleId), course = await canReachCourse(ctx, lesson.courseId);
+  if (ctx.toolSession && module.courseId !== lesson.courseId) fail('forbidden', 'This lesson is outside the tool session course.');
   const blocks = await ctx.repo.listBlocks(lessonId);
   return { lesson, moduleTitle: module.title, courseTitle: course.title, blocks, readiness: lessonReadiness(blocks) };
 }

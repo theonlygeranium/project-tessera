@@ -15,6 +15,8 @@ import type { Repo } from '../shared/repo';
 import { seedData } from '../shared/seed';
 import { dispatch, service, type ServiceContext } from '../shared/service';
 import { coerceQuery, validateInput } from '../shared/schema';
+import { isToolSessionBearerAttempt, toolSessionCookie, toolSessionCredential } from './identity/tool-session';
+import { TOOL_SESSION_OPERATIONS, toolSessionCourse } from './identity/tool-session-scope';
 
 const SESSION_COOKIE = 'tessera_user';
 const VIEW_AS_COOKIE = 'tessera_view_as';
@@ -75,10 +77,11 @@ export function apiRelativePath(pathname: string): string {
 
 async function handleApi(request: Request, env: Env): Promise<Response> {
   const requestId = crypto.randomUUID();
-  const withId = (res: Response) => { res.headers.set('x-request-id', requestId); return res; };
+  let refreshedToolCookie: string | null = null;
+  const withId = (res: Response) => { res.headers.set('x-request-id', requestId); if (refreshedToolCookie) res.headers.append('set-cookie', refreshedToolCookie); return res; };
   try {
     // Reject anonymous production traffic before touching the database.
-    if (env.ENVIRONMENT !== 'local' && !bearerToken(request) && !hasAccessCredential(request)) {
+    if (env.ENVIRONMENT !== 'local' && !bearerToken(request) && !isToolSessionBearerAttempt(request) && !toolSessionCredential(request) && !hasAccessCredential(request)) {
       return withId(fail(401, 'unauthenticated', 'Sign in through Cloudflare Access, or send an API token.'));
     }
     const repo = new D1Repo(env.DB);
@@ -93,6 +96,20 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     const now = new Date().toISOString();
 
     const principal = await resolvePrincipal(request, env, repo, fileRoute ? fileRoute.route : certificateMatch ? ROUTES.getCertificate : ROUTES[found!.op], now);
+    if (principal.toolSession && principal.toolSessionCredentialSource === 'cookie') {
+      const token = toolSessionCredential(request)!;
+      const absoluteEnd = Date.parse(principal.toolSession.createdAt) + 8 * 60 * 60 * 1000;
+      const seconds = Math.max(0, Math.ceil((Math.min(Date.parse(principal.toolSession.expiresAt), absoluteEnd) - Date.parse(now)) / 1000));
+      refreshedToolCookie = toolSessionCookie(token, seconds);
+    }
+    if (principal.toolSession) {
+      if (fileRoute || certificateMatch || !found || !TOOL_SESSION_OPERATIONS[found.op]) throw new ApiError('forbidden', 'This tool session cannot access this operation.');
+    }
+    let input: unknown;
+    if (principal.toolSession && found) {
+      input = validateInput(found.op, coerceQuery(found.op, await readInput(request, found.params)));
+      if (await toolSessionCourse(found.op, repo, input, principal.toolSession) !== principal.toolSession.courseId) throw new ApiError('forbidden', 'This tool session cannot access this course.');
+    }
     const wait = rateLimiter.check(principal.rateKey);
     if (wait > 0) {
       const res = fail(429, 'rate-limited', `Too many requests. Try again in ${wait} seconds.`);
@@ -106,7 +123,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
 
     // Idempotent creates (D-020): the same key from the same principal replays the first response.
     const idempotencyKey = request.method === 'POST' ? request.headers.get('idempotency-key') : null;
-    const idemPrincipal = principal.token ? `tok:${principal.token.id}` : principal.user ? `user:${principal.user.id}` : null;
+    const idemPrincipal = principal.toolSession ? `tts:${principal.toolSession.id}` : principal.token ? `tok:${principal.token.id}` : principal.user ? `user:${principal.user.id}` : null;
     if (idempotencyKey && idemPrincipal) {
       const replay = await env.DB.prepare('SELECT status, body, created_at FROM idempotency_keys WHERE key = ? AND principal = ?').bind(idempotencyKey, idemPrincipal).first<{ status: number; body: string; created_at: string }>();
       if (replay && Date.now() - Date.parse(replay.created_at) < IDEMPOTENCY_TTL_MS) {
@@ -128,7 +145,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     }
     if (!found) throw new ApiError('not-found', 'No route matches.');
 
-    const input = validateInput(found.op, coerceQuery(found.op, await readInput(request, found.params)));
+    if (!principal.toolSession) input = validateInput(found.op, coerceQuery(found.op, await readInput(request, found.params)));
     let output: unknown;
     if (found.op === 'whoAmI') {
       output = { email: principal.email, user: principal.user, viewingAs: principal.actingAs ? principal.user : null };
@@ -166,7 +183,7 @@ export function serviceContextFor(env: Env, repo: Repo, user: import("../shared/
 
 function createServiceContext(env: Env, repo: Repo, principal: Awaited<ReturnType<typeof resolvePrincipal>>): ServiceContext {
   return {
-    repo, ai: createAiClient(env), user: principal.user, token: principal.token,
+    repo, ai: createAiClient(env), user: principal.user, token: principal.token, toolSession: principal.toolSession,
     now: () => new Date().toISOString(),
     newId: (prefix) => prefix + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12),
     documents: createDocumentEngine(env),

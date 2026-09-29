@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '../shared/api';
+import { ApiError, ROUTES } from '../shared/api';
 import { seedData } from '../shared/seed';
 import { service, type Service } from '../shared/service';
+import { MemoryRepo } from '../shared/service/memory-repo';
 import { clearAccessKeyCache } from './access';
+import { resolvePrincipal } from './api/auth';
 import { D1Repo } from './d1-repo';
 import worker from './index';
 import { createTestDb } from './test/d1-shim';
@@ -488,6 +490,49 @@ describe('persona picker outside local (Codex review 5)', () => {
     const asStranger = await (await call(env, '/api/v1/session', { headers: { 'cf-access-jwt-assertion': stranger, cookie: 'tessera_user=u-admin' } })).json() as { user: { id: string } | null };
     expect(asStranger.user).toBeNull();
     expect((await call(env, '/api/v1/users', { headers: { 'cf-access-jwt-assertion': stranger, cookie: 'tessera_user=u-admin' } })).status).toBe(401);
+  });
+});
+
+describe('Access Unicode identity regression', () => {
+  it('P1 — Access folds Kelvin sign before JIT rejection', async () => {
+    const key = await createTestKey('unicode-access-key');
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ keys: [key.jwk] }), { status: 200 }));
+    const db = createTestDb();
+    const d1 = new D1Repo(db as never);
+    const memory = new MemoryRepo(seedData());
+    const stored = { id: 'u-kelvin', name: 'Kelvin', email: 'Kate@meridian.edu', role: 'instructor' as const, initials: 'K', profile: null };
+    const ascii = { id: 'u-ascii', name: 'Emile', email: 'Emile@meridian.edu', role: 'instructor' as const, initials: 'E', profile: null };
+    await d1.reset(seedData());
+    for (const repo of [d1, memory]) {
+      await repo.putUser(stored);
+      await repo.putUser(ascii);
+      await repo.putInstitution({ ...await repo.getInstitution(), sso: { domains: ['meridian.edu'], defaultRole: 'student' } });
+    }
+    const env = testEnv(db, assetsFor().fetcher, 'production');
+    const signed = async (email: string) => signJwt(key.privateKey, key.kid, {
+      aud: AUD, iss: `https://${DOMAIN}`, exp: Math.floor(Date.now() / 1000) + 3600, email,
+    });
+    const access = async (email: string) => {
+      const request = new Request('http://localhost/api/v1/session', { headers: { 'cf-access-jwt-assertion': await signed(email) } });
+      const response = await worker.fetch(request.clone(), env as never, {} as never);
+      expect(response.status).toBe(200);
+      const body = await response.json() as { user: { id: string; email: string; role: string } | null };
+      const principal = await resolvePrincipal(request, env as never, memory, ROUTES.getSession, new Date().toISOString());
+      return { d1User: body.user, memoryUser: principal.user };
+    };
+    expect(await access(' Kate@meridian.edu ')).toEqual({ d1User: null, memoryUser: null });
+    expect((await d1.listUsers()).filter(user => user.email.includes('meridian.edu'))).toEqual(expect.arrayContaining([expect.objectContaining(stored), expect.objectContaining(ascii)]));
+    expect((await d1.listUsers()).filter(user => user.email.includes('meridian.edu'))).toHaveLength(2);
+    expect((await memory.listUsers()).filter(user => user.email.includes('meridian.edu'))).toHaveLength(2);
+    const existing = await access('EMILE@MERIDIAN.EDU');
+    expect(existing.d1User).toMatchObject({ id: ascii.id, role: 'instructor' });
+    expect(existing.memoryUser).toMatchObject({ id: ascii.id, role: 'instructor' });
+    const created = await access('kate@meridian.edu');
+    for (const user of [created.d1User, created.memoryUser]) {
+      expect(user).toMatchObject({ email: 'kate@meridian.edu', role: 'student' });
+      expect(user?.id).not.toBe(stored.id);
+    }
+    for (const repo of [d1, memory]) expect(await repo.getUser(stored.id)).toEqual(stored);
   });
 });
 

@@ -38,6 +38,19 @@ async function ensureAssignment(ctx: ServiceContext, r: Requirement, person: Use
 }
 async function applicable(ctx:ServiceContext, person:User) {
   const rows:{r:Requirement; courseId:string}[]=[];
+  if (ctx.toolSession) {
+    // A launch role is temporary. Read eligibility from the stored role and only
+    // inspect the launched course; assignment and enrollment are never written.
+    const stored = await ctx.repo.getUser(person.id);
+    const launched = await ctx.repo.getCourse(ctx.toolSession.courseId);
+    if (!stored || !launched) return rows;
+    for (const r of await ctx.repo.listRequirements()) {
+      const eligible = r.audience.kind === 'role' ? r.audience.role === stored.role : r.audience.userIds.includes(stored.id);
+      const targetsCourse = r.target.kind === 'course' ? r.target.courseId === launched.id : r.target.programId === launched.programId;
+      if (eligible && targetsCourse) rows.push({r,courseId:launched.id});
+    }
+    return rows;
+  }
   for (const r of await ctx.repo.listRequirements()) if (r.audience.kind==='role' ? r.audience.role===person.role : r.audience.userIds.includes(person.id)) for (const courseId of await targetCourses(ctx,r)) { await ensureAssignment(ctx,r,person,courseId); rows.push({r,courseId}); }
   return rows;
 }
@@ -88,6 +101,9 @@ async function instructorCourse(ctx:ServiceContext,courseId:string){ await canTe
 
 /** Called after progress is saved; audit events are only appended. */
 export async function onLessonProgress(ctx:ServiceContext,courseId:string) {
+  // Tool sessions may record completion only for their own course; applicable()
+  // avoids assignments and uses the person's stored institution role.
+  if (ctx.toolSession && courseId !== ctx.toolSession.courseId) return;
   const person=user(ctx), assigned=(await applicable(ctx,person)).filter(x=>x.courseId===courseId); if(!assigned.length)return;
   const r=assigned[0].r,events=await ctx.repo.listCompletionEvents({userId:person.id,courseId});
   const cycle=trainingCycle(r,ctx.now(),events.filter(e=>e.kind==='completed'||e.kind==='tested-out').at(-1)?.at??null);

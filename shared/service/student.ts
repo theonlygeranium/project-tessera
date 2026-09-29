@@ -53,12 +53,13 @@ export const student: Pick<Service, 'saveProfile' | 'getToday' | 'getStudentLess
     const requested = await learnerLesson(ctx, lessonId);
     const master = requested.variantOf ? await learnerLesson(ctx, requested.variantOf.lessonId) : requested;
     const profile = (await ctx.repo.getUser(user(ctx).id))?.profile;
-    const variants = (await ctx.repo.listVariantLessons(master.id)).filter(v => v.status === 'published');
+    const variants = (await ctx.repo.listVariantLessons(master.id)).filter(v => v.status === 'published' && v.courseId === master.courseId);
     const matched = profile?.readingLevel === 'plain' ? variants.find(v => v.variantOf?.audience === 'plain') : undefined;
     const available = matched ?? (profile?.sessionMinutes !== undefined && profile.sessionMinutes <= 15 ? variants.find(v => v.variantOf?.audience === 'micro') : undefined);
     const chosen = version === 'full' ? master : requested.variantOf ? requested : available ?? master;
     const why = (audience: 'plain' | 'micro') => audience === 'plain' ? 'Shown in plain language because your profile asks for plain reading.' : 'Shown as a 15-minute version because your sessions are 15 minutes or less.';
     const c = await learnerCourse(ctx, master.courseId), m = await moduleFor(ctx, chosen.moduleId);
+    if (ctx.toolSession && m.courseId !== master.courseId) fail('forbidden', 'This lesson is outside the tool session course.');
     const blocks: StudentBlock[] = (await ctx.repo.listBlocks(chosen.id)).filter(visible).map(b => {
       const meta = { id: b.id, position: b.position, origin: b.origin, provenance: b.provenance };
       const c = content(b);

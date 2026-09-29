@@ -36,7 +36,7 @@ export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseO
     const u = user(ctx), learnerView = asLearner || u.role === 'student', modules = await ctx.repo.listModules(courseId);
     const out = [];
     for (const m of modules) {
-      const lessons = await ctx.repo.listLessons({ moduleId: m.id });
+      const lessons = (await ctx.repo.listLessons({ moduleId: m.id })).filter(l => l.courseId === courseId);
       const visible = learnerView ? lessons.filter(l => l.status === 'published') : lessons;
       if (learnerView && !visible.length) continue;
       const summaries: LessonSummary[] = [];

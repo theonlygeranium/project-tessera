@@ -9,10 +9,13 @@ import type {
 } from '../shared/repo';
 import type { SeedData } from '../shared/seed';
 import { ApiError } from '../shared/api';
+import type { IdentityKind, IdentityLinkSuggestion, ToolSession, UserIdentity } from '../shared/domain';
+import { asciiLower } from '../shared/service/interop/ascii';
 
 type SqlBind = string | number | null;
 
 const DELETE_ORDER = [
+  'identity_link_suggestions', 'tool_sessions', 'user_identities',
   'manager_consents', 'reporting_lines', 'certificates', 'test_out_attempts', 'test_outs',
   'completion_events', 'requirements', 'outcome_links', 'outcomes', 'readiness_items', 'rubrics', 'templates', 'programs',
   // Night 2 tables first (they reference users, courses, modules, files).
@@ -601,8 +604,8 @@ export class D1Repo implements Repo {
 
   private institutionStmt(institution: Institution): D1PreparedStatement {
     return this.db.prepare(
-      `INSERT INTO institution (id, name, short_name, accent, setup_complete, policy, access_policy, template_id, readiness_policy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO institution (id, name, short_name, accent, setup_complete, policy, access_policy, template_id, readiness_policy, sso)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          short_name = excluded.short_name,
@@ -611,7 +614,8 @@ export class D1Repo implements Repo {
          policy = excluded.policy,
          access_policy = excluded.access_policy,
          template_id = excluded.template_id,
-         readiness_policy = excluded.readiness_policy`,
+         readiness_policy = excluded.readiness_policy,
+         sso = excluded.sso`,
     ).bind(
       institution.id,
       institution.name,
@@ -622,6 +626,7 @@ export class D1Repo implements Repo {
       JSON.stringify(institution.accessPolicy),
       institution.templateId ?? null,
       jsonOrNull(institution.readinessPolicy),
+      jsonOrNull(institution.sso),
     );
   }
 
@@ -910,7 +915,80 @@ export class D1Repo implements Repo {
       ON CONFLICT(manager_id,report_id) DO UPDATE SET sharing=excluded.sharing,at=excluded.at`)
       .bind(c.managerId, c.reportId, bit(c.sharing), c.at);
   }
+  async getUserIdentity(kind: IdentityKind, key: string): Promise<UserIdentity | null> {
+    const row = await this.first<IdentityRow>('SELECT * FROM user_identities WHERE kind = ? AND key = ?', [kind, kind === 'access-email' ? asciiLower(key) : key]);
+    return row ? identityFromRow(row) : null;
+  }
+  async listUserIdentities(userId: Id): Promise<UserIdentity[]> {
+    return (await this.all<IdentityRow>('SELECT * FROM user_identities WHERE user_id = ? ORDER BY kind, key', [userId])).map(identityFromRow);
+  }
+  async insertUserWithIdentity(user: User, identity: UserIdentity): Promise<{ inserted: true; user: User } | { inserted: false; user: User }> {
+    const key = identity.kind === 'access-email' ? asciiLower(identity.key) : identity.key;
+    const results = await this.db.batch([
+      this.db.prepare(`INSERT INTO users (id,name,email,role,initials,profile)
+        SELECT ?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM user_identities WHERE kind=? AND key=?)
+        AND NOT EXISTS (SELECT 1 FROM users WHERE lower(email)=?)`)
+        .bind(user.id,user.name,user.email,user.role,user.initials,jsonOrNull(user.profile),identity.kind,key,asciiLower(user.email)),
+      this.db.prepare(`INSERT INTO user_identities (user_id,kind,key,linked_at,linked_by,last_seen_at)
+        SELECT ?,?,?,?,?,? WHERE changes()=1 AND EXISTS (SELECT 1 FROM users WHERE id=?)
+        AND NOT EXISTS (SELECT 1 FROM user_identities WHERE kind=? AND key=?)`)
+        .bind(user.id,identity.kind,key,identity.linkedAt,identity.linkedBy,identity.lastSeenAt,user.id,identity.kind,key),
+    ]);
+    if (results[0].meta.changes === 1 && results[1].meta.changes === 1) return { inserted: true, user };
+    const found = await this.getUserIdentity(identity.kind, key);
+    if (found) {
+      const linked = await this.getUser(found.userId);
+      if (linked) return { inserted: false, user: linked };
+    }
+    const emailOwner = await this.findUserByEmail(user.email);
+    if (emailOwner && identity.kind === 'access-email') return { inserted: false, user: emailOwner };
+    throw new Error('LTI synthetic email or user id collided with an existing user.');
+  }
+  async touchUserIdentity(kind: IdentityKind, key: string, now: string): Promise<void> {
+    await this.db.prepare('UPDATE user_identities SET last_seen_at=? WHERE kind=? AND key=?').bind(now,kind,kind === 'access-email' ? asciiLower(key) : key).run();
+  }
+  async putIdentityLinkSuggestion(s: IdentityLinkSuggestion): Promise<void> {
+    await this.db.prepare(`INSERT OR IGNORE INTO identity_link_suggestions (id,identity_kind,identity_key,from_user_id,target_user_id,email,created_at,resolved_at) VALUES (?,?,?,?,?,?,?,?)`)
+      .bind(s.id,s.identityKind,s.identityKey,s.fromUserId,s.targetUserId,s.email,s.createdAt,s.resolvedAt).run();
+  }
+  async listIdentityLinkSuggestions(filter: { open?: boolean }): Promise<IdentityLinkSuggestion[]> {
+    const clause = filter.open === undefined ? '' : filter.open ? ' WHERE resolved_at IS NULL' : ' WHERE resolved_at IS NOT NULL';
+    return (await this.all<SuggestionRow>(`SELECT * FROM identity_link_suggestions${clause} ORDER BY created_at,id`)).map(suggestionFromRow);
+  }
+  async insertToolSession(s: ToolSession): Promise<void> {
+    await this.db.prepare(`INSERT INTO tool_sessions (id,token_hash,user_id,course_id,role,platform_id,context_id,resource_link_id,created_at,expires_at,return_url,revoked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .bind(s.id,s.tokenHash,s.userId,s.courseId,s.role,s.platformId,s.contextId,s.resourceLinkId,s.createdAt,s.expiresAt,s.returnUrl,s.revokedAt).run();
+  }
+  async replaceToolSession(s: ToolSession): Promise<void> {
+    await this.db.batch([
+      this.db.prepare('UPDATE tool_sessions SET revoked_at=? WHERE user_id=? AND platform_id=? AND context_id=? AND revoked_at IS NULL')
+        .bind(s.createdAt,s.userId,s.platformId,s.contextId),
+      this.db.prepare(`INSERT INTO tool_sessions (id,token_hash,user_id,course_id,role,platform_id,context_id,resource_link_id,created_at,expires_at,return_url,revoked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .bind(s.id,s.tokenHash,s.userId,s.courseId,s.role,s.platformId,s.contextId,s.resourceLinkId,s.createdAt,s.expiresAt,s.returnUrl,s.revokedAt),
+    ]);
+  }
+  async getToolSessionByHash(hash: string): Promise<ToolSession | null> {
+    const row = await this.first<ToolSessionRow>('SELECT * FROM tool_sessions WHERE token_hash=?',[hash]);
+    return row ? toolSessionFromRow(row) : null;
+  }
+  async extendToolSession(id: Id, expiresAt: string, now: string): Promise<boolean> {
+    const result = await this.db.prepare('UPDATE tool_sessions SET expires_at=? WHERE id=? AND revoked_at IS NULL AND expires_at>? AND expires_at<?')
+      .bind(expiresAt,id,now,expiresAt).run();
+    return result.meta.changes > 0;
+  }
+  async revokeToolSessions(filter: { userId: Id; platformId?: Id; contextId: Id }, now: string, exceptId?: Id): Promise<number> {
+    const result = await this.db.prepare('UPDATE tool_sessions SET revoked_at=? WHERE user_id=? AND (? IS NULL OR platform_id=?) AND context_id=? AND revoked_at IS NULL AND id<>?')
+      .bind(now,filter.userId,filter.platformId ?? null,filter.platformId ?? null,filter.contextId,exceptId ?? '').run();
+    return result.meta.changes;
+  }
 }
+
+interface IdentityRow extends Record<string, unknown> { user_id: Id; kind: IdentityKind; key: string; linked_at: string; linked_by: UserIdentity['linkedBy']; last_seen_at: string | null }
+const identityFromRow = (r: IdentityRow): UserIdentity => ({ userId:r.user_id,kind:r.kind,key:r.key,linkedAt:r.linked_at,linkedBy:r.linked_by,lastSeenAt:r.last_seen_at });
+interface SuggestionRow extends Record<string, unknown> { id: Id; identity_kind: IdentityKind; identity_key: string; from_user_id: Id; target_user_id: Id; email: string; created_at: string; resolved_at: string | null }
+const suggestionFromRow = (r: SuggestionRow): IdentityLinkSuggestion => ({ id:r.id,identityKind:r.identity_kind,identityKey:r.identity_key,fromUserId:r.from_user_id,targetUserId:r.target_user_id,email:r.email,createdAt:r.created_at,resolvedAt:r.resolved_at });
+interface ToolSessionRow extends Record<string, unknown> { id: Id; token_hash: string; user_id: Id; course_id: Id; role: ToolSession['role']; platform_id: Id; context_id: Id; resource_link_id: string | null; created_at: string; expires_at: string; return_url: string | null; revoked_at: string | null }
+const toolSessionFromRow = (r: ToolSessionRow): ToolSession => ({ id:r.id,tokenHash:r.token_hash,userId:r.user_id,courseId:r.course_id,role:r.role,platformId:r.platform_id,contextId:r.context_id,resourceLinkId:r.resource_link_id,createdAt:r.created_at,expiresAt:r.expires_at,returnUrl:r.return_url,revokedAt:r.revoked_at });
 
 interface InvitationRow extends Record<string, unknown> { user_id: string; email: string; invited_by: string; invited_at: string; access_granted: number; access_error: string | null; accepted_at: string | null }
 function invitationFromRow(row: InvitationRow): Invitation {
@@ -1028,6 +1106,7 @@ interface InstitutionRow extends Record<string, unknown> {
   access_policy: string | null;
   template_id: string | null;
   readiness_policy: string | null;
+  sso: string | null;
 }
 
 interface UserRow extends Record<string, unknown> {
@@ -1143,6 +1222,7 @@ function institutionFromRow(row: InstitutionRow): Institution {
     accessPolicy: row.access_policy ? parseJson(row.access_policy) : { minimumScore: 0, blockingSeverities: ['critical'] },
     ...(row.template_id !== null ? { templateId: row.template_id } : {}),
     ...(row.readiness_policy !== null ? { readinessPolicy: parseJson(row.readiness_policy) } : {}),
+    ...(row.sso !== null ? { sso: parseJson(row.sso) } : {}),
   };
 }
 

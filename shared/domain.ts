@@ -80,6 +80,7 @@ export interface Institution {
   templateId?: Id | null;
   /** Night 3: the readiness rubric and whether a minimum result blocks publishing (D-029). */
   readinessPolicy?: ReadinessPolicy;
+  sso?: SsoSettings | null;
 }
 
 // ---- Courses and structure -------------------------------------------------------
@@ -1138,3 +1139,27 @@ export interface ManagerView {
   /** People who report to this manager and haven't chosen to share. Names are not shown. */
   notSharingCount: number;
 }
+
+// ---- Identity v2 and tool sessions (D-045, D-046, D-048, D-052) ----
+export type IdentityKind = 'access-email' | 'lti';
+export interface UserIdentity {
+  userId: Id; kind: IdentityKind;
+  /** access-email: ASCII letters lowercased, matching SQLite NOCASE. lti: `${platformId}|${sub}`. */
+  key: string;
+  linkedAt: Timestamp; linkedBy: 'first-sign-in' | 'admin';
+  lastSeenAt: Timestamp | null;
+}
+/** An email in an LTI launch matched an existing user: an administrator decides (D-048). */
+export interface IdentityLinkSuggestion {
+  id: Id; identityKind: IdentityKind; identityKey: string;
+  fromUserId: Id; targetUserId: Id; email: string;
+  createdAt: Timestamp; resolvedAt: Timestamp | null;
+}
+/** Stored hashed; the plaintext lives only in page memory (D-046). */
+export interface ToolSession {
+  id: Id; tokenHash: string; userId: Id; courseId: Id; role: 'instructor' | 'student';
+  platformId: Id; contextId: Id; resourceLinkId: string | null;
+  createdAt: Timestamp; expiresAt: Timestamp; returnUrl: string | null;
+  revokedAt: Timestamp | null;
+}
+export interface SsoSettings { domains: string[]; defaultRole: 'student' }
