@@ -42,7 +42,7 @@ export function seedGradebook(baseCourse: Course): Pick<SeedData,
     id: item.assignmentId,
     moduleId: module.id,
     courseId,
-    title: item.title,
+    title: item.assignmentId === 'draft' ? 'Project draft' : item.title,
     position: item.position,
     status: 'published',
     publishedAt: '2025-12-01T00:00:00.000Z',
@@ -55,6 +55,16 @@ export function seedGradebook(baseCourse: Course): Pick<SeedData,
     extraCredit: item.extraCredit,
     countsTowardGrade: item.countsTowardGrade
   }));
+  for (const [id, title, categoryId, points, position] of [
+    ['hw5', 'Homework 5', 'hw', 10, 12],
+    ['q4', 'Quiz 4', 'quiz', 20, 13],
+    ['final', 'Final report', 'project', 40, 14],
+  ] as const) assignments.push({
+    id, moduleId: module.id, courseId, title, position, status: 'published',
+    publishedAt: '2026-09-01T00:00:00.000Z', dueAt: '2026-12-04T00:00:00.000Z',
+    points, submissionType: 'text', rubric: [], instructions: [], categoryId,
+    extraCredit: false, countsTowardGrade: true,
+  });
   const submissions: Submission[] = [];
   const studentItemStates: StudentItemState[] = [];
   for (const id of ids) {

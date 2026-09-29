@@ -5,6 +5,7 @@ import { calculate, cellDisplays, exportRow } from '../grading';
 import { seedData } from '../seed';
 import { MemoryRepo, dispatch, service, type ServiceContext } from './index';
 import { resetWhatIfRateLimit } from './gradebook';
+import { OPERATIONS } from '../schema/operations';
 const courseId = 'stat110-04';
 let sequence = 0;
 const time = '2026-02-01T00:00:00.000Z';
@@ -29,6 +30,22 @@ async function fixture() {
   };
 }
 describe('gradebook service', () => {
+  it('shows AI feedback origin only after review and release', async () => {
+    const { repo, teacher, priya } = await fixture();
+    const submission = (await repo.listSubmissions({ courseId, assignmentId: 'draft' })).find(s => s.studentId === 'u-priya')!;
+    const draft = await dispatch(service, teacher, 'draftFeedback', { submissionId: submission.id, criteria: submission.grade!.criteria });
+    const held = await dispatch(service, priya, 'getMyGrade', { courseId });
+    expect(held.items.find(item => item.assignmentId === 'draft')).toMatchObject({ feedback: null });
+    expect(held.items.find(item => item.assignmentId === 'draft')).not.toHaveProperty('feedbackOrigin');
+    expect(held.items.find(item => item.assignmentId === 'draft')).not.toHaveProperty('feedbackProvenance');
+    await dispatch(service, teacher, 'gradeSubmission', { submissionId: submission.id, criteria: submission.grade!.criteria, score: submission.grade!.score, feedback: draft.feedback, feedbackOrigin: 'ai', feedbackProvenance: draft.provenance });
+    const kept = await dispatch(service, priya, 'getMyGrade', { courseId });
+    expect(kept.items.find(item => item.assignmentId === 'draft')).not.toHaveProperty('feedbackOrigin');
+    await dispatch(service, teacher, 'releaseGrades', { assignmentId: 'draft' });
+    const released = await dispatch(service, priya, 'getMyGrade', { courseId });
+    expect(released.items.find(item => item.assignmentId === 'draft')).toMatchObject({ feedback: draft.feedback, feedbackOrigin: 'ai', feedbackProvenance: draft.provenance });
+    expect(OPERATIONS.getMyGrade.output.parse(released)).toEqual(released);
+  });
   it('uses the M1 result for every seeded grid, trace, student, what-if and export surface', async () => {
     const {
       teacher,
@@ -67,7 +84,7 @@ describe('gradebook service', () => {
         percent: expected.totals.rounded,
         letter: expected.totals.letter
       });
-      expect(row.cells.map(c => c.display?.adjusted)).toEqual(cellDisplays(expected).map(c => c.adjusted));
+      expect(row.cells.map(c => c.display?.adjusted)).toEqual([...cellDisplays(expected).map(c => c.adjusted), null, null, null]);
       expect(explained.trace.totals.rounded).toBe(expected.totals.rounded);
       expect(mine.trace.totals.rounded).toBe(expected.totals.rounded);
       expect(plan.trace.totals.rounded).toBe(expected.totals.rounded);
@@ -109,6 +126,23 @@ describe('gradebook service', () => {
       letter: 'C-'
     });
     expect(Math.round(grid.rows.reduce((sum, row) => sum + (row.result?.percent ?? 0), 0) / grid.rows.length * 10) / 10).toBe(82.1);
+  });
+  it('lets Priya plan the phone mockup scores without changing her released grade', async () => {
+    const { priya, repo } = await fixture();
+    const other = await ctx(repo, 'u-ramirez');
+    const mine = await dispatch(service, priya, 'getMyGrade', { courseId });
+    const theirs = await dispatch(service, other, 'getMyGrade', { courseId });
+    expect([mine.trace.studentId, mine.trace.totals.rounded, mine.trace.totals.letter]).toEqual(['u-priya', 88.1, 'B+']);
+    expect(theirs.trace.studentId).toBe('u-ramirez');
+    expect(JSON.stringify(theirs)).not.toContain('u-priya');
+    await expect(dispatch(service, priya, 'previewRelease', { assignmentId: 'draft' })).rejects.toMatchObject({ code: 'forbidden' });
+    await expect(dispatch(service, priya, 'listGradeEvents', { courseId })).rejects.toMatchObject({ code: 'forbidden' });
+    const scores = [{ assignmentId: 'hw5', score: 9 }, { assignmentId: 'q4', score: 17 }, { assignmentId: 'final', score: 36 }];
+    const plan = await dispatch(service, priya, 'whatIfMyGrade', { courseId, scores });
+    expect([plan.trace.totals.rounded, plan.trace.totals.letter]).toEqual([88.4, 'B+']);
+    expect(plan.trace.categories.find(c => c.categoryId === 'quiz')?.items.filter(i => i.state === 'dropped').map(i => i.assignmentId)).toContain('q1');
+    const target = await dispatch(service, priya, 'whatIfMyGrade', { courseId, scores: scores.filter(s => s.assignmentId !== 'final'), target: { letter: 'A-' }, solveFor: 'final' });
+    expect(target.needed).toEqual({ assignmentId: 'final', score: 38.3 });
   });
   it('blocks cross-course, manager and student staff access', async () => {
     const {

@@ -5,6 +5,7 @@
 .header h2 { font: 600 24px var(--font-serif); margin: 0; }
 .header h2:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
 .controls button, .actions button, .panel button { min-height: 28px; padding: 4px 8px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.actions a, .history a { display: inline-flex; align-items: center; min-height: 28px; color: var(--accent-dark); }
 .controls button:focus-visible, .actions button:focus-visible, .panel button:focus-visible, .panel a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .panel button:disabled { color: var(--disabled-text); cursor: default; }
 .controls span { font: 11px var(--font-mono); }

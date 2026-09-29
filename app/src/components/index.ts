@@ -42,3 +42,7 @@ export { CalculationTrace } from './CalculationTrace/CalculationTrace';
 export { SetupCheckList } from './SetupCheckList/SetupCheckList';
 export { WeightMeter } from './WeightMeter/WeightMeter';
 export { ChangeSetTable } from './ChangeSetTable/ChangeSetTable';
+export { ReleaseDialog } from '../features/gradebook/ReleaseDialog';
+export { HistoryPage } from '../features/gradebook/HistoryPage';
+export { MyGrade } from '../features/gradebook/MyGrade';
+export { WhatIf } from '../features/gradebook/WhatIf';

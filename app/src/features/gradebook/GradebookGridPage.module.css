@@ -10,7 +10,7 @@
 .pageActions .primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
 .pageActions .primary:disabled { background: var(--surface-sunk); color: var(--disabled-text); border-color: var(--line); }
 .pageActions .next { padding: 5px 8px; border-radius: var(--radius-sm); color: var(--warning-text); background: var(--warning-soft); font-size: 12px; }
-.pageActions a { min-height: 28px; box-sizing: border-box; border: 1px solid var(--control-line); text-decoration: none; }
+.pageActions a { display: inline-flex; align-items: center; min-height: 28px; box-sizing: border-box; padding: 5px 8px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); text-decoration: none; }
 .pageActions a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .gridOnly { min-width: 0; }
 .withPanel { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); gap: 12px; min-width: 0; }

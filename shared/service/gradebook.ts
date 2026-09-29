@@ -566,11 +566,13 @@ export const gradebook: Pick<Service,
         const s = data.submissionByCell.get(`${id}:${a.id}`) ?? null,
           st = data.stateByCell.get(`${id}:${a.id}`) ?? null,
           d = displays.get(a.id)!;
+        const visibleGrade = s?.grade && (s.grade.releasedAt || s.state === 'returned') ? s.grade : null;
         return {
           assignmentId: a.id,
           state: d.state,
           score: d.adjusted,
-          feedback: s?.grade && (s.grade.releasedAt || s.state === 'returned') ? s.grade.feedback : null,
+          feedback: visibleGrade?.feedback ?? null,
+          ...(visibleGrade ? { feedbackOrigin: visibleGrade.feedbackOrigin, feedbackProvenance: visibleGrade.feedbackProvenance } : {}),
           studentNote: st?.excused?.studentNote ?? null
         };
       })

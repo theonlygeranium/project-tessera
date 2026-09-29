@@ -55,7 +55,7 @@ function instructionBlocks(ctx: ServiceContext, id: string, blocks: BlockInput[]
 }
 function current(items: Submission[]) { return items[0] ?? null; }
 function studentView(s: Submission | null): Submission | null { return s ? s.grade?.releasedAt ? { ...s, feedbackDraft:null } : { ...s, grade: null, feedbackDraft:null } : null; }
-export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAssignment'|'updateAssignment'|'deleteAssignment'|'publishAssignment'|'listSubmissions'|'submit'|'getMySubmission'|'gradeSubmission'|'draftFeedback'> = {
+export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAssignment'|'updateAssignment'|'deleteAssignment'|'publishAssignment'|'listSubmissions'|'submit'|'getMySubmission'|'gradeSubmission'|'discardFeedbackDraft'|'draftFeedback'> = {
   createAssignment: async (ctx, input) => {
     const m = await moduleFor(ctx, input.moduleId); await canTeach(ctx, m.courseId);
     const siblings = await ctx.repo.listAssignments({ moduleId: m.id });
@@ -129,15 +129,37 @@ export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAss
     if (input.feedbackOrigin !== 'human' && input.feedbackOrigin !== 'ai') fail('invalid','Feedback origin is invalid.');
     if (input.feedbackOrigin === 'ai' && !input.feedbackProvenance) fail('invalid','AI feedback needs its source.');
     const before={...s};const expectedVersion=s.version??0;
-    s.state='graded'; s.grade={ score:input.score,criteria:input.criteria,feedback:input.feedback.trim(),feedbackOrigin:input.feedbackOrigin,feedbackProvenance:input.feedbackOrigin==='ai' ? input.feedbackProvenance ?? null : null,gradedBy:user(ctx).id,gradedAt:ctx.now(),releasedAt:null };s.version=expectedVersion+1;
+    s.state='graded'; s.grade={ score:input.score,criteria:input.criteria,feedback:input.feedback.trim(),feedbackOrigin:input.feedbackOrigin,feedbackProvenance:input.feedbackOrigin==='ai' ? input.feedbackProvenance ?? null : null,gradedBy:user(ctx).id,gradedAt:ctx.now(),releasedAt:null };s.feedbackDraft=null;s.version=expectedVersion+1;
     const setup=await ctx.repo.getGradebookSetup(a.courseId);
     const event={id:ctx.newId('ge'),courseId:a.courseId,studentId:s.studentId,assignmentId:a.id,kind:'score' as const,before,after:s,reason:null,by:user(ctx).id,at:ctx.now(),batchId:null,undoOf:null,rulesVersion:setup?.rulesVersion??0};
     const result=await ctx.repo.applyGradeWrites([{kind:'submission',value:s,expectedVersion}],[event]);if(!result.ok)fail('conflict','Submission changed.');return s;
   },
+  discardFeedbackDraft: async (ctx, { submissionId }) => {
+    const {s,a}=await submission(ctx,submissionId);
+    if (current(await ctx.repo.listSubmissions({ assignmentId:a.id,studentId:s.studentId }))?.id !== s.id) fail('conflict','Only the current submission can have its feedback draft discarded.');
+    if (s.state === 'returned' || s.grade?.releasedAt) fail('conflict','Released grades cannot be changed.');
+    if (!s.feedbackDraft) fail('conflict','There is no feedback draft to discard.');
+    const expectedVersion=s.version??0;
+    const saved={...s,feedbackDraft:null,version:expectedVersion+1};
+    const write=await ctx.repo.applyGradeWrites([{kind:'submission',value:saved,expectedVersion}],[]);
+    if(!write.ok)fail('conflict','Submission changed while discarding feedback.');
+    return saved;
+  },
   draftFeedback: async (ctx, { submissionId,criteria }) => {
     const {s,a} = await submission(ctx,submissionId); await aiEnabled(ctx); checkedCriteria(a,criteria);
+    if (s.state === 'returned' || s.grade?.releasedAt) fail('invalid','Released submissions cannot receive a feedback draft.');
+    if (current(await ctx.repo.listSubmissions({ assignmentId:a.id,studentId:s.studentId }))?.id !== s.id) fail('conflict','Only the current submission can receive a feedback draft.');
     const c = await ctx.repo.getCourse(a.courseId);
     const result = await ctx.ai.run('feedback',{ courseTitle:c?.title ?? '',assignmentTitle:a.title,rubric:a.rubric,criteria,submissionText:s.text || s.link || (s.fileId ? 'File submission' : '') });
-    return { feedback:result.output.feedback,provenance:{model:result.model,task:'feedback',generatedAt:ctx.now(),sources:[],summary:`Feedback draft from rubric results for ${a.title}` } };
+    if (current(await ctx.repo.listSubmissions({ assignmentId:a.id,studentId:s.studentId }))?.id !== s.id) fail('conflict','Submission changed while drafting feedback.');
+    const feedback = result.output.feedback.trim();
+    if (!feedback || feedback.length > 2000) fail('invalid','Feedback draft must be between 1 and 2000 characters.');
+    const createdAt=ctx.now();
+    const provenance={model:result.model,task:'feedback' as const,generatedAt:createdAt,sources:[],summary:`Feedback draft from rubric results for ${a.title}` };
+    const expectedVersion=s.version??0;
+    const saved={...s,feedbackDraft:{text:feedback,provenance,createdAt},version:expectedVersion+1};
+    const write=await ctx.repo.applyGradeWrites([{kind:'submission',value:saved,expectedVersion}],[]);
+    if(!write.ok) fail('conflict','Submission changed while drafting feedback.');
+    return { feedback,provenance };
   },
 };

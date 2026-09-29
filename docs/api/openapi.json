@@ -9739,6 +9739,115 @@
         }
       }
     },
+    "/api/v1/submissions/{submissionId}/discard-feedback-draft": {
+      "post": {
+        "operationId": "discardFeedbackDraft",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "submissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/submissions/{submissionId}/draft-feedback": {
       "post": {
         "operationId": "draftFeedback",
@@ -14852,6 +14961,23 @@
                             "type": [
                               "string",
                               "null"
+                            ]
+                          },
+                          "feedbackOrigin": {
+                            "type": "string",
+                            "enum": [
+                              "human",
+                              "ai"
+                            ]
+                          },
+                          "feedbackProvenance": {
+                            "anyOf": [
+                              {
+                                "$ref": "#/components/schemas/Provenance"
+                              },
+                              {
+                                "type": "null"
+                              }
                             ]
                           },
                           "studentNote": {

@@ -193,6 +193,7 @@ export interface ApiSpec {
   submit: { input: { assignmentId: Id; text?: string; fileId?: Id; link?: string }; output: Submission };
   getMySubmission: { input: { assignmentId: Id }; output: Submission | null };
   gradeSubmission: { input: { submissionId: Id; criteria: Grade['criteria']; score: number; feedback: string; feedbackOrigin: 'human' | 'ai'; feedbackProvenance?: Provenance | null }; output: Submission };
+  discardFeedbackDraft: { input: { submissionId: Id }; output: Submission };
   /** AI-drafted feedback from the rubric result and the submission (a draft, D-003). */
   draftFeedback: { input: { submissionId: Id; criteria: Grade['criteria'] }; output: { feedback: string; provenance: Provenance } };
   releaseGrades: { input: { assignmentId: Id; hash?: string }; output: Ok & { released?: Id[]; notSent?: GradeChangeSet['notSent'] } };
@@ -210,7 +211,7 @@ export interface ApiSpec {
   unreleaseGrades: { input: { assignmentId: Id }; output: Ok };
   listGradeEvents: { input: { courseId: Id; studentId?: Id; assignmentId?: Id; kind?: GradeEventKind; cursor?: string; limit?: number }; output: Page<GradeEvent> };
   undoGradeEvent: { input: { eventId: Id }; output: Ok };
-  getMyGrade: { input: { courseId: Id }; output: { trace: CalculationTrace; lines: string[]; items: { assignmentId: Id; state: CellState; score: number | null; feedback: string | null; studentNote: string | null }[] } };
+  getMyGrade: { input: { courseId: Id }; output: { trace: CalculationTrace; lines: string[]; items: { assignmentId: Id; state: CellState; score: number | null; feedback: string | null; feedbackOrigin?: Grade['feedbackOrigin']; feedbackProvenance?: Provenance | null; studentNote: string | null }[] } };
   whatIfMyGrade: { input: { courseId: Id; scores: { assignmentId: Id; score: number }[]; target?: { letter: string } | { percent: number }; solveFor?: Id }; output: { trace: CalculationTrace; delta: number | null; changedReasons: string[]; needed: { assignmentId: Id; score: number } | { unreachable: true } | null } };
 
   // Tutor (D-005, plan §5.4)
@@ -477,6 +478,7 @@ export const ROUTES: { [K in Operation]: Route } = {
   submit: { method: 'POST', path: '/assignments/:assignmentId/submissions', access: STUDENT, scope: null },
   getMySubmission: { method: 'GET', path: '/assignments/:assignmentId/submissions/me', access: STUDENT, scope: null },
   gradeSubmission: { method: 'POST', path: '/submissions/:submissionId/grade', access: INSTRUCTOR, scope: 'grades:write' },
+  discardFeedbackDraft: { method: 'POST', path: '/submissions/:submissionId/discard-feedback-draft', access: INSTRUCTOR, scope: 'grades:write' },
   draftFeedback: { method: 'POST', path: '/submissions/:submissionId/draft-feedback', access: INSTRUCTOR, scope: 'ai:run' },
   releaseGrades: { method: 'POST', path: '/assignments/:assignmentId/release', access: INSTRUCTOR, scope: 'grades:write' },
   getGradebook: { method: 'GET', path: '/courses/:courseId/gradebook', access: STAFF, scope: 'grades:read' },

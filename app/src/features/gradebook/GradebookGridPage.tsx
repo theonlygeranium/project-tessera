@@ -13,6 +13,7 @@ import { ErrorNotice, Loading } from '../../shell/Status';
 import { cellMatches, filterCounts, filters, parseGradeValue, type Filter } from './grid-model';
 import styles from './GradebookGridPage.module.css';
 import { StudentPanel } from './StudentPanel';
+import { ReleaseDialog } from './ReleaseDialog';
 
 type Change = Input<'updateGradeCells'>['changes'][number];
 type Target = { row: GradebookRow; assignmentId: string };
@@ -41,6 +42,8 @@ export function GradebookGridPage({ courseId }: { courseId: string }) {
   const [conflict, setConflict] = useState<{ changes: Change[]; current: { value: unknown; by: string | null; at: string | null } } | null>(null);
   const [lastBatch, setLastBatch] = useState<string | null>(null);
   const [busy, setBusy] = useState(false); const [shortcuts, setShortcuts] = useState(false);
+  const [releaseId, setReleaseId] = useState<string | null>(null);
+  const [draftProgress, setDraftProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
   const shortcutOpener = useRef<HTMLElement | null>(null);
   const panelOpener = useRef<HTMLElement | null>(null);
   const [panelStudentId, setPanelStudentId] = useState<string | null>(null);
@@ -125,6 +128,33 @@ export function GradebookGridPage({ courseId }: { courseId: string }) {
   }
   const rangeTargets = (range = selection) => { const result: Target[] = []; for (let r = Math.min(range.row, range.fromRow); r <= Math.max(range.row, range.fromRow); r++) for (let c = Math.min(range.col, range.fromCol); c <= Math.max(range.col, range.fromCol); c++) if (visibleRows[r] && ordered[c]) result.push(target(visibleRows[r], ordered[c].id)); return result; };
   const chosenTargets = () => selected.size ? visibleRows.filter(r => selected.has(r.student.id)).flatMap(r => ordered.map(a => target(r, a.id))) : rangeTargets();
+  const draftTargets = () => chosenTargets().filter(t => { const cell = cellOf(t); return cell?.state === 'graded' && !cell.released && (cell.submissionVersion !== undefined); });
+  async function draftSelectedFeedback() {
+    const targets = draftTargets();
+    if (!targets.length) return;
+    setDraftProgress({ done: 0, total: targets.length, failed: 0 }); setBusy(true); setError('');
+    let done = 0, failed = 0;
+    const byAssignment = new Map<string, Target[]>();
+    for (const t of targets) byAssignment.set(t.assignmentId, [...(byAssignment.get(t.assignmentId) ?? []), t]);
+    for (const [assignmentId, group] of byAssignment) {
+      try {
+        const items: Submission[] = [];
+        let cursor: string | undefined;
+        do { const page = await api.listSubmissions({ assignmentId, cursor, limit: 100 }); items.push(...page.items); cursor = page.nextCursor ?? undefined; } while (cursor);
+        for (const t of group) {
+          const s = items.find(item => item.studentId === t.row.student.id && item.state === 'graded' && item.grade && !item.grade.releasedAt);
+          if (!s) { failed++; done++; setDraftProgress({ done, total: targets.length, failed }); continue; }
+          try { await api.draftFeedback({ submissionId: s.id, criteria: s.grade!.criteria }); }
+          catch { failed++; }
+          done++; setDraftProgress({ done, total: targets.length, failed });
+        }
+      } catch { failed += group.length; done += group.length; setDraftProgress({ done, total: targets.length, failed }); }
+    }
+    await queryClient.invalidateQueries({ queryKey: ['gradebook-feedback-drafts'] });
+    await queryClient.invalidateQueries({ queryKey: ['student-feedback-drafts'] });
+    await queryClient.invalidateQueries({ queryKey: ['getGradebook'] });
+    setMessage(`${done - failed} feedback ${done - failed === 1 ? 'draft' : 'drafts'} ready for review${failed ? ` · ${failed} failed` : ''}.`); setBusy(false);
+  }
   async function bulk(op: 'score' | 'excuse' | 'mark-missing' | 'clear-missing' | 'clear') {
     const targets = chosenTargets(); if (!targets.length) return;
     const raw = op === 'score' ? window.prompt('Score for selected cells. Use a number, fraction, or percent.') : null;
@@ -196,13 +226,14 @@ export function GradebookGridPage({ courseId }: { courseId: string }) {
   if (loading) return <Loading />;
   if (book.error || setup.error || assignments.error) return <ErrorNotice error={book.error ?? setup.error ?? assignments.error!} onRetry={() => { void book.refetch(); void setup.refetch(); void assignments.refetch(); }} />;
   return <div className={styles.page}>
-    <header className={styles.heading}><div><h2>Gradebook</h2><p>{courseId === 'stat110-04' ? 'Section 04 · ' : ''}{rows.length} students · Meridian State</p></div><div className={styles.pageActions}><Link className={styles.next} to={paths.teach.gradebookSetup(courseId)}>Setup check</Link><button type="button" onClick={() => void exportCsv()} disabled={exporting.isPending}>↓ Export CSV</button><button type="button" className={styles.primary} disabled title="Release preview arrives in M5">Release — next</button></div></header>
+    <header className={styles.heading}><div><h2>Gradebook</h2><p>{courseId === 'stat110-04' ? 'Section 04 · ' : ''}{rows.length} students · Meridian State</p></div><div className={styles.pageActions}><Link className={styles.next} to={paths.teach.gradebookSetup(courseId)}>Setup check</Link><Link to={paths.teach.gradebookHistory(courseId)}>History</Link><button type="button" onClick={() => void exportCsv()} disabled={exporting.isPending}>↓ Export CSV</button><button type="button" className={styles.primary} disabled={!ordered.length} onClick={() => setReleaseId(ordered.find(a => rows.some(r => r.cells.some(c => c.assignmentId === a.id && c.state === 'graded' && !c.released)))?.id ?? ordered[0]?.id ?? null)}>Release …</button></div></header>
     <div className={styles.toolbar}><label className={styles.search}>Find a student<input type="search" value={find} placeholder="Find a student" onChange={e => setFind(e.target.value)} /></label><div className={styles.filters}><span>Show only</span>{filters.map(f => <button key={f.key} type="button" aria-pressed={filter === f.key} onClick={() => setFilter(filter === f.key ? null : f.key)}><StateLabel state={f.key} label={`${f.label} ${counts[f.key]}`} /></button>)}</div><SegmentedControl legend="Grade visibility" hideLegend name="gradebook-view" density="compact" value={view} onChange={value => setView(value as typeof view)} options={[{ value: 'student', label: 'Released only' }, { value: 'held', label: 'Include held' }]} /><SegmentedControl legend="Grid density" hideLegend name="gradebook-density" density="compact" value={density} onChange={value => { setDensity(value as typeof density); try { localStorage.setItem(densityKey, value); } catch { /* storage blocked */ } }} options={[{ value: 'compact', label: 'Compact' }, { value: 'comfortable', label: 'Comfortable' }]} /></div>
-    {(selected.size > 0 || selection.row !== selection.fromRow || selection.col !== selection.fromCol) && <div className={styles.bulk} aria-label="Selected grade actions"><strong>{selected.size ? `${selected.size} students selected` : 'Cell range selected'}</strong><button onClick={() => void bulk('score')} disabled={busy}>Set score</button><button onClick={() => void bulk('excuse')} disabled={busy}>Excuse</button><button onClick={() => void bulk('mark-missing')} disabled={busy}>Mark missing</button><button onClick={() => void bulk('clear-missing')} disabled={busy}>Clear missing</button><button onClick={() => void bulk('clear')} disabled={busy}>Clear score</button><button onClick={() => setSelected(new Set())}>Clear selection</button></div>}
+    {(selected.size > 0 || selection.row !== selection.fromRow || selection.col !== selection.fromCol) && <div className={styles.bulk} aria-label="Selected grade actions"><strong>{selected.size ? `${selected.size} students selected` : 'Cell range selected'}</strong><button onClick={() => void bulk('score')} disabled={busy}>Set score</button><button onClick={() => void bulk('excuse')} disabled={busy}>Excuse</button><button onClick={() => void bulk('mark-missing')} disabled={busy}>Mark missing</button><button onClick={() => void bulk('clear-missing')} disabled={busy}>Clear missing</button><button onClick={() => void bulk('clear')} disabled={busy}>Clear score</button><button onClick={() => void draftSelectedFeedback()} disabled={busy || !draftTargets().length}>Draft feedback for {draftTargets().length}</button><button onClick={() => setSelected(new Set())}>Clear selection</button>{draftProgress && <span role="status">{draftProgress.done} of {draftProgress.total} drafted · {draftProgress.failed} failed</span>}</div>}
     {error && <StatusNotice tone="error" live="assertive">{error}</StatusNotice>}{conflict && <div className={styles.conflict} role="alert"><p>Changed by {conflict.current.by ?? 'another editor'}{conflict.current.at ? ` at ${new Date(conflict.current.at).toLocaleTimeString()}` : ''}. Keep theirs or use yours.</p><button onClick={() => { setConflict(null); void book.refetch(); }}>Keep theirs</button><button onClick={async () => { const pending = conflict.changes; setConflict(null); const fresh = await book.refetch(); if (!fresh.data) return; const rebased = pending.map(c => { const current = fresh.data.rows.find(r => r.student.id === c.studentId)?.cells.find(cell => cell.assignmentId === c.assignmentId); return { ...c, expectedVersion: ['score', 'clear'].includes(c.op) && !current?.released ? current?.submissionVersion ?? 0 : current?.itemStateVersion ?? 0 }; }); void send(rebased, 'Your change saved after review.'); }}>Use yours</button></div>}
     <div className={panelRow ? styles.withPanel : styles.gridOnly}><DataGrid caption="Faculty gradebook" rows={visibleRows} columns={columns} rowKey={row => row.student.id} rowName={row => row.student.name} density={density} selectedRows={selected} onSelectRow={id => setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; })} onOpenRow={(id, opener) => openPanel(id, opener)} onSelectionChange={setSelection} onCommit={(row, col, text) => score(target(row, col.key), text)} onAction={gridAction} />{panelRow && <StudentPanel courseId={courseId} row={panelRow} assignments={assignments.data ?? []} onClose={closePanel} onNavigate={movePanel} />}</div>
     <div className={styles.mobile}>{visibleRows.map(row => <article key={row.student.id} className={styles.studentCard}><label><input type="checkbox" checked={selected.has(row.student.id)} onChange={() => setSelected(prev => { const next = new Set(prev); next.has(row.student.id) ? next.delete(row.student.id) : next.add(row.student.id); return next; })} /> <button type="button" onClick={event => openPanel(row.student.id, event.currentTarget)}>Open {row.student.name} grade details</button></label><p>Current {row.result?.percent === null || row.result?.percent === undefined ? '—' : `${row.result.percent}%`} {row.result?.letter}</p><dl>{ordered.map(a => { const cell = row.cells.find(c => c.assignmentId === a.id); return <div key={a.id}><dt>{a.title}</dt><dd>{cell?.display && <GradeCell display={cell.display} student={row.student.name} item={a.title} points={a.points} feedbackDraft={drafts.data?.has(`${row.student.id}:${a.id}`)} />}</dd><button type="button" onClick={() => { const value = window.prompt(`Score or EX for ${row.student.name}, ${a.title}`, cellEditText(cell)); if (value !== null) void score(target(row, a.id), value); }}>Edit {a.title}</button></div>; })}</dl></article>)}</div>
     <footer className={styles.status}><div className={styles.legend}>{legend.map(state => <StateLabel key={state} state={state} />)}</div><div className={styles.last} aria-live="polite">{message}{lastBatch && <button type="button" disabled={busy} onClick={() => void undo()}>Undo (⌘Z)</button>}</div></footer>
     {shortcuts && <div className={styles.modalBackdrop}><div className={styles.modal} role="dialog" aria-modal="true" aria-label="Gradebook shortcuts" onKeyDown={e => { if (e.key === 'Tab') { e.preventDefault(); (e.currentTarget.querySelector('button') as HTMLButtonElement | null)?.focus(); } if (e.key === 'Escape') { setShortcuts(false); requestAnimationFrame(() => shortcutOpener.current?.focus()); } }}><h3>Gradebook shortcuts</h3><p>Arrows move · Shift+arrows select · Enter edit/save · Tab save/right · Esc cancel · E excuse · M missing · O override · Space open student panel · ⌘/Ctrl+D fill down · ⌘/Ctrl+Z undo</p><button autoFocus onClick={() => { setShortcuts(false); requestAnimationFrame(() => shortcutOpener.current?.focus()); }}>Close shortcuts</button></div></div>}
+    {releaseId && <ReleaseDialog courseId={courseId} assignments={assignments.data ?? []} initialId={releaseId} rows={rows} onClose={() => setReleaseId(null)} />}
   </div>;
 }
