@@ -287,7 +287,8 @@ export interface ApiSpec {
   listOutcomes: { input: { courseId: Id }; output: Outcome[] };
   /** Replaces the course's outcomes in order (existing ones keep their id); mirrors the text into `Course.outcomes`. Removing an outcome removes its links. */
   saveOutcomes: { input: { courseId: Id; outcomes: { id?: Id; text: string }[] }; output: Outcome[] };
-  keepDesignOutcome: { input: { sessionId: Id; outcomeId: Id }; output: Outcome };
+  keepDesignOutcome: { input: { sessionId: Id; outcomeId: Id; expectedText: string }; output: Outcome };
+  keepOutcome: { input: { courseId: Id; outcomeId: Id; expectedText: string }; output: Outcome };
   listOutcomeLinks: { input: { courseId: Id }; output: OutcomeLink[] };
   /** Replaces the outcomes a check, scenario, or assignment is tagged with. */
   setOutcomeLinks: { input: { courseId: Id; targetKind: AlignableKind; targetId: Id; outcomeIds: Id[] }; output: OutcomeLink[] };
@@ -558,6 +559,7 @@ export const ROUTES: { [K in Operation]: Route } = {
   listOutcomes: { method: 'GET', path: '/courses/:courseId/outcomes', access: 'signed-in', scope: 'courses:read' },
   saveOutcomes: { method: 'PUT', path: '/courses/:courseId/outcomes', access: STAFF, scope: 'courses:write' },
   keepDesignOutcome: { method: 'POST', path: '/design/:sessionId/outcomes/:outcomeId/keep', access: INSTRUCTOR, scope: 'courses:write' },
+  keepOutcome: { method: 'POST', path: '/courses/:courseId/outcomes/:outcomeId/keep', access: STAFF, scope: 'courses:write' },
   listOutcomeLinks: { method: 'GET', path: '/courses/:courseId/outcome-links', access: STAFF, scope: 'content:read' },
   setOutcomeLinks: { method: 'PUT', path: '/courses/:courseId/outcome-links', access: INSTRUCTOR, scope: 'content:write' },
 

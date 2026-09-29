@@ -9,6 +9,7 @@ import { MemoryRepo, service } from './index';
 import { csvCell, joinSmallCaps } from './design-partner';
 import { AiPolicySchema, WorkloadRatesSchema } from '../schema/domain';
 import { RICE_DEFAULTS, validWorkloadRates } from '../policy';
+import { effectiveProfile } from '../design/effective-profile';
 
 const at = '2026-09-28T12:00:00.000Z';
 let clock = Date.parse(at);
@@ -21,6 +22,19 @@ const sample = { courseId: 'c-stat110', sourceKind: 'syllabus' as const, sample:
 const file: FileRecord = { id: 'f-test', courseId: 'c-stat110', name: 'Syllabus.pdf', kind: 'pdf', mime: 'application/pdf', size: 100, key: 'files/test', version: 1, uploadedBy: 'u-okafor', uploadedAt: at, scan: null };
 
 describe('design partner service', () => {
+  it('applies days-only meeting and common modality corrections without losing extracted minutes', async () => {
+    const ctx = await context();
+    const session = await service.createDesignSession(ctx, sample);
+    await service.advanceDesignSession(ctx, { sessionId: session.id });
+    const read = await service.advanceDesignSession(ctx, { sessionId: session.id });
+    const extracted = read.extraction!.profile;
+    const profile = effectiveProfile(extracted, [], { meeting: 'Tuesday Thursday', modality: 'Hybrid' });
+    expect(profile.meeting.value).toEqual({ days: ['Tuesday', 'Thursday'], minutes: extracted.meeting.value!.minutes });
+    expect(profile.modality.value).toBe('hybrid');
+    for (const [text, expected] of [['online', 'online-async'], ['fully online', 'online-async'], ['asynchronous online', 'online-async'], ['synchronous online', 'online-sync'], ['live online', 'online-sync'], ['in person', 'in-person'], ['face-to-face', 'in-person'], ['HyFlex', 'hyflex']]) {
+      expect(effectiveProfile(extracted, [], { modality: text }).modality.value).toBe(expected);
+    }
+  });
   it('neutralizes spreadsheet formulas after whitespace and control characters before CSV quoting', () => {
     for (const prefix of ['=', '+', '-', '@']) for (const lead of ['', '  ', '\t', '\r\n', '\u0000']) {
       expect(csvCell(`${lead}${prefix}SUM(1,1)`)).toBe(`"'${lead}${prefix}SUM(1,1)"`);
@@ -261,13 +275,13 @@ describe('design partner service', () => {
       const first = await service.createDesignSession({ ...ctx, ai: broken }, sample);
       const failed = await service.advanceDesignSession({ ...ctx, ai: broken }, { sessionId: first.id });
       expect(failed.provisioning?.error).toContain('(cut off at the length limit)');
-      expect(log).toHaveBeenCalledWith('design AI failed', { task: 'syllabus-extract', status: null, category: 'ai-failed', sessionId: first.id, jobId: first.provisioning!.jobId });
+      expect(log).toHaveBeenCalledWith('AI task failed', { task: 'syllabus-extract', status: null, category: 'ai-failed', sessionId: first.id, jobId: first.provisioning!.jobId });
       const next = await service.createDesignSession(ctx, sample);
       await service.advanceDesignSession(ctx, { sessionId: next.id });
       const readAi = { run: async (task: never, input: never) => task === 'syllabus-analyze' ? Promise.reject(new Error('request timed out')) : fixtureAi.run(task, input) } as ServiceContext['ai'];
       const readFailed = await service.advanceDesignSession({ ...ctx, ai: readAi }, { sessionId: next.id });
       expect(readFailed.provisioning?.error).toContain('(timed out)');
-      expect(log).toHaveBeenCalledWith('design AI failed', { task: 'syllabus-analyze', status: null, category: 'unexpected', sessionId: next.id, jobId: next.provisioning!.jobId });
+      expect(log).toHaveBeenCalledWith('AI task failed', { task: 'syllabus-analyze', status: null, category: 'unexpected', sessionId: next.id, jobId: next.provisioning!.jobId });
     } finally { log.mockRestore(); }
   });
   it('rejects another course file and session access', async () => {

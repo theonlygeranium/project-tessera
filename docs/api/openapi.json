@@ -17638,8 +17638,142 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {},
-                "required": []
+                "properties": {
+                  "expectedText": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "expectedText"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{courseId}/outcomes/{outcomeId}/keep": {
+      "post": {
+        "operationId": "keepOutcome",
+        "tags": [
+          "courses"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "outcomeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Outcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "courses:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedText": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "expectedText"
+                ]
               }
             }
           }
@@ -30456,6 +30590,87 @@
               "draft",
               "kept"
             ]
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task": {
+                "type": "string",
+                "enum": [
+                  "brief",
+                  "outline",
+                  "lesson-draft",
+                  "block-regenerate",
+                  "announcement",
+                  "feedback",
+                  "alt-text",
+                  "rewrite",
+                  "link-text",
+                  "element",
+                  "tutor",
+                  "tutor-summary",
+                  "agent",
+                  "readiness-item",
+                  "variant",
+                  "syllabus-extract",
+                  "syllabus-analyze",
+                  "structure-options",
+                  "module-scaffold",
+                  "objective-rewrite",
+                  "outcome-suggest"
+                ]
+              },
+              "generatedAt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "span": {
+                      "$ref": "#/components/schemas/SourceSpan"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "summary": {
+                "type": "string"
+              },
+              "keptBy": {
+                "type": "string"
+              },
+              "keptAt": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "model",
+              "task",
+              "generatedAt",
+              "sources",
+              "summary"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

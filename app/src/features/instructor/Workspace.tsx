@@ -1,16 +1,25 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
-import { Button, StatusChip } from '../../components';
+import { AiContent, Button, StatusChip, StatusNotice } from '../../components';
 import { useApiMutation, useApiQuery } from '../../data/hooks';
 import { paths } from '../../paths';
 import { ErrorNotice, Loading } from '../../shell/Status';
 import { usePageTitle } from '../../shell/usePageTitle';
 import { CourseBar, Field, Message, SaveButton } from './common';
 import styles from './instructor.module.css';
+import { outcomeMarker } from '../readiness/OutcomesPage';
+
+export function courseHomeValues(course: { welcome: string; outcomes: string[] }) { return { welcome: course.welcome, outcomes: [...course.outcomes] }; }
+export function resetCourseHomeEditor(course: { welcome: string; outcomes: string[] }, setWelcome: (value: string) => void, setOutcomes: (value: string[]) => void) {
+  const latest = courseHomeValues(course);
+  setWelcome(latest.welcome);
+  setOutcomes(latest.outcomes);
+}
 
 export function Workspace() {
   const { courseId = '' } = useParams();
   const q = useApiQuery('getCourseOutline', { courseId });
+  const outcomeQuery = useApiQuery('listOutcomes', { courseId });
   const reviewReadiness = useApiQuery('getCourseReadiness', { courseId }, { enabled: q.data?.designSession?.stage === 'review' });
   usePageTitle(q.data?.course.title ?? 'Course');
   const updateCourse = useApiMutation('updateCourse'); const createModule = useApiMutation('createModule'); const updateModule = useApiMutation('updateModule'); const deleteModule = useApiMutation('deleteModule'); const createLesson = useApiMutation('createLesson'); const updateLesson = useApiMutation('updateLesson'); const deleteLesson = useApiMutation('deleteLesson');
@@ -20,15 +29,16 @@ export function Workspace() {
   const [renaming, setRenaming] = useState<string | null>(null); const [renameTitle, setRenameTitle] = useState('');
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
   const [message, setMessage] = useState(''); const [error, setError] = useState('');
-  useEffect(() => { if (q.data) { setWelcome(q.data.course.welcome); setOutcomes(q.data.course.outcomes); } }, [q.data?.course.id, q.data?.course.welcome, JSON.stringify(q.data?.course.outcomes)]);
-  const run = async (task: () => Promise<unknown>, success: string) => { try { setError(''); await task(); setMessage(success); return true; } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.'); return false; } };
+  const [outcomeConflict, setOutcomeConflict] = useState(false);
+  useEffect(() => { if (q.data) resetCourseHomeEditor(q.data.course, setWelcome, setOutcomes); }, [q.data?.course.id, q.data?.course.welcome, JSON.stringify(q.data?.course.outcomes)]);
+  const run = async (task: () => Promise<unknown>, success: string) => { try { setError(''); await task(); setOutcomeConflict(false); setMessage(success); return true; } catch (e) { const conflict = success === 'Course home saved.' && !!e && typeof e === 'object' && 'code' in e && e.code === 'conflict'; setOutcomeConflict(conflict); setMessage(''); setError(conflict ? 'Outcomes changed while you were editing. Reload to see the latest.' : e instanceof Error ? e.message : 'Could not save.'); return false; } };
   const closeRename = (id: string) => { setRenaming(null); requestAnimationFrame(() => document.getElementById(`rename-${id}`)?.focus()); };
   const modules = q.data?.modules ?? [];
   return <><CourseBar title={q.data?.course.title ?? 'Course'} courseId={courseId} courseTitle={q.data?.course.title} />
-    {q.isPending ? <Loading /> : q.error ? <ErrorNotice error={q.error} onRetry={() => void q.refetch()} /> : <div className={styles.stack}>{q.data?.designSession?.stage === 'review' && <section className={styles.panel}><h2>Built from your syllabus · review progress</h2><p>{q.data.modules.flatMap(module => module.lessons).reduce((count, lesson) => count + (lesson.draftBlockCount ?? 0), 0)} AI drafts to review. You decide what to keep and publish.</p>{reviewReadiness.data && <><label htmlFor="design-course-readiness">Course readiness · {reviewReadiness.data.percent}%</label><progress id="design-course-readiness" value={reviewReadiness.data.percent} max={100} /></>}<Link to={paths.teach.designSession(courseId, q.data.designSession.id)}>Open Design partner session</Link><Link to={paths.teach.readiness(courseId)}>Open full course readiness report</Link></section>}<p><Link to={paths.teach.template(courseId)}>Template</Link></p><Message text={message} /><Message text={error} error />
-      <section><h2>Course home</h2><form className={styles.inlineForm} onSubmit={(e: FormEvent) => { e.preventDefault(); void run(() => updateCourse.mutateAsync({ courseId, welcome, outcomes }), 'Course home saved.'); }}>
+    {q.isPending ? <Loading /> : q.error ? <ErrorNotice error={q.error} onRetry={() => void q.refetch()} /> : <div className={styles.stack}>{q.data?.designSession?.stage === 'review' && <section className={styles.panel}><h2>Built from your syllabus · review progress</h2><p>{q.data.modules.flatMap(module => module.lessons).reduce((count, lesson) => count + (lesson.draftBlockCount ?? 0), 0)} AI drafts to review. You decide what to keep and publish.</p>{reviewReadiness.data && <><label htmlFor="design-course-readiness">Course readiness · {reviewReadiness.data.percent}%</label><progress id="design-course-readiness" value={reviewReadiness.data.percent} max={100} /></>}<Link to={paths.teach.designSession(courseId, q.data.designSession.id)}>Open Design partner session</Link><Link to={paths.teach.readiness(courseId)}>Open full course readiness report</Link></section>}<p><Link to={paths.teach.template(courseId)}>Template</Link></p><Message text={message} /><Message text={outcomeConflict ? '' : error} error />{outcomeConflict && <StatusNotice tone="error" live="assertive" action={<Button onClick={() => { void q.refetch().then(result => { if (result.error) { setError(result.error.message); return; } if (result.data) resetCourseHomeEditor(result.data.course, setWelcome, setOutcomes); setOutcomeConflict(false); setError(''); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-course-home] button[type="submit"]')?.focus()); }); }}>Reload latest course home</Button>}>{error}</StatusNotice>}
+      <section><h2>Course home</h2><form data-course-home className={styles.inlineForm} onSubmit={(e: FormEvent) => { e.preventDefault(); void run(() => updateCourse.mutateAsync({ courseId, welcome, outcomes }), 'Course home saved.'); }}>
         <Field label="Welcome message" value={welcome} onChange={setWelcome} multiline />
-        <div><h3>Outcomes</h3><ul className={styles.list}>{outcomes.map((value, i) => <li key={i} className={styles.fieldRow}><Field label={`Outcome ${i + 1}`} value={value} onChange={v => setOutcomes(outcomes.map((x, index) => index === i ? v : x))} /><Button density="compact" onClick={() => setOutcomes(outcomes.filter((_, index) => index !== i))}>Remove</Button></li>)}</ul><Button density="compact" onClick={() => setOutcomes([...outcomes, ''])}>Add outcome</Button></div><SaveButton pending={updateCourse.isPending}>Save course home</SaveButton></form></section>
+        <div><h3>Outcomes</h3><ul className={styles.list}>{outcomes.map((value, i) => { const saved = outcomeQuery.data?.filter(row => row.aiState !== 'draft')[i]; const marker = saved?.text === value ? outcomeMarker(saved) : null; const editor = <><Field label={`Outcome ${i + 1}`} value={value} onChange={v => setOutcomes(outcomes.map((x, index) => index === i ? v : x))} /><Button density="compact" onClick={() => setOutcomes(outcomes.filter((_, index) => index !== i))}>Remove</Button></>; return <li key={i} className={styles.fieldRow}>{marker ? <AiContent kind="block" state="kept" {...marker}>{editor}</AiContent> : editor}</li>; })}</ul><Button density="compact" onClick={() => setOutcomes([...outcomes, ''])}>Add outcome</Button></div><SaveButton pending={updateCourse.isPending}>Save course home</SaveButton></form></section>
       <section className={styles.stack}><h2>Outline</h2>{modules.map((m, moduleIndex) => <div key={m.id} className={styles.panel}>
         <div className={styles.outlineHeader}>{renaming === m.id ? <form className={styles.fieldRow} onSubmit={e => { e.preventDefault(); void (async () => { if (await run(() => updateModule.mutateAsync({ moduleId: m.id, title: renameTitle }), 'Module renamed.')) closeRename(m.id); })(); }}><Field label="Module title" value={renameTitle} onChange={setRenameTitle} required /><SaveButton pending={updateModule.isPending}>Save</SaveButton><Button density="compact" onClick={() => closeRename(m.id)}>Cancel</Button></form> : <h3>{m.title}</h3>}
           <div className={styles.row}><Button id={`rename-${m.id}`} density="compact" onClick={() => { setRenaming(m.id); setRenameTitle(m.title); }}>Rename</Button><Button density="compact" disabled={moduleIndex === 0} onClick={() => void run(() => updateModule.mutateAsync({ moduleId: m.id, position: moduleIndex - 1 }), 'Module moved.')}>Move up</Button><Button density="compact" disabled={moduleIndex === modules.length - 1} onClick={() => void run(() => updateModule.mutateAsync({ moduleId: m.id, position: moduleIndex + 1 }), 'Module moved.')}>Move down</Button><Button density="compact" onClick={() => { if (m.lessons.length) { setDeleteNote(m.id); return; } if (window.confirm(`Delete module “${m.title}”?`)) void run(() => deleteModule.mutateAsync({ moduleId: m.id }), 'Module deleted.'); }}>Delete</Button></div>

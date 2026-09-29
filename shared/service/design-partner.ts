@@ -8,7 +8,7 @@ import { aiEnabled, canTeach, designPartnerEnabled, fail, provenance, required, 
 import { validateExtraction, validateRead, validateObjectiveRewrite, repairRead } from './validate-design';
 import { analyzeSyllabusFixture } from '../design/read-fixture';
 import { estimateWorkload } from '../design/workload';
-import { effectiveProfile } from '../design/effective-profile';
+import { effectiveProfile, parseProfileCorrection } from '../design/effective-profile';
 import { problemsFrom, questionsFrom } from './design-rules';
 import { groundSpans } from './ground-spans';
 import { normalizeExtraction } from './normalize-extraction';
@@ -16,16 +16,13 @@ import { WORKFLOW_STALL_MS } from './generation';
 import { selectCandidates } from '../design/candidates';
 import { combinationNote, finalizeOptions, validateSuggestions } from '../design/options';
 import { advanceScaffoldJob } from './design-plan';
+import { safeAiLog } from './log';
 
 type Problem = SyllabusExtraction['problems'][number];
-function safeAiLog(task: string, error: unknown, ids: Record<string, string>) {
-  const details = error instanceof ApiError && error.details && typeof error.details === 'object' ? error.details as Record<string, unknown> : null;
-  const status = typeof details?.status === 'number' ? details.status : null;
-  const category = error instanceof ApiError ? error.code : error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'unexpected';
-  console.error('design AI failed', { task, status, category, ...ids });
-}
 const MAX_CHARS = 60_000;
 const SAMPLE = seed as DesignSource;
+// Generic table-column vocabulary, not assessment titles, marks a boundary after roster rows.
+const TABLE_VOCABULARY = /\b(?:points|score|weight|date|week|topic|title|due|assignment|percent|total|description)\b/i;
 
 /**
  * Headings set in small caps often come out of a PDF as "C ATALOG D ESCRIPTION". In a short
@@ -61,21 +58,56 @@ function cleanSource(source: DesignSource): { source: DesignSource; problems: Pr
   const flattened = source.sections.flatMap((section, sectionIndex) => (section.lines ?? section.text.split('\n')).map(joinSmallCaps)
     .filter(line => !running.has(line.trim().toLocaleLowerCase().replace(/\d/g, '#').replace(/\s+/g, ' ')))
     .map(line => ({ line, sectionIndex })));
-  // A roster is a table headed by student names or IDs whose rows hold a name and an ID or
-  // email. Ordinary tables mention students too ("student choice from a set"), so both are required.
-  const rosterHeader = (line: string) => /\bstudent\b[\s|]{0,4}(?:name|id|number|e-?mail)\b|\bname\b[^|]{0,20}\|\s*(?:student\s*)?id\b/i.test(line);
-  const person = String.raw`\p{Lu}\p{L}+(?:[-']\p{Lu}?\p{L}+)?[\s,]+\p{Lu}\p{L}+(?:[-']\p{Lu}?\p{L}+)?`;
-  const identifier = String.raw`(?:\d{3,}|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,})`;
-  const rosterRow = (line: string) => new RegExp(`^(?:${person}\\s*(?:[|,;:]\\s*|\\s+)${identifier}(?:\\s*[|,;:]\\s*${identifier})?|${identifier}\\s*(?:[|,;:]\\s*|\\s+)${person})$`, 'u').test(line.trim());
+  // Best-effort pre-model redaction: names without IDs and unusual layouts can remain.
+  const namePart = String.raw`\p{Lu}\p{L}*(?:[-'’]\p{Lu}?\p{L}+)*`;
+  const person = new RegExp(String.raw`(?:${namePart}|\p{Lu}\.)[\s,]+(?:\p{Lu}\.[\s,]+)?${namePart}(?:[\s,]+${namePart})?`, 'u');
+  const studentId = /\b\d{6,}\b|\b[A-Za-z]+\d{5,}\b|\b(?:student\s*)?id\s*[:#-]?\s*[A-Za-z0-9]+\b/i;
+  const email = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/i;
+  const studentEmail = /[\w.+-]+@(?:[\w.-]*student[\w.-]*|students?\.)[\w.-]*\.[A-Za-z]{2,}/i;
+  const standaloneRow = (line: string) => {
+    if (line.length > 1000 || !(studentId.test(line) || email.test(line))) return false;
+    const match = person.exec(line);
+    if (!match) return false;
+    // Ordinary faculty contact addresses beside a name are not student roster rows.
+    if (email.test(line) && !studentEmail.test(line) && !studentId.test(line)) return false;
+    // A two-word pipe row with an unlabelled number can also be an assessment title.
+    if (/^\s*[^|]+\|\s*\d+\s*$/.test(line) && match[0].trim().split(/\s+/).length === 2 && !/[.'’\-]/u.test(match[0])) return false;
+    return true;
+  };
+  const cells = (line: string, delimiter: string) => {
+    if (delimiter !== ',') return line.split(delimiter).map(cell => cell.trim());
+    const row: string[] = []; let cell = '', quoted = false;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { if (quoted && line[i + 1] === '"') { cell += '"'; i++; } else quoted = !quoted; }
+      else if (line[i] === ',' && !quoted) { row.push(cell.trim()); cell = ''; }
+      else cell += line[i];
+    }
+    row.push(cell.trim()); return row;
+  };
+  const headerCell = (cell: string) => cell.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const tableHeader = (line: string): { delimiter: string; columns: number; nameColumns: number[]; idColumns: number[] } | null => {
+    for (const delimiter of ['|', '\t', ',']) {
+      if (!line.includes(delimiter)) continue;
+      const row = cells(line, delimiter).map(headerCell);
+      const nameColumns = row.flatMap((cell, index) => /^(?:name|student name|learner|full name|first name|last name|student)$/.test(cell) ? [index] : []);
+      const idColumns = row.flatMap((cell, index) => /^(?:id|student id|sid|student number|email|e mail|username|user name)$/.test(cell) ? [index] : []);
+      if (nameColumns.length && idColumns.length) return { delimiter, columns: row.length, nameColumns, idColumns };
+    }
+    return null;
+  };
   const kept = source.sections.map(() => [] as string[]);
-  let roster = false;
+  let table: ReturnType<typeof tableHeader> = null;
   for (let index = 0; index < flattened.length; index++) {
     const { line, sectionIndex } = flattened[index];
-    const candidates = flattened.slice(index + 1, index + 5).map(entry => entry.line);
-    if (rosterHeader(line) && candidates.some(rosterRow)) { roster = true; stripped++; continue; }
-    if (roster && rosterRow(line)) { stripped++; continue; }
-    roster = false;
-    if (rosterRow(line)) { stripped++; continue; }
+    const header = tableHeader(line);
+    if (header) { table = header; stripped++; continue; }
+    if (table && line.trim()) {
+      const row = cells(line, table.delimiter);
+      const nameShaped = row.length === table.columns && (row.slice(0, 2).some(cell => !TABLE_VOCABULARY.test(cell.trim().split(/\s+/, 1)[0] ?? '') && person.test(cell)) || table.nameColumns.length > 1 && row.slice(0, 2).every(cell => /^\p{Lu}[\p{L}'’.-]*$/u.test(cell)));
+      if (!(TABLE_VOCABULARY.test(line) && !email.test(line) && !studentId.test(line) && !nameShaped)) { stripped++; continue; }
+    }
+    table = null;
+    if (standaloneRow(line)) { stripped++; continue; }
     if (remaining <= 0) { clipped = true; clippedAt ??= source.sections[sectionIndex].page; continue; }
     const part = line.slice(0, remaining);
     kept[sectionIndex].push(part);
@@ -283,7 +315,10 @@ async function advanceOptionsJob(ctx: ServiceContext, job: GenerationJob): Promi
     latest.provisioning = { jobId: current.id, done: 1, total: 1, error: null };
     latest.updatedAt = ctx.now();
     current.done = 1; current.state = 'done'; current.updatedAt = ctx.now();
-    await ctx.repo.putDesignSession(latest);
+    if (!await ctx.repo.saveDesignOptions(latest.id, job.id, latest)) {
+      await ctx.repo.failSupersededDesignJob(job.id, superseded);
+      return await ctx.repo.getGenerationJob(job.id) ?? job;
+    }
     await ctx.repo.putGenerationJob(current);
     return current;
   } catch (error) {
@@ -362,6 +397,10 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
       const answer = answers.find(item => item.questionId === question.id);
       if (!answer) return question;
       if (answer.optionId && !question.options.some(option => option.id === answer.optionId)) fail('invalid', 'That answer option is unknown.');
+      if (question.profileField && !answer.skipped) {
+        const value = (answer.value ?? answer.optionId ?? '').trim();
+        if (value && parseProfileCorrection(question.profileField, value) === null) fail('invalid', question.profileField === 'meeting' ? 'Use a meeting format such as Tue/Thu, 75 min.' : question.profileField === 'modality' ? 'Use a modality such as in-person, online, hybrid, or hyflex.' : `Use a format such as ${question.profileField === 'credits' ? '6 credits' : '16 weeks'}.`);
+      }
       return { ...question, answer: { optionId: answer.skipped ? null : answer.optionId ?? null, value: answer.skipped ? null : answer.value ?? null, skipped: answer.skipped } };
     });
     session.questions = updated;
@@ -384,6 +423,9 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     if (!session.read || session.stage !== 'read') fail('invalid', 'Wait until the syllabus has been read.');
     const profile = session.extraction!.profile;
     if (!Object.prototype.hasOwnProperty.call(profile, field) || field === 'weeklyHoursBudget' || !correction.trim() || correction.length > 1000) fail('invalid', 'Provide a profile field and a correction.');
+    if (field === 'credits' || field === 'termWeeks' || field === 'meeting' || field === 'modality') {
+      if (parseProfileCorrection(field, correction) === null) fail('invalid', field === 'meeting' ? 'Use a meeting format such as Tue/Thu, 75 min.' : field === 'modality' ? 'Use a modality such as in-person, online, hybrid, or hyflex.' : `Use a format such as ${field === 'credits' ? '6 credits' : '16 weeks'}.`);
+    }
     const item = profile[field as keyof Omit<typeof profile, 'weeklyHoursBudget'>];
     const id = `question-contest-${field}`;
     const question: DesignQuestion = { id, text: `You marked ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} as needing a change. What should I use?`, spans: item.spans, kind: 'text', ...(field === 'credits' || field === 'termWeeks' || field === 'meeting' || field === 'modality' ? { profileField: field } : {}), options: [], required: false, answer: { optionId: null, value: correction.trim(), skipped: false }, fromProblem: 'missing-field' };
@@ -421,8 +463,10 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     const texts = new Set<string>();
     for (const outcome of outcomes) {
       if (!outcome.code.trim() || !outcome.text.trim() || codes.has(outcome.code) || texts.has(outcome.text.trim()) || (outcome.originalText && sourceTexts.has(outcome.originalText))) fail('invalid', 'Outcomes must have unique codes and text.');
-      if (outcome.source === 'suggested' && !session.suggestedOutcomes?.some(item => item.text === (outcome.suggestedText ?? outcome.text))) fail('invalid', 'Use a suggestion shown in this session.');
-      if ((outcome.source === 'instructor' || outcome.source === 'suggested') ? outcome.originalText !== '' : !originals.has(outcome.originalText)) fail('invalid', 'The outcome source is invalid.');
+      const rewrite = session.extraction?.outcomes.find(item => item.text === outcome.originalText);
+      const suggested = session.suggestedOutcomes?.some(item => item.text === (outcome.suggestedText ?? outcome.text)) || !!rewrite && session.read?.outcomeAudits.some(audit => audit.outcomeId === rewrite.id && audit.suggestion?.text === (outcome.suggestedText ?? outcome.text));
+      if (outcome.source === 'suggested' && !suggested) fail('invalid', 'Use a suggestion shown in this session.');
+      if (outcome.source === 'instructor' ? outcome.originalText !== '' : outcome.source === 'suggested' ? !!outcome.originalText && !rewrite : !originals.has(outcome.originalText)) fail('invalid', 'The outcome source is invalid.');
       codes.add(outcome.code);
       texts.add(outcome.text.trim());
       if (outcome.originalText) sourceTexts.add(outcome.originalText);

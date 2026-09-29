@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import worker from '../index';
 import { createTestDb } from '../test/d1-shim';
+import { D1Repo } from '../d1-repo';
 
 function testEnv() {
   return { DB: createTestDb(), ENVIRONMENT: 'local', ASSETS: { fetch: async () => new Response('missing', { status: 404 }) } };
@@ -44,7 +45,7 @@ describe('/mcp', () => {
     const secret = await token(env, 'u-admin', ['courses:read']);
     const body = await (await post(env, secret, rpc('tools/list'))).json() as { result: { tools: { name: string; inputSchema: { type: string } }[] } };
     expect(body.result.tools.map(t => t.name)).toEqual([
-      'list_courses', 'get_course_outline', 'import_course', 'create_course', 'create_module', 'create_lesson', 'get_lesson',
+      'list_courses', 'get_course_outline', 'import_course', 'create_course', 'update_course', 'save_outcomes', 'create_module', 'create_lesson', 'get_lesson',
       'design_session_create', 'design_session_get', 'design_session_advance', 'design_session_answer', 'design_session_confirm', 'design_session_select', 'design_session_preview', 'design_session_apply', 'design_session_undo', 'save_blocks',
       'get_course_access', 'get_lesson_access', 'list_files', 'get_file_access', 'generate_at_scope', 'get_generation_job', 'generate_element',
       'list_assignments', 'get_assignment', 'create_assignment', 'list_announcements', 'create_announcement',
@@ -63,6 +64,58 @@ describe('/mcp', () => {
     const denied = await (await post(env, readOnly, rpc('tools/call', { name: 'import_course', arguments: { course: { code: 'BIO 106', title: 'Other cells', term: 'Spring' }, modules: [] } }))).json() as { result: { isError: boolean; content: { text: string }[] } };
     expect(denied.result.isError).toBe(true);
     expect(denied.result.content[0].text).toContain('forbidden');
+  });
+
+  it('guards course and outcome MCP writes with scope, drafts, and a current snapshot', async () => {
+    const env = testEnv();
+    const reader = await token(env, 'u-okafor', ['courses:read']);
+    const writer = await token(env, 'u-okafor', ['courses:read', 'courses:write']);
+    const repo = new D1Repo(env.DB as never);
+    const courseId = 'c-stat110';
+    const original = await repo.listOutcomes(courseId);
+    const kept = original.map(row => ({ id: row.id, text: row.text }));
+    for (const [name, args] of [['save_outcomes', { courseId, outcomes: [] }], ['update_course', { courseId, title: 'Fictional denied title' }]] as const) {
+      const denied = await (await post(env, reader, rpc('tools/call', { name, arguments: args }))).json() as { result: { isError: boolean; content: { text: string }[] } };
+      expect(denied.result.isError).toBe(true);
+      expect(denied.result.content[0].text).toContain('forbidden');
+    }
+    for (const outcomes of [[], kept.slice(1), [...kept].reverse()]) {
+      await designTool(env, writer, 'save_outcomes', { courseId, outcomes });
+      expect((await repo.getCourse(courseId))?.outcomes).toEqual(original.map(row => row.text));
+      expect((await repo.listOutcomes(courseId)).filter(row => row.aiState !== 'draft')).toEqual(original);
+    }
+    for (const outcomes of [[], original.slice(1).map(row => row.text), [...original].reverse().map(row => row.text)]) {
+      await designTool(env, writer, 'update_course', { courseId, outcomes });
+      expect((await repo.getCourse(courseId))?.outcomes).toEqual(original.map(row => row.text));
+    }
+    await designTool(env, writer, 'save_outcomes', { courseId, outcomes: kept.map((row, index) => index ? row : { ...row, text: 'Fictional assistant edit' }) });
+    expect((await repo.listOutcomes(courseId)).some(row => row.text === 'Fictional assistant edit' && row.aiState === 'draft' && row.provenance?.model.includes('MCP'))).toBe(true);
+    await designTool(env, writer, 'update_course', { courseId, outcomes: original.map((row, index) => index ? row.text : 'Fictional course edit') });
+    const rows = await repo.listOutcomes(courseId);
+    expect(rows.filter(row => row.aiState !== 'draft').map(row => row.text)).toEqual(original.map(row => row.text));
+    expect(rows.filter(row => row.aiState === 'draft').map(row => row.text)).toContain('Fictional course edit');
+    expect(rows.find(row => row.text === 'Fictional course edit')?.provenance?.model).toContain('MCP');
+    const rest = await call(env, '/api/v1/courses/c-stat110/outcomes', { headers: { cookie: 'tessera_user=u-priya' } });
+    expect(rest.status).toBe(200);
+    expect((await rest.json() as { text: string }[]).map(row => row.text)).toEqual(original.map(row => row.text));
+
+    const list = D1Repo.prototype.listOutcomes;
+    let resume!: () => void, entered!: () => void, first = true;
+    const paused = new Promise<void>(resolve => { entered = resolve; });
+    const gate = new Promise<void>(resolve => { resume = resolve; });
+    D1Repo.prototype.listOutcomes = async function(id) { if (id === courseId && first) { first = false; entered(); await gate; } return list.call(this, id); };
+    try {
+      const pending = post(env, writer, rpc('tools/call', { name: 'update_course', arguments: { courseId, title: 'Fictional stale title', outcomes: original.map(row => row.text) } }));
+      await paused;
+      await designTool(env, writer, 'update_course', { courseId, title: 'Fictional latest title', outcomes: [...original.map(row => row.text), 'Fictional latest draft'] });
+      resume();
+      const stale = await (await pending).json() as { result: { isError: boolean; content: { text: string }[] } };
+      expect(stale.result.isError).toBe(true);
+      expect(stale.result.content[0].text).toContain('conflict');
+      expect((await repo.getCourse(courseId))?.title).toBe('Fictional latest title');
+      expect((await repo.listOutcomes(courseId)).some(row => row.text === 'Fictional latest draft' && row.aiState === 'draft')).toBe(true);
+      expect((await repo.listOutcomes(courseId)).some(row => row.text === 'Fictional stale title')).toBe(false);
+    } finally { D1Repo.prototype.listOutcomes = list; resume(); }
   });
 
   it('requires a token and never publishes announcements', async () => {

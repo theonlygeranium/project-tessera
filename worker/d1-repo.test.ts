@@ -6,6 +6,17 @@ import type { StoredAnnouncement, StoredProgress } from '../shared/repo';
 import { seedData, type SeedData } from '../shared/seed';
 import { D1Repo } from './d1-repo';
 import { createTestDb } from './test/d1-shim';
+import { createTestDbThrough0009 } from './test/d1-shim';
+import { readFileSync } from 'node:fs';
+
+it('migration 0010 preserves populated 0009 outcomes and foreign keys', async () => {
+  const db = createTestDbThrough0009();
+  await db.prepare("INSERT INTO courses (id,code,title,term) VALUES ('c-fictional','ART 110','Fictional practice','Fall')").run();
+  await db.prepare("INSERT INTO outcomes (id,course_id,code,text,position,ai_state) VALUES ('o-fictional','c-fictional','O1','Compare fictional approaches.',0,'kept')").run();
+  await db.exec(readFileSync(new URL('../migrations/0010_outcome_provenance.sql', import.meta.url), 'utf8'));
+  expect(await db.prepare("SELECT id,text,provenance FROM outcomes WHERE id = 'o-fictional'").first()).toEqual({ id: 'o-fictional', text: 'Compare fictional approaches.', provenance: null });
+  expect((await db.prepare('PRAGMA foreign_key_check').all()).results).toEqual([]);
+});
 
 function fresh() {
   return new D1Repo(createTestDb() as never);

@@ -298,6 +298,6 @@ export function seedData(): SeedData {
   }];
   const reportingLines: ReportingLine[] = [{ managerId: 'u-sam', reportId: 'u-dana', createdBy: 'u-admin', createdAt: t(15) }];
 
-  return { institution, users, courses, enrollments, modules, lessons, blocks, assignments, submissions, announcements, reads, progress, adaptations: [], builderSessions: [], generationJobs: [], apiTokens: [], invitations: [], files: [], fileVersions: [], scans: [], formats: [], tutorSettings: [], tutorSessions: [],
+  return { institution, users, courses, enrollments, modules, lessons, blocks, assignments, submissions, announcements, reads, progress, adaptations: [], builderSessions: [], generationJobs: [], apiTokens: [], invitations: [], files: [{ id: 'file-fictional-design-source', courseId: 'c-stat110', name: 'Design source draft (fictional).pdf', kind: 'pdf', mime: 'application/pdf', size: 1024, key: 'files/c-stat110/file-fictional-design-source/v1/design-source-draft.pdf', version: 1, uploadedBy: 'u-okafor', uploadedAt: t(20), visibility: 'staff', scan: null }], fileVersions: [], scans: [], formats: [], tutorSettings: [], tutorSessions: [],
     programs: [], templates: [], rubrics: [], outcomeLinks: [], requirements, completionEvents, testOuts, testOutAttempts: [], certificates: [], reportingLines, managerConsents: [] };
 }

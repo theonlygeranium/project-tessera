@@ -349,6 +349,116 @@ describe('API tokens and browser-only routes', () => {
   });
 });
 
+describe('authenticated outcome writes', () => {
+  it('rejects a stale design Keep over HTTP and accepts the reviewed revision', async () => {
+    const db = createTestDb(), env = testEnv(db, assetsFor().fetcher);
+    await call(env, '/api/v1/session');
+    const repo = new D1Repo(db as never), courseId = 'c-stat110', sessionId = 'ds-http-keep', outcomeId = 'o-http-keep';
+    const at = '2026-09-28T12:00:00Z';
+    const session = { id: sessionId, courseId, mode: 'syllabus', stage: 'review', createdBy: 'u-okafor', createdAt: at, updatedAt: at,
+      source: { kind: 'syllabus', fileId: null, version: null, name: 'Fictional source', sections: [], chars: 0, ocr: false }, consent: { syllabusOnly: true, at, rememberProfile: false },
+      extraction: null, read: null, questions: [], confirmedOutcomes: null, teachingNote: '', options: null, selection: null, plan: null, provisioning: null,
+      created: { outcomeIds: [outcomeId], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] },
+      record: { sessionId, source: { name: 'Fictional source', kind: 'syllabus', chars: 0 }, extraction: null, read: null, questions: [], confirmedOutcomes: [], optionsShown: [], selection: null, plan: null, appliedAt: null, undoneAt: null, decisions: [] },
+    } as Parameters<D1Repo['putDesignSession']>[0];
+    await repo.putDesignSession(session);
+    await repo.replaceOutcomes(courseId, [...await repo.listOutcomes(courseId), { id: outcomeId, courseId, code: 'O9', text: 'Fictional draft A', position: 9, aiState: 'draft' }]);
+    const saved = await repo.listOutcomes(courseId);
+    await repo.replaceOutcomes(courseId, saved.map(row => row.id === outcomeId ? { ...row, text: 'Fictional draft B' } : row));
+    const path = `/api/v1/design/${sessionId}/outcomes/${outcomeId}/keep`;
+    const headers = { cookie: 'tessera_user=u-okafor', 'content-type': 'application/json' };
+    const stale = await call(env, path, { method: 'POST', headers, body: JSON.stringify({ expectedText: 'Fictional draft A' }) });
+    expect(stale.status).toBe(409);
+    expect((await repo.listOutcomes(courseId)).find(row => row.id === outcomeId)?.aiState).toBe('draft');
+    expect((await repo.getCourse(courseId))?.outcomes).not.toContain('Fictional draft B');
+    const kept = await call(env, path, { method: 'POST', headers, body: JSON.stringify({ expectedText: 'Fictional draft B' }) });
+    expect(kept.status).toBe(200);
+    expect((await repo.getCourse(courseId))?.outcomes).toContain('Fictional draft B');
+  });
+
+  it('keeps student outcomes stable through REST token and MCP agent changes, then publishes only the displayed draft', async () => {
+    const db = createTestDb(), env = testEnv(db, assetsFor().fetcher);
+    await call(env, '/api/v1/session');
+    const repo = new D1Repo(db as never), courseId = 'c-stat110';
+    const { hashSecret } = await import('../shared/tokens');
+    const secret = `tsk_${'b'.repeat(40)}`;
+    await repo.putApiToken({ id: 'tok-outcomes', name: 'Fictional assistant', prefix: 'bbbbbbbb', scopes: ['courses:read', 'courses:write'], ownerId: 'u-okafor', createdAt: '2026-09-27T00:00:00.000Z', expiresAt: null, lastUsedAt: null, revokedAt: null, hash: await hashSecret(secret) } as never);
+    const auth = { authorization: `Bearer ${secret}`, 'content-type': 'application/json' };
+    const person = { cookie: 'tessera_user=u-okafor', 'content-type': 'application/json' };
+    const student = { cookie: 'tessera_user=u-priya' };
+    const path = `/api/v1/courses/${courseId}/outcomes`;
+    const original = await repo.listOutcomes(courseId), visible = await (await call(env, path, { headers: student })).json();
+    const mirror = (await repo.getCourse(courseId))!.outcomes;
+    const request = async (method: string, url: string, body: unknown) => call(env, url, { method, headers: auth, body: JSON.stringify(body) });
+    for (const changed of [[], original.slice(1).map(({ id, text }) => ({ id, text })), [...original].reverse().map(({ id, text }) => ({ id, text }))]) {
+      expect((await request('PUT', path, { outcomes: changed })).status).toBe(200);
+      expect(await (await call(env, path, { headers: student })).json()).toEqual(visible);
+      expect((await repo.getCourse(courseId))?.outcomes).toEqual(mirror);
+    }
+    for (const outcomes of [[], original.slice(1).map(row => row.text), [...original].reverse().map(row => row.text)]) {
+      expect((await request('PATCH', `/api/v1/courses/${courseId}`, { outcomes })).status).toBe(200);
+      expect(await (await call(env, path, { headers: student })).json()).toEqual(visible);
+    }
+    const edited = await request('PUT', path, { outcomes: original.map((row, i) => ({ id: row.id, text: i ? row.text : 'Fictional REST draft A' })) });
+    expect(edited.status).toBe(200);
+    const draft = ((await edited.json()) as { id: string; text: string; aiState?: string }[]).find(row => row.text === 'Fictional REST draft A')!;
+    expect(draft.aiState).toBe('draft');
+    expect((await repo.listOutcomes(courseId)).find(row => row.id === draft.id)?.provenance).toMatchObject({ task: 'agent', model: expect.stringContaining('API token') });
+    const mcp = async (name: string, args: unknown) => (await call(env, '/mcp', { method: 'POST', headers: auth, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) })).json() as Promise<{ result: { isError?: boolean; structuredContent?: unknown } }>;
+    for (const args of [{ courseId, outcomes: [] }, { courseId, outcomes: [...original].reverse().map(({ id, text }) => ({ id, text })) }]) {
+      expect((await mcp('save_outcomes', args)).result.isError).not.toBe(true);
+      expect(await (await call(env, path, { headers: student })).json()).toEqual(visible);
+    }
+    expect((await mcp('update_course', { courseId, outcomes: [] })).result.isError).not.toBe(true);
+    expect(await (await call(env, path, { headers: student })).json()).toEqual(visible);
+    expect((await mcp('update_course', { courseId, outcomes: [...original].reverse().map(row => row.text) })).result.isError).not.toBe(true);
+    expect(await (await call(env, path, { headers: student })).json()).toEqual(visible);
+    expect((await mcp('update_course', { courseId, outcomes: original.map((row, i) => i ? row.text : 'Fictional MCP edited kept text') })).result.isError).not.toBe(true);
+    expect((await repo.listOutcomes(courseId)).some(row => row.text === 'Fictional MCP edited kept text' && row.aiState === 'draft' && row.provenance?.model.includes('MCP'))).toBe(true);
+    expect(await (await call(env, path, { headers: student })).json()).toEqual(visible);
+    const agent = await mcp('save_outcomes', { courseId, outcomes: original.map((row, i) => ({ id: row.id, text: i ? row.text : 'Fictional MCP draft B' })) });
+    expect(agent.result.isError).not.toBe(true);
+    const agentDraft = (agent.result.structuredContent as { items: { id: string; text: string; aiState?: string }[] }).items.find(row => row.text === 'Fictional MCP draft B')!;
+    expect(agentDraft.aiState).toBe('draft');
+    expect((await repo.listOutcomes(courseId)).find(row => row.id === agentDraft.id)?.provenance).toMatchObject({ task: 'agent', model: expect.stringContaining('MCP') });
+    expect(await (await call(env, path, { headers: student })).json()).toEqual(visible);
+    const current = await repo.listOutcomes(courseId);
+    await request('PUT', path, { outcomes: current.map(row => ({ id: row.id, text: row.id === agentDraft.id ? 'Fictional MCP draft C' : row.text })) });
+    const keepPath = `${path}/${agentDraft.id}/keep`;
+    const stale = await call(env, keepPath, { method: 'POST', headers: person, body: JSON.stringify({ expectedText: 'Fictional MCP draft B' }) });
+    expect(stale.status).toBe(409);
+    expect(await (await call(env, path, { headers: student })).json()).toEqual(visible);
+    const kept = await call(env, keepPath, { method: 'POST', headers: person, body: JSON.stringify({ expectedText: 'Fictional MCP draft C' }) });
+    expect(kept.status).toBe(200);
+    expect((await repo.getCourse(courseId))!.outcomes).toContain('Fictional MCP draft C');
+  });
+
+  it('returns 409 on a stale REST course update without changing the newer title or outcomes', async () => {
+    const db = createTestDb(), env = testEnv(db, assetsFor().fetcher);
+    await call(env, '/api/v1/session');
+    const repo = new D1Repo(db as never), courseId = 'c-stat110';
+    const original = await repo.listOutcomes(courseId);
+    const path = `/api/v1/courses/${courseId}`;
+    const headers = { cookie: 'tessera_user=u-okafor', 'content-type': 'application/json' };
+    const list = D1Repo.prototype.listOutcomes;
+    let resume!: () => void, entered!: () => void, first = true;
+    const paused = new Promise<void>(resolve => { entered = resolve; });
+    const gate = new Promise<void>(resolve => { resume = resolve; });
+    D1Repo.prototype.listOutcomes = async function(id) { if (id === courseId && first) { first = false; entered(); await gate; } return list.call(this, id); };
+    try {
+      const stale = call(env, path, { method: 'PATCH', headers, body: JSON.stringify({ title: 'Fictional stale title', outcomes: original.map((row, index) => index ? row.text : 'Fictional stale outcome') }) });
+      await paused;
+      const latest = await call(env, path, { method: 'PATCH', headers, body: JSON.stringify({ title: 'Fictional latest title', outcomes: original.map((row, index) => index ? row.text : 'Fictional latest outcome') }) });
+      expect(latest.status).toBe(200);
+      resume();
+      expect((await stale).status).toBe(409);
+      expect((await repo.getCourse(courseId))?.title).toBe('Fictional latest title');
+      expect((await repo.listOutcomes(courseId))[0].text).toBe('Fictional latest outcome');
+      expect((await repo.getCourse(courseId))?.outcomes[0]).toBe('Fictional latest outcome');
+    } finally { D1Repo.prototype.listOutcomes = list; resume(); }
+  });
+});
+
 describe('file routes', () => {
   async function fileEnv() {
     const { createTestBucket } = await import('./test/r2-shim');

@@ -135,7 +135,7 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
   const instructional = modules.filter(m => m.key.startsWith('module-'));
   const moduleWeeks = (module: PlanModule) => spine.modules[Number(module.key.slice('module-'.length)) - 1]?.weeks ?? module.lessons.map(l => l.week).filter((week): week is number => week !== null);
   const usedDates = snapshot.assignments.flatMap(a => a.dueAt ? [a.dueAt.slice(0, 10)] : []);
-  const breakWeeks = new Set(session.extraction.schedule.filter(row => isBreak(`${row.topic} ${row.due}`) || /\bexam week\b/i.test(`${row.topic} ${row.due}`)).map(row => row.week));
+  const breakWeeks = new Set(session.extraction.schedule.filter(row => isBreak(`${row.topic} ${row.due}`) || /\bexam week\b/i.test(`${row.topic} ${row.due}`)).flatMap(coveredWeeks));
   for (const question of session.questions) {
     const answer = question.answer;
     if (!answer || answer.skipped || (!['break', 'exam'].includes(answer.optionId ?? '') && !isBreak(answer.value ?? '') && !/\bexam week\b/i.test(answer.value ?? ''))) continue;

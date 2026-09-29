@@ -1129,6 +1129,8 @@ export interface Outcome {
   position: number;
   /** Existing outcomes default to kept. Design apply creates drafts. */
   aiState?: 'draft' | 'kept';
+  /** Retained after a person keeps an assistant draft; absent for human-authored text. */
+  provenance?: Provenance & { keptBy?: string; keptAt?: Timestamp };
 }
 
 export type AlignableKind = 'block' | 'assignment';

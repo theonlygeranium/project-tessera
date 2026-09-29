@@ -233,7 +233,12 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
         const id = ctx.newId('o');
         outcomeIds.set(item.code, id);
       }
-      const allocated = await ctx.repo.appendDesignOutcomes(session.id, revision, plan.outcomes.map((item, index) => ({ id: outcomeIds.get(item.code)!, courseId: session.courseId, code: item.code, text: item.text, position: oldOutcomes.length + index, aiState: 'draft' })));
+      const outcomeAuthor = (index: number) => {
+        const submitted = session.confirmedOutcomes?.[index]?.submittedBy;
+        const agent = ctx.agent?.name ?? ctx.token?.name ?? ctx.token?.id ?? (submitted?.kind === 'agent' || submitted?.kind === 'token' ? submitted.name : null);
+        return agent ? `Assistant (${agent})` : 'Design partner';
+      };
+      const allocated = await ctx.repo.appendDesignOutcomes(session.id, revision, plan.outcomes.map((item, index) => ({ id: outcomeIds.get(item.code)!, courseId: session.courseId, code: item.code, text: item.text, position: oldOutcomes.length + index, aiState: 'draft', provenance: provenance(ctx, outcomeAuthor(index), 'outcome-suggest', `Draft outcome from ${session.source.name}`, [{ id: session.source.fileId ?? session.id, name: session.source.name }]) })));
       if (!allocated) {
         const message = `This plan needs ${plan.outcomes.length} outcome slots, but the course no longer has room for all of them. Review the plan again.`;
         if (await ctx.repo.resetDesignCapacityFailure(session.id, revision, message)) fail('conflict', message);

@@ -8,6 +8,8 @@ export const Info: Story = {};
 export const Success: Story = { args: { tone: 'success', children: 'Your answer was saved.' } };
 export const Warning: Story = { args: { tone: 'warning', children: 'This lesson closes tomorrow.' } };
 export const Error: Story = { args: { tone: 'error', children: 'Your answer could not be saved. Try again.' } };
+export const KeepConflict: Story = { args: { tone: 'error', live: 'assertive', children: 'This draft changed since you opened it. Review the new wording, then keep it.' } };
+export const OutcomesConflict: Story = { args: { tone: 'error', live: 'assertive', children: 'Outcomes changed while you were editing. Reload to see the latest.', action: <Button onClick={() => {}}>Reload latest outcomes</Button> } };
 export const Policy: Story = { args: { tone: 'policy', children: 'Open tutor mode is unavailable on graded work.' } };
 export const WithUndo: Story = { args: { children: 'Why this moved: your weekly time changed.', action: <Button variant="text" onClick={() => {}}>Undo</Button> } };
 export const Dismissible: Story = { args: { onDismiss: () => {} } };

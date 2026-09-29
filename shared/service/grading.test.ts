@@ -70,7 +70,7 @@ describe('file scans in demo mode', () => {
     await repo.putFile({ id: 'f1', courseId: 'c-stat110', name: 'a.pdf', kind: 'pdf', mime: 'application/pdf', size: 1, key: 'k', version: 1, uploadedBy: 'u-okafor', uploadedAt: '2026-09-27T00:00:00.000Z', scan: null });
     await repo.putScan({ id: 's1', courseId: 'c-stat110', version: 1, target: { kind: 'file', fileId: 'f1', version: 1 }, score: 70, grade: 'Moderate', issueCount: 1, bySeverity: { critical: 1, serious: 0, moderate: 0, minor: 0 }, scannedAt: '2026-09-27T01:00:00.000Z', issues: [], document: null });
     expect((await repo.getFile('f1'))?.scan?.score).toBe(70);
-    expect((await repo.listFiles('c-stat110'))[0].scan?.grade).toBe('Moderate');
+    expect((await repo.listFiles('c-stat110')).find(file => file.id === 'f1')?.scan?.grade).toBe('Moderate');
   });
 });
 

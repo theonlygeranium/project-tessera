@@ -158,6 +158,9 @@ const APP = [
   { name: 'App · Dana · Sharing', url: 'app/sharing?data=mock&as=u-dana' },
   { name: 'App · Dana · Sharing on', url: 'app/sharing?data=mock&as=u-dana', steps: async (p) => { await p.getByRole('switch', { name: /Share with Sam Ortiz/ }).check(); await p.getByRole('status').filter({ hasText: /Now sharing/ }).waitFor(); } },
   { name: 'App · Reporting lines', url: 'app/admin/setup?data=mock&as=u-admin', steps: async (p) => { await p.getByRole('button', { name: 'Finish setup' }).click(); await p.getByRole('heading', { name: 'Overview', level: 1 }).waitFor(); await p.getByRole('navigation', { name: 'Administrator navigation' }).getByRole('link', { name: 'Reporting lines' }).click(); await p.getByRole('heading', { name: 'Reporting lines', level: 1 }).waitFor(); } },
+  { name: 'App · Design partner · Draft outcomes kept', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: async (page) => { await designReviewSteps(page); const outcomes = page.locator('[aria-labelledby="draft-outcomes-heading"] .ai.ai--block'); await outcomes.first().getByRole('button', { name: 'Keep outcome' }).click(); await page.locator('[aria-labelledby="draft-outcomes-heading"] .ai.ai--block[data-state="kept"]').first().waitFor(); } },
+  { name: 'App · Instructor · File library · Share with students', url: 'app/teach/courses/c-stat110/files?data=mock&as=u-okafor', steps: async (page) => { await page.getByRole('row', { name: /Design source draft \(fictional\)\.pdf/ }).getByRole('button', { name: 'Share with students' }).waitFor(); } },
+  { name: 'App · Instructor · Course outcomes · Draft', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: async (page) => { await designReviewSteps(page); await page.getByRole('link', { name: 'Open the course outline' }).click(); await page.getByRole('link', { name: 'Outcomes', exact: true }).click(); await page.getByRole('button', { name: 'Keep outcome' }).first().waitFor(); } },
 ];
 const adminNight3 = async (page, destination) => {
   await page.getByRole('button', { name: 'Finish setup' }).click();
@@ -225,6 +228,14 @@ targets.push({ name: 'Prototype · Reflect step', url: 'prototype/#today', steps
   await p.click('#task-resume'); await p.check('input[name=kc][value=b]'); await p.click('#kc-form button[type=submit]'); await p.click('[data-act=next-chunk]'); } });
 targets.push({ name: 'Prototype · Phone width + tutor', url: 'prototype/#today', viewport: { width: 390, height: 844 }, steps: async (p) => {
   await p.click('#task-resume'); await p.click('[data-act=toggle-tutor]'); await p.waitForTimeout(700); } });
+targets.push({ name: 'App · Outcome draft review after design', url: 'app/teach/courses/c-stat110/design?data=mock&as=u-okafor', steps: async (page) => {
+  await designReviewSteps(page);
+  await page.getByRole('link', { name: 'Open the course outline' }).click();
+  await page.getByRole('link', { name: 'Outcomes', exact: true }).click();
+  await page.getByRole('button', { name: 'Keep outcome' }).first().waitFor();
+} });
+targets.push({ name: 'Story · Keep conflict live notice', url: 'storybook/iframe.html?id=components-statusnotice--keep-conflict&viewMode=story' });
+targets.push({ name: 'Story · Outcomes conflict live notice', url: 'storybook/iframe.html?id=components-statusnotice--outcomes-conflict&viewMode=story' });
 
 // ---- run -------------------------------------------------------------------
 const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});

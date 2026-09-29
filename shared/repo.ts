@@ -59,6 +59,7 @@ export interface Repo {
   /** Ordered by code. */
   listCourses(): Promise<Course[]>;
   putCourse(course: Course): Promise<void>;
+  updateCourseDetails(course: Course, expected: Course): Promise<boolean>;
 
   listEnrollments(filter: { courseId?: Id; userId?: Id }): Promise<Enrollment[]>;
   /** Replaces the course's enrollments. */
@@ -172,6 +173,7 @@ export interface Repo {
   getGenerationJob(id: Id): Promise<GenerationJob | null>;
   putGenerationJob(job: GenerationJob): Promise<void>;
   claimDesignOptions(session: DesignSession, job: GenerationJob, expectedStage: 'read' | 'approaches', previousJobId: Id): Promise<boolean>;
+  saveDesignOptions(sessionId: Id, jobId: Id, session: DesignSession): Promise<boolean>;
   failSupersededDesignJob(jobId: Id, message: string): Promise<void>;
 
   /** Files in R2 (D-019). `listFiles` is newest first. */
@@ -239,7 +241,11 @@ export interface Repo {
 
   /** Ordered by position. */
   listOutcomes(courseId: Id): Promise<Outcome[]>;
-  keepDesignOutcome(sessionId: Id, outcomeId: Id): Promise<boolean>;
+  replaceOutcomesIfUnchanged(courseId: Id, expected: Outcome[], outcomes: Outcome[]): Promise<boolean>;
+  updateCourseAndOutcomesIfUnchanged(course: Course, expectedCourse: Course, expectedOutcomes: Outcome[], outcomes: Outcome[]): Promise<boolean>;
+  keepDesignOutcome(sessionId: Id, outcomeId: Id, expectedText: string, keeper: string, keptAt: string): Promise<boolean>;
+  /** Compare-and-set a draft in this course to kept and refresh its learner-visible mirror. */
+  keepOutcome(courseId: Id, outcomeId: Id, expectedText: string, keeper: string, keptAt: string): Promise<boolean>;
   /** Replaces the course's outcomes with these; outcomes not in the list are deleted with their links. */
   replaceOutcomes(courseId: Id, outcomes: Outcome[]): Promise<void>;
   /** Links for a course's outcomes, or for one target. Ordered by outcome id, then target kind and id. */

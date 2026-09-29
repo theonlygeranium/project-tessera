@@ -15,6 +15,8 @@ const TOOLS: Tool[] = [
   { name: 'get_course_outline', operation: 'getCourseOutline', description: 'Read a course and its module and lesson outline.', readOnly: true },
   { name: 'import_course', operation: 'importCourse', description: 'Import a course outline and draft lesson content for a person to review.', readOnly: false },
   { name: 'create_course', operation: 'createCourse', description: 'Create a course for a person to develop.', readOnly: false },
+  { name: 'update_course', operation: 'updateCourse', description: 'Update course details and propose outcome drafts without changing kept outcomes.', readOnly: false },
+  { name: 'save_outcomes', operation: 'saveOutcomes', description: 'Save draft outcome proposals without changing kept outcomes.', readOnly: false },
   { name: 'create_module', operation: 'createModule', description: 'Add a module to a course.', readOnly: false },
   { name: 'create_lesson', operation: 'createLesson', description: 'Add an unpublished lesson to a module.', readOnly: false },
   { name: 'get_lesson', operation: 'getLesson', description: 'Read a lesson and its blocks.', readOnly: true },

@@ -18,7 +18,7 @@ function normalized<T extends object>(value: T): T {
 }
 const cmp = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const byName = (a: { name: string }, b: { name: string }) => cmp(a.name, b.name);
-const byPosition = (a: { position: number }, b: { position: number }) => a.position - b.position;
+const byPosition = (a: { position: number; id: string }, b: { position: number; id: string }) => a.position - b.position || cmp(a.id, b.id);
 const byNewest = (a: { publishedAt: string | null; createdAt: string }, b: { publishedAt: string | null; createdAt: string }) =>
   (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt);
 
@@ -37,6 +37,7 @@ export class MemoryRepo implements Repo {
   async getCourse(id: string): Promise<Course | null> { return copy(this.data.courses.find(x => x.id === id) ?? null); }
   async listCourses(): Promise<Course[]> { return copy(this.data.courses.sort((a,b) => a.code.localeCompare(b.code))); }
   async putCourse(value: Course) { this.upsert(this.data.courses, normalized(value)); }
+  async updateCourseDetails(value: Course, expected: Course) { const current = this.data.courses.find(x => x.id === value.id); if (!current || ['code', 'title', 'term', 'description', 'welcome'].some(key => current[key as keyof Course] !== expected[key as keyof Course])) return false; Object.assign(current, { code: value.code, title: value.title, term: value.term, description: value.description, welcome: value.welcome }); return true; }
   async listEnrollments(filter: { courseId?: string; userId?: string }): Promise<Enrollment[]> {
     return copy(this.data.enrollments.filter(x => (!filter.courseId || x.courseId === filter.courseId) && (!filter.userId || x.userId === filter.userId)).sort((a,b) => a.courseId.localeCompare(b.courseId) || a.userId.localeCompare(b.userId)));
   }
@@ -150,6 +151,12 @@ export class MemoryRepo implements Repo {
     const previous = this.data.generationJobs.find(x => x.id === previousJobId);
     if (!current || current.stage !== expectedStage || current.provisioning?.jobId !== previousJobId || (expectedStage === 'approaches' && (current.options || previous?.state !== 'failed')) || this.data.generationJobs.some(x => x.id === job.id)) return false;
     this.upsert(this.data.designSessions!, value); this.upsert(this.data.generationJobs, job); return true;
+  }
+  async saveDesignOptions(id: string, jobId: string, value: DesignSession) {
+    const current = this.data.designSessions!.find(x => x.id === id);
+    const job = this.data.generationJobs.find(x => x.id === jobId);
+    if (current?.stage !== 'approaches' || current.provisioning?.jobId !== jobId || current.options !== null || job?.state !== 'running') return false;
+    this.upsert(this.data.designSessions!, value); return true;
   }
   async failSupersededDesignJob(jobId: string, message: string) {
     const job = this.data.generationJobs.find(x => x.id === jobId);
@@ -338,13 +345,23 @@ export class MemoryRepo implements Repo {
     }
   }
   async listOutcomes(courseId: string) { return copy(this.data.outcomes!.filter(x => x.courseId === courseId).sort((a, b) => a.position - b.position || cmp(a.id, b.id))); }
-  async keepDesignOutcome(sessionId: string, outcomeId: string) {
+  async keepDesignOutcome(sessionId: string, outcomeId: string, expectedText: string, keeper: string, keptAt: string) {
     const s = this.data.designSessions!.find(x => x.id === sessionId);
     const o = this.data.outcomes!.find(x => x.id === outcomeId && x.courseId === s?.courseId);
     const c = this.data.courses.find(x => x.id === s?.courseId);
-    if (!s || !['provisioning', 'review'].includes(s.stage) || !o || !c || !s.created.outcomeIds.includes(outcomeId) || o.aiState !== 'draft') return false;
+    if (!s || !['provisioning', 'review'].includes(s.stage) || !o || !c || !s.created.outcomeIds.includes(outcomeId) || o.aiState !== 'draft' || o.text !== expectedText) return false;
     delete o.aiState;
+    if (o.provenance) o.provenance = { ...o.provenance, keptBy: keeper, keptAt };
     c.outcomes = this.data.outcomes!.filter(x => x.courseId === c.id && x.aiState !== 'draft').sort(byPosition).map(x => x.text);
+    return true;
+  }
+  async keepOutcome(courseId: string, outcomeId: string, expectedText: string, keeper: string, keptAt: string) {
+    const o = this.data.outcomes!.find(x => x.id === outcomeId && x.courseId === courseId && x.aiState === 'draft' && x.text === expectedText);
+    const c = this.data.courses.find(x => x.id === courseId);
+    if (!o || !c) return false;
+    delete o.aiState;
+    if (o.provenance) o.provenance = { ...o.provenance, keptBy: keeper, keptAt };
+    c.outcomes = this.data.outcomes!.filter(x => x.courseId === courseId && x.aiState !== 'draft').sort(byPosition).map(x => x.text);
     return true;
   }
   async replaceOutcomes(courseId: string, outcomes: Outcome[]) {
@@ -353,6 +370,28 @@ export class MemoryRepo implements Repo {
     const inserted = new Set(outcomes.map(x => x.id));
     this.data.outcomes = this.data.outcomes!.filter(x => x.courseId !== courseId && !inserted.has(x.id)).concat(copy(outcomes));
     this.data.outcomeLinks = this.data.outcomeLinks!.filter(x => !removed.has(x.outcomeId));
+  }
+  async replaceOutcomesIfUnchanged(courseId: string, expected: Outcome[], outcomes: Outcome[]) {
+    const current = copy(this.data.outcomes!.filter(x => x.courseId === courseId).sort(byPosition));
+    if (JSON.stringify(current) !== JSON.stringify(expected) || !this.data.courses.some(c => c.id === courseId) || outcomes.some(item => item.courseId !== courseId)) return false;
+    const removed = new Set(current.filter(x => !outcomes.some(y => y.id === x.id)).map(x => x.id));
+    const inserted = new Set(outcomes.map(x => x.id));
+    this.data.outcomes = this.data.outcomes!.filter(x => x.courseId !== courseId && !inserted.has(x.id)).concat(copy(outcomes));
+    this.data.outcomeLinks = this.data.outcomeLinks!.filter(x => !removed.has(x.outcomeId));
+    const course = this.data.courses.find(c => c.id === courseId)!;
+    course.outcomes = outcomes.filter(item => item.aiState !== 'draft').sort(byPosition).map(item => item.text);
+    return true;
+  }
+  async updateCourseAndOutcomesIfUnchanged(value: Course, expectedCourse: Course, expectedOutcomes: Outcome[], outcomes: Outcome[]) {
+    const current = this.data.courses.find(course => course.id === value.id);
+    if (!current || ['code', 'title', 'term', 'description', 'welcome'].some(key => current[key as keyof Course] !== expectedCourse[key as keyof Course])) return false;
+    if (JSON.stringify(copy(this.data.outcomes!.filter(row => row.courseId === value.id).sort(byPosition))) !== JSON.stringify(expectedOutcomes) || outcomes.some(row => row.courseId !== value.id)) return false;
+    const removed = new Set(expectedOutcomes.filter(row => !outcomes.some(next => next.id === row.id)).map(row => row.id));
+    const inserted = new Set(outcomes.map(row => row.id));
+    this.data.outcomes = this.data.outcomes!.filter(row => row.courseId !== value.id && !inserted.has(row.id)).concat(copy(outcomes));
+    this.data.outcomeLinks = this.data.outcomeLinks!.filter(link => !removed.has(link.outcomeId));
+    Object.assign(current, { code: value.code, title: value.title, term: value.term, description: value.description, welcome: value.welcome, outcomes: outcomes.filter(row => row.aiState !== 'draft').sort(byPosition).map(row => row.text) });
+    return true;
   }
   async listOutcomeLinks(filter: { courseId?: string; targetKind?: AlignableKind; targetId?: string }) {
     const ids = filter.courseId ? new Set(this.data.outcomes!.filter(x => x.courseId === filter.courseId).map(x => x.id)) : null;
