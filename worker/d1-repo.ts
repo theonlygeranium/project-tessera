@@ -2,13 +2,14 @@
 // `put*` upserts. replaceBlocks, setEnrollments, deleteLesson, and reset each run
 // in one batch so a failure leaves the previous rows in place.
 import type {
-  AccessibleFormat, ActivityKind, Adaptation, AlignableKind, ApiToken, Assignment, Block, BlockContent, BuilderSession, Certificate, CompletionEvent, Course, CourseTemplate, FileRecord, Id, Institution, Invitation, Lesson, ManagerConsent, Module, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Role, Rubric, Submission, TestOut, TutorSetting, User,
+  AccessibleFormat, ActivityKind, Adaptation, AlignableKind, ApiToken, Assignment, Block, BlockContent, BuilderSession, Certificate, CompletionEvent, Course, CourseTemplate, FileRecord, Id, Institution, Invitation, Lesson, ManagerConsent, Module, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Role, Rubric, Submission, TestOut, TutorSetting, User, WorkerRecord, WorkerColumnMap, WorkerLink, RuleMember,
 } from '../shared/domain';
 import type {
-  AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt,
+  AnnouncementRead, Enrollment, Repo, StoredAnnouncement, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt, HrImportRow,
 } from '../shared/repo';
 import type { SeedData } from '../shared/seed';
 import { ApiError } from '../shared/api';
+import { sameWorkerVersion } from '../shared/hris/equal';
 
 type SqlBind = string | number | null;
 
@@ -29,6 +30,7 @@ const DELETE_ORDER = [
   'courses',
   'users',
   'institution',
+  'rule_members', 'hr_imports', 'worker_column_maps', 'worker_links', 'worker_records', 'hr_state',
 ] as const;
 
 export class D1Repo implements Repo {
@@ -549,6 +551,85 @@ export class D1Repo implements Repo {
     return (await this.all<ConsentRow>('SELECT * FROM manager_consents WHERE (? IS NULL OR manager_id = ?) AND (? IS NULL OR report_id = ?) ORDER BY manager_id, report_id', [manager, manager, report, report])).map(consentFromRow);
   }
   async putManagerConsent(c: ManagerConsent): Promise<void> { await this.managerConsentStmt(c).run(); }
+
+  // ---- HRIS compliance M1 ----
+  async insertWorkerRecord(r: WorkerRecord, guard?: { preceding: WorkerRecord | null }): Promise<'inserted' | 'identical' | 'conflict'> {
+    const expected=guard?.preceding;
+    const fields=['email','name','job_code','job_title','department','location','employment_type','manager_employee_id','hire_date','status'] as const;
+    const values=expected?[expected.email,expected.name,expected.jobCode,expected.jobTitle,expected.department,expected.location,expected.employmentType,expected.managerEmployeeId,expected.hireDate,expected.status]:[];
+    const preceding=`SELECT * FROM worker_records WHERE employee_id=? AND effective_at<? ORDER BY effective_at DESC LIMIT 1`;
+    const guarded=guard ? ` AND ${expected ? `EXISTS (SELECT 1 FROM (${preceding}) WHERE employee_id=? AND effective_at=? AND ${fields.map(f=>`${f} IS ?`).join(' AND ')})` : `NOT EXISTS (${preceding})`}
+      AND NOT EXISTS (SELECT 1 FROM worker_records WHERE employee_id=? AND effective_at>? AND effective_at<=?)` : '';
+    const [result] = await this.db.batch([this.db.prepare(`INSERT INTO worker_records
+      (employee_id,effective_at,received_at,source,import_id,email,name,job_code,job_title,department,location,employment_type,manager_employee_id,hire_date,status)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE 1=1 ${guarded} ON CONFLICT(employee_id,effective_at) DO NOTHING`)
+      .bind(r.employeeId,r.effectiveAt,r.receivedAt,r.source,r.importId,r.email,r.name,r.jobCode,r.jobTitle,r.department,r.location,r.employmentType,r.managerEmployeeId,r.hireDate,r.status,...(guard ? [...(expected?[r.employeeId,r.effectiveAt,expected.employeeId,expected.effectiveAt,...values]:[r.employeeId,r.effectiveAt]),r.employeeId,r.effectiveAt,r.receivedAt]:[])),
+      this.db.prepare("INSERT INTO hr_state (id,revision) SELECT 'default',1 WHERE changes() = 1 ON CONFLICT(id) DO UPDATE SET revision=revision+1")]);
+    if (result.meta.changes === 1) return 'inserted';
+    const prior = (await this.listWorkerRecords({ employeeId: r.employeeId })).find(x => x.effectiveAt === r.effectiveAt);
+    return prior && sameWorkerVersion(prior,r) ? 'identical' : 'conflict';
+  }
+  async listWorkerRecords(filter?: { employeeId?: string }): Promise<WorkerRecord[]> {
+    const rows = await this.all<Record<string, string | null>>('SELECT * FROM worker_records WHERE (? IS NULL OR employee_id = ?) ORDER BY employee_id,effective_at', [filter?.employeeId ?? null,filter?.employeeId ?? null]);
+    return rows.map(r => ({employeeId:r.employee_id!,effectiveAt:r.effective_at!,receivedAt:r.received_at!,source:r.source as WorkerRecord['source'],importId:r.import_id!,email:r.email!,name:r.name!,jobCode:r.job_code!,jobTitle:r.job_title!,department:r.department!,location:r.location!,employmentType:r.employment_type as WorkerRecord['employmentType'],managerEmployeeId:r.manager_employee_id,hireDate:r.hire_date,status:r.status as WorkerRecord['status']}));
+  }
+  async getWorkerColumnMap(): Promise<WorkerColumnMap | null> {
+    const row = await this.first<{columns:string;date_format:WorkerColumnMap['dateFormat'];updated_by:string;updated_at:string}>('SELECT * FROM worker_column_maps WHERE id = ?', ['default']);
+    return row ? {columns:parseJson(row.columns),dateFormat:row.date_format,updatedBy:row.updated_by,updatedAt:row.updated_at} : null;
+  }
+  // Administrator setting: last write wins.
+  async putWorkerColumnMap(map: WorkerColumnMap): Promise<void> {
+    await this.db.prepare(`INSERT INTO worker_column_maps (id,columns,date_format,updated_by,updated_at) VALUES ('default',?,?,?,?)
+      ON CONFLICT(id) DO UPDATE SET columns=excluded.columns,date_format=excluded.date_format,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
+      .bind(JSON.stringify(map.columns),map.dateFormat,map.updatedBy,map.updatedAt).run();
+  }
+  async listWorkerLinks(): Promise<WorkerLink[]> {
+    return (await this.all<{employee_id:string;user_id:string;linked_by:string;linked_at:string}>('SELECT * FROM worker_links ORDER BY employee_id')).map(r => ({employeeId:r.employee_id,userId:r.user_id,linkedBy:r.linked_by,linkedAt:r.linked_at}));
+  }
+  async insertWorkerLink(link: WorkerLink): Promise<boolean> {
+    const [result] = await this.db.batch([this.db.prepare('INSERT INTO worker_links (employee_id,user_id,linked_by,linked_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING').bind(link.employeeId,link.userId,link.linkedBy,link.linkedAt),
+      this.db.prepare("INSERT INTO hr_state (id,revision) SELECT 'default',1 WHERE changes() = 1 ON CONFLICT(id) DO UPDATE SET revision=revision+1")]);
+    return result.meta.changes === 1;
+  }
+  async getHrRevision(): Promise<number> { return (await this.first<{revision:number}>("SELECT revision FROM hr_state WHERE id='default'"))?.revision ?? 0; }
+  async insertHrImport(row: HrImportRow): Promise<boolean> {
+    const result = await this.db.prepare('INSERT INTO hr_imports (id,hash,source_hash,at,actor_id,source,counts,skipped_rows,incomplete) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING').bind(row.id,row.hash,row.sourceHash,row.at,row.actorId,row.source,JSON.stringify(row.counts),row.skippedRows,Number(row.incomplete)).run();
+    return result.meta.changes === 1;
+  }
+  async findHrImportByHash(hash: string): Promise<HrImportRow | null> {
+    const r = await this.first<{id:string;hash:string;source_hash:string;at:string;actor_id:string;source:HrImportRow['source'];counts:string;skipped_rows:number;incomplete:number}>('SELECT * FROM hr_imports WHERE hash = ?', [hash]);
+    return r ? {id:r.id,hash:r.hash,sourceHash:r.source_hash,at:r.at,actorId:r.actor_id,source:r.source,counts:parseJson(r.counts),skippedRows:r.skipped_rows,incomplete:Boolean(r.incomplete)} : null;
+  }
+  async finishHrImport(id: Id, incomplete: boolean, skippedRows: number, counts: HrImportRow['counts']): Promise<void> {
+    await this.db.prepare('UPDATE hr_imports SET incomplete=?,skipped_rows=?,counts=? WHERE id=?').bind(Number(incomplete),skippedRows,JSON.stringify(counts),id).run();
+  }
+  async listRuleMembers(requirementId: string): Promise<RuleMember[]> {
+    return (await this.all<{requirement_id:string;user_id:string;state:RuleMember['state'];revision:number;reasons:string;changed_at:string;changed_by:string}>('SELECT * FROM rule_members WHERE requirement_id = ? ORDER BY user_id',[requirementId]))
+      .map(r => ({requirementId:r.requirement_id,userId:r.user_id,state:r.state,revision:r.revision,reasons:parseJson(r.reasons),changedAt:r.changed_at,changedBy:r.changed_by}));
+  }
+  async putRuleMember(m: RuleMember, expectedRevision: number, guard: { hrRevision: number }): Promise<boolean> {
+    if (m.revision !== expectedRevision + 1) return false;
+    if (expectedRevision === 0) {
+      const result = await this.db.prepare("INSERT INTO rule_members (requirement_id,user_id,state,revision,reasons,changed_at,changed_by) SELECT ?,?,?,?,?,?,? WHERE coalesce((SELECT revision FROM hr_state WHERE id='default'),0)=? AND EXISTS (SELECT 1 FROM requirements WHERE id=? AND json_extract(audience,'$.kind')='rule') ON CONFLICT DO NOTHING").bind(m.requirementId,m.userId,m.state,m.revision,JSON.stringify(m.reasons),m.changedAt,m.changedBy,guard.hrRevision,m.requirementId).run();
+      return result.meta.changes === 1;
+    }
+    const result = await this.db.prepare("UPDATE rule_members SET state=?,revision=?,reasons=?,changed_at=?,changed_by=? WHERE requirement_id=? AND user_id=? AND revision=? AND coalesce((SELECT revision FROM hr_state WHERE id='default'),0)=? AND EXISTS (SELECT 1 FROM requirements WHERE id=? AND json_extract(audience,'$.kind')='rule')").bind(m.state,m.revision,JSON.stringify(m.reasons),m.changedAt,m.changedBy,m.requirementId,m.userId,expectedRevision,guard.hrRevision,m.requirementId).run();
+    return result.meta.changes === 1;
+  }
+  async assignRuleMember(m: RuleMember, expectedRevision: number, guard: { hrRevision: number }, events: CompletionEvent[], courseIds: Id[]): Promise<boolean> {
+    if (m.revision !== expectedRevision + 1) return false;
+    const cas=expectedRevision===0
+      ? this.db.prepare("INSERT INTO rule_members (requirement_id,user_id,state,revision,reasons,changed_at,changed_by) SELECT ?,?,?,?,?,?,? WHERE coalesce((SELECT revision FROM hr_state WHERE id='default'),0)=? AND EXISTS (SELECT 1 FROM requirements WHERE id=? AND json_extract(audience,'$.kind')='rule') ON CONFLICT DO NOTHING").bind(m.requirementId,m.userId,m.state,m.revision,JSON.stringify(m.reasons),m.changedAt,m.changedBy,guard.hrRevision,m.requirementId)
+      : this.db.prepare("UPDATE rule_members SET state=?,revision=?,reasons=?,changed_at=?,changed_by=? WHERE requirement_id=? AND user_id=? AND revision=? AND coalesce((SELECT revision FROM hr_state WHERE id='default'),0)=? AND EXISTS (SELECT 1 FROM requirements WHERE id=? AND json_extract(audience,'$.kind')='rule')").bind(m.state,m.revision,JSON.stringify(m.reasons),m.changedAt,m.changedBy,m.requirementId,m.userId,expectedRevision,guard.hrRevision,m.requirementId);
+    const statements=[cas];
+    for(const event of events) {
+      statements.push(this.db.prepare('INSERT INTO completion_events (id,at,user_id,course_id,requirement_id,kind,actor_id,detail) SELECT ?,?,?,?,?,?,?,? WHERE changes()=1').bind(event.id,event.at,event.userId,event.courseId,event.requirementId,event.kind,event.actorId,event.detail));
+    }
+    for(const courseId of courseIds)
+      statements.push(this.db.prepare('INSERT INTO enrollments (course_id,user_id) SELECT ?,? WHERE changes()=1 ON CONFLICT(course_id,user_id) DO UPDATE SET user_id=excluded.user_id').bind(courseId,m.userId));
+    const results=await this.db.batch(statements);
+    return results[0].meta.changes===1;
+  }
 
   async isEmpty(): Promise<boolean> {
     const row = await this.first<{ i: number; u: number }>('SELECT (SELECT count(*) FROM institution) AS i, (SELECT count(*) FROM users) AS u');

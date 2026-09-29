@@ -993,7 +993,8 @@ export interface VariantDiff {
 
 export type RequirementAudience =
   | { kind: 'role'; role: Role }
-  | { kind: 'users'; userIds: Id[] };
+  | { kind: 'users'; userIds: Id[] }
+  | { kind: 'rule'; rule: AssignmentRule };
 
 /** An administrator's assignment of required training. */
 export interface Requirement {
@@ -1091,6 +1092,52 @@ export interface ComplianceRow {
   user: Pick<User, 'id' | 'name' | 'email'>;
   training: RequiredTraining;
 }
+
+// ---- HRIS-driven compliance, M1 (spec D-085, D-086; linking per D-048) ----
+export type EmploymentStatus = 'active' | 'leave' | 'terminated';
+export type EmploymentType = 'full-time' | 'part-time' | 'contractor' | 'temporary' | 'other';
+export interface WorkerRecord {
+  employeeId: string;
+  email: string; name: string;
+  jobCode: string; jobTitle: string; department: string; location: string;
+  employmentType: EmploymentType;
+  managerEmployeeId: string | null;
+  hireDate: string | null;
+  status: EmploymentStatus;
+  effectiveAt: Timestamp; receivedAt: Timestamp; source: 'csv' | 'json';
+  importId: Id;
+}
+export type WorkerRecordInput = Omit<WorkerRecord, 'receivedAt' | 'source' | 'importId' | 'effectiveAt'> & { effectiveAt?: Timestamp | null };
+export type WorkerField = keyof WorkerRecordInput;
+export interface WorkerColumnMap { columns: Partial<Record<WorkerField, string>>; dateFormat: 'iso' | 'mdy' | 'dmy'; updatedBy: Id; updatedAt: Timestamp }
+export interface WorkerLink { employeeId: string; userId: Id; linkedBy: Id; linkedAt: Timestamp }
+export type WorkerRowErrorCode = 'worker-missing-id' | 'worker-duplicate-id' | 'worker-bad-email' | 'worker-bad-date' | 'worker-bad-value' | 'worker-unsafe-value' | 'worker-unknown-manager' | 'worker-version-conflict' | 'worker-too-long';
+export type WorkerChangeKind = 'add' | 'update' | 'leave' | 'terminate' | 'rehire' | 'unchanged';
+export type WorkerImportSource = { format: 'csv'; csv: string; columnMap?: Pick<WorkerColumnMap, 'columns' | 'dateFormat'> } | { format: 'json'; records: WorkerRecordInput[] };
+export interface WorkerChangeSet {
+  asOf: Timestamp;
+  people: Record<WorkerChangeKind, number>;
+  links: { linked: number; suggested: number; unlinked: number };
+  changes: { line: number; employeeId: string; name: string; kind: Exclude<WorkerChangeKind, 'unchanged'>; fields: WorkerField[]; effectiveAt: Timestamp; suggestedUserId: Id | null }[];
+  rowErrors: { line: number; employeeId: string | null; field: WorkerField | null; code: WorkerRowErrorCode; message: string }[];
+  ruleEffects: { requirementId: Id; add: number; remove: number }[];
+  summary: string; hash: string;
+}
+export interface WorkerImportResult { importId: Id; alreadyApplied: boolean; people: Record<WorkerChangeKind, number>; skippedRows: number; message?: string }
+export type RuleField = 'jobCode' | 'department' | 'location' | 'employmentType';
+export type RuleCondition =
+  | { field: RuleField; op: 'in' | 'not-in'; values: string[] }
+  | { field: 'hireDate'; op: 'within-days'; days: number };
+export interface AssignmentRule { match: 'all' | 'any'; conditions: RuleCondition[] }
+export interface RuleMember { requirementId: Id; userId: Id; state: 'assigned' | 'removed'; revision: number; reasons: string[]; changedAt: Timestamp; changedBy: Id }
+export interface RulePreview {
+  requirementId: Id;
+  add: { userId: Id; name: string; employeeId: string; reasons: string[]; previousCompletionAt: Timestamp | null }[];
+  remove: { userId: Id; name: string; employeeId: string; reasons: string[]; hasCompleted: boolean }[];
+  unchanged: number; skipped: { unlinked: number; notCurrent: number };
+  summary: string; hash: string;
+}
+export interface RuleApplyResult { added: number; removed: number; conflicts: number; message?: string }
 
 // ---- Managers (D-025, D-026) --------------------------------------------------------------
 

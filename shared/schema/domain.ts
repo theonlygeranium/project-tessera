@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type * as D from '../domain';
+import { validateRule } from '../hris/rules';
 import type { BlockInput } from '../api';
 
 export type Expect<T extends true> = T;
@@ -121,7 +122,9 @@ export const OutcomeLinkSchema = z.object({outcomeId:id,targetKind:AlignableKind
 export const LessonVariantSchema = z.object({lessonId:id,masterLessonId:id,audience:VariantAudienceSchema,title:required,minutes,status:z.enum(['draft','published']),syncedAt:timestamp,divergedBlocks:nonnegative,uncoveredBlocks:nonnegative});
 export const VariantDiffRowSchema = z.object({state:z.enum(['in-sync','diverged','master-removed','new-in-master','variant-only']),master:BlockSchema.nullable(),variant:BlockSchema.nullable()});
 export const VariantDiffSchema = z.object({variant:LessonVariantSchema,rows:z.array(VariantDiffRowSchema)});
-export const RequirementAudienceSchema = z.discriminatedUnion('kind',[z.object({kind:z.literal('role'),role:RoleSchema}),z.object({kind:z.literal('users'),userIds:z.array(id).min(1).max(5000)})]);
+export const RuleConditionSchema = z.discriminatedUnion('field',[z.object({field:z.literal('jobCode'),op:z.enum(['in','not-in']),values:z.array(z.string())}),z.object({field:z.literal('department'),op:z.enum(['in','not-in']),values:z.array(z.string())}),z.object({field:z.literal('location'),op:z.enum(['in','not-in']),values:z.array(z.string())}),z.object({field:z.literal('employmentType'),op:z.enum(['in','not-in']),values:z.array(z.string())}),z.object({field:z.literal('hireDate'),op:z.literal('within-days'),days:integer})]);
+export const AssignmentRuleSchema = z.object({match:z.enum(['all','any']),conditions:z.array(RuleConditionSchema).min(1).max(20)}).superRefine((rule,ctx)=>{const problem=validateRule(rule);if(problem)ctx.addIssue({code:'custom',message:problem});});
+export const RequirementAudienceSchema = z.discriminatedUnion('kind',[z.object({kind:z.literal('role'),role:RoleSchema}),z.object({kind:z.literal('users'),userIds:z.array(id).min(1).max(5000)}),z.object({kind:z.literal('rule'),rule:AssignmentRuleSchema})]);
 export const RequirementTargetSchema = z.discriminatedUnion('kind',[z.object({kind:z.literal('course'),courseId:id}),z.object({kind:z.literal('program'),programId:id})]);
 export const RequirementSchema = z.object({id,target:RequirementTargetSchema,audience:RequirementAudienceSchema,dueAt:timestamp.nullable(),recurrence:z.enum(['none','annual']),createdBy:id,createdAt:timestamp});
 export const CompletionEventSchema = z.object({id,at:timestamp,userId:id,courseId:id,requirementId:id.nullable(),kind:z.enum(['assigned','unassigned','started','completed','tested-out','certificate-issued','certificate-replaced','due-date-changed']),actorId:id.nullable(),detail:string});
@@ -213,3 +216,41 @@ export type _ReportingLineCheck = Expect<Equal<z.infer<typeof ReportingLineSchem
 export type _ManagerConsentCheck = Expect<Equal<z.infer<typeof ManagerConsentSchema>, D.ManagerConsent>>;
 export type _MyVisibilityCheck = Expect<Equal<z.infer<typeof MyVisibilitySchema>, D.MyVisibility>>;
 export type _ManagerViewCheck = Expect<Equal<z.infer<typeof ManagerViewSchema>, D.ManagerView>>;
+
+// HRIS compliance M1 schemas and domain checks.
+export const EmploymentStatusSchema = z.enum(['active','leave','terminated']);
+export const EmploymentTypeSchema = z.enum(['full-time','part-time','contractor','temporary','other']);
+export const WorkerRecordInputSchema = z.object({employeeId:string,email:string,name:string,jobCode:string,jobTitle:string,department:string,location:string,employmentType:EmploymentTypeSchema,managerEmployeeId:string.nullable(),hireDate:string.nullable(),status:EmploymentStatusSchema,effectiveAt:timestamp.nullable().optional()});
+export const WorkerRecordSchema = WorkerRecordInputSchema.omit({effectiveAt:true}).extend({effectiveAt:timestamp,receivedAt:timestamp,source:z.enum(['csv','json']),importId:id});
+export const WorkerFieldSchema = z.enum(['employeeId','email','name','jobCode','jobTitle','department','location','employmentType','managerEmployeeId','hireDate','status','effectiveAt']);
+export const WorkerColumnInputSchema = z.object({columns:z.partialRecord(WorkerFieldSchema,string),dateFormat:z.enum(['iso','mdy','dmy'])});
+export const WorkerColumnMapSchema = WorkerColumnInputSchema.extend({updatedBy:id,updatedAt:timestamp});
+export const WorkerLinkSchema = z.object({employeeId:string,userId:id,linkedBy:id,linkedAt:timestamp});
+export const WorkerRowErrorCodeSchema = z.enum(['worker-missing-id','worker-duplicate-id','worker-bad-email','worker-bad-date','worker-bad-value','worker-unsafe-value','worker-unknown-manager','worker-version-conflict','worker-too-long']);
+export const WorkerChangeKindSchema = z.enum(['add','update','leave','terminate','rehire','unchanged']);
+// Accept malformed JSON rows so the import reports row errors instead of rejecting the whole batch.
+const WorkerImportRowSchema = z.custom<D.WorkerRecordInput>(()=>true).meta({type:'object',properties:{employeeId:{type:'string'},email:{type:'string'},name:{type:'string'},jobCode:{type:'string'},jobTitle:{type:'string'},department:{type:'string'},location:{type:'string'},employmentType:{type:'string'},managerEmployeeId:{type:['string','null']},hireDate:{type:['string','null']},status:{type:'string'},effectiveAt:{type:['string','null']}}});
+export const WorkerImportSourceSchema = z.discriminatedUnion('format',[z.object({format:z.literal('csv'),csv:z.string(),columnMap:WorkerColumnInputSchema.optional()}),z.object({format:z.literal('json'),records:z.array(WorkerImportRowSchema)})]);
+export const WorkerPeopleSchema = z.object({add:nonnegative,update:nonnegative,leave:nonnegative,terminate:nonnegative,rehire:nonnegative,unchanged:nonnegative});
+export const WorkerChangeSetSchema = z.object({asOf:timestamp,people:WorkerPeopleSchema,links:z.object({linked:nonnegative,suggested:nonnegative,unlinked:nonnegative}),changes:z.array(z.object({line:integer.min(1),employeeId:string,name:string,kind:z.enum(['add','update','leave','terminate','rehire']),fields:z.array(WorkerFieldSchema),effectiveAt:timestamp,suggestedUserId:id.nullable()})),rowErrors:z.array(z.object({line:integer.min(1),employeeId:string.nullable(),field:WorkerFieldSchema.nullable(),code:WorkerRowErrorCodeSchema,message:string})),ruleEffects:z.array(z.object({requirementId:id,add:nonnegative,remove:nonnegative})),summary:string,hash:string});
+export const WorkerImportResultSchema = z.object({importId:id,alreadyApplied:z.boolean(),people:WorkerPeopleSchema,skippedRows:nonnegative,message:z.string().optional()});
+export const RuleMemberSchema = z.object({requirementId:id,userId:id,state:z.enum(['assigned','removed']),revision:integer.min(1),reasons:z.array(string),changedAt:timestamp,changedBy:id});
+export const RulePreviewSchema = z.object({requirementId:id,add:z.array(z.object({userId:id,name:string,employeeId:string,reasons:z.array(string),previousCompletionAt:timestamp.nullable()})),remove:z.array(z.object({userId:id,name:string,employeeId:string,reasons:z.array(string),hasCompleted:z.boolean()})),unchanged:nonnegative,skipped:z.object({unlinked:nonnegative,notCurrent:nonnegative}),summary:string,hash:string});
+export const RuleApplyResultSchema = z.object({added:nonnegative,removed:nonnegative,conflicts:nonnegative,message:string.optional()});
+export type _EmploymentStatusCheck = Expect<Equal<z.infer<typeof EmploymentStatusSchema>, D.EmploymentStatus>>;
+export type _EmploymentTypeCheck = Expect<Equal<z.infer<typeof EmploymentTypeSchema>, D.EmploymentType>>;
+export type _WorkerRecordCheck = Expect<Equal<z.infer<typeof WorkerRecordSchema>, D.WorkerRecord>>;
+export type _WorkerRecordInputCheck = Expect<Equal<z.infer<typeof WorkerRecordInputSchema>, D.WorkerRecordInput>>;
+export type _WorkerFieldCheck = Expect<Equal<z.infer<typeof WorkerFieldSchema>, D.WorkerField>>;
+export type _WorkerColumnMapCheck = Expect<Equal<z.infer<typeof WorkerColumnMapSchema>, D.WorkerColumnMap>>;
+export type _WorkerLinkCheck = Expect<Equal<z.infer<typeof WorkerLinkSchema>, D.WorkerLink>>;
+export type _WorkerRowErrorCodeCheck = Expect<Equal<z.infer<typeof WorkerRowErrorCodeSchema>, D.WorkerRowErrorCode>>;
+export type _WorkerChangeKindCheck = Expect<Equal<z.infer<typeof WorkerChangeKindSchema>, D.WorkerChangeKind>>;
+export type _WorkerImportSourceCheck = Expect<Equal<z.infer<typeof WorkerImportSourceSchema>, D.WorkerImportSource>>;
+export type _WorkerChangeSetCheck = Expect<Equal<z.infer<typeof WorkerChangeSetSchema>, D.WorkerChangeSet>>;
+export type _WorkerImportResultCheck = Expect<Equal<z.infer<typeof WorkerImportResultSchema>, D.WorkerImportResult>>;
+export type _RuleConditionCheck = Expect<Equal<z.infer<typeof RuleConditionSchema>, D.RuleCondition>>;
+export type _AssignmentRuleCheck = Expect<Equal<z.infer<typeof AssignmentRuleSchema>, D.AssignmentRule>>;
+export type _RuleMemberCheck = Expect<Equal<z.infer<typeof RuleMemberSchema>, D.RuleMember>>;
+export type _RulePreviewCheck = Expect<Equal<z.infer<typeof RulePreviewSchema>, D.RulePreview>>;
+export type _RuleApplyResultCheck = Expect<Equal<z.infer<typeof RuleApplyResultSchema>, D.RuleApplyResult>>;

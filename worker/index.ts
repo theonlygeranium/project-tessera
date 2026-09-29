@@ -14,6 +14,7 @@ import { API_PREFIX, ApiError, ROUTES, matchPath, type Operation, type SessionIn
 import type { Repo } from '../shared/repo';
 import { seedData } from '../shared/seed';
 import { dispatch, service, type ServiceContext } from '../shared/service';
+import { assertRouteAccess } from '../shared/service/context';
 import { coerceQuery, validateInput } from '../shared/schema';
 
 const SESSION_COOKIE = 'tessera_user';
@@ -21,6 +22,7 @@ const VIEW_AS_COOKIE = 'tessera_view_as';
 /** 30 days. */
 const SESSION_MAX_AGE = 2592000;
 const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+const HR_OPERATIONS = new Set<Operation>(['getWorkerColumnMap','saveWorkerColumnMap','previewWorkerImport','applyWorkerImport','listWorkerRecords','listWorkerLinkSuggestions','confirmWorkerLink','previewRule','applyRule']);
 const rateLimiter = new RateLimiter(300, 60_000);
 
 // One seed check per database object. An isolate has a single D1 binding;
@@ -107,9 +109,13 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     // Idempotent creates (D-020): the same key from the same principal replays the first response.
     const idempotencyKey = request.method === 'POST' ? request.headers.get('idempotency-key') : null;
     const idemPrincipal = principal.token ? `tok:${principal.token.id}` : principal.user ? `user:${principal.user.id}` : null;
-    if (idempotencyKey && idemPrincipal) {
-      const replay = await env.DB.prepare('SELECT status, body, created_at FROM idempotency_keys WHERE key = ? AND principal = ?').bind(idempotencyKey, idemPrincipal).first<{ status: number; body: string; created_at: string }>();
+    const replayAccess = fileRoute?.route.access ?? (found ? ROUTES[found.op].access : null);
+    const replaySafe = replayAccess === 'public' || (Array.isArray(replayAccess) && replayAccess.length === 1 && replayAccess[0] === 'administrator');
+    const idemKey = idempotencyKey && replaySafe && (!found || !HR_OPERATIONS.has(found.op)) ? `${found?.op ?? fileRoute?.route.path}:${idempotencyKey}` : null;
+    if (idemKey && idemPrincipal) {
+      const replay = await env.DB.prepare('SELECT status, body, created_at FROM idempotency_keys WHERE key = ? AND principal = ?').bind(idemKey, idemPrincipal).first<{ status: number; body: string; created_at: string }>();
       if (replay && Date.now() - Date.parse(replay.created_at) < IDEMPOTENCY_TTL_MS) {
+        assertRouteAccess(fileRoute?.route.access ?? ROUTES[found!.op].access, ctx.user);
         return withId(json(JSON.parse(replay.body), replay.status, new Headers({ 'idempotency-replayed': 'true' })));
       }
     }
@@ -119,10 +125,10 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     if (fileRoute) {
       if (!principal.user) throw new ApiError('unauthenticated', 'Sign in first.');
       const res = await fileRoute.handle(request, ctx, env.FILES, fileRoute.params);
-      if (idempotencyKey && idemPrincipal && res.status === 201) {
+      if (idemKey && idemPrincipal && res.status === 201) {
         const body = await res.clone().text();
         await env.DB.prepare('INSERT OR REPLACE INTO idempotency_keys (key, principal, status, body, created_at) VALUES (?, ?, ?, ?, ?)')
-          .bind(idempotencyKey, idemPrincipal, 201, body, now).run();
+          .bind(idemKey, idemPrincipal, 201, body, now).run();
       }
       return withId(res);
     }
@@ -147,9 +153,9 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       const target = (input as { userId?: string | null }).userId;
       headers.set('set-cookie', sessionCookie(VIEW_AS_COOKIE, target ?? '', env, target ? SESSION_MAX_AGE : 0));
     }
-    if (idempotencyKey && idemPrincipal) {
+    if (idemKey && idemPrincipal) {
       await env.DB.prepare('INSERT OR REPLACE INTO idempotency_keys (key, principal, status, body, created_at) VALUES (?, ?, ?, ?, ?)')
-        .bind(idempotencyKey, idemPrincipal, 200, JSON.stringify(output), now).run();
+        .bind(idemKey, idemPrincipal, 200, JSON.stringify(output), now).run();
     }
     return withId(json(output, 200, headers));
   } catch (error) {

@@ -5,7 +5,7 @@
 // stable order: by `position` where the entity has one, otherwise as documented.
 import type {
   AccessibleFormat, AccessReport, ActivityKind, Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Course, FileRecord, FormatStatus, Id, Institution, Invitation, Lesson, LessonProgress, Module, Role, Submission, Timestamp, TutorMessage, TutorMode, TutorSetting, User,
-  AiFinding, AlignableKind, Attestation, Certificate, CompletionEvent, CourseTemplate, ManagerConsent, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, TestOut,
+  AiFinding, AlignableKind, Attestation, Certificate, CompletionEvent, CourseTemplate, ManagerConsent, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, TestOut, WorkerRecord, WorkerColumnMap, WorkerLink, RuleMember, WorkerChangeKind,
 } from './domain';
 import type { SeedData } from './seed';
 
@@ -41,6 +41,8 @@ export interface StoredReadinessItem {
   finding: AiFinding | null; attestation: Attestation | null; updatedAt: Timestamp;
 }
 export interface TestOutAttempt { id: Id; courseId: Id; userId: Id; percent: number; passed: boolean; at: Timestamp }
+
+export interface HrImportRow { id: Id; hash: string; sourceHash: string; at: Timestamp; actorId: Id; source: 'csv' | 'json'; counts: Record<WorkerChangeKind, number>; skippedRows: number; incomplete: boolean }
 
 export interface Repo {
   getInstitution(): Promise<Institution>;
@@ -237,6 +239,22 @@ export interface Repo {
   /** Ordered by manager id, then report id. */
   listManagerConsents(filter: { managerId?: Id; reportId?: Id }): Promise<ManagerConsent[]>;
   putManagerConsent(consent: ManagerConsent): Promise<void>;
+
+  // ---- HRIS compliance M1 ----
+  insertWorkerRecord(record: WorkerRecord, guard?: { preceding: WorkerRecord | null }): Promise<'inserted' | 'identical' | 'conflict'>;
+  listWorkerRecords(filter?: { employeeId?: string }): Promise<WorkerRecord[]>;
+  getWorkerColumnMap(): Promise<WorkerColumnMap | null>;
+  /** Administrator setting; last write wins. */
+  putWorkerColumnMap(map: WorkerColumnMap): Promise<void>;
+  listWorkerLinks(): Promise<WorkerLink[]>;
+  insertWorkerLink(link: WorkerLink): Promise<boolean>;
+  getHrRevision(): Promise<number>;
+  insertHrImport(row: HrImportRow): Promise<boolean>;
+  findHrImportByHash(hash: string): Promise<HrImportRow | null>;
+  finishHrImport(id: Id, incomplete: boolean, skippedRows: number, counts: Record<WorkerChangeKind, number>): Promise<void>;
+  listRuleMembers(requirementId: Id): Promise<RuleMember[]>;
+  putRuleMember(member: RuleMember, expectedRevision: number, guard: { hrRevision: number }): Promise<boolean>;
+  assignRuleMember(member: RuleMember, expectedRevision: number, guard: { hrRevision: number }, events: CompletionEvent[], courseIds: Id[]): Promise<boolean>;
 
   /** True when there's no institution or no users: a database the Worker must seed on first request. */
   isEmpty(): Promise<boolean>;

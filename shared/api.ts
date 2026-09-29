@@ -20,7 +20,7 @@ import type {
   AlignableKind, Brand, Certificate, CertificateVerification, CompletionEvent, ComplianceRow, CourseTemplate, ManagerView,
   MyVisibility, Outcome, PageTranscription, OutcomeLink, Program, ReadinessPolicy, ReadinessResult, RequiredTraining, Requirement,
   RequirementAudience, Rubric, RubricCheckKind, AutomaticCheck, StudentTestOut, TemplateChangeSet, TemplateModule,
-  TestOut, LessonVariant, ReportingLine, TrainingStatus, VariantAudience, VariantDiff,
+  TestOut, LessonVariant, ReportingLine, TrainingStatus, VariantAudience, VariantDiff, WorkerColumnMap, WorkerImportSource, WorkerChangeSet, WorkerImportResult, WorkerRecord, WorkerLink, RulePreview, RuleApplyResult, WorkerField,
 } from './domain';
 
 /** Every API route lives under this prefix (D-020). `/api` without a version is an alias during Night 2. */
@@ -306,6 +306,17 @@ export interface ApiSpec {
   /** A correction: issues a new certificate and marks this one replaced (certificates are immutable). */
   reissueCertificate: { input: { certificateId: Id; learnerName?: string }; output: Certificate };
 
+  // HRIS compliance M1
+  getWorkerColumnMap: { input: void; output: WorkerColumnMap | null };
+  saveWorkerColumnMap: { input: { columns: Partial<Record<WorkerField,string>>; dateFormat: WorkerColumnMap['dateFormat'] }; output: WorkerColumnMap };
+  previewWorkerImport: { input: { source: WorkerImportSource }; output: WorkerChangeSet };
+  applyWorkerImport: { input: { source: WorkerImportSource; asOf: Timestamp; hash: string }; output: WorkerImportResult };
+  listWorkerRecords: { input: { employeeId?: string; history?: boolean }; output: WorkerRecord[] };
+  listWorkerLinkSuggestions: { input: void; output: { employeeId: string; name: string; email: string; userId: Id; userName: string }[] };
+  confirmWorkerLink: { input: { employeeId: string; userId: Id }; output: WorkerLink };
+  previewRule: { input: { requirementId: Id }; output: RulePreview };
+  applyRule: { input: { requirementId: Id; hash: string }; output: RuleApplyResult };
+
   // Managers (lane D2, D-025, D-026)
   listReportingLines: { input: { managerId?: Id; reportId?: Id }; output: ReportingLine[] };
   addReportingLine: { input: { managerId: Id; reportId: Id }; output: ReportingLine };
@@ -539,6 +550,17 @@ export const ROUTES: { [K in Operation]: Route } = {
   getCertificate: { method: 'GET', path: '/certificates/:certificateId', access: 'signed-in', scope: 'people:read' },
   verifyCertificate: { method: 'GET', path: '/verify/:code', access: 'public', scope: null },
   reissueCertificate: { method: 'POST', path: '/certificates/:certificateId/reissue', access: ADMIN, scope: 'people:write' },
+
+  // HRIS compliance M1
+  getWorkerColumnMap: { method: 'GET', path: '/hr/column-map', access: ADMIN, scope: 'people:read' },
+  saveWorkerColumnMap: { method: 'PUT', path: '/hr/column-map', access: ADMIN, scope: 'people:write' },
+  previewWorkerImport: { method: 'POST', path: '/hr/imports/preview', access: ADMIN, scope: 'people:write' },
+  applyWorkerImport: { method: 'POST', path: '/hr/imports/apply', access: ADMIN, scope: 'people:write' },
+  listWorkerRecords: { method: 'GET', path: '/hr/records', access: ADMIN, scope: 'people:read' },
+  listWorkerLinkSuggestions: { method: 'GET', path: '/hr/links/suggestions', access: ADMIN, scope: 'people:read' },
+  confirmWorkerLink: { method: 'POST', path: '/hr/links', access: ADMIN, scope: 'people:write' },
+  previewRule: { method: 'POST', path: '/requirements/:requirementId/rule/preview', access: ADMIN, scope: 'people:write' },
+  applyRule: { method: 'POST', path: '/requirements/:requirementId/rule/apply', access: ADMIN, scope: 'people:write' },
 
   listReportingLines: { method: 'GET', path: '/reporting-lines', access: ADMIN, scope: 'people:read' },
   addReportingLine: { method: 'POST', path: '/reporting-lines', access: ADMIN, scope: 'people:write' },

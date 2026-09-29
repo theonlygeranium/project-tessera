@@ -1,5 +1,6 @@
 import type { Certificate, CompletionEvent, CompletionEventKind, Requirement, RequiredTraining, TestOut, User } from '../domain';
 import { managerMayReadCertificate } from '../managers/policy';
+import { validateRule } from '../hris/rules';
 import type { Service, ServiceContext } from './context';
 import { canReachCourse, canTeach, course, fail, required, user } from './helpers';
 
@@ -23,6 +24,7 @@ async function targetCourses(ctx: ServiceContext, r: Requirement): Promise<strin
   return (await ctx.repo.listCourses()).filter(c => c.programId === programId).map(c => c.id);
 }
 async function audience(ctx: ServiceContext, r: Requirement): Promise<User[]> {
+  if (r.audience.kind === 'rule') return (await Promise.all((await ctx.repo.listRuleMembers(r.id)).filter(m => m.state === 'assigned').map(m => ctx.repo.getUser(m.userId)))).filter((x):x is User => !!x);
   return r.audience.kind === 'role' ? ctx.repo.listUsers({ role: r.audience.role }) : (await Promise.all(r.audience.userIds.map(id => ctx.repo.getUser(id)))).filter((x):x is User => !!x);
 }
 async function event(ctx: ServiceContext, kind: CompletionEventKind, userId: string, courseId: string, requirementId: string | null, detail: string, actorId: string | null = null, id?: string) {
@@ -33,12 +35,13 @@ async function event(ctx: ServiceContext, kind: CompletionEventKind, userId: str
   }
 }
 async function ensureAssignment(ctx: ServiceContext, r: Requirement, person: User, courseId: string) {
+  if (r.audience.kind === 'rule') return;
   await event(ctx,'assigned',person.id,courseId,r.id,`Assigned ${courseId}, due ${date(r.dueAt)}.`,r.createdBy,`ev-assigned-${r.id}-${person.id}-${courseId}`);
   await ctx.repo.addEnrollment(courseId,person.id);
 }
 async function applicable(ctx:ServiceContext, person:User) {
   const rows:{r:Requirement; courseId:string}[]=[];
-  for (const r of await ctx.repo.listRequirements()) if (r.audience.kind==='role' ? r.audience.role===person.role : r.audience.userIds.includes(person.id)) for (const courseId of await targetCourses(ctx,r)) { await ensureAssignment(ctx,r,person,courseId); rows.push({r,courseId}); }
+  for (const r of await ctx.repo.listRequirements()) if (r.audience.kind==='role' ? r.audience.role===person.role : r.audience.kind==='users' ? r.audience.userIds.includes(person.id) : (await ctx.repo.listRuleMembers(r.id)).some(m=>m.userId===person.id&&m.state==='assigned')) for (const courseId of await targetCourses(ctx,r)) { await ensureAssignment(ctx,r,person,courseId); rows.push({r,courseId}); }
   return rows;
 }
 async function certificateCycleAt(ctx:ServiceContext, certificate:Certificate):Promise<string> {
@@ -100,8 +103,9 @@ export async function onLessonProgress(ctx:ServiceContext,courseId:string) {
 const csvCell=(v:unknown)=>`"${String(v??'').replace(/^[=+\-@]/,"'$&").replaceAll('"','""')}"`;
 export const training: Pick<Service,'listRequirements'|'createRequirement'|'updateRequirement'|'deleteRequirement'|'getComplianceReport'|'listCompletionEvents'|'exportCompletionEvents'|'listMyTraining'|'getTestOut'|'saveTestOut'|'deleteTestOut'|'getMyTestOut'|'takeTestOut'|'listMyCertificates'|'getCertificate'|'verifyCertificate'|'reissueCertificate'> = {
   listRequirements:async(ctx,{courseId})=>{ const all=await ctx.repo.listRequirements(); if(!courseId) return all; await course(ctx,courseId); const c=await course(ctx,courseId); return all.filter(r=>r.target.kind==='course'?r.target.courseId===courseId:c.programId===r.target.programId); },
-  createRequirement:async(ctx,input)=>{ if(input.target.kind==='course') await course(ctx,input.target.courseId); else if(!await ctx.repo.getProgram(input.target.programId)) fail('not-found','Program not found.');
+  createRequirement:async(ctx,input)=>{ if(input.audience.kind==='rule'&&input.target.kind==='program') fail('invalid','Rule-based training targets one course for now.'); if(input.target.kind==='course') await course(ctx,input.target.courseId); else if(!await ctx.repo.getProgram(input.target.programId)) fail('not-found','Program not found.');
     if(input.audience.kind==='users') { if(!input.audience.userIds.length||new Set(input.audience.userIds).size!==input.audience.userIds.length) fail('invalid','Choose distinct people.'); for(const id of input.audience.userIds) if(!await ctx.repo.getUser(id)) fail('not-found','Person not found.'); }
+    if(input.audience.kind==='rule') { const problem=validateRule(input.audience.rule); if(problem) fail('invalid',problem); }
     const r:Requirement={id:ctx.newId('req'),target:input.target,audience:input.audience,dueAt:input.dueAt??null,recurrence:input.recurrence??'none',createdBy:user(ctx).id,createdAt:ctx.now()}; await ctx.repo.putRequirement(r);
     for(const p of await audience(ctx,r)) for(const courseId of await targetCourses(ctx,r)) await ensureAssignment(ctx,r,p,courseId); return r; },
   updateRequirement:async(ctx,input)=>{ const r=await ctx.repo.getRequirement(input.requirementId)??fail('not-found','Requirement not found.'); const before=r.dueAt,beforeRecurrence=r.recurrence; if(input.dueAt!==undefined)r.dueAt=input.dueAt;if(input.recurrence!==undefined)r.recurrence=input.recurrence;await ctx.repo.putRequirement(r); if(before!==r.dueAt||beforeRecurrence!==r.recurrence) for(const p of await audience(ctx,r))for(const courseId of await targetCourses(ctx,r)) { await ensureAssignment(ctx,r,p,courseId); await event(ctx,'due-date-changed',p.id,courseId,r.id,before!==r.dueAt?`Due date changed from ${date(before)} to ${date(r.dueAt)}.`:`Recurrence changed from ${beforeRecurrence} to ${r.recurrence}.`,user(ctx).id); } return r; },

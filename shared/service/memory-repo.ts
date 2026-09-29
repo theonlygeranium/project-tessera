@@ -1,7 +1,8 @@
-import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Invitation, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat, ActivityKind, TutorSetting, Program, CourseTemplate, Rubric, Outcome, OutcomeLink, AlignableKind, Requirement, CompletionEvent, TestOut, Certificate, ReportingLine, ManagerConsent } from '../domain';
-import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt } from '../repo';
+import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Course, Institution, Invitation, Lesson, Module, Submission, User, ApiToken, FileRecord, AccessibleFormat, ActivityKind, TutorSetting, Program, CourseTemplate, Rubric, Outcome, OutcomeLink, AlignableKind, Requirement, CompletionEvent, TestOut, Certificate, ReportingLine, ManagerConsent, WorkerRecord, WorkerColumnMap, WorkerLink, RuleMember } from '../domain';
+import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt, HrImportRow } from '../repo';
 import type { SeedData } from '../seed';
 import { ApiError } from '../api';
+import { sameWorkerVersion } from '../hris/equal';
 
 declare const structuredClone: <T>(value: T) => T;
 const copy = <T>(value: T): T => structuredClone(value);
@@ -23,6 +24,12 @@ const byNewest = (a: { publishedAt: string | null; createdAt: string }, b: { pub
 
 export class MemoryRepo implements Repo {
   private data: SeedData & { readinessItems: StoredReadinessItem[] };
+  private workerRecords: WorkerRecord[] = [];
+  private workerColumnMap: WorkerColumnMap | null = null;
+  private workerLinks: WorkerLink[] = [];
+  private hrImports: HrImportRow[] = [];
+  private ruleMembers: RuleMember[] = [];
+  private hrRevision = 0;
   constructor(seed: SeedData) { this.data = this.withNight3(seed); }
   async getInstitution(): Promise<Institution> { return copy(this.data.institution); }
   async putInstitution(value: Institution) { this.data.institution = normalized(value); }
@@ -252,8 +259,59 @@ export class MemoryRepo implements Repo {
   async deleteReportingLine(managerId: string, reportId: string) { this.data.reportingLines = this.data.reportingLines!.filter(x => x.managerId !== managerId || x.reportId !== reportId); this.data.managerConsents = this.data.managerConsents!.filter(x => x.managerId !== managerId || x.reportId !== reportId); }
   async listManagerConsents(filter: { managerId?: string; reportId?: string }) { return copy(this.data.managerConsents!.filter(x => (!filter.managerId || x.managerId === filter.managerId) && (!filter.reportId || x.reportId === filter.reportId)).sort((a, b) => cmp(a.managerId, b.managerId) || cmp(a.reportId, b.reportId))); }
   async putManagerConsent(value: ManagerConsent) { const i = this.data.managerConsents!.findIndex(x => x.managerId === value.managerId && x.reportId === value.reportId); if (i < 0) this.data.managerConsents!.push(copy(value)); else this.data.managerConsents![i] = copy(value); }
+  // ---- HRIS compliance M1 ----
+  async insertWorkerRecord(record: WorkerRecord, guard?: { preceding: WorkerRecord | null }): Promise<'inserted' | 'identical' | 'conflict'> {
+    const prior = this.workerRecords.find(r => r.employeeId === record.employeeId && r.effectiveAt === record.effectiveAt);
+    if (prior) return sameWorkerVersion(prior, record) ? 'identical' : 'conflict';
+    if (guard) {
+      const preceding = this.workerRecords.filter(r => r.employeeId === record.employeeId && r.effectiveAt < record.effectiveAt).sort((a,b) => cmp(b.effectiveAt,a.effectiveAt))[0] ?? null;
+      if (Boolean(preceding) !== Boolean(guard.preceding) || (preceding && guard.preceding && !sameWorkerVersion(preceding,guard.preceding))) return 'conflict';
+      if (this.workerRecords.some(r => r.employeeId === record.employeeId && r.effectiveAt > record.effectiveAt && r.effectiveAt <= record.receivedAt)) return 'conflict';
+    }
+    this.workerRecords.push(copy(record)); this.hrRevision++; return 'inserted';
+  }
+  async listWorkerRecords(filter?: { employeeId?: string }): Promise<WorkerRecord[]> {
+    return copy(this.workerRecords.filter(r => filter?.employeeId === undefined || r.employeeId === filter.employeeId)
+      .sort((a,b) => cmp(a.employeeId,b.employeeId) || cmp(a.effectiveAt,b.effectiveAt)));
+  }
+  async getWorkerColumnMap(): Promise<WorkerColumnMap | null> { return copy(this.workerColumnMap); }
+  // Administrator setting: last write wins.
+  async putWorkerColumnMap(map: WorkerColumnMap): Promise<void> { this.workerColumnMap = copy(map); }
+  async listWorkerLinks(): Promise<WorkerLink[]> { return copy(this.workerLinks.sort((a,b) => cmp(a.employeeId,b.employeeId))); }
+  async insertWorkerLink(link: WorkerLink): Promise<boolean> {
+    if (this.workerLinks.some(x => x.employeeId === link.employeeId || x.userId === link.userId)) return false;
+    this.workerLinks.push(copy(link)); this.hrRevision++; return true;
+  }
+  async getHrRevision(): Promise<number> { return this.hrRevision; }
+  async insertHrImport(row: HrImportRow): Promise<boolean> {
+    if (this.hrImports.some(x => x.id === row.id || x.hash === row.hash)) return false;
+    this.hrImports.push(copy(row)); return true;
+  }
+  async findHrImportByHash(hash: string): Promise<HrImportRow | null> { return copy(this.hrImports.find(x => x.hash === hash) ?? null); }
+  async finishHrImport(id: string, incomplete: boolean, skippedRows: number, counts: HrImportRow['counts']): Promise<void> { const row=this.hrImports.find(x=>x.id===id);if(row){row.incomplete=incomplete;row.skippedRows=skippedRows;row.counts=copy(counts);} }
+  async listRuleMembers(requirementId: string): Promise<RuleMember[]> {
+    return copy(this.ruleMembers.filter(x => x.requirementId === requirementId).sort((a,b) => cmp(a.userId,b.userId)));
+  }
+  async putRuleMember(member: RuleMember, expectedRevision: number, guard: { hrRevision: number }): Promise<boolean> {
+    if (member.revision !== expectedRevision + 1 || this.hrRevision !== guard.hrRevision || this.data.requirements!.find(r => r.id === member.requirementId)?.audience.kind !== 'rule') return false;
+    const index = this.ruleMembers.findIndex(x => x.requirementId === member.requirementId && x.userId === member.userId);
+    if (expectedRevision === 0) { if (index !== -1) return false; this.ruleMembers.push(copy(member)); return true; }
+    if (index === -1 || this.ruleMembers[index].revision !== expectedRevision) return false;
+    this.ruleMembers[index] = copy(member); return true;
+  }
+  async assignRuleMember(member: RuleMember, expectedRevision: number, guard: { hrRevision: number }, events: CompletionEvent[], courseIds: string[]): Promise<boolean> {
+    if (member.revision !== expectedRevision + 1 || this.hrRevision !== guard.hrRevision || this.data.requirements!.find(r => r.id === member.requirementId)?.audience.kind !== 'rule') return false;
+    const index = this.ruleMembers.findIndex(x=>x.requirementId===member.requirementId&&x.userId===member.userId);
+    if (expectedRevision === 0 ? index !== -1 : index === -1 || this.ruleMembers[index].revision !== expectedRevision) return false;
+    if (events.some(e=>this.data.completionEvents!.some(x=>x.id===e.id)) || new Set(events.map(e=>e.id)).size!==events.length) throw new Error('Duplicate completion event id');
+    if (index === -1) this.ruleMembers.push(copy(member)); else this.ruleMembers[index]=copy(member);
+    this.data.completionEvents!.push(...copy(events));
+    for(const courseId of courseIds)if(!this.data.enrollments.some(x=>x.courseId===courseId&&x.userId===member.userId))this.data.enrollments.push({courseId,userId:member.userId});
+    return true;
+  }
+
   async isEmpty(): Promise<boolean> { return this.data.users.length === 0; }
-  async reset(seed: SeedData) { this.data = this.withNight3(seed); }
+  async reset(seed: SeedData) { this.data = this.withNight3(seed); this.workerRecords = []; this.workerColumnMap = null; this.workerLinks = []; this.hrImports = []; this.ruleMembers = []; this.hrRevision = 0; }
   private withNight3(seed: SeedData): SeedData & { readinessItems: StoredReadinessItem[] } {
     return copy({ ...seed, programs: seed.programs ?? [], templates: seed.templates ?? [], rubrics: (seed.rubrics ?? []).map(r => ({ ...r, source: 'custom' as const, builtIn: false })), readinessItems: [],
       outcomes: seed.outcomes ?? seed.courses.flatMap(course => course.outcomes.flatMap((value, i) => value.trim() ? [{ id: `${course.id}-o${i + 1}`, courseId: course.id, code: `O${i + 1}`, text: value, position: i }] : [])),

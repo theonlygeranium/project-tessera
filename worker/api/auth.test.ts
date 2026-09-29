@@ -90,16 +90,16 @@ describe('API tokens (D-020)', () => {
 
   it('replays an idempotent create', async () => {
     const e = env(createTestDb());
-    const { secret } = await createToken(e, ['courses:write', 'courses:read']);
+    const { secret } = await createToken(e, ['people:write', 'people:read']);
     const headers = { authorization: `Bearer ${secret}`, 'idempotency-key': 'abc-1', ...json({}) };
-    const body = JSON.stringify({ code: 'DL 101', title: 'Data Literacy', term: 'Spring 2027' });
-    const first = await call(e, '/api/v1/courses', { method: 'POST', headers, body });
-    const second = await call(e, '/api/v1/courses', { method: 'POST', headers, body });
+    const body = JSON.stringify({ name: 'Data Learner', email: 'data.learner@example.test', role: 'student' });
+    const first = await call(e, '/api/v1/users', { method: 'POST', headers, body });
+    const second = await call(e, '/api/v1/users', { method: 'POST', headers, body });
     expect(first.status).toBe(200);
     expect(second.headers.get('idempotency-replayed')).toBe('true');
     expect(await second.json()).toEqual(await first.json());
-    const list = (await (await call(e, '/api/v1/courses', { headers: { authorization: `Bearer ${secret}` } })).json()) as { code: string }[];
-    expect(list.filter((c) => c.code === 'DL 101')).toHaveLength(1);
+    const list = (await (await call(e, '/api/v1/users', { headers: { authorization: `Bearer ${secret}` } })).json()) as { email: string }[];
+    expect(list.filter((u) => u.email === 'data.learner@example.test')).toHaveLength(1);
   });
 });
 

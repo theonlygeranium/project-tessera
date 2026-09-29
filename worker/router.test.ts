@@ -448,16 +448,16 @@ describe('journey 6: API', () => {
 });
 
 describe('review 4', () => {
-  it('replays a retried upload with the same Idempotency-Key instead of storing a second file', async () => {
+  it('does not replay an instructor upload from an Idempotency-Key', async () => {
     const { createTestBucket } = await import('./test/r2-shim');
     const FILES = createTestBucket();
     const env = { ...testEnv(createTestDb(), assetsFor().fetcher), FILES };
     const send = () => { const form = new FormData(); form.append('file', new File(['%PDF-1.7 x'], 'a.pdf')); return call(env as never, '/api/v1/courses/c-stat110/files/upload', { method: 'POST', headers: { cookie: 'tessera_user=u-okafor', 'idempotency-key': 'up-1' }, body: form }); };
     const first = await send(); const second = await send();
     expect(first.status).toBe(201);
-    expect(second.headers.get('idempotency-replayed')).toBe('true');
-    expect((await second.json() as { id: string }).id).toBe((await first.json() as { id: string }).id);
-    expect(FILES.store.size).toBe(1);
+    expect(second.headers.get('idempotency-replayed')).toBeNull();
+    expect((await second.json() as { id: string }).id).not.toBe((await first.json() as { id: string }).id);
+    expect(FILES.store.size).toBe(2);
   });
 });
 

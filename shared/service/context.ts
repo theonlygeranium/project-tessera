@@ -2,7 +2,7 @@
 // The Worker (worker/) and the app's mock adapter (app/src/data/mock.ts) both call
 // `dispatch`, so they behave the same by construction.
 import type { AiClient } from '../ai';
-import { ApiError, ROUTES, type Input, type Operation, type Output } from '../api';
+import { ApiError, ROUTES, type Access, type Input, type Operation, type Output } from '../api';
 import type { AccessReport, AccessibleFormat, ApiToken, Block, FileRecord, Id, PageTranscription, Provenance, Timestamp, User } from '../domain';
 import { allows } from '../policy';
 import type { Repo } from '../repo';
@@ -53,11 +53,13 @@ export interface DocumentEngine {
 export type Handler<K extends Operation> = (ctx: ServiceContext, input: Input<K>) => Promise<Output<K>>;
 export type Service = { [K in Operation]: Handler<K> };
 
+export function assertRouteAccess(access: Access, user: User | null): void {
+  if (!allows(access, user)) throw user ? new ApiError('forbidden', 'Your role can\'t do this.') : new ApiError('unauthenticated', 'Sign in first.');
+}
+
 /** Checks the route's role rule (ROUTES), then runs the handler. */
 export async function dispatch<K extends Operation>(service: Service, ctx: ServiceContext, op: K, input: Input<K>): Promise<Output<K>> {
   const route = ROUTES[op];
-  if (!allows(route.access, ctx.user)) {
-    throw ctx.user ? new ApiError('forbidden', 'Your role can\'t do this.') : new ApiError('unauthenticated', 'Sign in first.');
-  }
+  assertRouteAccess(route.access, ctx.user);
   return service[op](ctx, (input ?? {}) as Input<K>);
 }

@@ -17839,6 +17839,976 @@
         }
       }
     },
+    "/api/v1/hr/column-map": {
+      "get": {
+        "operationId": "getWorkerColumnMap",
+        "tags": [
+          "session"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WorkerColumnMap"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "saveWorkerColumnMap",
+        "tags": [
+          "session"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerColumnMap"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerColumnInput",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hr/imports/preview": {
+      "post": {
+        "operationId": "previewWorkerImport",
+        "tags": [
+          "import"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerChangeSet"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "$ref": "#/components/schemas/WorkerImportSource"
+                  }
+                },
+                "required": [
+                  "source"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hr/imports/apply": {
+      "post": {
+        "operationId": "applyWorkerImport",
+        "tags": [
+          "import"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "$ref": "#/components/schemas/WorkerImportSource"
+                  },
+                  "asOf": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hash": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "source",
+                  "asOf",
+                  "hash"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hr/records": {
+      "get": {
+        "operationId": "listWorkerRecords",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "employeeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkerRecord"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/hr/links/suggestions": {
+      "get": {
+        "operationId": "listWorkerLinkSuggestions",
+        "tags": [
+          "session"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "userId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "userName": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "employeeId",
+                      "name",
+                      "email",
+                      "userId",
+                      "userName"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/hr/links": {
+      "post": {
+        "operationId": "confirmWorkerLink",
+        "tags": [
+          "session"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerLink"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "employeeId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "employeeId",
+                  "userId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/requirements/{requirementId}/rule/preview": {
+      "post": {
+        "operationId": "previewRule",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "requirementId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/requirements/{requirementId}/rule/apply": {
+      "post": {
+        "operationId": "applyRule",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "requirementId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleApplyResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "people:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hash": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "hash"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reporting-lines": {
       "get": {
         "operationId": "listReportingLines",
@@ -19273,6 +20243,171 @@
           "grades:read",
           "grades:write",
           "ai:run"
+        ]
+      },
+      "AssignmentRule": {
+        "type": "object",
+        "properties": {
+          "match": {
+            "type": "string",
+            "enum": [
+              "all",
+              "any"
+            ]
+          },
+          "conditions": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            }
+          }
+        },
+        "required": [
+          "match",
+          "conditions"
+        ],
+        "additionalProperties": false
+      },
+      "RuleCondition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "const": "jobCode"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "in",
+                  "not-in"
+                ]
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "values"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "const": "department"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "in",
+                  "not-in"
+                ]
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "values"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "const": "location"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "in",
+                  "not-in"
+                ]
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "values"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "const": "employmentType"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "in",
+                  "not-in"
+                ]
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "values"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "const": "hireDate"
+              },
+              "op": {
+                "type": "string",
+                "const": "within-days"
+              },
+              "days": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "field",
+              "op",
+              "days"
+            ],
+            "additionalProperties": false
+          }
         ]
       },
       "Assignment": {
@@ -23305,6 +24440,24 @@
         ],
         "additionalProperties": false
       },
+      "EmploymentStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "leave",
+          "terminated"
+        ]
+      },
+      "EmploymentType": {
+        "type": "string",
+        "enum": [
+          "full-time",
+          "part-time",
+          "contractor",
+          "temporary",
+          "other"
+        ]
+      },
       "FileRecord": {
         "type": "object",
         "properties": {
@@ -25284,6 +26437,23 @@
               "userIds"
             ],
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "rule"
+              },
+              "rule": {
+                "$ref": "#/components/schemas/AssignmentRule"
+              }
+            },
+            "required": [
+              "kind",
+              "rule"
+            ],
+            "additionalProperties": false
           }
         ]
       },
@@ -25579,6 +26749,160 @@
           "title",
           "description",
           "items"
+        ],
+        "additionalProperties": false
+      },
+      "RuleApplyResult": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "number",
+            "minimum": 0
+          },
+          "removed": {
+            "type": "number",
+            "minimum": 0
+          },
+          "conflicts": {
+            "type": "number",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "added",
+          "removed",
+          "conflicts"
+        ],
+        "additionalProperties": false
+      },
+      "RuleMember": {
+        "$ref": "#/components/schemas/RuleMember"
+      },
+      "RulePreview": {
+        "type": "object",
+        "properties": {
+          "requirementId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "add": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string"
+                },
+                "employeeId": {
+                  "type": "string"
+                },
+                "reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "previousCompletionAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "userId",
+                "name",
+                "employeeId",
+                "reasons",
+                "previousCompletionAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "remove": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string"
+                },
+                "employeeId": {
+                  "type": "string"
+                },
+                "reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "hasCompleted": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "userId",
+                "name",
+                "employeeId",
+                "reasons",
+                "hasCompleted"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "unchanged": {
+            "type": "number",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "object",
+            "properties": {
+              "unlinked": {
+                "type": "number",
+                "minimum": 0
+              },
+              "notCurrent": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "unlinked",
+              "notCurrent"
+            ],
+            "additionalProperties": false
+          },
+          "summary": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "requirementId",
+          "add",
+          "remove",
+          "unchanged",
+          "skipped",
+          "summary",
+          "hash"
         ],
         "additionalProperties": false
       },
@@ -27279,6 +28603,551 @@
         "required": [
           "variant",
           "rows"
+        ],
+        "additionalProperties": false
+      },
+      "WorkerChangeKind": {
+        "$ref": "#/components/schemas/WorkerChangeKind"
+      },
+      "WorkerChangeSet": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "minLength": 1
+          },
+          "people": {
+            "$ref": "#/components/schemas/WorkerPeople"
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "linked": {
+                "type": "number",
+                "minimum": 0
+              },
+              "suggested": {
+                "type": "number",
+                "minimum": 0
+              },
+              "unlinked": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "linked",
+              "suggested",
+              "unlinked"
+            ],
+            "additionalProperties": false
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "employeeId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "update",
+                    "leave",
+                    "terminate",
+                    "rehire"
+                  ]
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkerField"
+                  }
+                },
+                "effectiveAt": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "suggestedUserId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "line",
+                "employeeId",
+                "name",
+                "kind",
+                "fields",
+                "effectiveAt",
+                "suggestedUserId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rowErrors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "employeeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "field": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WorkerField"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "code": {
+                  "$ref": "#/components/schemas/WorkerRowErrorCode"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "line",
+                "employeeId",
+                "field",
+                "code",
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "ruleEffects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "requirementId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "add": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "remove": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "requirementId",
+                "add",
+                "remove"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "asOf",
+          "people",
+          "links",
+          "changes",
+          "rowErrors",
+          "ruleEffects",
+          "summary",
+          "hash"
+        ],
+        "additionalProperties": false
+      },
+      "WorkerPeople": {
+        "type": "object",
+        "properties": {
+          "add": {
+            "type": "number",
+            "minimum": 0
+          },
+          "update": {
+            "type": "number",
+            "minimum": 0
+          },
+          "leave": {
+            "type": "number",
+            "minimum": 0
+          },
+          "terminate": {
+            "type": "number",
+            "minimum": 0
+          },
+          "rehire": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unchanged": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "add",
+          "update",
+          "leave",
+          "terminate",
+          "rehire",
+          "unchanged"
+        ],
+        "additionalProperties": false
+      },
+      "WorkerField": {
+        "type": "string",
+        "enum": [
+          "employeeId",
+          "email",
+          "name",
+          "jobCode",
+          "jobTitle",
+          "department",
+          "location",
+          "employmentType",
+          "managerEmployeeId",
+          "hireDate",
+          "status",
+          "effectiveAt"
+        ]
+      },
+      "WorkerRowErrorCode": {
+        "type": "string",
+        "enum": [
+          "worker-missing-id",
+          "worker-duplicate-id",
+          "worker-bad-email",
+          "worker-bad-date",
+          "worker-bad-value",
+          "worker-unsafe-value",
+          "worker-unknown-manager",
+          "worker-version-conflict",
+          "worker-too-long"
+        ]
+      },
+      "WorkerColumnInput": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/WorkerField"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "dateFormat": {
+            "type": "string",
+            "enum": [
+              "iso",
+              "mdy",
+              "dmy"
+            ]
+          }
+        },
+        "required": [
+          "columns",
+          "dateFormat"
+        ]
+      },
+      "WorkerColumnMap": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "object",
+            "propertyNames": {
+              "$ref": "#/components/schemas/WorkerField"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "dateFormat": {
+            "type": "string",
+            "enum": [
+              "iso",
+              "mdy",
+              "dmy"
+            ]
+          },
+          "updatedBy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "updatedAt": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "columns",
+          "dateFormat",
+          "updatedBy",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "WorkerImportResult": {
+        "type": "object",
+        "properties": {
+          "importId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "people": {
+            "$ref": "#/components/schemas/WorkerPeople"
+          },
+          "skippedRows": {
+            "type": "number",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "importId",
+          "alreadyApplied",
+          "people",
+          "skippedRows"
+        ],
+        "additionalProperties": false
+      },
+      "WorkerImportSource": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "string",
+                "const": "csv"
+              },
+              "csv": {
+                "type": "string"
+              },
+              "columnMap": {
+                "$ref": "#/components/schemas/WorkerColumnInput"
+              }
+            },
+            "required": [
+              "format",
+              "csv"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "string",
+                "const": "json"
+              },
+              "records": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeId": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "jobCode": {
+                      "type": "string"
+                    },
+                    "jobTitle": {
+                      "type": "string"
+                    },
+                    "department": {
+                      "type": "string"
+                    },
+                    "location": {
+                      "type": "string"
+                    },
+                    "employmentType": {
+                      "type": "string"
+                    },
+                    "managerEmployeeId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "hireDate": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "effectiveAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "required": [
+              "format",
+              "records"
+            ]
+          }
+        ]
+      },
+      "WorkerLink": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "linkedBy": {
+            "type": "string",
+            "minLength": 1
+          },
+          "linkedAt": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "employeeId",
+          "userId",
+          "linkedBy",
+          "linkedAt"
+        ],
+        "additionalProperties": false
+      },
+      "WorkerRecordInput": {
+        "$ref": "#/components/schemas/WorkerRecordInput"
+      },
+      "WorkerRecord": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "jobCode": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "department": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "employmentType": {
+            "$ref": "#/components/schemas/EmploymentType"
+          },
+          "managerEmployeeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hireDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/EmploymentStatus"
+          },
+          "effectiveAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "receivedAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json"
+            ]
+          },
+          "importId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "employeeId",
+          "email",
+          "name",
+          "jobCode",
+          "jobTitle",
+          "department",
+          "location",
+          "employmentType",
+          "managerEmployeeId",
+          "hireDate",
+          "status",
+          "effectiveAt",
+          "receivedAt",
+          "source",
+          "importId"
         ],
         "additionalProperties": false
       },

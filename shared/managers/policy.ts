@@ -42,6 +42,7 @@ export const FORBIDDEN_MANAGER_FIELDS = [
   'messages', 'tutor', 'hintsUsed', 'answerRequests', 'summary',
   'profile', 'adaptations', 'preset', 'readingLevel', 'accessibility', 'goals',
   'email', 'lastActivity', 'updatedAt', 'minutesDone', 'progress',
+  'jobCode', 'jobTitle', 'department', 'location', 'employmentType', 'employeeId', 'managerEmployeeId', 'hireDate',
 ] as const;
 
 type Line = Pick<ReportingLine, 'managerId' | 'reportId' | 'createdAt'>;

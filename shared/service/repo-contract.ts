@@ -1,12 +1,97 @@
 import { describe, expect, it } from 'vitest';
 import type { Repo } from '../repo';
 import { seedData } from '../seed';
-import type { Certificate, CourseTemplate, Program, Requirement, Rubric } from '../domain';
+import type { Certificate, CourseTemplate, Program, Requirement, Rubric, WorkerRecord } from '../domain';
 import type { StoredReadinessItem } from '../repo';
 
 /** Shared behavioral contract for MemoryRepo and the Worker's D1Repo. */
 export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>) {
   describe(name, () => {
+    it('keeps HR versions, links, and rule members compare-and-set consistent', async () => {
+      const repo=await makeRepo();
+      const record:WorkerRecord={employeeId:'MS-101',email:'avery@example.test',name:'Avery Chen',jobCode:'FL-1',jobTitle:'Facilities staff',department:'Facilities and Operations',location:'North Campus Facilities',employmentType:'full-time',managerEmployeeId:null,hireDate:null,status:'active',effectiveAt:'2026-09-28T00:00:00.000Z',receivedAt:'2026-09-28T12:00:00.000Z',source:'csv',importId:'imp-one'};
+      expect(await repo.insertWorkerRecord(record)).toBe('inserted');
+      expect(await repo.getHrRevision()).toBe(1);
+      expect(await repo.insertWorkerRecord({...record,receivedAt:'2026-09-28T13:00:00.000Z',source:'json',importId:'imp-two'})).toBe('identical');
+      expect(await repo.insertWorkerRecord({...record,jobCode:'FL-2'})).toBe('conflict');
+      expect(await repo.getHrRevision()).toBe(1);
+      expect(await repo.listWorkerRecords({employeeId:'MS-101'})).toEqual([record]);
+      expect(await repo.listWorkerRecords({employeeId:''})).toEqual([]);
+      expect((await repo.listWorkerRecords())[0]).toEqual(record);
+      await repo.insertWorkerRecord({...record,employeeId:'MS-099',effectiveAt:'2026-09-29T00:00:00.000Z'});
+      expect((await repo.listWorkerRecords()).map(r=>r.employeeId)).toEqual(['MS-099','MS-101']);
+      const map={columns:{employeeId:'Employee ID'},dateFormat:'iso' as const,updatedBy:'u-admin',updatedAt:record.receivedAt};
+      await repo.putWorkerColumnMap(map);expect(await repo.getWorkerColumnMap()).toEqual(map);
+      const link={employeeId:'MS-101',userId:'u-priya',linkedBy:'u-admin',linkedAt:record.receivedAt};
+      expect(await repo.insertWorkerLink(link)).toBe(true);
+      expect(await repo.getHrRevision()).toBe(3);
+      expect(await repo.insertWorkerLink(link)).toBe(false);
+      expect(await repo.insertWorkerLink({...link,employeeId:'MS-102'})).toBe(false);
+      expect(await repo.insertWorkerLink({...link,userId:'u-marcus'})).toBe(false);
+      expect(await repo.listWorkerLinks()).toEqual([link]);
+      await repo.putRequirement({id:'req-rule',target:{kind:'course',courseId:'c-ops101'},audience:{kind:'rule',rule:{match:'all',conditions:[{field:'location',op:'in',values:['North Campus Facilities']}]}},dueAt:null,recurrence:'none',createdBy:'u-admin',createdAt:record.receivedAt});
+      const member={requirementId:'req-rule',userId:'u-priya',state:'assigned' as const,revision:1,reasons:['Location is North Campus Facilities'],changedAt:record.receivedAt,changedBy:'u-admin'};
+      const guard={hrRevision:await repo.getHrRevision()};
+      expect(await repo.putRuleMember(member,0,{hrRevision:guard.hrRevision-1})).toBe(false);
+      expect(await repo.putRuleMember(member,0,guard)).toBe(true);
+      expect(await repo.putRuleMember(member,0,guard)).toBe(false);
+      expect(await repo.putRuleMember({...member,revision:3},1,guard)).toBe(false);
+      expect(await repo.putRuleMember({...member,revision:2,state:'removed'},1,guard)).toBe(true);
+      expect(await repo.putRuleMember({...member,revision:2},1,guard)).toBe(false);
+      expect(await repo.listRuleMembers('req-rule')).toEqual([{...member,revision:2,state:'removed'}]);
+      const importRow={id:'imp-one',hash:'hash-one',sourceHash:'source-one',at:record.receivedAt,actorId:'u-admin',source:'csv' as const,counts:{add:1,update:0,leave:0,terminate:0,rehire:0,unchanged:0},skippedRows:0,incomplete:false};
+      expect(await repo.insertHrImport(importRow)).toBe(true);expect(await repo.insertHrImport({...importRow,id:'imp-two'})).toBe(false);
+      expect(await repo.findHrImportByHash('hash-one')).toEqual(importRow);
+      await repo.reset(seedData());
+      expect(await repo.getHrRevision()).toBe(0);
+      expect(await repo.listWorkerRecords()).toEqual([]);expect(await repo.listWorkerLinks()).toEqual([]);expect(await repo.listRuleMembers('req-rule')).toEqual([]);expect(await repo.getWorkerColumnMap()).toBeNull();expect(await repo.findHrImportByHash('hash-one')).toBeNull();
+    });
+    it('guards predecessor history and commits assignment, event and enrollment as one unit', async () => {
+      const repo=await makeRepo();
+      const base:WorkerRecord={employeeId:'MS-901',email:'avery@example.test',name:'Avery Chen',jobCode:'FL-1',jobTitle:'Staff',department:'Facilities',location:'North Campus Facilities',employmentType:'full-time',managerEmployeeId:null,hireDate:null,status:'active',effectiveAt:'2026-09-01T00:00:00.000Z',receivedAt:'2026-09-28T12:00:00.000Z',source:'json',importId:'imp-base'};
+      expect(await repo.insertWorkerRecord(base)).toBe('inserted');
+      const later={...base,effectiveAt:'2026-09-25T00:00:00.000Z',jobCode:'FL-2'};
+      expect(await repo.insertWorkerRecord(later)).toBe('inserted');
+      expect(await repo.insertWorkerRecord({...base,effectiveAt:'2026-09-20T00:00:00.000Z',jobCode:'FL-3'},{preceding:base})).toBe('conflict');
+      expect(await repo.insertWorkerRecord({...later,effectiveAt:'2026-09-28T12:00:00.000Z',jobCode:'FL-3'},{preceding:base})).toBe('conflict');
+      expect(await repo.insertWorkerRecord({...later,effectiveAt:'2026-09-28T12:00:00.000Z',jobCode:'FL-3'},{preceding:later})).toBe('inserted');
+      await repo.putRequirement({id:'req-atomic',target:{kind:'course',courseId:'c-ops101'},audience:{kind:'rule',rule:{match:'all',conditions:[{field:'location',op:'in',values:['North Campus Facilities']}]}},dueAt:null,recurrence:'none',createdBy:'u-admin',createdAt:base.receivedAt});
+      const member={requirementId:'req-atomic',userId:'u-marcus',state:'assigned' as const,revision:1,reasons:['Location is North Campus Facilities'],changedAt:base.receivedAt,changedBy:'u-admin'};
+      const event={id:'ev-atomic',at:base.receivedAt,userId:'u-marcus',courseId:'c-ops101',requirementId:member.requirementId,kind:'assigned' as const,actorId:'u-admin',detail:'Assigned by rule.'};
+      const revision=await repo.getHrRevision();
+      expect(await repo.assignRuleMember(member,0,{hrRevision:revision-1},[event],['c-ops101'])).toBe(false);
+      expect(await repo.listRuleMembers(member.requirementId)).toEqual([]);
+      expect((await repo.listCompletionEvents({userId:'u-marcus',courseId:'c-ops101'})).filter(e=>e.id===event.id)).toEqual([]);
+      expect(await repo.listEnrollments({courseId:'c-ops101',userId:'u-marcus'})).toEqual([]);
+      expect(await repo.assignRuleMember(member,0,{hrRevision:revision},[event],['c-ops101'])).toBe(true);
+      expect((await repo.listCompletionEvents({userId:'u-marcus',courseId:'c-ops101'})).filter(e=>e.id===event.id)).toEqual([event]);
+      expect(await repo.listEnrollments({courseId:'c-ops101',userId:'u-marcus'})).toEqual([{courseId:'c-ops101',userId:'u-marcus'}]);
+    });
+    it('rejects a predecessor guard with another employee id', async () => {
+      const repo=await makeRepo();
+      const base:WorkerRecord={employeeId:'MS-101',email:'avery@example.test',name:'Avery Chen',jobCode:'FL-1',jobTitle:'Staff',department:'Facilities',location:'North Campus Facilities',employmentType:'full-time',managerEmployeeId:null,hireDate:null,status:'active',effectiveAt:'2026-09-01T00:00:00.000Z',receivedAt:'2026-09-28T12:00:00.000Z',source:'json',importId:'imp-base'};
+      const update={...base,effectiveAt:'2026-09-28T12:00:00.000Z',jobCode:'FL-2'};
+      expect(await repo.insertWorkerRecord(base)).toBe('inserted');
+      expect(await repo.insertWorkerRecord(update,{preceding:{...base,employeeId:'OTHER'}})).toBe('conflict');
+      expect(await repo.getHrRevision()).toBe(1);
+      expect(await repo.insertWorkerRecord(update,{preceding:base})).toBe('inserted');
+    });
+    it('uses courseIds for enrollment independently of assignment events', async () => {
+      const repo=await makeRepo();
+      await repo.putRequirement({id:'req-course-ids',target:{kind:'course',courseId:'c-ops101'},audience:{kind:'rule',rule:{match:'all',conditions:[{field:'location',op:'in',values:['North Campus Facilities']}]}},dueAt:null,recurrence:'none',createdBy:'u-admin',createdAt:'2026-09-28T12:00:00.000Z'});
+      const member={requirementId:'req-course-ids',userId:'u-marcus',state:'assigned' as const,revision:1,reasons:['Location is North Campus Facilities'],changedAt:'2026-09-28T12:00:00.000Z',changedBy:'u-admin'};
+      const event={id:'ev-course-ids-1',at:member.changedAt,userId:member.userId,courseId:'c-ops101',requirementId:member.requirementId,kind:'assigned' as const,actorId:'u-admin',detail:'Assigned by rule.'};
+      const guard={hrRevision:await repo.getHrRevision()};
+      expect(await repo.assignRuleMember(member,0,guard,[event],[])).toBe(true);
+      expect(await repo.listRuleMembers(member.requirementId)).toEqual([member]);
+      expect((await repo.listCompletionEvents({userId:member.userId,courseId:'c-ops101'})).filter(e=>e.id===event.id)).toEqual([event]);
+      expect(await repo.listEnrollments({courseId:'c-ops101',userId:member.userId})).toEqual([]);
+      const second={...member,revision:2};
+      const secondEvent={...event,id:'ev-course-ids-2'};
+      expect(await repo.assignRuleMember(second,1,guard,[secondEvent],['c-ops101'])).toBe(true);
+      expect((await repo.listCompletionEvents({userId:member.userId,courseId:'c-ops101'})).filter(e=>e.id===secondEvent.id)).toEqual([secondEvent]);
+      expect(await repo.listEnrollments({courseId:'c-ops101',userId:member.userId})).toEqual([{courseId:'c-ops101',userId:member.userId}]);
+    });
     it('round trips entities and isolates both reads and writes', async () => {
       const repo = await makeRepo();
       const institution = await repo.getInstitution(); institution.name = 'Changed'; await repo.putInstitution(institution);
