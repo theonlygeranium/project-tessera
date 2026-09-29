@@ -6,7 +6,9 @@ import { seedData } from '../seed';
 import type { ServiceContext } from './context';
 import { advanceGenerationJob, WORKFLOW_STALL_MS } from './generation';
 import { MemoryRepo, service } from './index';
-import { joinSmallCaps } from './design-partner';
+import { csvCell, joinSmallCaps } from './design-partner';
+import { AiPolicySchema, WorkloadRatesSchema } from '../schema/domain';
+import { RICE_DEFAULTS, validWorkloadRates } from '../policy';
 
 const at = '2026-09-28T12:00:00.000Z';
 let clock = Date.parse(at);
@@ -19,6 +21,25 @@ const sample = { courseId: 'c-stat110', sourceKind: 'syllabus' as const, sample:
 const file: FileRecord = { id: 'f-test', courseId: 'c-stat110', name: 'Syllabus.pdf', kind: 'pdf', mime: 'application/pdf', size: 100, key: 'files/test', version: 1, uploadedBy: 'u-okafor', uploadedAt: at, scan: null };
 
 describe('design partner service', () => {
+  it('neutralizes spreadsheet formulas after whitespace and control characters before CSV quoting', () => {
+    for (const prefix of ['=', '+', '-', '@']) for (const lead of ['', '  ', '\t', '\r\n', '\u0000']) {
+      expect(csvCell(`${lead}${prefix}SUM(1,1)`)).toBe(`"'${lead}${prefix}SUM(1,1)"`);
+    }
+    expect(csvCell('Ordinary "quoted" cell')).toBe('"Ordinary ""quoted"" cell"');
+  });
+  it('uses the same finite, positive, at-most-1000 rate constraint in policy and service', async () => {
+    const ctx = await context();
+    const institution = await ctx.repo.getInstitution();
+    for (const invalid of [0, -1, 1001, Infinity, NaN]) {
+      const rates = { ...RICE_DEFAULTS, readingPagesPerHour: invalid };
+      expect(validWorkloadRates(rates)).toBe(false);
+      expect(WorkloadRatesSchema.safeParse(rates).success).toBe(false);
+      expect(AiPolicySchema.safeParse({ ...institution.policy, workloadRates: rates }).success).toBe(false);
+      await expect(service.updatePolicy({ ...ctx, user: await ctx.repo.getUser('u-admin') }, { ...institution.policy, workloadRates: rates })).rejects.toMatchObject({ code: 'invalid' });
+    }
+    expect(WorkloadRatesSchema.safeParse({ ...RICE_DEFAULTS, readingPagesPerHour: 0.0001 }).success).toBe(true);
+    expect(WorkloadRatesSchema.safeParse({ ...RICE_DEFAULTS, readingPagesPerHour: 1000 }).success).toBe(true);
+  });
   it('persists institution design controls and applies them to new sessions', async () => {
     const ctx = await context();
     const institution = await ctx.repo.getInstitution();
@@ -43,6 +64,18 @@ describe('design partner service', () => {
     await expect(service.createDesignSession(ctx, sample)).rejects.toMatchObject({ code: 'ai-disabled' });
     institution.policy.designPartner.enabled = true; institution.policy.aiAuthoring = false; await ctx.repo.putInstitution(institution);
     await expect(service.createDesignSession(ctx, sample)).rejects.toMatchObject({ code: 'ai-disabled' });
+  });
+  it('denies new suggestions and approach generation in an existing session after policy is disabled', async () => {
+    const ctx = await context();
+    const started = await service.createDesignSession(ctx, sample);
+    await service.getDesignSession(ctx, { sessionId: started.id });
+    const read = await service.getDesignSession(ctx, { sessionId: started.id });
+    const admin = { ...ctx, user: await ctx.repo.getUser('u-admin') };
+    const institution = await ctx.repo.getInstitution();
+    await service.updatePolicy(admin, { ...institution.policy, designPartner: { enabled: false, allowedArchitectures: null } });
+    await expect(service.suggestDesignOutcomes(ctx, { sessionId: started.id })).rejects.toMatchObject({ code: 'ai-disabled' });
+    await expect(service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((item, index) => ({ code: `O${index + 1}`, text: item.text, originalText: item.text })) })).rejects.toMatchObject({ code: 'ai-disabled' });
+    expect((await service.getDesignSession(ctx, { sessionId: started.id })).read).not.toBeNull();
   });
   it('stores a sample source and advances extraction and questions on two polls', async () => {
     const ctx = await context();

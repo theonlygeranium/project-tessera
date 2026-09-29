@@ -8,7 +8,7 @@ import styles from './Admin.module.css';
 import { policyValueFrom, toAiPolicy, type PolicyValue } from './form';
 import { PolicyFields } from './PolicyFields';
 import { DEFAULT_READINESS_POLICY } from '../../../../shared/quality';
-import { RICE_DEFAULTS } from '../../../../shared/policy';
+import { MAX_WORKLOAD_RATE, RICE_DEFAULTS, validWorkloadRates } from '../../../../shared/policy';
 import type { ArchitectureId, WorkloadRates } from '../../../../shared/domain';
 
 const architectures: { id: ArchitectureId; label: string }[] = [
@@ -43,6 +43,7 @@ export function PolicyPage() {
     event.preventDefault();
     setSaved(false);
     setError(null);
+    if (!validWorkloadRates(policy.workloadRates)) { setError(`Each workload rate must be greater than 0 and at most ${MAX_WORKLOAD_RATE}.`); return; }
     save.mutate(toAiPolicy(policy), {
       onSuccess: () => setSaved(true),
       onError: (caught) => setError(caught.message),
@@ -76,7 +77,7 @@ export function PolicyPage() {
             <label className={styles.policyChoice}><input type="checkbox" checked={policy.allowedArchitectures === null} onChange={event => setPolicy({ ...policy, allowedArchitectures: event.target.checked ? null : architectures.map(item => item.id) })} /> Allow all approaches</label>
             <div className={styles.policyGrid}>{architectures.map(item => <label className={styles.policyChoice} key={item.id}><input type="checkbox" disabled={policy.allowedArchitectures === null} checked={policy.allowedArchitectures === null || policy.allowedArchitectures.includes(item.id)} onChange={event => { const current = policy.allowedArchitectures ?? architectures.map(option => option.id); const next = event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id); if (next.length) setPolicy({ ...policy, allowedArchitectures: next }); }} /> {item.label}</label>)}</div>
           </fieldset>
-          <fieldset className={styles.policyFieldset}><legend>Workload estimates</legend><p>Default time assumptions for the weekly workload chart. Instructors can change them for a session.</p><div className={styles.policyGrid}>{rateLabels.map(item => <label key={item.key}>{item.label} <span>({item.unit})</span><input type="number" min="0.01" step="any" required value={policy.workloadRates[item.key]} onChange={event => setPolicy({ ...policy, workloadRates: { ...policy.workloadRates, [item.key]: Number(event.target.value) } })} /></label>)}</div><Button type="button" onClick={() => setPolicy({ ...policy, workloadRates: { ...RICE_DEFAULTS } })}>Reset to Rice CTE defaults</Button></fieldset>
+          <fieldset className={styles.policyFieldset}><legend>Workload estimates</legend><p>Default time assumptions for the weekly workload chart. Instructors can change them for a session.</p><div className={styles.policyGrid}>{rateLabels.map(item => <label key={item.key}>{item.label} <span>({item.unit})</span><input type="number" min="0" max={MAX_WORKLOAD_RATE} step="any" required value={policy.workloadRates[item.key]} onChange={event => setPolicy({ ...policy, workloadRates: { ...policy.workloadRates, [item.key]: Number(event.target.value) } })} /></label>)}</div><Button type="button" onClick={() => setPolicy({ ...policy, workloadRates: { ...RICE_DEFAULTS } })}>Reset to Rice CTE defaults</Button></fieldset>
           <label className={styles.policyDisclosure}>Default AI-use disclosure <span>Starts in the draft “Start here” lesson. The instructor can edit it before keeping the block.</span><textarea required value={policy.defaultAiDisclosure} onChange={event => setPolicy({ ...policy, defaultAiDisclosure: event.target.value })} /></label>
         </section>
         <div className={styles.actions}>

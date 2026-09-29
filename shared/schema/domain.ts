@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type * as D from '../domain';
 import type { BlockInput } from '../api';
+import { MAX_WORKLOAD_RATE } from '../policy';
 
 export type Expect<T extends true> = T;
 export type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
@@ -24,7 +25,8 @@ export const DesignSourceKindSchema = z.enum(['syllabus','brief']);
 export const ArchitectureIdSchema = z.enum(['weekly','thematic','case','project','competency','flipped','scaffolded','performance','micro','hyflex']);
 export const OverlayIdSchema = z.enum(['bookends','spaced-review','udl-choice','teaching-presence']);
 export const DesignStageSchema = z.enum(['start','read','confirm','approaches','preview','provisioning','review','undoing']);
-export const WorkloadRatesSchema = z.object({readingPagesPerHour:nonnegative,problemSetHours:nonnegative,writingHoursPerPage:nonnegative,projectHours:nonnegative,quizMinutes:nonnegative,discussionMinutes:nonnegative});
+export const WorkloadRateSchema = z.number().finite().gt(0).max(MAX_WORKLOAD_RATE);
+export const WorkloadRatesSchema = z.object({readingPagesPerHour:WorkloadRateSchema,problemSetHours:WorkloadRateSchema,writingHoursPerPage:WorkloadRateSchema,projectHours:WorkloadRateSchema,quizMinutes:WorkloadRateSchema,discussionMinutes:WorkloadRateSchema});
 export const AiPolicySchema = z.object({ aiAuthoring:z.boolean(), tutorModes:z.object({ graded:z.array(TutorModeSchema), practice:z.array(TutorModeSchema) }), workloadRates:WorkloadRatesSchema.optional(), designPartner:z.object({enabled:z.boolean(),allowedArchitectures:z.array(ArchitectureIdSchema).min(1).nullable()}).optional(), defaultAiDisclosure:required.optional() });
 export const AccessPolicySchema = z.object({ minimumScore:integer.min(0).max(100), blockingSeverities:z.array(z.enum(['critical','serious','moderate','minor'])) });
 export const AccentSchema = z.enum(['teal','blue','plum','rust']);

@@ -21361,28 +21361,22 @@
         "type": "object",
         "properties": {
           "readingPagesPerHour": {
-            "type": "number",
-            "minimum": 0
+            "$ref": "#/components/schemas/WorkloadRate"
           },
           "problemSetHours": {
-            "type": "number",
-            "minimum": 0
+            "$ref": "#/components/schemas/WorkloadRate"
           },
           "writingHoursPerPage": {
-            "type": "number",
-            "minimum": 0
+            "$ref": "#/components/schemas/WorkloadRate"
           },
           "projectHours": {
-            "type": "number",
-            "minimum": 0
+            "$ref": "#/components/schemas/WorkloadRate"
           },
           "quizMinutes": {
-            "type": "number",
-            "minimum": 0
+            "$ref": "#/components/schemas/WorkloadRate"
           },
           "discussionMinutes": {
-            "type": "number",
-            "minimum": 0
+            "$ref": "#/components/schemas/WorkloadRate"
           }
         },
         "required": [
@@ -21394,6 +21388,11 @@
           "discussionMinutes"
         ],
         "additionalProperties": false
+      },
+      "WorkloadRate": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 1000
       },
       "ArchitectureId": {
         "type": "string",

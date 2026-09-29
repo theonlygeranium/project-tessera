@@ -124,6 +124,11 @@ export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseO
     if (input.title !== undefined) l.title = required(input.title, 'title');
     if (input.minutes !== undefined) l.minutes = minutes(input.minutes);
     await ctx.repo.putLesson(l);
+    if (oldModule !== l.moduleId) {
+      for (const session of (await ctx.repo.listDesignSessions(l.courseId)).filter(s => s.stage === 'review' && Object.values(s.planIds?.modules ?? {}).includes(l.moduleId))) {
+        await ctx.repo.appendDesignDecision(session.id, { at: ctx.now(), who: user(ctx).id, what: `Moved existing lesson ${l.id} into design module ${l.moduleId}.` });
+      }
+    }
     if (oldModule !== l.moduleId) await renumberLessons(ctx, oldModule, (await ctx.repo.listLessons({ moduleId: oldModule })).map(x => x.id));
     if (input.position !== undefined) await renumberLessons(ctx, l.moduleId, move((await ctx.repo.listLessons({ moduleId: l.moduleId })).map(x => x.id), l.id, input.position));
     return lessonFor(ctx, l.id);

@@ -1,10 +1,10 @@
 import seed from '../seed-syllabus.json';
 import { ApiError, type Input } from '../api';
-import type { DesignSession, DesignSource, DesignQuestion, SyllabusExtraction, WorkloadRates } from '../domain';
+import type { DesignSession, DesignSource, DesignQuestion, SyllabusExtraction } from '../domain';
 import type { GenerationJob } from '../repo';
 import type { Service, ServiceContext } from './context';
-import { DEFAULT_AI_DISCLOSURE, designPartnerPolicy, workloadRatesFor } from '../policy';
-import { aiEnabled, canTeach, fail, provenance, required, user } from './helpers';
+import { DEFAULT_AI_DISCLOSURE, designPartnerPolicy, validWorkloadRates, workloadRatesFor } from '../policy';
+import { aiEnabled, canTeach, designPartnerEnabled, fail, provenance, required, user } from './helpers';
 import { validateExtraction, validateRead, validateObjectiveRewrite, repairRead } from './validate-design';
 import { analyzeSyllabusFixture } from '../design/read-fixture';
 import { estimateWorkload } from '../design/workload';
@@ -111,6 +111,10 @@ async function sessionFor(ctx: ServiceContext, id: string): Promise<DesignSessio
 
 export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob): Promise<GenerationJob> {
   if (job.state !== 'running' || job.kind !== 'extract' || !job.sessionId) return job;
+  if (!designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) {
+    await ctx.repo.stopDesignJob(job.sessionId, job.id, 'Design partner was disabled by your administrator. Your saved work remains available; undo is still available.');
+    return await ctx.repo.getGenerationJob(job.id) ?? job;
+  }
   if (job.instruction === 'options') return advanceOptionsJob(ctx, job);
   const session = await ctx.repo.getDesignSession(job.sessionId);
   if (!session) return job;
@@ -151,6 +155,10 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
       }));
       result = { model: analyzed.model, output: { ...validated, outcomeAudits: audits, deficiencies: validated.deficiencies.map(item => ({ ...item, rubricRefs: item.rubricRefs.filter(ref => allowed.includes(ref.rubric)) })), learnerCenteredness: session.source.kind === 'brief' ? null : validated.learnerCenteredness } } as typeof result;
     }
+    if (!designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) {
+      await ctx.repo.stopDesignJob(job.sessionId, job.id, 'Design partner was disabled by your administrator. Your saved work remains available; undo is still available.');
+      return await ctx.repo.getGenerationJob(job.id) ?? job;
+    }
     const current = await ctx.repo.getGenerationJob(job.id);
     if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
     const latest = await ctx.repo.getDesignSession(job.sessionId);
@@ -189,6 +197,10 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
     await ctx.repo.putGenerationJob(current);
     return current;
   } catch (error) {
+    if (!designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) {
+      await ctx.repo.stopDesignJob(job.sessionId!, job.id, 'Design partner was disabled by your administrator. Your saved work remains available; undo is still available.');
+      return await ctx.repo.getGenerationJob(job.id) ?? job;
+    }
     const current = await ctx.repo.getGenerationJob(job.id);
     if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
     const cause = error instanceof ApiError && error.details && typeof error.details === 'object' && 'cause' in error.details ? String(error.details.cause) : error instanceof ApiError && error.code === 'invalid' ? `invalid shape: ${error.message}` : error instanceof Error ? error.message : String(error);
@@ -205,6 +217,7 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
 }
 
 async function startOptionsJob(ctx: ServiceContext, session: DesignSession): Promise<void> {
+  await designPartnerEnabled(ctx);
   const now = ctx.now(), jobId = ctx.newId('gj');
   const job: GenerationJob = { id: jobId, courseId: session.courseId, requestedBy: user(ctx).id, kind: 'extract', sessionId: session.id, state: 'running', done: 0, total: 1, lessonIds: [], error: null, work: [], instruction: 'options', failures: [], createdAt: now, updatedAt: now };
   session.options = null;
@@ -219,6 +232,10 @@ async function startOptionsJob(ctx: ServiceContext, session: DesignSession): Pro
 }
 
 async function advanceOptionsJob(ctx: ServiceContext, job: GenerationJob): Promise<GenerationJob> {
+  if (!designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) {
+    await ctx.repo.stopDesignJob(job.sessionId!, job.id, 'Design partner was disabled by your administrator. Your saved work remains available; undo is still available.');
+    return await ctx.repo.getGenerationJob(job.id) ?? job;
+  }
   const session = await ctx.repo.getDesignSession(job.sessionId!);
   if (!session?.extraction || !session.confirmedOutcomes?.length) return job;
   const { done, state, runner } = job;
@@ -231,6 +248,10 @@ async function advanceOptionsJob(ctx: ServiceContext, job: GenerationJob): Promi
       const result = await ctx.ai.run('structure-options', input);
       try { options = finalizeOptions(result.output, input); break; }
       catch (error) { if (attempt >= 1) throw error; }
+    }
+    if (!designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) {
+      await ctx.repo.stopDesignJob(job.sessionId!, job.id, 'Design partner was disabled by your administrator. Your saved work remains available; undo is still available.');
+      return await ctx.repo.getGenerationJob(job.id) ?? job;
     }
     const current = await ctx.repo.getGenerationJob(job.id);
     if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
@@ -256,7 +277,11 @@ async function advanceOptionsJob(ctx: ServiceContext, job: GenerationJob): Promi
   }
 }
 
-const csvCell = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+export const csvCell = (value: unknown) => {
+  const raw = String(value ?? '');
+  const safe = /^[\s\p{Cc}]*[=+\-@]/u.test(raw) ? `'${raw}` : raw;
+  return `"${safe.replaceAll('"', '""')}"`;
+};
 
 export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSession' | 'listDesignSessions' | 'answerDesignQuestions' | 'contestDesignField' | 'updateDesignRates' | 'confirmOutcomes' | 'suggestDesignOutcomes' | 'retryDesignOptions' | 'selectApproach' | 'exportDesignRecord' | 'getInstructorProfile' | 'updateInstructorProfile'> = {
   createDesignSession: async (ctx, input) => {
@@ -291,6 +316,10 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     if ((session.stage !== 'start' && !(session.stage === 'approaches' && !session.options) && session.stage !== 'provisioning') || !jobId || (session.stage !== 'provisioning' && session.provisioning?.error)) return session;
     const job = await ctx.repo.getGenerationJob(jobId);
     if (!job || job.state !== 'running' || (job.kind !== 'extract' && job.kind !== 'scaffold')) return session;
+    if (!designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) {
+      await ctx.repo.stopDesignJob(session.id, job.id, 'Design partner was disabled by your administrator. Your saved work remains available; undo is still available.');
+      return sessionFor(ctx, sessionId);
+    }
     if (job.runner === 'workflow') {
       if (Date.parse(ctx.now()) - Date.parse(job.updatedAt) < WORKFLOW_STALL_MS) return session;
       if (job.kind === 'scaffold') {
@@ -346,8 +375,7 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
   updateDesignRates: async (ctx, { sessionId, rates }) => {
     const session = await sessionFor(ctx, sessionId);
     if (!session.read || !session.extraction || session.stage !== 'read') fail('invalid', 'Wait until the syllabus has been read.');
-    const names: (keyof WorkloadRates)[] = ['readingPagesPerHour', 'problemSetHours', 'writingHoursPerPage', 'projectHours', 'quizMinutes', 'discussionMinutes'];
-    if (names.some(name => !Number.isFinite(rates[name]) || rates[name] <= 0 || rates[name] > 1000)) fail('invalid', 'Workload rates must be positive numbers.');
+    if (!validWorkloadRates(rates)) fail('invalid', 'Workload rates must be greater than 0 and at most 1000.');
     session.workloadRates = { ...rates };
     session.read!.workload = estimateWorkload(session.extraction!.profile, session.extraction!.schedule, session.extraction!.assessments, rates);
     session.record.read = session.read;
@@ -358,6 +386,7 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
   },
   confirmOutcomes: async (ctx, { sessionId, outcomes }) => {
     const session = await sessionFor(ctx, sessionId);
+    await designPartnerEnabled(ctx);
     if (session.stage !== 'read' || !session.read || !session.extraction) fail('invalid', 'Read and confirm the syllabus before approaches.');
     if (!outcomes.length) fail('invalid', 'Confirm at least one outcome.');
     const originals = new Map(session.extraction!.outcomes.map(item => [item.text, item]));
@@ -381,6 +410,7 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
   },
   suggestDesignOutcomes: async (ctx, { sessionId }) => {
     const session = await sessionFor(ctx, sessionId);
+    await designPartnerEnabled(ctx);
     if (session.stage !== 'read' || !session.extraction) fail('invalid', 'Read the syllabus first.');
     await aiEnabled(ctx);
     const extraction = session.extraction!;
@@ -392,12 +422,14 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
       try { output = validateSuggestions(result.output); break; } catch (error) { if (attempt >= 1) throw error; }
     }
     session.suggestedOutcomes = output.suggestions;
+    await designPartnerEnabled(ctx);
     session.updatedAt = ctx.now();
     await ctx.repo.putDesignSession(session);
     return output;
   },
   retryDesignOptions: async (ctx, { sessionId }) => {
     const session = await sessionFor(ctx, sessionId);
+    await designPartnerEnabled(ctx);
     if (session.stage !== 'approaches' || session.options || !session.provisioning?.error) fail('invalid', 'There is no failed approaches draft to retry.');
     await aiEnabled(ctx);
     await startOptionsJob(ctx, session);

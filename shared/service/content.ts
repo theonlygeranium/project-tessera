@@ -46,10 +46,8 @@ async function recordDesignDecision(ctx: ServiceContext, block: Block, decision:
   const lesson = await ctx.repo.getLesson(block.lessonId);
   if (!lesson) return;
   const sessions = await ctx.repo.listDesignSessions(lesson.courseId);
-  for (const session of sessions.filter(item => item.created.blockIds.includes(block.id))) {
-    session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `${decision} block ${block.id} in lesson ${block.lessonId}.` });
-    session.updatedAt = ctx.now();
-    await ctx.repo.putDesignSession(session);
+  for (const session of sessions.filter(item => item.created.blockIds.includes(block.id) || item.stage === 'review' && Object.values(item.planIds?.lessons ?? {}).includes(block.lessonId))) {
+    await ctx.repo.appendDesignDecision(session.id, { at: ctx.now(), who: user(ctx).id, what: `${decision} block ${block.id} in lesson ${block.lessonId}.` });
   }
 }
 export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBlock' | 'revertBlock' | 'regenerateBlock' | 'publishLesson' | 'unpublishLesson'> = {

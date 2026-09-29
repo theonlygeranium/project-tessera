@@ -1,7 +1,7 @@
 import type { Service } from './context';
 import { ApiError } from '../api';
 import type { Role } from '../domain';
-import { ACCENTS, initialsFor, isEmail, isRole, normalizePolicyModes, parseUserCsv } from '../policy';
+import { ACCENTS, designPartnerPolicy, initialsFor, isEmail, isRole, normalizePolicyModes, parseUserCsv, validWorkloadRates } from '../policy';
 import { fail, required, user } from './helpers';
 
 export const admin: Pick<Service, 'updateInstitution' | 'updatePolicy' | 'getOverview' | 'listUsers' | 'createUser' | 'importUsers' | 'updateUser'> = {
@@ -19,9 +19,16 @@ export const admin: Pick<Service, 'updateInstitution' | 'updatePolicy' | 'getOve
   updatePolicy: async (ctx, input) => {
     const institution = await ctx.repo.getInstitution();
     if (input.designPartner?.allowedArchitectures?.length === 0) fail('invalid', 'Allow at least one design approach.');
-    if (input.workloadRates && Object.values(input.workloadRates).some(value => !Number.isFinite(value) || value <= 0 || value > 1000)) fail('invalid', 'Workload rates must be positive numbers.');
+    if (input.workloadRates && !validWorkloadRates(input.workloadRates)) fail('invalid', 'Workload rates must be greater than 0 and at most 1000.');
+    const wasEnabled = designPartnerPolicy(institution.policy).enabled;
     institution.policy = { aiAuthoring: input.aiAuthoring, tutorModes: normalizePolicyModes(input.tutorModes.graded, input.tutorModes.practice), workloadRates: input.workloadRates, designPartner: input.designPartner, defaultAiDisclosure: input.defaultAiDisclosure };
-    await ctx.repo.putInstitution(institution); return institution;
+    await ctx.repo.putInstitution(institution);
+    if (wasEnabled && !designPartnerPolicy(institution.policy).enabled) {
+      for (const course of await ctx.repo.listCourses()) for (const session of await ctx.repo.listDesignSessions(course.id)) {
+        if (session.provisioning?.jobId) await ctx.repo.stopDesignJob(session.id, session.provisioning.jobId, 'Design partner was disabled by your administrator. Your saved work remains available; undo is still available.');
+      }
+    }
+    return institution;
   },
   getOverview: async ctx => {
     const [users, courses, announcements] = await Promise.all([ctx.repo.listUsers(), ctx.repo.listCourses(), ctx.repo.listAnnouncements({})]);

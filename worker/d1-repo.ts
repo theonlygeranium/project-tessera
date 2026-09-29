@@ -309,6 +309,18 @@ export class D1Repo implements Repo {
   }
 
   async putDesignSession(session: DesignSession): Promise<void> { await this.designSessionStmt(session).run(); }
+  async appendDesignDecision(id: Id, decision: DesignSession['record']['decisions'][number]): Promise<boolean> {
+    const result = await this.db.prepare("UPDATE design_sessions SET data = json_set(data, '$.record.decisions', json_insert(json_extract(data, '$.record.decisions'), '$[#]', json(?)), '$.updatedAt', ?), updated_at = ? WHERE id = ?")
+      .bind(JSON.stringify(decision), decision.at, decision.at, id).run();
+    return (result.meta.changes ?? 0) === 1;
+  }
+  async stopDesignJob(sessionId: Id, jobId: Id, message: string): Promise<boolean> {
+    const results = await this.db.batch([
+      this.db.prepare("UPDATE generation_jobs SET state = 'failed', error = ? WHERE id = ? AND session_id = ? AND state = 'running'").bind(message,jobId,sessionId),
+      this.db.prepare("UPDATE design_sessions SET data = json_set(data, '$.provisioning.error', ?) WHERE id = ? AND json_extract(data, '$.provisioning.jobId') = ? AND changes() = 1").bind(message,sessionId,jobId),
+    ]);
+    return (results[0].meta.changes ?? 0) === 1 && (results[1].meta.changes ?? 0) === 1;
+  }
   async finishDesignUndo(id: Id, revision: Id, session: DesignSession): Promise<boolean> { const result = await this.db.prepare("UPDATE design_sessions SET data = ?, stage = 'approaches', updated_at = ? WHERE id = ? AND stage = 'undoing' AND json_extract(data, '$.applyRevision') = ?").bind(JSON.stringify(session),session.updatedAt,id,revision).run(); return (result.meta.changes ?? 0) === 1; }
   async revertDesignPreview(id: Id): Promise<boolean> { const result = await this.db.prepare("UPDATE design_sessions SET data = json_set(data, '$.stage', 'approaches', '$.selection', null, '$.plan', null), stage = 'approaches' WHERE id = ? AND stage = 'preview'").bind(id).run(); return (result.meta.changes ?? 0) === 1; }
   async saveDesignPoints(id: Id, values: Record<string, number>): Promise<boolean> { const result = await this.db.prepare("UPDATE design_sessions SET data = json_set(data, '$.confirmedPoints', json(?), '$.plan', null) WHERE id = ? AND stage = 'preview'").bind(JSON.stringify(values),id).run(); return (result.meta.changes ?? 0) === 1; }

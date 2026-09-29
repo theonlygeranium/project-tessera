@@ -1,7 +1,7 @@
 .page { display: grid; gap: 24px; min-width: 0; padding-bottom: var(--space-7, 40px); }
 .columns { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 24px; align-items: start; min-width: 0; }
 .stack { display: grid; gap: 16px; min-width: 0; }
-.card { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
 .card h2, .card h3, .stack h2 { margin: 0; }
 .card p { margin: 0; line-height: 1.5; }
 .intro { max-width: 75ch; line-height: 1.55; margin: 0; }
@@ -60,8 +60,9 @@
 .previewGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 350px); gap: 18px; align-items: start; }
 .previewGrid h1 { font: 500 29px/1.2 var(--font-display); margin: 0 0 8px; }
 .previewGrid aside { align-content: start; }
-.previewGrid select { min-height: 44px; padding: 8px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
-.previewTableWrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.previewGrid select { width: 100%; max-width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.previewTableWrap { min-width: 0; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.previewTableWrap:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .previewTable { width: 100%; border-collapse: collapse; min-width: 750px; background: var(--surface); }
 .previewTable caption { text-align: left; padding: 12px; font-weight: 600; }
 .previewTable th, .previewTable td { vertical-align: top; text-align: left; border-top: 1px solid var(--line); padding: 12px; }
@@ -96,7 +97,10 @@
 .reviewOutline a[aria-current='page'] { background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
 .reviewOutline li span { color: var(--ink-3); padding-left: 6px; }
 /* Five-stage layout follows the artboards while allowing the app rail and 320px reflow. */
-.page { gap: 16px; }
+.page { gap: 16px; min-width: 0; }
+.page :is(h1, h2, h3, p, li, a, strong) { overflow-wrap: anywhere; }
+.page :is(main, aside, section, header, form, ul, ol) { min-width: 0; }
+.page > *, .columns > *, .optionGrid > *, .previewGrid > *, .readSplit > * { min-width: 0; }
 .columns { grid-template-columns: minmax(0, 2.1fr) minmax(310px, 1fr); gap: 20px; }
 .uploadCard { border: 1px dashed var(--line-dashed); background: var(--surface-sunk); text-align: center; justify-items: center; padding: 26px 22px; }
 .readSplit { grid-template-columns: minmax(280px, 300px) minmax(0, 1fr); }

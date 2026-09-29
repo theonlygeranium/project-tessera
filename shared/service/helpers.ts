@@ -1,6 +1,7 @@
 import { ApiError } from '../api';
 import type { Block, BlockContent, Course, Lesson, Module, Provenance, User } from '../domain';
 import type { ServiceContext } from './context';
+import { designPartnerPolicy } from '../policy';
 
 export const fail = (code: ConstructorParameters<typeof ApiError>[0], message: string): never => { throw new ApiError(code, message); };
 export const required = (value: string, field: string): string => typeof value === 'string' && value.trim() ? value.trim() : fail('invalid', `${field} is required.`);
@@ -33,6 +34,9 @@ export const content = (b: Block): BlockContent => {
 export const provenance = (ctx: ServiceContext, model: string, task: Provenance['task'], summary: string, sources: Provenance['sources'] = []): Provenance =>
   ({ model, task, generatedAt: ctx.now(), sources, summary });
 export async function aiEnabled(ctx: ServiceContext) { if (!(await ctx.repo.getInstitution()).policy.aiAuthoring) fail('ai-disabled', 'AI authoring is disabled.'); }
+export async function designPartnerEnabled(ctx: ServiceContext) {
+  if (!designPartnerPolicy((await ctx.repo.getInstitution()).policy).enabled) fail('ai-disabled', 'Design partner is disabled by your administrator.');
+}
 export const aiFailed = (): never => fail('ai-failed', 'AI returned unusable content.');
 export async function renumberModules(ctx: ServiceContext, courseId: string, ids: string[]) {
   for (const [position, id] of ids.entries()) { const m = await moduleFor(ctx, id); if (m.courseId === courseId) await ctx.repo.putModule({ ...m, position }); }

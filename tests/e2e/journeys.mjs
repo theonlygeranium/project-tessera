@@ -901,10 +901,15 @@ await journey('Journey 19 · Design partner: syllabus to reviewed draft and sele
     await page.getByRole('button', { name: 'Undo everything this plan added' }).click();
     await page.getByRole('dialog', { name: 'Undo this plan?' }).getByRole('button', { name: 'Undo the plan' }).click();
     await page.getByRole('heading', { name: 'Three ways to structure this course' }).waitFor();
-    await page.getByRole('link', { name: 'Course', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Course workspace' }).click();
+    // Wait for the outline to load, then for it to settle on the original modules plus the kept one.
+    await page.getByRole('heading', { name: 'Asking statistical questions' }).waitFor();
     const outline = page.getByRole('heading', { name: 'Outline', exact: true }).locator('..');
-    const count = await outline.locator(':scope > div').count();
+    let count = 0;
+    for (let tries = 0; tries < 40; tries++) { count = await outline.locator(':scope > div').count(); if (count === 3) break; await page.waitForTimeout(250); }
     if (count !== 3) throw new Error(`Expected 2 original modules and the kept module after undo; found ${count}.`);
+    await outline.getByRole('link', { name: 'Start here', exact: true }).waitFor();
+    if (await page.getByRole('heading', { name: 'Built from your syllabus · review progress' }).count()) throw new Error('The review-progress card should go away after undo.');
     await outline.getByRole('link', { name: 'Start here', exact: true }).click();
     await page.getByRole('heading', { name: 'Publish readiness' }).waitFor();
     await waitForIncludes(readinessSection(page), '1 of');

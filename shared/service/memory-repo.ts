@@ -195,6 +195,16 @@ export class MemoryRepo implements Repo {
     if (!s || s.stage !== 'provisioning' || s.applyRevision || s.provisioning?.jobId !== jobId || !job || job.state !== 'running') return false;
     s.legacyApply = true; s.provisioning.error = message; job.state = 'failed'; job.error = message; return true;
   }
+  async stopDesignJob(id: string, jobId: string, message: string) {
+    const s = this.data.designSessions!.find(x => x.id === id), job = this.data.generationJobs.find(j => j.id === jobId);
+    if (!s || s.provisioning?.jobId !== jobId || !job || job.state !== 'running') return false;
+    s.provisioning.error = message; job.state = 'failed'; job.error = message; return true;
+  }
+  async appendDesignDecision(id: string, decision: DesignSession['record']['decisions'][number]) {
+    const s = this.data.designSessions!.find(x => x.id === id);
+    if (!s) return false;
+    s.record.decisions.push(copy(decision)); s.updatedAt = decision.at; return true;
+  }
   async startDesignJob(id: string, revision: string, job: GenerationJob) { if (!this.activeDesign(id,revision) || this.data.generationJobs.some(j => j.id === job.id)) return false; this.upsert(this.data.generationJobs,job); return true; }
   async setDesignRunner(id: string, revision: string, jobId: string, runner: 'poll' | 'workflow') { const s = this.activeDesign(id,revision), j = this.data.generationJobs.find(x => x.id === jobId); if (!s || s.provisioning?.jobId !== jobId || !j || j.state !== 'running') return false; j.runner = runner; return true; }
   async setDesignApplyError(id: string, revision: string, message: string) { const s = this.activeDesign(id,revision); if (!s?.provisioning) return false; s.provisioning.error = message; return true; }
