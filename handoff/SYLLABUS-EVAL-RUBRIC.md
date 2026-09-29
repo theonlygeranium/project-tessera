@@ -50,6 +50,7 @@ A syllabus **passes extraction** when E1–E3, E5–E7, E9 and E10 pass and E4, 
 | P4 | Apply creates exactly what the preview listed (hash matches); readiness forecast equals the checks after apply | yes |
 | P5 | Undo removes everything the plan added, nothing else | yes |
 | P6 | Starter content has `[Your …]` slots; nothing is published | yes |
+| P7 | Graded work lands where the syllabus puts it: recurring components (labs, quizzes, weekly checkpoints) split into their occurrences, dated work in its week, and no more than half the graded points in the last module | yes |
 
 ## Recording results
 

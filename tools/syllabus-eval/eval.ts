@@ -207,6 +207,15 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
       const readingsCited = plan.readings.every(r => r.span && r.span.text);
       checks.push({ id: 'P3', pass: plan.outcomes.length === (session.confirmedOutcomes ?? []).length && placed.length === components.length && readingsCited,
         detail: `${plan.modules.length} modules, ${plan.counts.lessons} lessons, ${plan.counts.assignments} assignments; outcomes ${plan.outcomes.length}/${(session.confirmedOutcomes ?? []).length}; graded components placed ${placed.length}/${components.length}; readings ${plan.readings.length} (all cited: ${readingsCited}); placeholders ${plan.placeholders}` });
+      // P7: graded work lands where the syllabus puts it, not all in the last module.
+      const graded = plan.modules.map(m => ({ m, items: [...((m as { assignments?: { replaces: string | null; points: number }[] }).assignments ?? []), ...(m.assignment ? [m.assignment] : [])].filter(a => a.replaces) }));
+      const totalPoints = graded.reduce((n, g) => n + g.items.reduce((k, a) => k + a.points, 0), 0);
+      const content = graded.filter(g => !/^(start here|wrap-up)$/i.test(g.m.title));
+      const lastShare = totalPoints ? (content.at(-1)?.items.reduce((k, a) => k + a.points, 0) ?? 0) / totalPoints : 0;
+      const recurring = components.filter(a => /\(\d+\)|weekly|each week|labs?\b|checkpoints|discussions|quizzes|homework/i.test(a.title));
+      const split = recurring.filter(a => graded.flatMap(g => g.items).filter(i => i.replaces === a.title).length >= 2);
+      checks.push({ id: 'P7', pass: lastShare <= 0.5 && split.length === recurring.length,
+        detail: `last content module holds ${Math.round(lastShare * 100)}% of graded points; recurring components split ${split.length}/${recurring.length}; graded assignments ${graded.flatMap(g => g.items).length}` });
       session = await service.applyProvisionPlan(ctx, { sessionId: session.id, hash: plan.hash });
       // A failed lesson is recorded and the job goes on: poll until provisioning ends.
       while (Date.now() - t2 < 1_800_000 && session.stage === 'provisioning') session = await service.getDesignSession(ctx, { sessionId: session.id });
@@ -257,7 +266,7 @@ async function main() {
   const done: RunResult[] = [];
   await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, async () => { for (let task = tasks.shift(); task; task = tasks.shift()) done.push(await task()); }));
   const results = done.sort((a, b) => a.file.localeCompare(b.file) || a.run - b.run);
-  const ids = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'R1', 'R2', 'R3', 'R4', 'R6', ...(stages >= 3 ? ['P1', 'P2'] : []), ...(stages >= 4 ? ['P3', 'P4', 'P5', 'P6'] : [])];
+  const ids = ['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'R1', 'R2', 'R3', 'R4', 'R6', ...(stages >= 3 ? ['P1', 'P2'] : []), ...(stages >= 4 ? ['P3', 'P4', 'P5', 'P6', 'P7'] : [])];
   console.log(`\n${'syllabus'.padEnd(34)} run ${ids.map(i => i.padEnd(4)).join('')} pass`);
   let passed = 0;
   for (const r of results) {
