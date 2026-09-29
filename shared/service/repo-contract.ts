@@ -7,6 +7,67 @@ import type { StoredReadinessItem } from '../repo';
 /** Shared behavioral contract for MemoryRepo and the Worker's D1Repo. */
 export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>) {
   describe(name, () => {
+    it('lists the same seed files after reset', async () => {
+      const repo = await makeRepo();
+      expect(await repo.listFiles('c-stat110')).toEqual(seedData().files.filter(file => file.courseId === 'c-stat110'));
+      await repo.reset(seedData());
+      expect(await repo.listFiles('c-stat110')).toEqual(seedData().files.filter(file => file.courseId === 'c-stat110'));
+    });
+    it('rejects an options claim with a duplicate job id without changing the session', async () => {
+      const repo = await makeRepo();
+      const at = '2026-09-28T12:00:00Z';
+      const session = { id: 'ds-duplicate-options', courseId: 'c-stat110', mode: 'syllabus', stage: 'read', createdBy: 'u-okafor', createdAt: at, updatedAt: at,
+        source: { kind: 'syllabus', fileId: null, version: null, name: 'Fictional', sections: [], chars: 0, ocr: false }, consent: { syllabusOnly: true, at, rememberProfile: false },
+        extraction: null, read: null, questions: [], confirmedOutcomes: null, teachingNote: '', options: null, selection: null, plan: null, provisioning: { jobId: 'previous', done: 1, total: 1, error: null },
+        created: { outcomeIds: [], moduleIds: [], lessonIds: [], blockIds: [], assignmentIds: [], linkKeys: [] },
+        record: { sessionId: 'ds-duplicate-options', source: { name: 'Fictional', kind: 'syllabus', chars: 0 }, extraction: null, read: null, questions: [], confirmedOutcomes: [], optionsShown: [], selection: null, plan: null, appliedAt: null, undoneAt: null, decisions: [] },
+      } as DesignSession;
+      const job = { id: 'duplicate', courseId: session.courseId, requestedBy: session.createdBy, kind: 'extract', sessionId: session.id, state: 'running', done: 0, total: 1, lessonIds: [], error: null, work: [], instruction: 'options', failures: [], createdAt: at, updatedAt: at } as Parameters<Repo['putGenerationJob']>[0];
+      await repo.putDesignSession(session); await repo.putGenerationJob(job);
+      const before = await repo.getDesignSession(session.id);
+      expect(await repo.claimDesignOptions({ ...session, stage: 'approaches', provisioning: { ...session.provisioning!, jobId: job.id } }, job, 'read', 'previous')).toBe(false);
+      expect(await repo.getDesignSession(session.id)).toEqual(before);
+      expect(await repo.saveDesignOptions(session.id, 'previous', { ...session, stage: 'approaches' })).toBe(false);
+    });
+    it('orders equal-position outcomes and the course mirror by id', async () => {
+      const repo = await makeRepo();
+      const course = (await repo.getCourse('c-stat110'))!;
+      const rows = [{ id: 'o-z', courseId: course.id, code: 'O2', text: 'Second', position: 0, aiState: 'draft' as const }, { id: 'o-a', courseId: course.id, code: 'O1', text: 'First', position: 0, aiState: 'draft' as const }];
+      await repo.replaceOutcomes(course.id, rows);
+      expect((await repo.listOutcomes(course.id)).map(row => row.id)).toEqual(['o-a', 'o-z']);
+      expect(await repo.keepOutcome(course.id, 'o-z', 'Second', 'Fictional reviewer', '2026-09-28T12:00:00.000Z')).toBe(true);
+      expect(await repo.keepOutcome(course.id, 'o-a', 'First', 'Fictional reviewer', '2026-09-28T12:00:00.000Z')).toBe(true);
+      expect((await repo.getCourse(course.id))?.outcomes).toEqual(['First', 'Second']);
+    });
+    it('conditionally replaces outcomes only when the saved snapshot is current', async () => {
+      const repo = await makeRepo(), courseId = 'c-stat110';
+      const original = await repo.listOutcomes(courseId);
+      const changed = original.map((item, index) => index ? item : { ...item, text: 'Fictional revision' });
+      expect(await repo.replaceOutcomesIfUnchanged(courseId, original, changed)).toBe(true);
+      expect((await repo.listOutcomes(courseId))[0].text).toBe('Fictional revision');
+      expect((await repo.getCourse(courseId))!.outcomes[0]).toBe('Fictional revision');
+      expect(await repo.replaceOutcomesIfUnchanged(courseId, original, original)).toBe(false);
+      expect(await repo.listOutcomes(courseId)).toEqual(changed);
+    });
+    it('allows exactly one of two concurrent outcome replacements from one snapshot', async () => {
+      const repo = await makeRepo(), courseId = 'c-stat110';
+      const original = await repo.listOutcomes(courseId);
+      const first = original.map((item, index) => index ? item : { ...item, text: 'First fictional revision' });
+      const second = original.map((item, index) => index ? item : { ...item, text: 'Second fictional revision' });
+      const result = await Promise.all([repo.replaceOutcomesIfUnchanged(courseId, original, first), repo.replaceOutcomesIfUnchanged(courseId, original, second)]);
+      expect(result.filter(Boolean)).toHaveLength(1);
+      expect(await repo.listOutcomes(courseId)).toEqual(result[0] ? first : second);
+    });
+    it('compares course details in the write while preserving the outcomes mirror', async () => {
+      const repo = await makeRepo(), original = (await repo.getCourse('c-stat110'))!;
+      const [first, second] = await Promise.all([
+        repo.updateCourseDetails({ ...original, title: 'First fictional title', outcomes: ['Stale mirror'] }, original),
+        repo.updateCourseDetails({ ...original, title: 'Second fictional title', outcomes: ['Stale mirror'] }, original),
+      ]);
+      expect([first, second].filter(Boolean)).toHaveLength(1);
+      expect((await repo.getCourse(original.id))?.title).toBe(first ? 'First fictional title' : 'Second fictional title');
+      expect((await repo.getCourse(original.id))?.outcomes).toEqual(original.outcomes);
+    });
     it('appends concurrent design decisions without losing either entry', async () => {
       const repo = await makeRepo();
       const at = '2026-09-28T12:00:00Z';
@@ -42,7 +103,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect(await repo.putDesignModule(session.id, 'rev-1', 'module-key', module)).toBe(true);
       const lesson = { id: 'l-cas', courseId: 'c-stat110', moduleId: module.id, title: 'Draft lesson', objective: 'Learn', minutes: 30, position: 0, status: 'draft' as const, publishedAt: null, templateKey: null };
       expect(await repo.putDesignLesson(session.id, 'rev-1', 'lesson-key', lesson)).toBe(true);
-      const outcome = { id: 'o-cas', courseId: 'c-stat110', code: 'O99', text: 'A new outcome', position: 99 };
+      const outcome = { id: 'o-cas', courseId: 'c-stat110', code: 'O99', text: 'A new outcome', position: 99, aiState: 'draft' as const };
       expect(await repo.appendDesignOutcome(session.id, 'rev-1', outcome)).toBe(true);
       expect((await repo.getDesignSession(session.id))?.planIds?.lessons['lesson-key']).toBe(lesson.id);
       expect((await repo.listOutcomes('c-stat110')).some(o => o.id === outcome.id)).toBe(true);
@@ -203,7 +264,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-priya']);
       await repo.addEnrollment('c-stat110', 'u-dana'); await repo.addEnrollment('c-stat110', 'u-dana');
       expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-dana', 'u-priya']);
-      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.adaptations = []; empty.builderSessions = []; empty.generationJobs = []; empty.requirements = []; empty.completionEvents = []; empty.testOuts = []; empty.reportingLines = [];
+      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.adaptations = []; empty.builderSessions = []; empty.generationJobs = []; empty.files = []; empty.requirements = []; empty.completionEvents = []; empty.testOuts = []; empty.reportingLines = [];
       await repo.reset(empty); expect(await repo.isEmpty()).toBe(true);
       await repo.reset(seedData()); expect(await repo.isEmpty()).toBe(false); expect(await repo.getUser('u-priya')).not.toBeNull();
       expect(await repo.getAssignment('asg-stat-1')).not.toBeNull();

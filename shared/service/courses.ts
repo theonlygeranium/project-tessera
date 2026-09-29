@@ -3,7 +3,7 @@ import type { Service, ServiceContext } from './context';
 import { canReachCourse, canTeach, course, fail, lessonFor, minutes, moduleFor, move, renumberLessons, renumberModules, required, user } from './helpers';
 import { learnerCourse } from './learner';
 import { applyTemplatePlan, effectiveTemplate } from './templates';
-import { saveCourseOutcomes } from './outcomes';
+import { prepareCourseOutcomes } from './outcomes';
 
 export async function summary(ctx: ServiceContext, c: Course, asLearner = false): Promise<CourseSummary> {
   const [modules, lessons, enrollments] = await Promise.all([ctx.repo.listModules(c.id), ctx.repo.listLessons({ courseId: c.id }), ctx.repo.listEnrollments({ courseId: c.id })]);
@@ -53,15 +53,32 @@ export const courses: Pick<Service, 'listCourses' | 'createCourse' | 'getCourseO
   updateCourse: async (ctx, input) => {
     const c = await canReachCourse(ctx, input.courseId);
     if (user(ctx).role === 'student') fail('forbidden', 'Cannot edit this course.');
+    const expected = { ...c };
     for (const key of ['code', 'title', 'term'] as const) if (input[key] !== undefined) c[key] = required(input[key], key);
     if (input.description !== undefined) c.description = input.description.trim();
     if (input.welcome !== undefined) c.welcome = input.welcome.trim();
     if (input.outcomes !== undefined && (input.outcomes.length > 30 || input.outcomes.some(x => typeof x !== 'string' || !x.trim() || x.trim().length > 500))) fail('invalid', 'Outcomes must have 1–500 characters, at most 30.');
-    await ctx.repo.putCourse(c);
+    let mappedOutcomes: { id?: string; text: string }[] | undefined;
+    let oldOutcomes: Awaited<ReturnType<typeof ctx.repo.listOutcomes>> | undefined;
     if (input.outcomes !== undefined) {
       const old = await ctx.repo.listOutcomes(c.id);
-      await saveCourseOutcomes(ctx, c.id, input.outcomes.map((text, position) => ({ id: old[position]?.id, text })));
+      oldOutcomes = old;
+      mappedOutcomes = input.outcomes.map((text, position) => ({ id: old[position]?.id, text }));
+      if (ctx.token || ctx.agent) {
+        const used = new Set<string>();
+        mappedOutcomes = input.outcomes.map((text, position) => {
+          const exact = old.find(item => !used.has(item.id) && item.text === text.trim());
+          const draft = old[position]?.aiState === 'draft' && !used.has(old[position].id) ? old[position] : undefined;
+          const match = exact ?? draft;
+          if (match) used.add(match.id);
+          return { id: match?.id, text };
+        });
+      }
     }
+    if (mappedOutcomes !== undefined) {
+      const rows = prepareCourseOutcomes(ctx, c.id, mappedOutcomes, oldOutcomes!);
+      if (!await ctx.repo.updateCourseAndOutcomesIfUnchanged(c, expected, oldOutcomes!, rows)) fail('conflict', 'Course details or outcomes changed while you were editing. Reload and try again.');
+    } else if (!await ctx.repo.updateCourseDetails(c, expected)) fail('conflict', 'Course details changed while you were editing. Reload and try again.');
     return (await ctx.repo.getCourse(c.id))!;
   },
   setCourseInstructors: async (ctx, input) => {

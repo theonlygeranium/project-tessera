@@ -25,7 +25,7 @@ const planAssignments = (module: ProvisionPlan['modules'][number]) => module.ass
 const plannedLinks = (session: DesignSession, kind: 'block' | 'assignment', id: string) => session.created.linkKeys.filter(key => key.startsWith(`${kind}:${id}:`)).map(key => key.slice(`${kind}:${id}:`.length));
 function sourceForLesson(session: DesignSession, module: ProvisionPlan['modules'][number], lesson: ProvisionPlan['modules'][number]['lessons'][number]): SourceSpan[] {
   const schedule = session.extraction?.schedule ?? [];
-  const spans = schedule.filter(row => row.span && lesson.week !== null && coveredWeeks(row).includes(lesson.week)).map(row => row.span!);
+  const spans = schedule.filter(row => row.span && (lesson.weeks ?? (lesson.week === null ? [] : [lesson.week])).some(week => coveredWeeks(row).includes(week))).map(row => row.span!);
   return [...spans, ...(lesson.skeleton === 'start-here' ? session.extraction!.profile.instructor.spans : []), ...session.extraction!.outcomes.filter(o => o.span && module.outcomeCodes.some(code => session.plan!.outcomes.find(p => p.code === code)?.text === o.text)).map(o => o.span!)].filter((span, i, all) => all.findIndex(s => s.page === span.page && s.text === span.text) === i);
 }
 export function scaffoldBlocks(raw: unknown, objective: string, source: DesignSession['source'], spans: SourceSpan[] = [], skeleton: ProvisionPlan['modules'][number]['lessons'][number]['skeleton'] = 'gagne'): BlockContent[] {
@@ -117,7 +117,7 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
       ];
     } else {
       const input = { courseTitle: (await ctx.repo.getCourse(session.courseId))?.title ?? '', module: planModule, lesson: planLesson, skeleton: planLesson.skeleton, outcomes: session.plan.outcomes.filter(o => planModule.outcomeCodes.includes(o.code)), spans, teachingNote: session.teachingNote, instructorProfile: await ctx.repo.getInstructorProfile(session.createdBy), priorLessonTitles: planModule.lessons.filter(l => l.key !== planLesson.key).map(l => l.title) };
-      const readingSpans = session.plan.readings.filter(reading => reading.moduleKey === planModule.key && reading.week === planLesson.week).map(reading => reading.span);
+      const readingSpans = session.plan.readings.filter(reading => reading.moduleKey === planModule.key && (planLesson.weeks ?? [planLesson.week]).includes(reading.week ?? null)).map(reading => reading.span);
       for (let attempt = 0; attempt < 2; attempt++) {
         const result = await ctx.ai.run('module-scaffold', input);
         try { drafted = scaffoldBlocks(result.output, planLesson.objective, session.source, readingSpans, planLesson.skeleton); model = result.model; break; }
@@ -128,9 +128,9 @@ export async function advanceScaffoldJob(ctx: ServiceContext, job: GenerationJob
           fallbackNote = 'The AI draft did not validate after two attempts; a rule-based starter was used.';
         } }
       }
-      const reading = session.plan.readings.find(r => r.moduleKey === planModule.key && r.week === planLesson.week);
+      const readings = session.plan.readings.filter(r => r.moduleKey === planModule.key && (planLesson.weeks ?? [planLesson.week]).includes(r.week ?? null));
       const callout = drafted.find(b => b.type === 'callout');
-      if (callout?.type === 'callout') callout.text += `\n${reading ? `Reading from your syllabus: ${reading.title}` : '[Reading to select]'}`;
+      if (callout?.type === 'callout') callout.text += `\n${readings.length ? `Readings from your syllabus: ${[...new Set(readings.map(reading => reading.title))].join('; ')}` : '[Reading to select]'}`;
       if (callout?.type === 'callout' && planLesson.patternNote) callout.text += `\n${planLesson.patternNote}`;
       const slots: BlockContent[] = [
         ...(planLesson.announcementSlot ? [{ type: 'callout' as const, tone: 'info' as const, title: 'Weekly announcement draft slot', text: '[Your update for this week]' }] : []),
@@ -233,7 +233,12 @@ export const designPlan: Pick<Service, 'previewProvisionPlan' | 'confirmDesignPo
         const id = ctx.newId('o');
         outcomeIds.set(item.code, id);
       }
-      const allocated = await ctx.repo.appendDesignOutcomes(session.id, revision, plan.outcomes.map((item, index) => ({ id: outcomeIds.get(item.code)!, courseId: session.courseId, code: item.code, text: item.text, position: oldOutcomes.length + index })));
+      const outcomeAuthor = (index: number) => {
+        const submitted = session.confirmedOutcomes?.[index]?.submittedBy;
+        const agent = ctx.agent?.name ?? ctx.token?.name ?? ctx.token?.id ?? (submitted?.kind === 'agent' || submitted?.kind === 'token' ? submitted.name : null);
+        return agent ? `Assistant (${agent})` : 'Design partner';
+      };
+      const allocated = await ctx.repo.appendDesignOutcomes(session.id, revision, plan.outcomes.map((item, index) => ({ id: outcomeIds.get(item.code)!, courseId: session.courseId, code: item.code, text: item.text, position: oldOutcomes.length + index, aiState: 'draft', provenance: provenance(ctx, outcomeAuthor(index), 'outcome-suggest', `Draft outcome from ${session.source.name}`, [{ id: session.source.fileId ?? session.id, name: session.source.name }]) })));
       if (!allocated) {
         const message = `This plan needs ${plan.outcomes.length} outcome slots, but the course no longer has room for all of them. Review the plan again.`;
         if (await ctx.repo.resetDesignCapacityFailure(session.id, revision, message)) fail('conflict', message);

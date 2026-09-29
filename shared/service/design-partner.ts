@@ -8,17 +8,129 @@ import { aiEnabled, canTeach, designPartnerEnabled, fail, provenance, required, 
 import { validateExtraction, validateRead, validateObjectiveRewrite, repairRead } from './validate-design';
 import { analyzeSyllabusFixture } from '../design/read-fixture';
 import { estimateWorkload } from '../design/workload';
+import { effectiveProfile, parseProfileCorrection } from '../design/effective-profile';
 import { problemsFrom, questionsFrom } from './design-rules';
 import { groundSpans } from './ground-spans';
 import { normalizeExtraction } from './normalize-extraction';
 import { WORKFLOW_STALL_MS } from './generation';
 import { selectCandidates } from '../design/candidates';
 import { combinationNote, finalizeOptions, validateSuggestions } from '../design/options';
-import { advanceScaffoldJob, designPlan } from './design-plan';
+import { advanceScaffoldJob } from './design-plan';
+import { safeAiLog } from './log';
 
 type Problem = SyllabusExtraction['problems'][number];
 const MAX_CHARS = 60_000;
 const SAMPLE = seed as DesignSource;
+// Generic table-column vocabulary, not assessment titles, marks a boundary after roster rows.
+const TABLE_VOCABULARY = /\b(?:points|score|weight|date|week|topic|title|due|assignment|percent|total|description)\b/i;
+const NAME_PART = String.raw`\p{Lu}\p{L}*(?:[-'’]\p{Lu}?\p{L}+)*`;
+const PERSON = new RegExp(String.raw`(?:${NAME_PART}|\p{Lu}\.)[\s,]+(?:\p{Lu}\.[\s,]+)?${NAME_PART}(?:[\s,]+${NAME_PART})?`, 'u');
+const STUDENT_ID = /\b\d{6,}\b|\b[A-Za-z]+\d{5,}\b|\b(?:student\s*)?id\s*[:#-]?\s*[A-Za-z0-9]+\b/i;
+const EMAIL = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/i;
+const STUDENT_EMAIL = /[\w.+-]+@(?:[\w.-]*student[\w.-]*|students?\.)[\w.-]*\.[A-Za-z]{2,}/i;
+const ROSTER_LABEL = /^\s*(?:(?:student|class|course)\s+roster|enrollment\s+list)\s*[\p{P}]?\s*$/iu;
+const FACULTY_PREFIX = /^\s*(?:instructor|faculty|professor|office)(?:\s+contact)?\s*:/i;
+const FACULTY_CONTACT = new RegExp(String.raw`^\s*(?:(?:Dr|Prof)\.?\s+)?${NAME_PART}\s+${NAME_PART}`, 'u');
+const ASSESSMENT_TITLE = /^(?:practice assignment|final exam|midterm exam|research paper|research project|reading response|studio practice|lab report|weekly quizzes|course total|participation|essay|assignment|quiz|exam|project)$/i;
+const ASSESSMENT_WORD = /\b(?:assignment|exercise|exam|quiz|project|essay|paper|practice|participation|lab|homework|response|activity|assessment|test|presentation|discussion)\b/i;
+const LOWER_PERSON = /\p{L}{2,}(?:[-'’]\p{L}+)*[\s,]+\p{L}{2,}(?:[-'’]\p{L}+)*(?:[\s,]+\p{L}{2,})?/u;
+
+function assessmentTitleHasIdentity(title: string): boolean {
+  if (EMAIL.test(title) || STUDENT_ID.test(title)) return true;
+  // Assessment labels such as "Homework Assignment" are themselves two capitalized words.
+  const remainder = title.replace(/^(?:(?:homework|practice|weekly|final|midterm|research|reading|studio|lab|course)\s+)?(?:assignment|exercise|exam|quiz(?:zes)?|project|essay|paper|practice|participation|report|response|activity|assessment|test|presentation|discussion|total)\b/i, '');
+  return (PERSON.test(remainder) || LOWER_PERSON.test(remainder));
+}
+
+function cells(line: string, delimiter: string): string[] {
+  if (delimiter !== ',') return line.split(delimiter).map(cell => cell.trim());
+  const row: string[] = []; let cell = '', quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '"') { if (quoted && line[i + 1] === '"') { cell += '"'; i++; } else quoted = !quoted; }
+    else if (line[i] === ',' && !quoted) { row.push(cell.trim()); cell = ''; }
+    else cell += line[i];
+  }
+  row.push(cell.trim()); return row;
+}
+function tableHeader(line: string): { delimiter: string; columns: number; nameColumns: number[]; idColumns: number[] } | null {
+  for (const delimiter of ['|', '\t', ',']) {
+    if (!line.includes(delimiter)) continue;
+    const row = cells(line, delimiter).map(cell => cell.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim());
+    const nameColumns = row.flatMap((cell, index) => /^(?:name|student name|learner|full name|first name|last name|student)$/.test(cell) ? [index] : []);
+    const idColumns = row.flatMap((cell, index) => /^(?:id|student id|sid|student number|email|e mail|username|user name)$/.test(cell) ? [index] : []);
+    if (nameColumns.length && idColumns.length) return { delimiter, columns: row.length, nameColumns, idColumns };
+  }
+  return null;
+}
+
+function assessmentHeaderCells(line: string): string[] | null {
+  for (const delimiter of ['|', '\t', ',']) {
+    if (!line.includes(delimiter)) continue;
+    const row = cells(line, delimiter).map(cell => cell.toLowerCase().replace(/\s+/g, ' ').trim());
+    if (row.length >= 2 && /^(?:assignment(?: name)?|assessment(?: name)?|activity|task|title)$/.test(row[0]) && /^(?:points?|score|weight|percent|total)$/.test(row[1])) return row;
+  }
+  return null;
+}
+
+function assessmentHeader(line: string): boolean {
+  return assessmentHeaderCells(line)?.slice(2).every(cell => !cell) ?? false;
+}
+
+function numericAssessmentRow(line: string, inAssessmentTable: boolean): boolean {
+  for (const delimiter of ['|', '\t', ',']) {
+    if (!line.includes(delimiter)) continue;
+    const row = cells(line, delimiter);
+    const assessmentTitle = ASSESSMENT_TITLE.test(row[0]) || inAssessmentTable && ASSESSMENT_WORD.test(row[0]);
+    if (row.length < 2 || !assessmentTitle || assessmentTitleHasIdentity(row[0])) continue;
+    if (row.slice(1).every(cell => /^\d+(?:\.\d+)?\s*(?:points?|pts?|%|\/\s*\d+)?$/i.test(cell))) return true;
+  }
+  return false;
+}
+
+function possibleIdentityRow(line: string, inAssessmentTable = false): boolean {
+  if (FACULTY_PREFIX.test(line)) {
+    const extra = line.split(/[|\t;,]/).slice(1).join(' ');
+    const facultyContact = FACULTY_CONTACT.exec(line.slice(line.indexOf(':') + 1));
+    const afterFaculty = facultyContact ? line.slice(line.indexOf(':') + 1 + facultyContact[0].length) : extra;
+    const identifierAt = [EMAIL.exec(afterFaculty)?.index, STUDENT_ID.exec(afterFaculty)?.index].filter((index): index is number => index !== undefined).sort((a, b) => a - b)[0];
+    const beforeIdentifier = identifierAt === undefined ? '' : afterFaculty.slice(0, identifierAt);
+    const labelled = /\b(?:student|learner|enrollee)\s*:\s*(.*)/i.exec(line.slice(line.indexOf(':') + 1))?.[1] ?? '';
+    return ((EMAIL.test(extra) || STUDENT_ID.test(extra)) && (PERSON.test(extra) || LOWER_PERSON.test(extra)))
+      || (identifierAt !== undefined && (PERSON.test(beforeIdentifier) || LOWER_PERSON.test(beforeIdentifier)))
+      || Boolean(labelled && (PERSON.test(labelled) || LOWER_PERSON.test(labelled) || EMAIL.test(labelled) || STUDENT_ID.test(labelled)));
+  }
+  if (numericAssessmentRow(line, inAssessmentTable)) return false;
+  // Bound regex work on a long OCR line while still examining its full length.
+  for (let offset = 0; offset < line.length; offset += 900) {
+    const part = line.slice(offset, offset + 1000);
+    const identifier = STUDENT_ID.test(part) || EMAIL.test(part);
+    const bareNumberRow = /[|\t,]\s*\d+\s*(?:[|\t,]|$)/.test(part);
+    if (!identifier && !bareNumberRow) continue;
+    const sameCellName = PERSON.test(part) || LOWER_PERSON.test(part);
+    const splitName = ['|', '\t', ','].some(delimiter => {
+      if (!part.includes(delimiter)) return false;
+      const row = cells(part, delimiter);
+      return row.length >= 3 && row.slice(0, 2).every(cell => /^\p{L}{2,}(?:[-'’]\p{L}+)*$/u.test(cell)) && (STUDENT_ID.test(row.slice(2).join(' ')) || EMAIL.test(row.slice(2).join(' ')));
+    });
+    if (sameCellName || splitName) return true;
+  }
+  return false;
+}
+
+// This is a pause for instructor review, not another redaction rule.
+function hasPossibleRoster(source: DesignSource): boolean {
+  let inAssessmentTable = false;
+  for (const section of source.sections) {
+    for (const line of [section.heading, ...(section.lines ?? section.text.split(/\r?\n/))]) {
+      if (!line.trim()) { inAssessmentTable = false; continue; }
+      if (tableHeader(line) || ROSTER_LABEL.test(line)) return true;
+      if (assessmentHeader(line)) { inAssessmentTable = true; continue; }
+      if (possibleIdentityRow(line, inAssessmentTable)) return true;
+      if (inAssessmentTable && !numericAssessmentRow(line, true)) inAssessmentTable = false;
+    }
+  }
+  return false;
+}
 
 /**
  * Headings set in small caps often come out of a PDF as "C ATALOG D ESCRIPTION". In a short
@@ -51,32 +163,62 @@ function cleanSource(source: DesignSource): { source: DesignSource; problems: Pr
     }
   });
   const running = new Set([...repeated].filter(([, seen]) => seen.size >= Math.ceil(pages.size / 2)).map(([key]) => key));
-  const flattened = source.sections.flatMap((section, sectionIndex) => (section.lines ?? section.text.split('\n')).map(joinSmallCaps)
-    .filter(line => !running.has(line.trim().toLocaleLowerCase().replace(/\d/g, '#').replace(/\s+/g, ' ')))
-    .map(line => ({ line, sectionIndex })));
-  // A roster is a table headed by student names or IDs whose rows hold a name and an ID or
-  // email. Ordinary tables mention students too ("student choice from a set"), so both are required.
-  const rosterHeader = (line: string) => /\bstudent\b[\s|]{0,4}(?:name|id|number|e-?mail)\b|\bname\b[^|]{0,20}\|\s*(?:student\s*)?id\b/i.test(line);
-  const rosterRow = (line: string) => /^(?:\d{3,}\s*\|?\s*)?[A-Z][a-z]+,?\s+[A-Z][a-z]+/.test(line.trim()) && (/\b\d{3,}\b/.test(line) || /@/.test(line))
-    || /^(?:\d{3,}\s+)?[A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+\d{3,})?$/.test(line.trim());
+  const flattened = source.sections.flatMap((section, sectionIndex) => [
+    ...(section.heading ? [{ line: section.heading, sectionIndex, heading: true }] : []),
+    ...(section.lines ?? section.text.split('\n')).map(joinSmallCaps)
+      .filter(line => !running.has(line.trim().toLocaleLowerCase().replace(/\d/g, '#').replace(/\s+/g, ' ')))
+      .map(line => ({ line, sectionIndex, heading: false })),
+  ]);
+  // Best-effort pre-model redaction: names without IDs and unusual layouts can remain.
+  const person = PERSON, studentId = STUDENT_ID, email = EMAIL, studentEmail = STUDENT_EMAIL;
+  const standaloneRow = (line: string) => {
+    if (line.length > 1000 || !(studentId.test(line) || email.test(line))) return false;
+    const match = person.exec(line);
+    if (!match) return false;
+    // Ordinary faculty contact addresses beside a name are not student roster rows.
+    if (email.test(line) && !studentEmail.test(line) && !studentId.test(line)) return false;
+    // A two-word pipe row with an unlabelled number can also be an assessment title.
+    if (/^\s*[^|]+\|\s*\d+\s*$/.test(line) && match[0].trim().split(/\s+/).length === 2 && !/[.'’\-]/u.test(match[0])) return false;
+    return true;
+  };
   const kept = source.sections.map(() => [] as string[]);
-  let roster = false;
+  const headings = source.sections.map(() => '');
+  let table: ReturnType<typeof tableHeader> = null;
+  let headingIdentityBlock = false;
   for (let index = 0; index < flattened.length; index++) {
-    const { line, sectionIndex } = flattened[index];
-    const candidates = flattened.slice(index + 1, index + 5).map(entry => entry.line);
-    if (rosterHeader(line) && candidates.filter(rosterRow).length >= 3) { roster = true; stripped++; continue; }
-    if (roster && rosterRow(line)) { stripped++; continue; }
-    roster = false;
+    const { line, sectionIndex, heading } = flattened[index];
+    const header = tableHeader(line);
+    if (header) { table = header; headingIdentityBlock = false; stripped++; continue; }
+    if (heading) {
+      if (possibleIdentityRow(line)) { headingIdentityBlock = true; stripped++; continue; }
+      // A new, ordinary section heading ends a roster table without losing the heading.
+      table = null;
+      headingIdentityBlock = false;
+    }
+    if (!heading && headingIdentityBlock) {
+      if (possibleIdentityRow(line)) { stripped++; continue; }
+      headingIdentityBlock = false;
+    }
+    if (table && line.trim()) {
+      const row = cells(line, table.delimiter);
+      const nameShaped = row.length === table.columns && (row.slice(0, 2).some(cell => !TABLE_VOCABULARY.test(cell.trim().split(/\s+/, 1)[0] ?? '') && person.test(cell)) || table.nameColumns.length > 1 && row.slice(0, 2).every(cell => /^\p{Lu}[\p{L}'’.-]*$/u.test(cell)));
+      if (!(TABLE_VOCABULARY.test(line) && !email.test(line) && !studentId.test(line) && !nameShaped)) { stripped++; continue; }
+    }
+    table = null;
+    if (!heading && (((FACULTY_PREFIX.test(line) || assessmentHeaderCells(line)?.slice(2).some(Boolean)) && possibleIdentityRow(line))
+      || (!numericAssessmentRow(line, true) && ASSESSMENT_WORD.test(line) && possibleIdentityRow(line))
+      || standaloneRow(line))) { stripped++; continue; }
     if (remaining <= 0) { clipped = true; clippedAt ??= source.sections[sectionIndex].page; continue; }
     const part = line.slice(0, remaining);
-    kept[sectionIndex].push(part);
+    if (heading) headings[sectionIndex] = part;
+    else kept[sectionIndex].push(part);
     remaining -= part.length + 1;
     if (part.length < line.length) { clipped = true; clippedAt ??= source.sections[sectionIndex].page; }
   }
-  const sections = source.sections.map((section, index) => ({ ...section, lines: kept[index], text: kept[index].join('\n') })).filter(section => section.lines.length);
+  const sections = source.sections.map((section, index) => ({ ...section, heading: headings[index], lines: kept[index], text: kept[index].join('\n') })).filter(section => section.heading || section.lines.length);
   if (stripped) problems.push({ code: 'missing-field', message: 'I removed a table that appears to contain student names or IDs before reading this source.', spans: [] });
   if (clipped) problems.push({ code: 'missing-field', message: clippedAt === null ? 'The document is longer than I can read in one pass; I read the first 60,000 characters.' : `The document is longer than I can read in one pass; I read pages 1–${clippedAt}.`, spans: [] });
-  const chars = sections.reduce((sum, section) => sum + section.text.length, 0);
+  const chars = sections.reduce((sum, section) => sum + section.heading.length + section.text.length, 0);
   return { source: { ...source, sections, chars }, problems };
 }
 
@@ -99,6 +241,9 @@ async function sourceFor(ctx: ServiceContext, input: Input<'createDesignSession'
     if (!engine) throw new ApiError('unsupported', "Uploads aren't available in demo mode. Use the sample syllabus or paste the text.");
     const extracted = await engine.extract(file);
     source = { kind: input.sourceKind, fileId: file.id, version: file.version, name: file.name, sections: extracted.sections.map(section => ({ page: section.page ?? null, heading: section.heading, level: section.level, text: section.text, lines: section.lines ?? section.text.split('\n') })), chars: 0, ocr: extracted.ocr };
+  }
+  if (!input.sample && hasPossibleRoster(source) && input.consent.confirmedNoStudentRoster !== true) {
+    throw new ApiError('invalid', 'This source may include a student roster or names beside emails or IDs. Remove those lines, or confirm this source has no student roster, then try again. Nothing has been sent to the model.', { reason: 'possible-roster' });
   }
   return cleanSource(source);
 }
@@ -185,6 +330,7 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
       latest.read = read;
       latest.record.read = read;
       latest.questions = questionsFrom(problems, extraction, await ctx.repo.getInstructorProfile(latest.createdBy), read);
+      latest.effectiveProfile = effectiveProfile(extraction.profile, latest.questions);
       latest.record.questions = latest.questions;
       latest.stage = 'read';
     }
@@ -204,7 +350,7 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
     const current = await ctx.repo.getGenerationJob(job.id);
     if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
     const cause = error instanceof ApiError && error.details && typeof error.details === 'object' && 'cause' in error.details ? String(error.details.cause) : error instanceof ApiError && error.code === 'invalid' ? `invalid shape: ${error.message}` : error instanceof Error ? error.message : String(error);
-    console.error(`syllabus-${done === 0 ? 'extract' : 'analyze'} failed:`, cause);
+    safeAiLog(done === 0 ? 'syllabus-extract' : 'syllabus-analyze', error, { sessionId: job.sessionId!, jobId: job.id });
     const reason = /cut off|length limit|truncat/i.test(cause) ? 'cut off at the length limit' : /timed? out|timeout|abort/i.test(cause) ? 'timed out' : /shape|schema|malformed|invalid json|unexpected token/i.test(cause) ? "response didn't match the expected shape" : 'AI service returned an error';
     current.state = 'failed';
     current.error = `The AI draft could not be created. Try again. (${reason})`;
@@ -218,13 +364,16 @@ export async function advanceExtractJob(ctx: ServiceContext, job: GenerationJob)
 
 async function startOptionsJob(ctx: ServiceContext, session: DesignSession): Promise<void> {
   await designPartnerEnabled(ctx);
+  const expectedStage = session.stage === 'read' || session.stage === 'approaches' ? session.stage : fail('conflict', 'The session changed before approaches could be drafted.');
+  const previousJobId = session.provisioning?.jobId;
+  if ((expectedStage !== 'read' && expectedStage !== 'approaches') || !previousJobId) fail('conflict', 'The session changed before approaches could be drafted.');
   const now = ctx.now(), jobId = ctx.newId('gj');
   const job: GenerationJob = { id: jobId, courseId: session.courseId, requestedBy: user(ctx).id, kind: 'extract', sessionId: session.id, state: 'running', done: 0, total: 1, lessonIds: [], error: null, work: [], instruction: 'options', failures: [], createdAt: now, updatedAt: now };
   session.options = null;
+  session.stage = 'approaches';
   session.provisioning = { jobId, done: 0, total: 1, error: null };
   session.updatedAt = now;
-  await ctx.repo.putDesignSession(session);
-  await ctx.repo.putGenerationJob(job);
+  if (!await ctx.repo.claimDesignOptions(session, job, expectedStage, previousJobId!)) fail('conflict', 'Approaches were already started for this session.');
   if (ctx.background) {
     try { job.runner = 'workflow'; await ctx.repo.putGenerationJob(job); await ctx.background.startGeneration(job.id); }
     catch { job.runner = 'poll'; await ctx.repo.putGenerationJob(job); }
@@ -237,12 +386,17 @@ async function advanceOptionsJob(ctx: ServiceContext, job: GenerationJob): Promi
     return await ctx.repo.getGenerationJob(job.id) ?? job;
   }
   const session = await ctx.repo.getDesignSession(job.sessionId!);
-  if (!session?.extraction || !session.confirmedOutcomes?.length) return job;
+  const superseded = 'This approaches job was superseded by a newer session job.';
+  if (!session || session.stage !== 'approaches' || session.provisioning?.jobId !== job.id || session.options || !session.extraction || !session.confirmedOutcomes?.length) {
+    await ctx.repo.failSupersededDesignJob(job.id, superseded);
+    return await ctx.repo.getGenerationJob(job.id) ?? job;
+  }
   const { done, state, runner } = job;
   try {
     const institution = await ctx.repo.getInstitution();
-    const choice = selectCandidates(session.extraction, session.questions, session.teachingNote, designPartnerPolicy(institution.policy).allowedArchitectures, session.source.kind);
-    const input = { profile: session.extraction.profile, schedule: session.extraction.schedule, assessments: session.extraction.assessments, source: session.source, confirmedOutcomes: session.confirmedOutcomes, answers: session.questions, teachingNote: session.teachingNote, instructorProfile: await ctx.repo.getInstructorProfile(session.createdBy), candidates: choice.ids, closest: choice.closest, overlaysDefault: choice.overlaysDefault, rates: session.workloadRates ?? workloadRatesFor(institution.policy), weeks: choice.weeks };
+    const profile = session.effectiveProfile ?? effectiveProfile(session.extraction.profile, session.questions, session.profileCorrections);
+    const choice = selectCandidates({ ...session.extraction, profile }, session.questions, session.teachingNote, designPartnerPolicy(institution.policy).allowedArchitectures, session.source.kind);
+    const input = { profile, schedule: session.extraction.schedule, assessments: session.extraction.assessments, source: session.source, confirmedOutcomes: session.confirmedOutcomes, answers: session.questions, teachingNote: session.teachingNote, instructorProfile: await ctx.repo.getInstructorProfile(session.createdBy), candidates: choice.ids, closest: choice.closest, overlaysDefault: choice.overlaysDefault, rates: session.workloadRates ?? workloadRatesFor(institution.policy), weeks: choice.weeks };
     let options!: ReturnType<typeof finalizeOptions>;
     for (let attempt = 0; ; attempt++) {
       const result = await ctx.ai.run('structure-options', input);
@@ -256,22 +410,28 @@ async function advanceOptionsJob(ctx: ServiceContext, job: GenerationJob): Promi
     const current = await ctx.repo.getGenerationJob(job.id);
     if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
     const latest = await ctx.repo.getDesignSession(job.sessionId!);
-    if (!latest || latest.stage !== 'approaches' || latest.options) return current;
+    if (!latest || latest.stage !== 'approaches' || latest.provisioning?.jobId !== job.id || latest.options) {
+      await ctx.repo.failSupersededDesignJob(job.id, superseded);
+      return await ctx.repo.getGenerationJob(job.id) ?? current;
+    }
     latest.options = options;
     latest.record.optionsShown = options;
     latest.provisioning = { jobId: current.id, done: 1, total: 1, error: null };
     latest.updatedAt = ctx.now();
     current.done = 1; current.state = 'done'; current.updatedAt = ctx.now();
-    await ctx.repo.putDesignSession(latest);
+    if (!await ctx.repo.saveDesignOptions(latest.id, job.id, latest)) {
+      await ctx.repo.failSupersededDesignJob(job.id, superseded);
+      return await ctx.repo.getGenerationJob(job.id) ?? job;
+    }
     await ctx.repo.putGenerationJob(current);
     return current;
   } catch (error) {
     const current = await ctx.repo.getGenerationJob(job.id);
     if (!current || current.done !== done || current.state !== state || current.runner !== runner) return current ?? job;
-    console.error('structure-options failed:', error);
+    safeAiLog('structure-options', error, { sessionId: job.sessionId!, jobId: job.id });
     current.state = 'failed'; current.error = 'The approaches could not be drafted. Try again.'; current.updatedAt = ctx.now();
     const latest = await ctx.repo.getDesignSession(job.sessionId!);
-    if (latest) { latest.provisioning = { jobId: current.id, done: 0, total: 1, error: current.error }; latest.updatedAt = ctx.now(); await ctx.repo.putDesignSession(latest); }
+    if (latest?.provisioning?.jobId === current.id) { latest.provisioning = { jobId: current.id, done: 0, total: 1, error: current.error }; latest.updatedAt = ctx.now(); await ctx.repo.putDesignSession(latest); }
     await ctx.repo.putGenerationJob(current);
     return current;
   }
@@ -283,7 +443,7 @@ export const csvCell = (value: unknown) => {
   return `"${safe.replaceAll('"', '""')}"`;
 };
 
-export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSession' | 'listDesignSessions' | 'answerDesignQuestions' | 'contestDesignField' | 'updateDesignRates' | 'confirmOutcomes' | 'suggestDesignOutcomes' | 'retryDesignOptions' | 'selectApproach' | 'exportDesignRecord' | 'getInstructorProfile' | 'updateInstructorProfile'> = {
+export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSession' | 'advanceDesignSession' | 'listDesignSessions' | 'answerDesignQuestions' | 'contestDesignField' | 'updateDesignRates' | 'confirmOutcomes' | 'suggestDesignOutcomes' | 'retryDesignOptions' | 'selectApproach' | 'exportDesignRecord' | 'getInstructorProfile' | 'updateInstructorProfile'> = {
   createDesignSession: async (ctx, input) => {
     await canTeach(ctx, input.courseId);
     await aiEnabled(ctx);
@@ -302,12 +462,10 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     }
     return session;
   },
-  getDesignSession: async (ctx, { sessionId }) => {
+  getDesignSession: async (ctx, { sessionId }) => sessionFor(ctx, sessionId),
+  advanceDesignSession: async (ctx, { sessionId }) => {
     const session = await sessionFor(ctx, sessionId);
-    if (session.stage === 'undoing') {
-      await designPlan.undoProvisionPlan(ctx, { sessionId });
-      return sessionFor(ctx, sessionId);
-    }
+    if (session.stage === 'undoing') return session;
     const jobId = session.provisioning?.jobId;
     if (session.stage === 'provisioning' && session.legacyApply && jobId) {
       await ctx.repo.stopLegacyDesignJob(session.id, jobId, 'This draft was created by an earlier version. Undo it and apply again.');
@@ -343,9 +501,16 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
       const answer = answers.find(item => item.questionId === question.id);
       if (!answer) return question;
       if (answer.optionId && !question.options.some(option => option.id === answer.optionId)) fail('invalid', 'That answer option is unknown.');
+      if (question.profileField && !answer.skipped) {
+        const value = (answer.value ?? answer.optionId ?? '').trim();
+        if (value && parseProfileCorrection(question.profileField, value) === null) fail('invalid', question.profileField === 'meeting' ? 'Use a meeting format such as Tue/Thu, 75 min.' : question.profileField === 'modality' ? 'Use a modality such as in-person, online, hybrid, or hyflex.' : `Use a format such as ${question.profileField === 'credits' ? '6 credits' : '16 weeks'}.`);
+      }
       return { ...question, answer: { optionId: answer.skipped ? null : answer.optionId ?? null, value: answer.skipped ? null : answer.value ?? null, skipped: answer.skipped } };
     });
     session.questions = updated;
+    session.effectiveProfile = effectiveProfile(session.extraction!.profile, updated, session.profileCorrections);
+    session.read!.workload = estimateWorkload(session.effectiveProfile, session.extraction!.schedule, session.extraction!.assessments, session.workloadRates ?? workloadRatesFor((await ctx.repo.getInstitution()).policy));
+    session.record.read = session.read;
     session.record.questions = updated;
     const openAnswer = updated.find(question => question.id === 'question-teaching-approach')?.answer;
     session.teachingNote = openAnswer?.skipped ? '' : (openAnswer?.value ?? teachingNote).trim();
@@ -362,10 +527,17 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     if (!session.read || session.stage !== 'read') fail('invalid', 'Wait until the syllabus has been read.');
     const profile = session.extraction!.profile;
     if (!Object.prototype.hasOwnProperty.call(profile, field) || field === 'weeklyHoursBudget' || !correction.trim() || correction.length > 1000) fail('invalid', 'Provide a profile field and a correction.');
+    if (field === 'credits' || field === 'termWeeks' || field === 'meeting' || field === 'modality') {
+      if (parseProfileCorrection(field, correction) === null) fail('invalid', field === 'meeting' ? 'Use a meeting format such as Tue/Thu, 75 min.' : field === 'modality' ? 'Use a modality such as in-person, online, hybrid, or hyflex.' : `Use a format such as ${field === 'credits' ? '6 credits' : '16 weeks'}.`);
+    }
     const item = profile[field as keyof Omit<typeof profile, 'weeklyHoursBudget'>];
     const id = `question-contest-${field}`;
-    const question: DesignQuestion = { id, text: `You marked ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} as needing a change. What should I use?`, spans: item.spans, kind: 'text', options: [], required: false, answer: { optionId: null, value: correction.trim(), skipped: false }, fromProblem: 'missing-field' };
+    const question: DesignQuestion = { id, text: `You marked ${field.replace(/([A-Z])/g, ' $1').toLowerCase()} as needing a change. What should I use?`, spans: item.spans, kind: 'text', ...(field === 'credits' || field === 'termWeeks' || field === 'meeting' || field === 'modality' ? { profileField: field } : {}), options: [], required: false, answer: { optionId: null, value: correction.trim(), skipped: false }, fromProblem: 'missing-field' };
     session.questions = [...session.questions.filter(q => q.id !== id && q.id !== 'question-teaching-approach').slice(0, 4), question, ...session.questions.filter(q => q.id === 'question-teaching-approach')];
+    if (question.profileField) session.profileCorrections = { ...session.profileCorrections, [question.profileField]: correction.trim() };
+    session.effectiveProfile = effectiveProfile(session.extraction!.profile, session.questions, session.profileCorrections);
+    session.read!.workload = estimateWorkload(session.effectiveProfile, session.extraction!.schedule, session.extraction!.assessments, session.workloadRates ?? workloadRatesFor((await ctx.repo.getInstitution()).policy));
+    session.record.read = session.read;
     session.record.questions = session.questions;
     session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `Contested profile ${field}: ${correction.trim()}` });
     session.updatedAt = ctx.now();
@@ -377,7 +549,7 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     if (!session.read || !session.extraction || session.stage !== 'read') fail('invalid', 'Wait until the syllabus has been read.');
     if (!validWorkloadRates(rates)) fail('invalid', 'Workload rates must be greater than 0 and at most 1000.');
     session.workloadRates = { ...rates };
-    session.read!.workload = estimateWorkload(session.extraction!.profile, session.extraction!.schedule, session.extraction!.assessments, rates);
+    session.read!.workload = estimateWorkload(session.effectiveProfile ?? effectiveProfile(session.extraction!.profile, session.questions, session.profileCorrections), session.extraction!.schedule, session.extraction!.assessments, rates);
     session.record.read = session.read;
     session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: 'Edited workload assumptions for this session.' });
     session.updatedAt = ctx.now();
@@ -395,16 +567,18 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     const texts = new Set<string>();
     for (const outcome of outcomes) {
       if (!outcome.code.trim() || !outcome.text.trim() || codes.has(outcome.code) || texts.has(outcome.text.trim()) || (outcome.originalText && sourceTexts.has(outcome.originalText))) fail('invalid', 'Outcomes must have unique codes and text.');
-      if (outcome.source === 'suggested' && !session.suggestedOutcomes?.some(item => item.text === (outcome.suggestedText ?? outcome.text))) fail('invalid', 'Use a suggestion shown in this session.');
-      if ((outcome.source === 'instructor' || outcome.source === 'suggested') ? outcome.originalText !== '' : !originals.has(outcome.originalText)) fail('invalid', 'The outcome source is invalid.');
+      const rewrite = session.extraction?.outcomes.find(item => item.text === outcome.originalText);
+      const suggested = session.suggestedOutcomes?.some(item => item.text === (outcome.suggestedText ?? outcome.text)) || !!rewrite && session.read?.outcomeAudits.some(audit => audit.outcomeId === rewrite.id && audit.suggestion?.text === (outcome.suggestedText ?? outcome.text));
+      if (outcome.source === 'suggested' && !suggested) fail('invalid', 'Use a suggestion shown in this session.');
+      if (outcome.source === 'instructor' ? outcome.originalText !== '' : outcome.source === 'suggested' ? !!outcome.originalText && !rewrite : !originals.has(outcome.originalText)) fail('invalid', 'The outcome source is invalid.');
       codes.add(outcome.code);
       texts.add(outcome.text.trim());
       if (outcome.originalText) sourceTexts.add(outcome.originalText);
     }
-    session.confirmedOutcomes = outcomes.map(item => ({ code: item.code.trim(), text: item.text.trim(), originalText: item.originalText, source: item.source ?? 'syllabus', ...(item.suggestedText ? { suggestedText: item.suggestedText } : {}) }));
+    const submittedBy = ctx.agent ? { kind: 'agent' as const, name: ctx.agent.name } : ctx.token ? { kind: 'token' as const, name: ctx.token.name ?? ctx.token.id } : { kind: 'person' as const, name: user(ctx).name };
+    session.confirmedOutcomes = outcomes.map(item => ({ code: item.code.trim(), text: item.text.trim(), originalText: item.originalText, source: item.source ?? 'syllabus', submittedBy, ...(item.suggestedText ? { suggestedText: item.suggestedText } : {}) }));
     session.record.confirmedOutcomes = session.confirmedOutcomes;
     session.record.decisions.push({ at: ctx.now(), who: user(ctx).id, what: `Confirmed ${outcomes.length} outcomes before approaches.` });
-    session.stage = 'approaches';
     await startOptionsJob(ctx, session);
     return session;
   },
@@ -454,7 +628,7 @@ export const designPartner: Pick<Service, 'createDesignSession' | 'getDesignSess
     const plan = session.record.plan;
     const headings = ['module', 'objective', 'outcomes', 'lessons', 'assessment', 'hours', 'source page or section'];
     const rows = plan?.modules.map(module => {
-      const weeks = new Set(module.lessons.map(lesson => lesson.week).filter((week): week is number => week !== null));
+      const weeks = new Set(module.lessons.flatMap(lesson => lesson.weeks ?? (lesson.week === null ? [] : [lesson.week])));
       const spans = [
         ...(session.extraction?.schedule.filter(row => weeks.has(row.week) && row.span).map(row => row.span!) ?? []),
         ...(module.key === 'start-here' ? session.extraction?.profile.instructor.spans ?? [] : []),

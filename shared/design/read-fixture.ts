@@ -33,8 +33,8 @@ export function analyzeSyllabusFixture(input: AiTasks['syllabus-analyze']['input
   const deficiencies: AiTasks['syllabus-analyze']['output']['deficiencies'] = [];
   for (const audit of audits) {
     const span = extraction.outcomes.find(item => item.id === audit.outcomeId)?.span;
-    if (!audit.measurable) deficiencies.push({ code: `unobservable-${audit.outcomeId}`, message: `Could outcome ${audit.outcomeId} use an observable action?`, rubricRefs: rubricRefs('2.2', '9'), spans: span ? [span] : [] });
-    if (!audit.assessedBy.length) deficiencies.push({ code: `unassessed-${audit.outcomeId}`, message: `I could not find an assessment for outcome ${audit.outcomeId}.`, rubricRefs: rubricRefs('3.2', '9'), spans: span ? [span] : [] });
+    if (!audit.measurable) deficiencies.push({ code: `unobservable-${audit.outcomeId}`, message: `Could outcome O${input.extraction.outcomes.findIndex(item => item.id === audit.outcomeId) + 1} use an observable action?`, rubricRefs: rubricRefs('2.2', '9'), spans: span ? [span] : [] });
+    if (!audit.assessedBy.length) deficiencies.push({ code: `unassessed-${audit.outcomeId}`, message: `I could not find an assessment for outcome O${input.extraction.outcomes.findIndex(item => item.id === audit.outcomeId) + 1}.`, rubricRefs: rubricRefs('3.2', '9'), spans: span ? [span] : [] });
   }
   const text = [...extraction.policies.map(item => item.text), extraction.profile.description.value ?? ''].join(' ').toLowerCase();
   const components = ['learner goals', 'choice', 'feedback', 'community', 'instructor presence', 'assessment clarity'].map(name => {

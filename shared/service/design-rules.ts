@@ -56,7 +56,7 @@ export function problemsFrom(extraction: SyllabusExtraction, termInfo?: TermInfo
     });
     if (outside.length) add('due-outside-term', `${outside.map(item => item.title).join(', ')} ${outside.length === 1 ? 'is' : 'are'} due outside the term.`, outside.flatMap(item => item.span ? [item.span] : []));
   }
-  for (const outcome of extraction.outcomes) if (needsObservableVerb(outcome.text)) add('objective-no-verb', `Outcome ${outcome.id} may need an observable verb.`, outcome.span ? [outcome.span] : []);
+  for (const [index, outcome] of extraction.outcomes.entries()) if (needsObservableVerb(outcome.text)) add('objective-no-verb', `Outcome O${index + 1} may need an observable verb.`, outcome.span ? [outcome.span] : []);
   for (const field of ['credits', 'termWeeks', 'modality', 'enrolment'] as const) if (extraction.profile[field].origin === 'missing') add('missing-field', `${field} is not stated in the source.`);
   return problems;
 }
@@ -91,13 +91,15 @@ export function questionsFrom(problems: Problem[], extraction: SyllabusExtractio
       }
       case 'objective-no-verb': continue;
     }
-    questions.push({ id: `question-${problem.code}-${index}`, text, spans: problem.spans, kind, options, required: false, answer: null, fromProblem: problem.code });
+    const field = problem.code === 'week-count-mismatch' ? 'termWeeks' : problem.code === 'missing-field' ? /^(credits|termWeeks|modality)\b/.exec(problem.message)?.[1] : undefined;
+    const weekIds = problem.code === 'empty-week' ? [...problem.message.matchAll(/\bweek\s+(\d+)\b/gi)].slice(0, 1).map(match => Number(match[1])) : undefined;
+    questions.push({ id: `question-${problem.code}-${index}`, text, spans: problem.spans, kind, ...(field ? { profileField: field as 'credits' | 'termWeeks' | 'modality' } : {}), ...(weekIds?.length ? { weekIds } : {}), options, required: false, answer: null, fromProblem: problem.code });
   }
   if (read) {
     for (const audit of read.outcomeAudits.filter(item => !item.assessedBy.length)) {
       const outcome = extraction.outcomes.find(item => item.id === audit.outcomeId);
       if (!outcome) continue;
-      questions.push({ id: `question-unassessed-${audit.outcomeId}`, text: `Outcome ${audit.outcomeId}, “${outcome.text}”, isn't assessed by anything I can find. How should we handle it?`, spans: outcome.span ? [outcome.span] : [], kind: 'choice', options: [choice('assess', 'Assess it (propose how)'), choice('inside', "It's inside an existing assessment"), choice('drop', 'Drop it')], required: false, answer: null, fromProblem: null });
+      questions.push({ id: `question-unassessed-${audit.outcomeId}`, text: `Outcome O${extraction.outcomes.indexOf(outcome) + 1}, “${outcome.text}”, isn't assessed by anything I can find. How should we handle it?`, spans: outcome.span ? [outcome.span] : [], kind: 'choice', options: [choice('assess', 'Assess it (propose how)'), choice('inside', "It's inside an existing assessment"), choice('drop', 'Drop it')], required: false, answer: null, fromProblem: null });
     }
     for (const assessment of extraction.assessments.filter(item => (item.weightPercent ?? 0) >= 30 && item.dueAt)) {
       questions.push({ id: `question-milestones-${assessment.id}`, text: `${assessment.title} is ${assessment.weightPercent}% with one due date. Would milestones with feedback help, or is the single deadline deliberate?`, spans: assessment.span ? [assessment.span] : [], kind: 'choice', options: [choice('milestones', 'Add milestones with feedback'), choice('single', 'Keep one deadline')], required: false, answer: null, fromProblem: null });

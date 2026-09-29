@@ -140,6 +140,9 @@
                       },
                       "rememberProfile": {
                         "type": "boolean"
+                      },
+                      "confirmedNoStudentRoster": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -351,6 +354,115 @@
             "bearerAuth": []
           }
         ]
+      }
+    },
+    "/api/v1/design/{sessionId}/advance": {
+      "post": {
+        "operationId": "advanceDesignSession",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "ai:run",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/design/{sessionId}/answers": {
@@ -9031,6 +9143,125 @@
         ]
       }
     },
+    "/api/v1/files/{fileId}/visibility": {
+      "post": {
+        "operationId": "setFileVisibility",
+        "tags": [
+          "files"
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "content:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "course",
+                      "staff"
+                    ]
+                  }
+                },
+                "required": [
+                  "visibility"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/files/{fileId}/formats": {
       "get": {
         "operationId": "getFormats",
@@ -17293,6 +17524,258 @@
                 },
                 "required": [
                   "outcomes"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/design/{sessionId}/outcomes/{outcomeId}/keep": {
+      "post": {
+        "operationId": "keepDesignOutcome",
+        "tags": [
+          "session"
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "outcomeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Outcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "courses:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedText": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "expectedText"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{courseId}/outcomes/{outcomeId}/keep": {
+      "post": {
+        "operationId": "keepOutcome",
+        "tags": [
+          "courses"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "outcomeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Outcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "courses:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedText": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "expectedText"
                 ]
               }
             }
@@ -26414,6 +26897,23 @@
               "text"
             ]
           },
+          "profileField": {
+            "type": "string",
+            "enum": [
+              "credits",
+              "termWeeks",
+              "meeting",
+              "modality"
+            ]
+          },
+          "weekIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
           "options": {
             "type": "array",
             "items": {
@@ -26582,6 +27082,27 @@
                 },
                 "suggestedText": {
                   "type": "string"
+                },
+                "submittedBy": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "person",
+                        "agent",
+                        "token"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -27544,6 +28065,12 @@
                           "null"
                         ]
                       },
+                      "weeks": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      },
                       "skeleton": {
                         "$ref": "#/components/schemas/LessonSkeleton"
                       }
@@ -27858,6 +28385,34 @@
               "$ref": "#/components/schemas/DesignQuestion"
             }
           },
+          "effectiveProfile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CourseProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profileCorrections": {
+            "type": "object",
+            "properties": {
+              "credits": {
+                "type": "string"
+              },
+              "termWeeks": {
+                "type": "string"
+              },
+              "meeting": {
+                "type": "string"
+              },
+              "modality": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
           "confirmedOutcomes": {
             "anyOf": [
               {
@@ -27884,6 +28439,27 @@
                     },
                     "suggestedText": {
                       "type": "string"
+                    },
+                    "submittedBy": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "person",
+                            "agent",
+                            "token"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -28361,6 +28937,13 @@
           "uploadedAt": {
             "type": "string",
             "minLength": 1
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "course",
+              "staff"
+            ]
           },
           "scan": {
             "anyOf": [
@@ -30003,6 +30586,94 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "aiState": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "kept"
+            ]
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task": {
+                "type": "string",
+                "enum": [
+                  "brief",
+                  "outline",
+                  "lesson-draft",
+                  "block-regenerate",
+                  "announcement",
+                  "feedback",
+                  "alt-text",
+                  "rewrite",
+                  "link-text",
+                  "element",
+                  "tutor",
+                  "tutor-summary",
+                  "agent",
+                  "readiness-item",
+                  "variant",
+                  "syllabus-extract",
+                  "syllabus-analyze",
+                  "structure-options",
+                  "module-scaffold",
+                  "objective-rewrite",
+                  "outcome-suggest"
+                ]
+              },
+              "generatedAt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "span": {
+                      "$ref": "#/components/schemas/SourceSpan"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "summary": {
+                "type": "string"
+              },
+              "keptBy": {
+                "type": "string"
+              },
+              "keptAt": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "model",
+              "task",
+              "generatedAt",
+              "sources",
+              "summary"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

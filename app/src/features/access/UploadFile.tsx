@@ -6,7 +6,7 @@ import { Button, FormField, StatusNotice } from '../../components';
 import { dataMode } from '../../data/client';
 import { uploadUrl } from './utils';
 
-export function UploadFile({ courseId, onUploaded, accept = '.pdf,.docx,.pptx,.png,.jpg,.jpeg,.gif,.webp,.vtt,.srt', hint = 'PDF, Word, PowerPoint, images, or captions (VTT, SRT); up to 25 MB. Word, PowerPoint, and PDF files get an accessibility scan.' }: { courseId: string; onUploaded?: (file: FileRecord) => void; accept?: string; hint?: string }) {
+export function UploadFile({ courseId, onUploaded, visibility = 'course', accept = '.pdf,.docx,.pptx,.png,.jpg,.jpeg,.gif,.webp,.vtt,.srt', hint = 'PDF, Word, PowerPoint, images, or captions (VTT, SRT); up to 25 MB. Word, PowerPoint, and PDF files get an accessibility scan.' }: { courseId: string; onUploaded?: (file: FileRecord) => void; visibility?: 'course' | 'staff'; accept?: string; hint?: string }) {
   const client = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -22,7 +22,7 @@ export function UploadFile({ courseId, onUploaded, accept = '.pdf,.docx,.pptx,.p
     setBusy(true); setError(''); setMessage(`Uploading ${file.name}…`);
     try {
       const body = new FormData(); body.set('file', file);
-      const response = await fetch(uploadUrl(courseId), { method: 'POST', credentials: 'include', body });
+      const response = await fetch(`${uploadUrl(courseId)}?visibility=${visibility}`, { method: 'POST', credentials: 'include', body });
       const result = await response.json() as FileRecord | { error?: { message?: string } };
       if (!response.ok) throw new Error('error' in result ? result.error?.message || 'Upload failed.' : 'Upload failed.');
       const uploaded = result as FileRecord;

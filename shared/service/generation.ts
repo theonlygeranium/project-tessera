@@ -178,7 +178,7 @@ export const generation: Pick<Service, 'generateAtScope' | 'getGenerationJob' | 
       blocks: (Array.isArray(lesson.blocks) ? lesson.blocks : fail('invalid', 'Blocks must be an array.')).map(validateBlockContent),
     })) }));
     const courseId = ctx.newId('c');
-    await ctx.repo.putCourse({ id: courseId, ...clean, instructorIds: [], status: 'active' });
+    await ctx.repo.putCourse({ id: courseId, ...clean, outcomes: ctx.token || ctx.agent ? [] : clean.outcomes, instructorIds: [], status: 'active' });
     if (clean.outcomes.length) await saveCourseOutcomes(ctx, courseId, clean.outcomes.map(text => ({ text })));
     for (const [modulePosition, module] of prepared.entries()) {
       const moduleId = ctx.newId('m'); await ctx.repo.putModule({ id: moduleId, courseId, title: module.title, position: modulePosition });

@@ -19,10 +19,10 @@ async function setup(kind: 'memory' | 'd1') {
 }
 async function prepare(ctx: ServiceContext) {
   const started = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', sample: true, consent: { syllabusOnly: true, rememberProfile: false } });
-  await service.getDesignSession(ctx, { sessionId: started.id });
-  const read = await service.getDesignSession(ctx, { sessionId: started.id });
+  await service.advanceDesignSession(ctx, { sessionId: started.id });
+  const read = await service.advanceDesignSession(ctx, { sessionId: started.id });
   await service.confirmOutcomes(ctx, { sessionId: started.id, outcomes: read.extraction!.outcomes.map((item, i) => ({ code: `O${i + 1}`, text: item.text, originalText: item.text })) });
-  const options = await service.getDesignSession(ctx, { sessionId: started.id });
+  const options = await service.advanceDesignSession(ctx, { sessionId: started.id });
   await service.selectApproach(ctx, { sessionId: started.id, optionIds: [options.options![0].id], overlays: ['bookends'], rationale: 'Repeated practice fits this group.' });
   const plan = await service.previewProvisionPlan(ctx, { sessionId: started.id });
   return { sessionId: started.id, plan };
@@ -142,7 +142,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
     const old = { ...current } as Record<string, unknown>;
     for (const key of ['applyRevision', 'planIds', 'createdBlocks', 'undoKept']) delete old[key];
     await ctx.repo.putDesignSession(old as never);
-    for (let i = 0; i < 3; i++) await service.getDesignSession(ctx, { sessionId });
+    for (let i = 0; i < 3; i++) await service.advanceDesignSession(ctx, { sessionId });
     const after = (await ctx.repo.getDesignSession(sessionId))!;
     const message = 'This draft was created by an earlier version. Undo it and apply again.';
     expect(after.stage).toBe('provisioning');
@@ -260,8 +260,8 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
     expect(after.plan).toBeNull();
     expect(after.created.moduleIds).toEqual([]);
   });
-  it('resumes a failed undo by retry and by polling, including finalization', async () => {
-    for (const recovery of ['retry', 'poll'] as const) {
+  it('resumes a failed undo only through the write-scoped operation', async () => {
+    for (const recovery of ['retry', 'page-read'] as const) {
       const { ctx, sessionId, plan } = await setup(kind);
       await service.applyProvisionPlan(ctx, { sessionId, hash: plan.hash });
       await finish(ctx, sessionId);
@@ -273,8 +273,12 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
       } }) as Repo;
       await expect(service.undoProvisionPlan({ ...ctx, repo: broken }, { sessionId })).rejects.toThrow('Interrupted cleanup');
       expect((await ctx.repo.getDesignSession(sessionId))?.stage).toBe('undoing');
-      if (recovery === 'retry') await service.undoProvisionPlan(ctx, { sessionId });
-      else await service.getDesignSession(ctx, { sessionId });
+      if (recovery === 'page-read') {
+        await service.getDesignSession(ctx, { sessionId });
+        await service.advanceDesignSession(ctx, { sessionId });
+        expect((await ctx.repo.getDesignSession(sessionId))?.stage).toBe('undoing');
+      }
+      await service.undoProvisionPlan(ctx, { sessionId });
       expect((await ctx.repo.getDesignSession(sessionId))?.stage).toBe('approaches');
       expect((await ctx.repo.listModules('c-stat110')).filter(m => m.id.includes(kind))).toEqual([]);
     }
@@ -290,7 +294,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
     } }) as Repo;
     await expect(service.undoProvisionPlan({ ...ctx, repo: broken }, { sessionId })).rejects.toMatchObject({ code: 'conflict' });
     expect((await ctx.repo.getDesignSession(sessionId))?.stage).toBe('undoing');
-    await service.getDesignSession(ctx, { sessionId });
+    await service.undoProvisionPlan(ctx, { sessionId });
     expect((await ctx.repo.getDesignSession(sessionId))?.stage).toBe('approaches');
   });
   it('uses only a full assessment title immediately before its points', async () => {
@@ -303,7 +307,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
     await expect(service.previewProvisionPlan(ctx, { sessionId })).rejects.toThrow('Confirm the points');
     await service.confirmDesignPoints(ctx, { sessionId, points: { project: 25 } });
     const plan = await service.previewProvisionPlan(ctx, { sessionId });
-    expect(plan.modules.flatMap(m => m.assignments ?? []).find(a => a.replaces === 'Project')?.points).toBe(25);
+    expect(plan.modules.flatMap(m => m.assignments ?? []).filter(a => a.replaces === 'Project').reduce((sum, a) => sum + a.points, 0)).toBe(25);
   });
   it('records a concurrent module position before a failed lesson insert so undo removes it', async () => {
     const { ctx, sessionId, plan } = await setup(kind);
@@ -336,8 +340,9 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
     expect(explicitAssessmentPoints(session.extraction!.assessments[0].span, 'Project')).toBe(1000);
     const plan = await service.previewProvisionPlan(ctx, { sessionId });
     const items = plan.modules.flatMap(m => m.assignments ?? []);
-    expect(items.find(a => a.replaces === 'Project')?.points).toBe(1000);
-    expect(items.find(a => a.replaces === 'Final project')).toMatchObject({ points: 200, weightPercent: 20 });
+    expect(items.filter(a => a.replaces === 'Project').reduce((sum, a) => sum + a.points, 0)).toBe(1000);
+    expect(items.filter(a => a.replaces === 'Final project').reduce((sum, a) => sum + a.points, 0)).toBe(200);
+    expect(items.filter(a => a.replaces === 'Final project').reduce((sum, a) => sum + (a.weightPercent ?? 0), 0)).toBe(20);
   });
   it('confirms every unresolved assessment on preview and hashes the values', async () => {
     const { ctx, sessionId } = await setup(kind);
@@ -510,7 +515,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} design safety ra
     await ctx.repo.setDesignRunner(sessionId, session.applyRevision!, session.provisioning!.jobId!, 'workflow');
     const pause = pauseOnce(ctx.repo, 'setDesignRunner');
     const stalled = { ...ctx, repo: pause.wrapped, now: () => '2026-09-28T13:00:00.000Z' };
-    const pending = service.getDesignSession(stalled, { sessionId });
+    const pending = service.advanceDesignSession(stalled, { sessionId });
     await pause.reached;
     await service.undoProvisionPlan(ctx, { sessionId });
     pause.release(); await pending;

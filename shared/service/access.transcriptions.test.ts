@@ -23,7 +23,7 @@ describe('file transcription review service', () => {
     for (const format of ['reading', 'epub'] as const) await ctx.repo.putFormat({ fileId: file.id, version: file.version, format, state: 'ready', outputKey: `old-${format}`, generatedAt: ctx.now(), error: null });
     const result = await access.reviewTranscription(ctx, { fileId: file.id, page: 2, decision: 'keep' });
     expect(result[0]).toMatchObject({ reviewedBy: 'u-okafor', reviewedByName: 'Dr. Amara Okafor', state: 'kept' });
-    expect(review).toHaveBeenCalledWith(file, 2, 'keep', ctx.user, ctx.now());
+    expect(review).toHaveBeenCalledWith({ ...file, visibility: 'course' }, 2, 'keep', ctx.user, ctx.now());
     for (const format of ['reading', 'epub'] as const) expect((await ctx.repo.getFormat(file.id, file.version, format))?.state).toBe('none');
   });
 

@@ -11,6 +11,14 @@ const extraction = extractSyllabusFixture({ sourceKind: 'syllabus', name: source
 const input: AiTasks['structure-options']['input'] = { profile: extraction.profile, schedule: extraction.schedule, assessments: extraction.assessments, source, confirmedOutcomes: extraction.outcomes.map((item, index) => ({ code: `O${index + 1}`, text: item.text, originalText: item.text })), answers: [], teachingNote: '', instructorProfile: null, candidates: ['weekly', 'project', 'flipped'], closest: 'weekly', overlaysDefault: ['bookends', 'spaced-review'], rates: RICE_DEFAULTS, weeks: 15 };
 
 describe('structure option validation', () => {
+  it('gives each demo architecture its own approach reasoning', async () => {
+    const candidates = ['weekly', 'project', 'flipped', 'case', 'thematic', 'scaffolded', 'competency', 'performance', 'micro', 'hyflex'] as const;
+    const options = (await fixtureAi.run('structure-options', { ...input, candidates: [...candidates] })).output;
+    for (const field of ['fits', 'changes', 'tradeoffs', 'evidence'] as const) {
+      const sentences = options.map(option => field === 'fits' ? option.fits[0].text : option[field]);
+      expect(new Set(sentences).size).toBe(candidates.length);
+    }
+  });
   it('overwrites model hours and repairs a missing outcome', async () => {
     const output = (await fixtureAi.run('structure-options', input)).output;
     output[0].modules[0].hours = 999;

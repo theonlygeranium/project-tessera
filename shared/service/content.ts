@@ -1,4 +1,3 @@
-import { logError } from './log';
 import { ApiError } from '../api';
 import type { Block, BlockContent, LessonDetail, SourceSpan } from '../domain';
 import { lessonReadiness } from '../policy';
@@ -98,9 +97,9 @@ export const contentHandlers: Pick<Service, 'getLesson' | 'saveBlocks' | 'keepBl
     const l = await lessonFor(ctx, b.lessonId), c = await canReachCourse(ctx, l.courseId), prompt = instruction?.trim() ?? '';
     let result;
     try { result = await ctx.ai.run('block-regenerate', { courseTitle: c.title, lessonTitle: l.title, block: content(b), instruction: prompt, sources: [] }); }
-    catch (error) { logError('AI task failed:', error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? ''); return aiFailed(); }
+    catch (error) { console.error('content AI failed', { task: 'block-regenerate', category: error instanceof ApiError ? error.code : 'unexpected', status: error instanceof ApiError && typeof (error.details as { status?: unknown } | undefined)?.status === 'number' ? (error.details as { status: number }).status : null, blockId }); return aiFailed(); }
     let generated: BlockContent;
-    try { generated = validateBlockContent(result.output.block); } catch (error) { logError('AI task failed:', error instanceof Error ? error.message : error, (error as { details?: unknown })?.details ?? ''); return aiFailed(); }
+    try { generated = validateBlockContent(result.output.block); } catch { console.error('content AI failed', { task: 'block-regenerate', category: 'invalid-output', blockId }); return aiFailed(); }
     if (generated.type !== b.type) aiFailed();
     await ctx.repo.putBlock({ ...metadata(b), ...generated, origin: 'ai', aiState: 'draft', previous: content(b), provenance: provenance(ctx, result.model, 'block-regenerate', prompt || 'Regenerated this block'), updatedAt: ctx.now() } as Block);
     return detail(ctx, b.lessonId);

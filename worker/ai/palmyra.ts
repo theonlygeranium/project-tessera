@@ -471,7 +471,7 @@ export function palmyraClient(options: PalmyraOptions): AiClient {
       request({ name: `syllabus_extract_${name}`, messages: extractMessages(name, input), schema: EXTRACT_PARTS[name].schema, maxTokens: EXTRACT_PARTS[name].maxTokens, reasoningEffort: 'low' }, timeoutMs), name === 'course' ? plausible : name === 'schedule' ? calendar : undefined) as Promise<any>;
     // Policies and materials are the least essential part: if they can't be read, the read goes on without them.
     const missing = { value: null, origin: 'missing', confidence: 0, spans: [] };
-    const [course, schedule, policies] = await Promise.all([part('course'), part('schedule'), part('policies').catch(error => { console.warn('syllabus-extract policies part failed:', String(error?.details?.cause ?? error)); return { materials: missing, policies: [] }; })]);
+    const [course, schedule, policies] = await Promise.all([part('course'), part('schedule'), part('policies').catch(error => { const details = error instanceof ApiError && error.details && typeof error.details === 'object' ? error.details as Record<string, unknown> : null; console.warn('syllabus-extract policies part failed', { task: 'syllabus-extract', category: error instanceof ApiError ? error.code : 'unexpected', status: typeof details?.status === 'number' ? details.status : null }); return { materials: missing, policies: [] }; })]);
     return MAP['syllabus-extract']({ profile: { ...course.profile, materials: policies.materials }, outcomes: course.outcomes, assessments: course.assessments, schedule: schedule.schedule, policies: policies.policies }, input);
   }
 

@@ -17,19 +17,23 @@ const MAX_STEPS = 120;
 export class GenerationWorkflow extends WorkflowEntrypoint<Env, GenerationParams> {
   async run(event: WorkflowEvent<GenerationParams>, step: WorkflowStep): Promise<string> {
     const { jobId } = event.payload;
+    let firstDone: number | null = null;
     for (let i = 0; i < MAX_STEPS; i++) {
       const state = await step.do(`advance ${i}`, { retries: { limit: 2, delay: '10 seconds', backoff: 'exponential' }, timeout: '5 minutes' }, async () => {
         const env = this.env as Env;
         const repo = new D1Repo(env.DB);
         const job = await repo.getGenerationJob(jobId);
         // Polling took over (the Workflow stalled) or the job is finished: stop.
-        if (!job || job.state !== 'running' || job.runner !== 'workflow') return 'stopped';
+        if (!job || job.state !== 'running' || job.runner !== 'workflow') return { state: 'stopped', done: job?.done ?? 0 };
         const user = await repo.getUser(job.requestedBy);
-        if (!user) return 'stopped';
+        if (!user) return { state: 'stopped', done: job.done };
         const ctx = serviceContextFor(env, repo, user);
-        return (await advanceGenerationJob(ctx, job)).state;
+        const advanced = await advanceGenerationJob(ctx, job);
+        return { state: advanced.state, done: advanced.done };
       });
-      if (state !== 'running') return state;
+      if (firstDone === null) firstDone = state.done;
+      if (state.state !== 'running') return state.state;
+      if (i === MAX_STEPS - 1 && state.done <= firstDone) return 'stalled';
     }
     await step.do('continue generation', async () => {
       const env = this.env as Env;

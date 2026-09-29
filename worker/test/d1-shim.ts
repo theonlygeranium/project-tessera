@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 // Every migration, in order, so the shim matches production's schema.
-const migrationSql = ['0001_init.sql', '0002_night2.sql', '0003_block_types.sql', '0004_generation_work.sql', '0005_invitation_error.sql', '0006_night3.sql', '0007_generation_runner.sql', '0008_design_partner.sql'].map((f) => readFileSync(new URL(`../../migrations/${f}`, import.meta.url), 'utf8')).join('\n');
+const migrationFiles = ['0001_init.sql', '0002_night2.sql', '0003_block_types.sql', '0004_generation_work.sql', '0005_invitation_error.sql', '0006_night3.sql', '0007_generation_runner.sql', '0008_design_partner.sql', '0009_design_source_visibility.sql', '0010_outcome_provenance.sql'];
+const migrationSql = migrationFiles.map((f) => readFileSync(new URL(`../../migrations/${f}`, import.meta.url), 'utf8')).join('\n');
 
 type SqlValue = null | number | bigint | string | Uint8Array;
 
@@ -141,5 +142,12 @@ export function createTestDb(): SqliteDatabase {
   const sqlite = new DatabaseSync(':memory:', { enableForeignKeyConstraints: true });
   sqlite.exec('PRAGMA foreign_keys = ON');
   sqlite.exec(migrationSql);
+  return new SqliteDatabase(sqlite);
+}
+
+export function createTestDbThrough0009(): SqliteDatabase {
+  const sqlite = new DatabaseSync(':memory:', { enableForeignKeyConstraints: true });
+  sqlite.exec('PRAGMA foreign_keys = ON');
+  sqlite.exec(migrationFiles.slice(0, -1).map(f => readFileSync(new URL(`../../migrations/${f}`, import.meta.url), 'utf8')).join('\n'));
   return new SqliteDatabase(sqlite);
 }
