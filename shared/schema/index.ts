@@ -3,6 +3,7 @@ import { ApiError } from '../api';
 import type { Input, Operation } from '../api';
 import { OPERATIONS } from './operations';
 export { OPERATIONS } from './operations';
+export * from './gradebook';
 
 function issuePath(parts: PropertyKey[]): string {
   return parts.reduce<string>((path, part) => typeof part === 'number' ? `${path}[${part}]` : path ? `${path}.${String(part)}` : String(part), '');

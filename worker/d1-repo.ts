@@ -9,10 +9,14 @@ import type {
 } from '../shared/repo';
 import type { SeedData } from '../shared/seed';
 import { ApiError } from '../shared/api';
+import { D1Gradebook } from './d1-gradebook';
+import type { CourseGradeOverride, GradebookSetup, StudentItemState, GradeEvent } from '../shared/domain';
+import type { GradeBatch, GradeSnapshot, GradeWrite, GradeWriteResult } from '../shared/repo';
 
 type SqlBind = string | number | null;
 
 const DELETE_ORDER = [
+  'grade_batches', 'grade_events', 'course_grade_overrides', 'student_item_states', 'gradebook_setups',
   'manager_consents', 'reporting_lines', 'certificates', 'test_out_attempts', 'test_outs',
   'completion_events', 'requirements', 'outcome_links', 'outcomes', 'readiness_items', 'rubrics', 'templates', 'programs',
   // Night 2 tables first (they reference users, courses, modules, files).
@@ -99,6 +103,7 @@ export class D1Repo implements Repo {
     );
     return rows.map((row) => ({ courseId: row.course_id, userId: row.user_id }));
   }
+  async listCourseStudents(courseId:Id):Promise<User[]>{const rows=await this.all<UserRow>('SELECT u.* FROM users u JOIN enrollments e ON e.user_id=u.id WHERE e.course_id=? AND u.role=? ORDER BY u.name,u.id',[courseId,'student']);return rows.map(userFromRow);}
 
   async setEnrollments(courseId: Id, userIds: Id[]): Promise<void> {
     await this.db.batch([
@@ -128,7 +133,10 @@ export class D1Repo implements Repo {
   }
 
   async deleteModule(id: Id): Promise<void> {
-    await this.db.prepare('DELETE FROM modules WHERE id = ?').bind(id).run();
+    await this.db.prepare(`DELETE FROM modules WHERE id = ?
+      AND NOT EXISTS (SELECT 1 FROM submissions s JOIN assignments a ON a.id=s.assignment_id WHERE a.module_id=?)
+      AND NOT EXISTS (SELECT 1 FROM student_item_states st JOIN assignments a ON a.id=st.assignment_id WHERE a.module_id=?)`).bind(id,id,id).run();
+    if(await this.getModule(id))throw new ApiError('conflict','Module has grade history.');
   }
 
   async getLesson(id: Id): Promise<Lesson | null> {
@@ -371,17 +379,34 @@ export class D1Repo implements Repo {
     return rows.map(assignmentFromRow);
   }
   async putAssignment(a: Assignment): Promise<void> { await this.assignmentStmt(a).run(); }
-  async deleteAssignment(id: Id): Promise<void> { await this.db.prepare('DELETE FROM assignments WHERE id = ?').bind(id).run(); }
+  async deleteAssignment(id: Id): Promise<void> { await this.db.prepare(`DELETE FROM assignments WHERE id = ?
+    AND NOT EXISTS (SELECT 1 FROM submissions WHERE assignment_id=?)
+    AND NOT EXISTS (SELECT 1 FROM student_item_states WHERE assignment_id=?)`).bind(id,id,id).run();
+    if(await this.getAssignment(id))throw new ApiError('conflict','Assignment has grade history.'); }
   async getSubmission(id: Id): Promise<Submission | null> {
-    const row = await this.first<SubmissionRow>('SELECT * FROM submissions WHERE id = ?', [id]);
+    const row = await this.first<SubmissionRow>('SELECT * FROM submissions WHERE id = ? AND deleted = 0', [id]);
     return row ? submissionFromRow(row) : null;
   }
-  async listSubmissions(filter: { assignmentId?: Id; studentId?: Id }): Promise<Submission[]> {
-    const rows = await this.all<SubmissionRow>(`SELECT * FROM submissions WHERE (? IS NULL OR assignment_id = ?) AND (? IS NULL OR student_id = ?)
-      ORDER BY student_id, attempt DESC, submitted_at DESC`, [filter.assignmentId ?? null, filter.assignmentId ?? null, filter.studentId ?? null, filter.studentId ?? null]);
+  async listSubmissions(filter: { assignmentId?: Id; studentId?: Id; courseId?: Id; includeDeleted?: boolean }): Promise<Submission[]> {
+    const rows = await this.all<SubmissionRow>(`SELECT s.* FROM submissions s JOIN assignments a ON a.id=s.assignment_id WHERE (? IS NULL OR s.assignment_id = ?) AND (? IS NULL OR s.student_id = ?) AND (? IS NULL OR a.course_id = ?) AND (? = 1 OR s.deleted = 0)
+      ORDER BY s.student_id, s.attempt DESC, s.submitted_at DESC`, [filter.assignmentId ?? null, filter.assignmentId ?? null, filter.studentId ?? null, filter.studentId ?? null, filter.courseId ?? null, filter.courseId ?? null, filter.includeDeleted ? 1 : 0]);
     return rows.map(submissionFromRow);
   }
   async putSubmission(s: Submission): Promise<void> { await this.submissionStmt(s).run(); }
+  private gradebook() { return new D1Gradebook(this.db); }
+  async getGradebookSetup(courseId: Id): Promise<GradebookSetup | null> { return this.gradebook().setup(courseId); }
+  async putGradebookSetup(value: GradebookSetup, expectedVersion: number, event: GradeEvent): Promise<GradeWriteResult> { return this.applyGradeWrites([{kind:'setup',value,expectedVersion}],[event]); }
+  async listStudentItemStates(filter: {courseId:Id;studentId?:Id;assignmentId?:Id}): Promise<StudentItemState[]> { return this.gradebook().states(filter); }
+  async putStudentItemState(value: StudentItemState, expectedVersion: number, event: GradeEvent): Promise<GradeWriteResult> { return this.applyGradeWrites([{kind:'state',value,expectedVersion}],[event]); }
+  async getFinalOverride(courseId: Id, studentId: Id): Promise<CourseGradeOverride | null> { return this.gradebook().final(courseId,studentId); }
+  async listFinalOverrides(courseId:Id):Promise<CourseGradeOverride[]> { return this.gradebook().finals(courseId); }
+  async listFinalOverrideRevisions(courseId:Id):Promise<CourseGradeOverride[]> { return this.gradebook().finalRevisions(courseId); }
+  async putFinalOverride(value: CourseGradeOverride | {courseId:Id;studentId:Id;clear:true}, expectedVersion: number, event: GradeEvent): Promise<GradeWriteResult> { return this.applyGradeWrites([{kind:'final',value,expectedVersion}],[event]); }
+  async appendGradeEvent(event:GradeEvent):Promise<void> { await this.gradebook().append(event); }
+  async listGradeEvents(filter:{courseId:Id;studentId?:Id;assignmentId?:Id;kind?:GradeEvent['kind'];batchId?:Id;cursor?:string;limit?:number}) { return this.gradebook().events(filter); }
+  async getGradeEvent(id:Id):Promise<GradeEvent|null> { return this.gradebook().event(id); }
+  async getGradeBatch(courseId:Id,batchId:Id) { return this.gradebook().batch(courseId,batchId); }
+  async applyGradeWrites(writes:GradeWrite[],events:GradeEvent[],snapshot?:GradeSnapshot,batch?:GradeBatch):Promise<GradeWriteResult> { return this.gradebook().apply(writes,events,snapshot,batch); }
 
   async getTutorSetting(kind: ActivityKind, id: Id): Promise<TutorSetting | null> {
     const r = await this.first<{ activity_kind: ActivityKind; activity_id: Id; mode: TutorSetting['mode']; max_hints: number; allowed_source_ids: string; set_by: Id; set_at: string }>('SELECT * FROM tutor_settings WHERE activity_kind = ? AND activity_id = ?', [kind, id]);
@@ -551,8 +576,8 @@ export class D1Repo implements Repo {
   async putManagerConsent(c: ManagerConsent): Promise<void> { await this.managerConsentStmt(c).run(); }
 
   async isEmpty(): Promise<boolean> {
-    const row = await this.first<{ i: number; u: number }>('SELECT (SELECT count(*) FROM institution) AS i, (SELECT count(*) FROM users) AS u');
-    return !row || row.i === 0 || row.u === 0;
+    const row = await this.first<{ i:number;u:number;g:number;s:number;o:number;e:number;b:number }>('SELECT (SELECT count(*) FROM institution) AS i,(SELECT count(*) FROM users) AS u,(SELECT count(*) FROM gradebook_setups) AS g,(SELECT count(*) FROM student_item_states) AS s,(SELECT count(*) FROM course_grade_overrides) AS o,(SELECT count(*) FROM grade_events) AS e,(SELECT count(*) FROM grade_batches) AS b');
+    return !row || row.u+row.g+row.s+row.o+row.e+row.b===0;
   }
 
   async reset(seed: SeedData): Promise<void> {
@@ -578,6 +603,10 @@ export class D1Repo implements Repo {
       ...(seed.managerConsents ?? []).map((c) => this.managerConsentStmt(c)),
       ...seed.assignments.map((assignment) => this.assignmentStmt(assignment)),
       ...seed.submissions.map((submission) => this.submissionStmt(submission)),
+      ...(seed.gradebookSetups ?? []).map(x => this.db.prepare('INSERT INTO gradebook_setups(course_id,data,version,rules_version,updated_by,updated_at) VALUES (?,?,?,?,?,?)').bind(x.courseId,JSON.stringify(x),x.version,x.rulesVersion,x.updatedBy,x.updatedAt)),
+      ...(seed.studentItemStates ?? []).map(x => this.db.prepare('INSERT INTO student_item_states(assignment_id,student_id,course_id,data,version) VALUES (?,?,?,?,?)').bind(x.assignmentId,x.studentId,x.courseId,JSON.stringify(x),x.version)),
+      ...(seed.finalOverrides ?? []).map(x => this.db.prepare('INSERT INTO course_grade_overrides(course_id,student_id,data,version) VALUES (?,?,?,?)').bind(x.courseId,x.studentId,JSON.stringify(x),x.version)),
+      ...(seed.gradeEvents ?? []).map(x => this.db.prepare('INSERT INTO grade_events(id,course_id,student_id,assignment_id,kind,data,by_user,at,batch_id) VALUES (?,?,?,?,?,?,?,?,?)').bind(x.id,x.courseId,x.studentId,x.assignmentId,x.kind,JSON.stringify(x),x.by,x.at,x.batchId)),
       ...seed.tutorSettings.map((s) => this.db.prepare('INSERT INTO tutor_settings (activity_kind,activity_id,mode,max_hints,allowed_source_ids,set_by,set_at) VALUES (?,?,?,?,?,?,?)').bind(s.activityKind,s.activityId,s.mode,s.maxHints,JSON.stringify(s.allowedSourceIds),s.setBy,s.setAt)),
       ...seed.tutorSessions.map((s) => this.db.prepare('INSERT INTO tutor_sessions (id,student_id,activity_kind,activity_id,course_id,mode,hints_used,max_hints,answer_requests,messages,started_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').bind(s.id,s.studentId,s.activityKind,s.activityId,s.courseId,s.mode,s.hintsUsed,s.maxHints,s.answerRequests,JSON.stringify(s.messages),s.startedAt,s.updatedAt)),
       ...seed.enrollments.map((row) => this.enrollmentStmt(row.courseId, row.userId)),
@@ -750,17 +779,17 @@ export class D1Repo implements Repo {
   }
 
   private assignmentStmt(a: Assignment): D1PreparedStatement {
-    return this.db.prepare(`INSERT INTO assignments (id,module_id,course_id,title,position,status,published_at,due_at,points,submission_type,rubric,instructions)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET module_id=excluded.module_id,course_id=excluded.course_id,title=excluded.title,
+    return this.db.prepare(`INSERT INTO assignments (id,module_id,course_id,title,position,status,published_at,due_at,points,submission_type,rubric,instructions,category_id,extra_credit,counts_toward_grade)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET module_id=excluded.module_id,course_id=excluded.course_id,title=excluded.title,
       position=excluded.position,status=excluded.status,published_at=excluded.published_at,due_at=excluded.due_at,points=excluded.points,
-      submission_type=excluded.submission_type,rubric=excluded.rubric,instructions=excluded.instructions`)
-      .bind(a.id,a.moduleId,a.courseId,a.title,a.position,a.status,a.publishedAt,a.dueAt,a.points,a.submissionType,JSON.stringify(a.rubric),JSON.stringify(a.instructions));
+      submission_type=excluded.submission_type,rubric=excluded.rubric,instructions=excluded.instructions,category_id=excluded.category_id,extra_credit=excluded.extra_credit,counts_toward_grade=excluded.counts_toward_grade`)
+      .bind(a.id,a.moduleId,a.courseId,a.title,a.position,a.status,a.publishedAt,a.dueAt,a.points,a.submissionType,JSON.stringify(a.rubric),JSON.stringify(a.instructions),a.categoryId??null,a.extraCredit===undefined?null:Number(a.extraCredit),a.countsTowardGrade===undefined?null:Number(a.countsTowardGrade));
   }
   private submissionStmt(s: Submission): D1PreparedStatement {
-    return this.db.prepare(`INSERT INTO submissions (id,assignment_id,student_id,attempt,state,text,file_id,link,submitted_at,grade)
-      VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET assignment_id=excluded.assignment_id,student_id=excluded.student_id,
-      attempt=excluded.attempt,state=excluded.state,text=excluded.text,file_id=excluded.file_id,link=excluded.link,submitted_at=excluded.submitted_at,grade=excluded.grade`)
-      .bind(s.id,s.assignmentId,s.studentId,s.attempt,s.state,s.text,s.fileId,s.link,s.submittedAt,jsonOrNull(s.grade));
+    return this.db.prepare(`INSERT INTO submissions (id,assignment_id,student_id,attempt,state,text,file_id,link,submitted_at,grade,version,source,feedback_draft,deleted)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET assignment_id=excluded.assignment_id,student_id=excluded.student_id,
+      attempt=excluded.attempt,state=excluded.state,text=excluded.text,file_id=excluded.file_id,link=excluded.link,submitted_at=excluded.submitted_at,grade=excluded.grade,version=excluded.version,source=excluded.source,feedback_draft=excluded.feedback_draft,deleted=excluded.deleted`)
+      .bind(s.id,s.assignmentId,s.studentId,s.attempt,s.state,s.text,s.fileId,s.link,s.submittedAt,jsonOrNull(s.grade),s.version??0,s.source??null,jsonOrNull(s.feedbackDraft),s.deleted?1:0);
   }
 
   private announcementStmt(announcement: StoredAnnouncement): D1PreparedStatement {
@@ -1239,17 +1268,17 @@ function progressFromRow(row: ProgressRow): StoredProgress {
 
 interface AssignmentRow extends Record<string, unknown> {
   id: string; module_id: string; course_id: string; title: string; position: number; status: Assignment['status'];
-  published_at: string | null; due_at: string | null; points: number; submission_type: Assignment['submissionType']; rubric: string; instructions: string;
+  published_at: string | null; due_at: string | null; points: number; submission_type: Assignment['submissionType']; rubric: string; instructions: string; category_id:string|null;extra_credit:number|null;counts_toward_grade:number|null;
 }
 function assignmentFromRow(r: AssignmentRow): Assignment {
   return { id:r.id,moduleId:r.module_id,courseId:r.course_id,title:r.title,position:r.position,status:r.status,publishedAt:r.published_at,
-    dueAt:r.due_at,points:r.points,submissionType:r.submission_type,rubric:parseJson(r.rubric),instructions:parseJson(r.instructions) };
+    dueAt:r.due_at,points:r.points,submissionType:r.submission_type,rubric:parseJson(r.rubric),instructions:parseJson(r.instructions),categoryId:r.category_id??null,extraCredit:!!r.extra_credit,countsTowardGrade:r.counts_toward_grade==null?true:!!r.counts_toward_grade };
 }
 interface SubmissionRow extends Record<string, unknown> {
   id: string; assignment_id: string; student_id: string; attempt: number; state: Submission['state']; text: string;
-  file_id: string | null; link: string; submitted_at: string; grade: string | null;
+  file_id: string | null; link: string; submitted_at: string; grade: string | null;version:number;source:string|null;feedback_draft:string|null;deleted?:number;
 }
 function submissionFromRow(r: SubmissionRow): Submission {
   return { id:r.id,assignmentId:r.assignment_id,studentId:r.student_id,attempt:r.attempt,state:r.state,text:r.text,fileId:r.file_id,
-    link:r.link,submittedAt:r.submitted_at,grade:r.grade ? parseJson(r.grade) : null };
+    link:r.link,submittedAt:r.submitted_at,grade:r.grade ? parseJson(r.grade) : null,version:r.version??0,source:(r.source??'student') as Submission['source'],feedbackDraft:r.feedback_draft?parseJson(r.feedback_draft):null,...(r.deleted?{deleted:true}:{}) };
 }

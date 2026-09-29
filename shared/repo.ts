@@ -8,6 +8,25 @@ import type {
   AiFinding, AlignableKind, Attestation, Certificate, CompletionEvent, CourseTemplate, ManagerConsent, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, TestOut,
 } from './domain';
 import type { SeedData } from './seed';
+import type { CourseGradeOverride, GradebookSetup, StudentItemState, GradeEvent } from './domain';
+
+export type GradeWrite =
+  | { kind: 'setup'; value: GradebookSetup; expectedVersion: number }
+  | { kind: 'state'; value: StudentItemState; expectedVersion: number }
+  | { kind: 'final'; value: CourseGradeOverride | { courseId: Id; studentId: Id; clear: true }; expectedVersion: number }
+  | { kind: 'submission'; value: Submission; expectedVersion: number; create?: boolean; priorId?: Id }
+  | { kind: 'submission-delete'; value: { id: Id; clear: true }; expectedVersion: number };
+export type GradeWriteResult = { ok: true; versions: { key: string; version: number }[] } | { ok: false; conflicts: { key: string; current: unknown }[] };
+export interface GradeBatch { courseId: Id; batchId: Id; by: Id; fingerprint: string; result: unknown; at: Timestamp }
+export interface GradeSnapshot {
+  courseId: Id;
+  setup: GradebookSetup;
+  assignments: Assignment[];
+  studentIds: Id[];
+  submissions: Submission[];
+  states: StudentItemState[];
+  finalRevisions: CourseGradeOverride[];
+}
 
 /** One element to draft; `variant: 'video-script'` is a document written as scenes with narration. */
 export interface GenerationItem { lessonId: Id; type: Block['type']; variant?: 'video-script' }
@@ -58,6 +77,8 @@ export interface Repo {
   putCourse(course: Course): Promise<void>;
 
   listEnrollments(filter: { courseId?: Id; userId?: Id }): Promise<Enrollment[]>;
+  /** Enrolled students in stable name/id order for gradebook calculations. */
+  listCourseStudents(courseId: Id): Promise<User[]>;
   /** Replaces the course's enrollments. */
   setEnrollments(courseId: Id, userIds: Id[]): Promise<void>;
   /** Idempotent: adds one enrollment; never removes any. */
@@ -90,8 +111,23 @@ export interface Repo {
   deleteAssignment(id: Id): Promise<void>;
   getSubmission(id: Id): Promise<Submission | null>;
   /** Ordered by student id, then descending attempt. */
-  listSubmissions(filter: { assignmentId?: Id; studentId?: Id }): Promise<Submission[]>;
+  listSubmissions(filter: { assignmentId?: Id; studentId?: Id; courseId?: Id; includeDeleted?: boolean }): Promise<Submission[]>;
   putSubmission(submission: Submission): Promise<void>;
+
+  getGradebookSetup(courseId: Id): Promise<GradebookSetup | null>;
+  putGradebookSetup(setup: GradebookSetup, expectedVersion: number, event: GradeEvent): Promise<GradeWriteResult>;
+  listStudentItemStates(filter: { courseId: Id; studentId?: Id; assignmentId?: Id }): Promise<StudentItemState[]>;
+  putStudentItemState(state: StudentItemState, expectedVersion: number, event: GradeEvent): Promise<GradeWriteResult>;
+  getFinalOverride(courseId: Id, studentId: Id): Promise<CourseGradeOverride | null>;
+  listFinalOverrides(courseId: Id): Promise<CourseGradeOverride[]>;
+  /** Includes cleared tombstones for version checks and preview fingerprints. */
+  listFinalOverrideRevisions(courseId: Id): Promise<CourseGradeOverride[]>;
+  putFinalOverride(value: CourseGradeOverride | { courseId: Id; studentId: Id; clear: true }, expectedVersion: number, event: GradeEvent): Promise<GradeWriteResult>;
+  appendGradeEvent(event: GradeEvent): Promise<void>;
+  listGradeEvents(filter: { courseId: Id; studentId?: Id; assignmentId?: Id; kind?: GradeEvent['kind']; batchId?: Id; cursor?: string; limit?: number }): Promise<{ items: GradeEvent[]; nextCursor: string | null }>;
+  getGradeEvent(id: Id): Promise<GradeEvent | null>;
+  getGradeBatch(courseId: Id, batchId: Id): Promise<GradeBatch | null>;
+  applyGradeWrites(writes: GradeWrite[], events: GradeEvent[], snapshot?: GradeSnapshot, batch?: GradeBatch): Promise<GradeWriteResult>;
 
   getTutorSetting(activityKind: ActivityKind, activityId: Id): Promise<TutorSetting | null>;
   putTutorSetting(setting: TutorSetting): Promise<void>;

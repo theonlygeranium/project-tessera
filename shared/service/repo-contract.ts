@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Repo } from '../repo';
 import { seedData } from '../seed';
-import type { Certificate, CourseTemplate, Program, Requirement, Rubric } from '../domain';
+import type { Certificate, CourseTemplate, Program, Requirement, Rubric, GradeEvent } from '../domain';
 import type { StoredReadinessItem } from '../repo';
 
 /** Shared behavioral contract for MemoryRepo and the Worker's D1Repo. */
@@ -17,10 +17,10 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       const module = (await repo.getModule('m-stat-1'))!; module.title = 'New'; await repo.putModule(module); expect((await repo.getModule(module.id))?.title).toBe('New');
       const lesson = (await repo.getLesson('l-stat-1'))!; lesson.title = 'New'; await repo.putLesson(lesson); expect((await repo.getLesson(lesson.id))?.title).toBe('New');
       const block = (await repo.getBlock('b-s1-1'))!; await repo.putBlock(block); expect(await repo.getBlock(block.id)).toEqual(block);
-      const assignment = (await repo.getAssignment('asg-stat-1'))!; assignment.title = 'Edited'; await repo.putAssignment(assignment); assignment.title = 'Changed locally';
+      const assignment = (await repo.getAssignment('asg-stat-1'))!;expect(assignment).toMatchObject({categoryId:null,extraCredit:false,countsTowardGrade:true}); assignment.title = 'Edited'; await repo.putAssignment(assignment); assignment.title = 'Changed locally';
       expect((await repo.getAssignment(assignment.id))?.title).toBe('Edited');
       const submission = { id:'sub-contract',assignmentId:assignment.id,studentId:'u-priya',attempt:1,state:'submitted' as const,text:'Answer',fileId:null,link:'',submittedAt:'2026-09-26T00:00:00Z',grade:null };
-      await repo.putSubmission(submission); expect(await repo.getSubmission(submission.id)).toEqual(submission);
+      await repo.putSubmission(submission); expect(await repo.getSubmission(submission.id)).toEqual({...submission,version:0,source:'student',feedbackDraft:null});
       const tutorSetting = { activityKind:'lesson' as const, activityId:'l-stat-1', mode:'hints' as const, maxHints:2, allowedSourceIds:['b-s1-1'], setBy:'u-okafor', setAt:'2026-09-26T00:00:00Z' };
       await repo.putTutorSetting(tutorSetting);
       tutorSetting.allowedSourceIds.push('local-change');
@@ -53,9 +53,9 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
     });
     it('orders users, courses, modules, lessons, blocks, announcements, and sessions', async () => {
       const repo = await makeRepo();
-      expect((await repo.listUsers()).map(x => x.role)).toEqual(['administrator','instructor','instructor','student','student','student','student','student','student']);
-      expect((await repo.listUsers({ role: 'student' })).map(x => x.name)).toEqual(['Dana Whitfield','Jordan Lee','Marcus Bell','Priya Natarajan','Sam Ortiz','Sofia Alvarez']);
-      expect((await repo.listCourses()).map(x => x.code)).toEqual(['COMM 120','OPS 101','STAT 110']);
+      expect((await repo.listUsers()).map(x => x.role)).toEqual([...seedData().users].sort((a,b)=>({administrator:0,instructor:1,student:2})[a.role]-({administrator:0,instructor:1,student:2})[b.role]).map(x=>x.role));
+      expect((await repo.listUsers({ role: 'student' })).map(x => x.name)).toEqual(seedData().users.filter(x=>x.role==='student').map(x=>x.name).sort());
+      expect((await repo.listCourses()).map(x => x.code)).toEqual(['COMM 120','OPS 101','STAT 110','STAT 110-04']);
       expect((await repo.listModules('c-stat110')).map(x => x.id)).toEqual(['m-stat-1','m-stat-2']);
       expect((await repo.listLessons({ courseId: 'c-stat110' })).map(x => x.id)).toEqual(['l-stat-1','l-stat-2','l-stat-3']);
       expect((await repo.listBlocks('l-stat-1')).map(x => x.position)).toEqual([0,1,2,3,4]);
@@ -93,7 +93,7 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-priya']);
       await repo.addEnrollment('c-stat110', 'u-dana'); await repo.addEnrollment('c-stat110', 'u-dana');
       expect((await repo.listEnrollments({ courseId: 'c-stat110' })).map(x => x.userId)).toEqual(['u-dana', 'u-priya']);
-      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.adaptations = []; empty.builderSessions = []; empty.generationJobs = []; empty.requirements = []; empty.completionEvents = []; empty.testOuts = []; empty.reportingLines = [];
+      const empty = seedData(); empty.users = []; empty.courses = []; empty.enrollments = []; empty.modules = []; empty.lessons = []; empty.blocks = []; empty.assignments = []; empty.submissions = []; empty.announcements = []; empty.reads = []; empty.progress = []; empty.adaptations = []; empty.builderSessions = []; empty.generationJobs = []; empty.requirements = []; empty.completionEvents = []; empty.testOuts = []; empty.reportingLines = []; empty.gradebookSetups=[]; empty.studentItemStates=[]; empty.finalOverrides=[]; empty.gradeEvents=[];
       await repo.reset(empty); expect(await repo.isEmpty()).toBe(true);
       await repo.reset(seedData()); expect(await repo.isEmpty()).toBe(false); expect(await repo.getUser('u-priya')).not.toBeNull();
       expect(await repo.getAssignment('asg-stat-1')).not.toBeNull();
@@ -311,6 +311,43 @@ export function describeRepoContract(name: string, makeRepo: () => Promise<Repo>
       expect(await repo.listOutcomeLinks({})).toEqual([]); expect(await repo.listRequirements()).toEqual(fresh.requirements); expect(await repo.listCompletionEvents({})).toEqual(fresh.completionEvents);
       expect(await repo.getTestOut('c-stat110')).toBeNull(); expect(await repo.listTestOutAttempts('u-priya', 'c-stat110')).toEqual([]);
       expect(await repo.listCertificates({})).toEqual([]); expect(await repo.listReportingLines({})).toEqual(fresh.reportingLines); expect(await repo.listManagerConsents({})).toEqual([]);
+    });
+    it('gradebook rows, CAS, atomic writes, filtering and stable event cursors', async () => {
+      const repo=await makeRepo(),courseId='stat110-04',at='2026-02-01T00:00:00.000Z';
+      const setup=(await repo.getGradebookSetup(courseId))!;
+      expect(setup.version).toBe(1);
+      expect(await repo.getGradebookSetup('c-comm120')).toBeNull();
+      const state=(await repo.listStudentItemStates({courseId,studentId:'u-priya',assignmentId:'q3'}))[0];
+      expect(state.excused?.reason).toBe('Fixture');
+      expect(await repo.listStudentItemStates({courseId:'c-comm120'})).toEqual([]);
+      const gradeEvent=(id:string,kind:GradeEvent['kind']='setup'):GradeEvent=>({id,courseId,studentId:null,assignmentId:null,kind,before:null,after:null,reason:null,by:'u-okafor',at,batchId:null,undoOf:null,rulesVersion:1});
+      const next={...setup,version:2};
+      expect((await repo.putGradebookSetup(next,1,gradeEvent('ge-contract-1'))).ok).toBe(true);
+      expect((await repo.putGradebookSetup({...next,version:3},1,gradeEvent('ge-contract-bad'))).ok).toBe(false);
+      expect((await repo.getGradebookSetup(courseId))?.version).toBe(2);
+      const changed={...state,missing:'force-not-missing' as const,version:2};
+      expect((await repo.putStudentItemState(changed,1,gradeEvent('ge-contract-2','missing'))).ok).toBe(true);
+      expect((await repo.putStudentItemState({...changed,version:3},1,gradeEvent('ge-contract-bad2'))).ok).toBe(false);
+      const final={courseId,studentId:'u-priya',letter:'B+',percent:null,reason:'Appeal',by:'u-okafor',at,version:1};
+      expect((await repo.putFinalOverride(final,0,gradeEvent('ge-contract-3','final-override'))).ok).toBe(true);
+      expect((await repo.putFinalOverride({...final,version:2},0,gradeEvent('ge-contract-bad3'))).ok).toBe(false);
+      expect((await repo.getFinalOverride(courseId,'u-priya'))?.reason).toBe('Appeal');expect((await repo.listFinalOverrides(courseId)).map(x=>x.studentId)).toEqual(['u-priya']);expect(await repo.listFinalOverrides('c-comm120')).toEqual([]);expect((await repo.listCourseStudents(courseId)).map(x=>x.id)).toContain('u-priya');
+      const submission=(await repo.listSubmissions({courseId,studentId:'u-priya'})).find(x=>x.assignmentId==='hw1')!;
+      expect((await repo.listSubmissions({courseId:'c-comm120'})).some(x=>x.id===submission.id)).toBe(false);
+      expect((await repo.applyGradeWrites([{kind:'submission',value:{...submission,id:'sub-duplicate-cell',version:1},expectedVersion:0,create:true}],[gradeEvent('ge-contract-duplicate','score')])).ok).toBe(false);
+      expect(await repo.getSubmission('sub-duplicate-cell')).toBeNull();
+      const update={...submission,version:(submission.version??0)+1};
+      const atomic=await repo.applyGradeWrites([{kind:'submission',value:update,expectedVersion:submission.version??0},{kind:'state',value:{...changed,version:3},expectedVersion:1}],[gradeEvent('ge-contract-atomic')]);
+      expect(atomic.ok).toBe(false);expect((await repo.getSubmission(submission.id))?.version).toBe(submission.version);expect(await repo.getGradeEvent('ge-contract-atomic')).toBeNull();
+      expect((await repo.applyGradeWrites([{kind:'submission',value:update,expectedVersion:submission.version??0}],[gradeEvent('ge-contract-4','score')])).ok).toBe(true);
+      expect((await repo.applyGradeWrites([{kind:'submission',value:{...update,version:2},expectedVersion:0}],[gradeEvent('ge-contract-stale','score')])).ok).toBe(false);
+      expect((await repo.getSubmission(submission.id))?.version).toBe(1);
+      expect((await repo.putFinalOverride({courseId,studentId:'u-priya',clear:true},1,gradeEvent('ge-contract-5','final-override'))).ok).toBe(true);
+      expect(await repo.getFinalOverride(courseId,'u-priya')).toBeNull();
+      const events=await repo.listGradeEvents({courseId,limit:2});expect(events.items.map(x=>x.id)).toEqual(['ge-contract-5','ge-contract-4']);
+      const second=await repo.listGradeEvents({courseId,limit:2,cursor:events.nextCursor!});expect(second.items.map(x=>x.id)).toEqual(['ge-contract-3','ge-contract-2']);
+      const third=await repo.listGradeEvents({courseId,limit:2,cursor:second.nextCursor!});expect(third.items.map(x=>x.id)).toEqual(['ge-contract-1']);
+      expect((await repo.listGradeEvents({courseId:'c-comm120'})).items).toEqual([]);
     });
   });
 }

@@ -136,7 +136,7 @@ describe('worker fetch', () => {
 
     const admin = await call(env, '/api/v1/overview', { headers: { cookie: 'theme=light; tessera_user=u-admin' } });
     expect(admin.status).toBe(200);
-    expect(((await admin.json()) as { people: Record<string, number> }).people.student).toBe(6);
+    expect(((await admin.json()) as { people: Record<string, number> }).people.student).toBe(17);
   });
 
   it('passes query and path fields to the handler and keeps ApiError details', async () => {

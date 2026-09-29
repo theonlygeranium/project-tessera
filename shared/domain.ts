@@ -584,6 +584,9 @@ export interface Assignment {
   rubric: RubricCriterion[];
   /** Instructions are blocks, like a lesson's. */
   instructions: Block[];
+  categoryId?: Id | null;
+  extraCredit?: boolean;
+  countsTowardGrade?: boolean;
 }
 
 export type SubmissionState = 'submitted' | 'graded' | 'returned';
@@ -599,6 +602,11 @@ export interface Submission {
   link: string;
   submittedAt: Timestamp;
   grade: Grade | null;
+  version?: number;
+  source?: 'student' | 'recorded';
+  feedbackDraft?: { text: string; provenance: Provenance; createdAt: Timestamp } | null;
+  /** Internal CAS tombstone; never returned from ordinary submission reads. */
+  deleted?: boolean;
 }
 
 export interface Grade {
@@ -617,9 +625,30 @@ export interface Grade {
 
 export interface GradebookRow {
   student: Pick<User, 'id' | 'name' | 'email'>;
-  cells: { assignmentId: Id; score: number | null; state: SubmissionState | 'missing'; released: boolean }[];
+  cells: { assignmentId: Id; score: number | null; state: SubmissionState | 'missing'; released: boolean; submissionVersion?: number; itemStateVersion?: number; display?: { state: import('./grading/types').CellState; adjusted: number | null; label: string } }[];
   total: number;
   possible: number;
+  result?: { percent: number | null; letter: string | null };
+  finalOverrideVersion?: number;
+}
+
+export type { CalculationMode, GradeCategory, LatePolicy, MissingPolicy, ExtraCreditPolicy, GradeScheme, GradebookSetup, StudentItemState, CourseGradeOverride, CalcItem, CalcInput, CellState, TraceCode, TraceReason, TraceItem, TraceCategory, CalculationTrace, CourseGradeResult, SetupCheckCode, SetupCheck } from './grading/types';
+export type GradeEventKind = 'score' | 'override' | 'excuse' | 'unexcuse' | 'missing' | 'extension' | 'late-waiver' | 'final-override' | 'release' | 'unrelease' | 'setup' | 'undo';
+export interface GradeEvent {
+  id: Id; courseId: Id; studentId: Id | null; assignmentId: Id | null; kind: GradeEventKind;
+  before: unknown; after: unknown; reason: string | null;
+  by: Id; at: Timestamp; batchId: Id | null; undoOf: Id | null; rulesVersion: number;
+  seq?: number;
+  requestFingerprint?: string;
+  result?: unknown;
+  batchResult?: unknown;
+}
+export interface GradeChangeSet {
+  kind: 'setup' | 'release';
+  changes: { studentId: Id; name: string; from: { percent: number | null; letter: string | null }; to: { percent: number | null; letter: string | null } }[];
+  letterChanges: number; unchanged: number;
+  notSent: { submissionId: Id; studentId: Id; reason: 'ai-draft-not-reviewed' }[];
+  hash: string;
 }
 
 // ---- Tutor (D-005, plan §5.4) -------------------------------------------------------------

@@ -7,3 +7,4 @@ export * from './explain';
 export * from './setup-check';
 export * from './what-if';
 export * from './views';
+export * from './timestamp';

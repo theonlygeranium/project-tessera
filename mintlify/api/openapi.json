@@ -8833,6 +8833,23 @@
                     "items": {
                       "$ref": "#/components/schemas/BlockInput"
                     }
+                  },
+                  "categoryId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "extraCredit": {
+                    "type": "boolean"
+                  },
+                  "countsTowardGrade": {
+                    "type": "boolean"
                   }
                 },
                 "required": []
@@ -9161,6 +9178,49 @@
                                 "type": "null"
                               }
                             ]
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "student",
+                              "recorded"
+                            ]
+                          },
+                          "feedbackDraft": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "text": {
+                                    "type": "string"
+                                  },
+                                  "provenance": {
+                                    "$ref": "#/components/schemas/Provenance"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "text",
+                                  "provenance",
+                                  "createdAt"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "deleted": {
+                            "type": "boolean"
                           },
                           "student": {
                             "type": "object",
@@ -9861,6 +9921,39 @@
                     "ok": {
                       "type": "boolean",
                       "const": true
+                    },
+                    "released": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "notSent": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "submissionId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "studentId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "const": "ai-draft-not-reviewed"
+                          }
+                        },
+                        "required": [
+                          "submissionId",
+                          "studentId",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": [
@@ -9944,7 +10037,11 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                  "hash": {
+                    "type": "string"
+                  }
+                },
                 "required": []
               }
             }
@@ -9966,6 +10063,18 @@
             "schema": {
               "type": "string",
               "minLength": 1
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "student",
+                "held"
+              ]
             }
           }
         ],
@@ -10020,6 +10129,28 @@
                       "items": {
                         "$ref": "#/components/schemas/GradebookRow"
                       }
+                    },
+                    "setup": {
+                      "type": "object",
+                      "properties": {
+                        "rulesVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "weighted",
+                            "points"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "rulesVersion",
+                        "mode"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -10115,6 +10246,244 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "csv",
+                "json"
+              ]
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "student",
+                "held"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "csv": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "csv"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "studentId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "percent": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "letter": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "rulesVersion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "trace": {
+                            "type": "object",
+                            "properties": {
+                              "studentId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "view": {
+                                "type": "string",
+                                "enum": [
+                                  "student",
+                                  "held"
+                                ]
+                              },
+                              "mode": {
+                                "type": "string",
+                                "enum": [
+                                  "weighted",
+                                  "points"
+                                ]
+                              },
+                              "rulesVersion": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "setupVersion": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "computedAt": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "engineVersion": {
+                                "type": "string"
+                              },
+                              "categories": {
+                                "type": "array",
+                                "items": {}
+                              },
+                              "steps": {
+                                "type": "array",
+                                "items": {}
+                              },
+                              "totals": {},
+                              "reasons": {
+                                "type": "array",
+                                "items": {}
+                              }
+                            },
+                            "required": [
+                              "studentId",
+                              "view",
+                              "mode",
+                              "rulesVersion",
+                              "setupVersion",
+                              "computedAt",
+                              "engineVersion",
+                              "categories",
+                              "steps",
+                              "totals",
+                              "reasons"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "studentId",
+                          "percent",
+                          "letter",
+                          "rulesVersion",
+                          "trace"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/gradebook/setup": {
+      "get": {
+        "operationId": "getGradebookSetup",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         ],
         "responses": {
@@ -10125,12 +10494,405 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "csv": {
+                    "courseId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "weighted",
+                        "points"
+                      ]
+                    },
+                    "categories": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "courseId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "weight": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "drop": {
+                            "type": "object",
+                            "properties": {
+                              "lowest": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "highest": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "keepAtLeast": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "lowest",
+                              "highest",
+                              "keepAtLeast"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "lateApplies": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "courseId",
+                          "name",
+                          "position",
+                          "weight",
+                          "drop",
+                          "lateApplies"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "late": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "percentPerPeriod": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "period": {
+                          "type": "string",
+                          "enum": [
+                            "day",
+                            "hour"
+                          ]
+                        },
+                        "basis": {
+                          "type": "string",
+                          "enum": [
+                            "score",
+                            "possible"
+                          ]
+                        },
+                        "maxPeriods": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "afterMax": {
+                          "type": "string",
+                          "enum": [
+                            "missing",
+                            "hold-at-max"
+                          ]
+                        },
+                        "graceMinutes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 525600
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "percentPerPeriod",
+                        "period",
+                        "basis",
+                        "maxPeriods",
+                        "afterMax",
+                        "graceMinutes"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "missing": {
+                      "type": "object",
+                      "properties": {
+                        "treatAs": {
+                          "type": "string",
+                          "enum": [
+                            "zero-after-due",
+                            "exclude-until-graded"
+                          ]
+                        },
+                        "droppable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "treatAs",
+                        "droppable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "extraCredit": {
+                      "type": "object",
+                      "properties": {
+                        "categoryCapPercent": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "courseCapPoints": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "categoryCapPercent",
+                        "courseCapPoints"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "scheme": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "bands": {
+                          "minItems": 1,
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "letter": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 12
+                              },
+                              "min": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                              }
+                            },
+                            "required": [
+                              "letter",
+                              "min"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "rounding": {
+                          "type": "object",
+                          "properties": {
+                            "decimals": {
+                              "type": "number",
+                              "const": 1
+                            },
+                            "mode": {
+                              "type": "string",
+                              "const": "half-up"
+                            }
+                          },
+                          "required": [
+                            "decimals",
+                            "mode"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "letterFrom": {
+                          "type": "string",
+                          "const": "rounded"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "bands",
+                        "rounding",
+                        "letterFrom"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "emptyCategory": {
+                      "type": "string",
+                      "const": "share-weight"
+                    },
+                    "studentNotes": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "categoryId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "text": {
+                            "type": "string",
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "categoryId",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "dismissedChecks": {
+                      "maxItems": 200,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "weights-not-100",
+                              "weight-invalid",
+                              "category-empty",
+                              "drop-exceeds-items",
+                              "drop-before-complete",
+                              "keep-at-least-invalid",
+                              "drop-count-invalid",
+                              "scheme-gap",
+                              "scheme-overlap",
+                              "scheme-order",
+                              "late-no-cap",
+                              "extra-credit-uncapped",
+                              "item-no-category",
+                              "item-zero-points",
+                              "missing-droppable",
+                              "mode-switch-extra-credit"
+                            ]
+                          },
+                          "target": {
+                            "type": "string"
+                          },
+                          "by": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "at": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "target",
+                          "by",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "manual",
+                            "syllabus"
+                          ]
+                        },
+                        "designSessionId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "designSessionId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "rulesVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "updatedBy": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "csv"
+                    "courseId",
+                    "mode",
+                    "categories",
+                    "late",
+                    "missing",
+                    "extraCredit",
+                    "scheme",
+                    "emptyCategory",
+                    "studentNotes",
+                    "dismissedChecks",
+                    "source",
+                    "version",
+                    "rulesVersion",
+                    "updatedBy",
+                    "updatedAt"
                   ],
                   "additionalProperties": false
                 }
@@ -10204,6 +10966,4273 @@
             "bearerAuth": []
           }
         ]
+      },
+      "put": {
+        "operationId": "saveGradebookSetup",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "courseId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "weighted",
+                        "points"
+                      ]
+                    },
+                    "categories": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "courseId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "weight": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "drop": {
+                            "type": "object",
+                            "properties": {
+                              "lowest": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "highest": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "keepAtLeast": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "lowest",
+                              "highest",
+                              "keepAtLeast"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "lateApplies": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "courseId",
+                          "name",
+                          "position",
+                          "weight",
+                          "drop",
+                          "lateApplies"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "late": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "percentPerPeriod": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "period": {
+                          "type": "string",
+                          "enum": [
+                            "day",
+                            "hour"
+                          ]
+                        },
+                        "basis": {
+                          "type": "string",
+                          "enum": [
+                            "score",
+                            "possible"
+                          ]
+                        },
+                        "maxPeriods": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "afterMax": {
+                          "type": "string",
+                          "enum": [
+                            "missing",
+                            "hold-at-max"
+                          ]
+                        },
+                        "graceMinutes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 525600
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "percentPerPeriod",
+                        "period",
+                        "basis",
+                        "maxPeriods",
+                        "afterMax",
+                        "graceMinutes"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "missing": {
+                      "type": "object",
+                      "properties": {
+                        "treatAs": {
+                          "type": "string",
+                          "enum": [
+                            "zero-after-due",
+                            "exclude-until-graded"
+                          ]
+                        },
+                        "droppable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "treatAs",
+                        "droppable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "extraCredit": {
+                      "type": "object",
+                      "properties": {
+                        "categoryCapPercent": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "courseCapPoints": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "categoryCapPercent",
+                        "courseCapPoints"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "scheme": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "bands": {
+                          "minItems": 1,
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "letter": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 12
+                              },
+                              "min": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                              }
+                            },
+                            "required": [
+                              "letter",
+                              "min"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "rounding": {
+                          "type": "object",
+                          "properties": {
+                            "decimals": {
+                              "type": "number",
+                              "const": 1
+                            },
+                            "mode": {
+                              "type": "string",
+                              "const": "half-up"
+                            }
+                          },
+                          "required": [
+                            "decimals",
+                            "mode"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "letterFrom": {
+                          "type": "string",
+                          "const": "rounded"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "bands",
+                        "rounding",
+                        "letterFrom"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "emptyCategory": {
+                      "type": "string",
+                      "const": "share-weight"
+                    },
+                    "studentNotes": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "categoryId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "text": {
+                            "type": "string",
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "categoryId",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "dismissedChecks": {
+                      "maxItems": 200,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "weights-not-100",
+                              "weight-invalid",
+                              "category-empty",
+                              "drop-exceeds-items",
+                              "drop-before-complete",
+                              "keep-at-least-invalid",
+                              "drop-count-invalid",
+                              "scheme-gap",
+                              "scheme-overlap",
+                              "scheme-order",
+                              "late-no-cap",
+                              "extra-credit-uncapped",
+                              "item-no-category",
+                              "item-zero-points",
+                              "missing-droppable",
+                              "mode-switch-extra-credit"
+                            ]
+                          },
+                          "target": {
+                            "type": "string"
+                          },
+                          "by": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "at": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "target",
+                          "by",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "manual",
+                            "syllabus"
+                          ]
+                        },
+                        "designSessionId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "designSessionId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "rulesVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "updatedBy": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "courseId",
+                    "mode",
+                    "categories",
+                    "late",
+                    "missing",
+                    "extraCredit",
+                    "scheme",
+                    "emptyCategory",
+                    "studentNotes",
+                    "dismissedChecks",
+                    "source",
+                    "version",
+                    "rulesVersion",
+                    "updatedBy",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "setup": {
+                    "type": "object",
+                    "properties": {
+                      "courseId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "weighted",
+                          "points"
+                        ]
+                      },
+                      "categories": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "courseId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            },
+                            "position": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "weight": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "drop": {
+                              "type": "object",
+                              "properties": {
+                                "lowest": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "highest": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "keepAtLeast": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "lowest",
+                                "highest",
+                                "keepAtLeast"
+                              ]
+                            },
+                            "lateApplies": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "courseId",
+                            "name",
+                            "position",
+                            "weight",
+                            "drop",
+                            "lateApplies"
+                          ]
+                        }
+                      },
+                      "late": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "percentPerPeriod": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "period": {
+                            "type": "string",
+                            "enum": [
+                              "day",
+                              "hour"
+                            ]
+                          },
+                          "basis": {
+                            "type": "string",
+                            "enum": [
+                              "score",
+                              "possible"
+                            ]
+                          },
+                          "maxPeriods": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "afterMax": {
+                            "type": "string",
+                            "enum": [
+                              "missing",
+                              "hold-at-max"
+                            ]
+                          },
+                          "graceMinutes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 525600
+                          }
+                        },
+                        "required": [
+                          "enabled",
+                          "percentPerPeriod",
+                          "period",
+                          "basis",
+                          "maxPeriods",
+                          "afterMax",
+                          "graceMinutes"
+                        ]
+                      },
+                      "missing": {
+                        "type": "object",
+                        "properties": {
+                          "treatAs": {
+                            "type": "string",
+                            "enum": [
+                              "zero-after-due",
+                              "exclude-until-graded"
+                            ]
+                          },
+                          "droppable": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "treatAs",
+                          "droppable"
+                        ]
+                      },
+                      "extraCredit": {
+                        "type": "object",
+                        "properties": {
+                          "categoryCapPercent": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "courseCapPoints": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "categoryCapPercent",
+                          "courseCapPoints"
+                        ]
+                      },
+                      "scheme": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "bands": {
+                            "minItems": 1,
+                            "maxItems": 50,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "letter": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 12
+                                },
+                                "min": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100
+                                }
+                              },
+                              "required": [
+                                "letter",
+                                "min"
+                              ]
+                            }
+                          },
+                          "rounding": {
+                            "type": "object",
+                            "properties": {
+                              "decimals": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "mode": {
+                                "type": "string",
+                                "const": "half-up"
+                              }
+                            },
+                            "required": [
+                              "decimals",
+                              "mode"
+                            ]
+                          },
+                          "letterFrom": {
+                            "type": "string",
+                            "const": "rounded"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "bands",
+                          "rounding",
+                          "letterFrom"
+                        ]
+                      },
+                      "emptyCategory": {
+                        "type": "string",
+                        "const": "share-weight"
+                      },
+                      "studentNotes": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "categoryId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "text": {
+                              "type": "string",
+                              "maxLength": 1000
+                            }
+                          },
+                          "required": [
+                            "categoryId",
+                            "text"
+                          ]
+                        }
+                      },
+                      "dismissedChecks": {
+                        "maxItems": 200,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "weights-not-100",
+                                "weight-invalid",
+                                "category-empty",
+                                "drop-exceeds-items",
+                                "drop-before-complete",
+                                "keep-at-least-invalid",
+                                "drop-count-invalid",
+                                "scheme-gap",
+                                "scheme-overlap",
+                                "scheme-order",
+                                "late-no-cap",
+                                "extra-credit-uncapped",
+                                "item-no-category",
+                                "item-zero-points",
+                                "missing-droppable",
+                                "mode-switch-extra-credit"
+                              ]
+                            },
+                            "target": {
+                              "type": "string"
+                            },
+                            "by": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "at": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "target",
+                            "by",
+                            "at"
+                          ]
+                        }
+                      },
+                      "source": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "manual",
+                              "syllabus"
+                            ]
+                          },
+                          "designSessionId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "designSessionId"
+                        ]
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "rulesVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "updatedBy": {
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "courseId",
+                      "mode",
+                      "categories",
+                      "late",
+                      "missing",
+                      "extraCredit",
+                      "scheme",
+                      "emptyCategory",
+                      "studentNotes",
+                      "dismissedChecks",
+                      "source",
+                      "version",
+                      "rulesVersion",
+                      "updatedBy",
+                      "updatedAt"
+                    ]
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "hash": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "setup",
+                  "expectedVersion",
+                  "hash"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{courseId}/gradebook/setup/preview": {
+      "post": {
+        "operationId": "previewGradebookSetup",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "weights-not-100",
+                              "weight-invalid",
+                              "category-empty",
+                              "drop-exceeds-items",
+                              "drop-before-complete",
+                              "keep-at-least-invalid",
+                              "drop-count-invalid",
+                              "scheme-gap",
+                              "scheme-overlap",
+                              "scheme-order",
+                              "late-no-cap",
+                              "extra-credit-uncapped",
+                              "item-no-category",
+                              "item-zero-points",
+                              "missing-droppable",
+                              "mode-switch-extra-credit"
+                            ]
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "fix",
+                              "review",
+                              "pass"
+                            ]
+                          },
+                          "target": {
+                            "type": "string"
+                          },
+                          "params": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": [
+                                "string",
+                                "number"
+                              ]
+                            }
+                          },
+                          "fixes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "patch": {}
+                              },
+                              "required": [
+                                "label",
+                                "patch"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "severity",
+                          "target",
+                          "params",
+                          "fixes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "changeSet": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "setup",
+                            "release"
+                          ]
+                        },
+                        "changes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "studentId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "from": {
+                                "type": "object",
+                                "properties": {
+                                  "percent": {
+                                    "type": [
+                                      "number",
+                                      "null"
+                                    ]
+                                  },
+                                  "letter": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "percent",
+                                  "letter"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "to": {
+                                "type": "object",
+                                "properties": {
+                                  "percent": {
+                                    "type": [
+                                      "number",
+                                      "null"
+                                    ]
+                                  },
+                                  "letter": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "percent",
+                                  "letter"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "studentId",
+                              "name",
+                              "from",
+                              "to"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "letterChanges": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "unchanged": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "notSent": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "submissionId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "studentId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "reason": {
+                                "type": "string",
+                                "const": "ai-draft-not-reviewed"
+                              }
+                            },
+                            "required": [
+                              "submissionId",
+                              "studentId",
+                              "reason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "hash": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "changes",
+                        "letterChanges",
+                        "unchanged",
+                        "notSent",
+                        "hash"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "checks",
+                    "changeSet"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "setup": {
+                    "type": "object",
+                    "properties": {
+                      "courseId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "weighted",
+                          "points"
+                        ]
+                      },
+                      "categories": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "courseId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            },
+                            "position": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "weight": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "drop": {
+                              "type": "object",
+                              "properties": {
+                                "lowest": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "highest": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "keepAtLeast": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "lowest",
+                                "highest",
+                                "keepAtLeast"
+                              ]
+                            },
+                            "lateApplies": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "courseId",
+                            "name",
+                            "position",
+                            "weight",
+                            "drop",
+                            "lateApplies"
+                          ]
+                        }
+                      },
+                      "late": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "percentPerPeriod": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "period": {
+                            "type": "string",
+                            "enum": [
+                              "day",
+                              "hour"
+                            ]
+                          },
+                          "basis": {
+                            "type": "string",
+                            "enum": [
+                              "score",
+                              "possible"
+                            ]
+                          },
+                          "maxPeriods": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "afterMax": {
+                            "type": "string",
+                            "enum": [
+                              "missing",
+                              "hold-at-max"
+                            ]
+                          },
+                          "graceMinutes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 525600
+                          }
+                        },
+                        "required": [
+                          "enabled",
+                          "percentPerPeriod",
+                          "period",
+                          "basis",
+                          "maxPeriods",
+                          "afterMax",
+                          "graceMinutes"
+                        ]
+                      },
+                      "missing": {
+                        "type": "object",
+                        "properties": {
+                          "treatAs": {
+                            "type": "string",
+                            "enum": [
+                              "zero-after-due",
+                              "exclude-until-graded"
+                            ]
+                          },
+                          "droppable": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "treatAs",
+                          "droppable"
+                        ]
+                      },
+                      "extraCredit": {
+                        "type": "object",
+                        "properties": {
+                          "categoryCapPercent": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "courseCapPoints": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "categoryCapPercent",
+                          "courseCapPoints"
+                        ]
+                      },
+                      "scheme": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "bands": {
+                            "minItems": 1,
+                            "maxItems": 50,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "letter": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 12
+                                },
+                                "min": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100
+                                }
+                              },
+                              "required": [
+                                "letter",
+                                "min"
+                              ]
+                            }
+                          },
+                          "rounding": {
+                            "type": "object",
+                            "properties": {
+                              "decimals": {
+                                "type": "number",
+                                "const": 1
+                              },
+                              "mode": {
+                                "type": "string",
+                                "const": "half-up"
+                              }
+                            },
+                            "required": [
+                              "decimals",
+                              "mode"
+                            ]
+                          },
+                          "letterFrom": {
+                            "type": "string",
+                            "const": "rounded"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "bands",
+                          "rounding",
+                          "letterFrom"
+                        ]
+                      },
+                      "emptyCategory": {
+                        "type": "string",
+                        "const": "share-weight"
+                      },
+                      "studentNotes": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "categoryId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "text": {
+                              "type": "string",
+                              "maxLength": 1000
+                            }
+                          },
+                          "required": [
+                            "categoryId",
+                            "text"
+                          ]
+                        }
+                      },
+                      "dismissedChecks": {
+                        "maxItems": 200,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "weights-not-100",
+                                "weight-invalid",
+                                "category-empty",
+                                "drop-exceeds-items",
+                                "drop-before-complete",
+                                "keep-at-least-invalid",
+                                "drop-count-invalid",
+                                "scheme-gap",
+                                "scheme-overlap",
+                                "scheme-order",
+                                "late-no-cap",
+                                "extra-credit-uncapped",
+                                "item-no-category",
+                                "item-zero-points",
+                                "missing-droppable",
+                                "mode-switch-extra-credit"
+                              ]
+                            },
+                            "target": {
+                              "type": "string"
+                            },
+                            "by": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "at": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "target",
+                            "by",
+                            "at"
+                          ]
+                        }
+                      },
+                      "source": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "manual",
+                              "syllabus"
+                            ]
+                          },
+                          "designSessionId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "designSessionId"
+                        ]
+                      },
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "rulesVersion": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "updatedBy": {
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "courseId",
+                      "mode",
+                      "categories",
+                      "late",
+                      "missing",
+                      "extraCredit",
+                      "scheme",
+                      "emptyCategory",
+                      "studentNotes",
+                      "dismissedChecks",
+                      "source",
+                      "version",
+                      "rulesVersion",
+                      "updatedBy",
+                      "updatedAt"
+                    ]
+                  }
+                },
+                "required": [
+                  "setup"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{courseId}/gradebook/setup/dismiss": {
+      "post": {
+        "operationId": "dismissSetupCheck",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "courseId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "weighted",
+                        "points"
+                      ]
+                    },
+                    "categories": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "courseId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "weight": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "drop": {
+                            "type": "object",
+                            "properties": {
+                              "lowest": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "highest": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "keepAtLeast": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "lowest",
+                              "highest",
+                              "keepAtLeast"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "lateApplies": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "courseId",
+                          "name",
+                          "position",
+                          "weight",
+                          "drop",
+                          "lateApplies"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "late": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "percentPerPeriod": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "period": {
+                          "type": "string",
+                          "enum": [
+                            "day",
+                            "hour"
+                          ]
+                        },
+                        "basis": {
+                          "type": "string",
+                          "enum": [
+                            "score",
+                            "possible"
+                          ]
+                        },
+                        "maxPeriods": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "afterMax": {
+                          "type": "string",
+                          "enum": [
+                            "missing",
+                            "hold-at-max"
+                          ]
+                        },
+                        "graceMinutes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 525600
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "percentPerPeriod",
+                        "period",
+                        "basis",
+                        "maxPeriods",
+                        "afterMax",
+                        "graceMinutes"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "missing": {
+                      "type": "object",
+                      "properties": {
+                        "treatAs": {
+                          "type": "string",
+                          "enum": [
+                            "zero-after-due",
+                            "exclude-until-graded"
+                          ]
+                        },
+                        "droppable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "treatAs",
+                        "droppable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "extraCredit": {
+                      "type": "object",
+                      "properties": {
+                        "categoryCapPercent": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "courseCapPoints": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "categoryCapPercent",
+                        "courseCapPoints"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "scheme": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "bands": {
+                          "minItems": 1,
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "letter": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 12
+                              },
+                              "min": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                              }
+                            },
+                            "required": [
+                              "letter",
+                              "min"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "rounding": {
+                          "type": "object",
+                          "properties": {
+                            "decimals": {
+                              "type": "number",
+                              "const": 1
+                            },
+                            "mode": {
+                              "type": "string",
+                              "const": "half-up"
+                            }
+                          },
+                          "required": [
+                            "decimals",
+                            "mode"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "letterFrom": {
+                          "type": "string",
+                          "const": "rounded"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "bands",
+                        "rounding",
+                        "letterFrom"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "emptyCategory": {
+                      "type": "string",
+                      "const": "share-weight"
+                    },
+                    "studentNotes": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "categoryId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "text": {
+                            "type": "string",
+                            "maxLength": 1000
+                          }
+                        },
+                        "required": [
+                          "categoryId",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "dismissedChecks": {
+                      "maxItems": 200,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "weights-not-100",
+                              "weight-invalid",
+                              "category-empty",
+                              "drop-exceeds-items",
+                              "drop-before-complete",
+                              "keep-at-least-invalid",
+                              "drop-count-invalid",
+                              "scheme-gap",
+                              "scheme-overlap",
+                              "scheme-order",
+                              "late-no-cap",
+                              "extra-credit-uncapped",
+                              "item-no-category",
+                              "item-zero-points",
+                              "missing-droppable",
+                              "mode-switch-extra-credit"
+                            ]
+                          },
+                          "target": {
+                            "type": "string"
+                          },
+                          "by": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "at": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "target",
+                          "by",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "manual",
+                            "syllabus"
+                          ]
+                        },
+                        "designSessionId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "designSessionId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "rulesVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "updatedBy": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "courseId",
+                    "mode",
+                    "categories",
+                    "late",
+                    "missing",
+                    "extraCredit",
+                    "scheme",
+                    "emptyCategory",
+                    "studentNotes",
+                    "dismissedChecks",
+                    "source",
+                    "version",
+                    "rulesVersion",
+                    "updatedBy",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "enum": [
+                      "weights-not-100",
+                      "weight-invalid",
+                      "category-empty",
+                      "drop-exceeds-items",
+                      "drop-before-complete",
+                      "keep-at-least-invalid",
+                      "drop-count-invalid",
+                      "scheme-gap",
+                      "scheme-overlap",
+                      "scheme-order",
+                      "late-no-cap",
+                      "extra-credit-uncapped",
+                      "item-no-category",
+                      "item-zero-points",
+                      "missing-droppable",
+                      "mode-switch-extra-credit"
+                    ]
+                  },
+                  "target": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "target"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{courseId}/gradebook/cells": {
+      "patch": {
+        "operationId": "updateGradeCells",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cells": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "ok": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "version": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "display": {
+                                "type": "object",
+                                "properties": {
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "graded",
+                                      "late",
+                                      "missing",
+                                      "excused",
+                                      "dropped",
+                                      "override",
+                                      "held",
+                                      "to-grade",
+                                      "not-submitted",
+                                      "not-due",
+                                      "extra-credit",
+                                      "what-if"
+                                    ]
+                                  },
+                                  "adjusted": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                        "minimum": 0
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "state",
+                                  "adjusted",
+                                  "label"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "ok",
+                              "version",
+                              "display"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "conflict": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "current": {
+                                "type": "object",
+                                "properties": {
+                                  "value": {},
+                                  "by": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "at": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "value",
+                                  "by",
+                                  "at"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "conflict",
+                              "current"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "cells"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "batchId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "partial": {
+                    "type": "boolean"
+                  },
+                  "changes": {
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "assignmentId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "studentId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "op": {
+                          "type": "string",
+                          "enum": [
+                            "score",
+                            "clear",
+                            "excuse",
+                            "unexcuse",
+                            "mark-missing",
+                            "clear-missing",
+                            "override",
+                            "clear-override",
+                            "extend",
+                            "waive-late"
+                          ]
+                        },
+                        "value": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "studentNote": {
+                          "type": "string"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "assignmentId",
+                        "studentId",
+                        "op",
+                        "expectedVersion"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "batchId",
+                  "changes"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{courseId}/gradebook/students/{studentId}/final": {
+      "put": {
+        "operationId": "setFinalOverride",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "letter": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "percent": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "reason",
+                  "expectedVersion"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "clearFinalOverride",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "expectedVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/gradebook/students/{studentId}/trace": {
+      "get": {
+        "operationId": "explainGrade",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "student",
+                "held"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "studentId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "student",
+                            "held"
+                          ]
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "weighted",
+                            "points"
+                          ]
+                        },
+                        "rulesVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "setupVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "computedAt": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "engineVersion": {
+                          "type": "string"
+                        },
+                        "categories": {
+                          "type": "array",
+                          "items": {}
+                        },
+                        "steps": {
+                          "type": "array",
+                          "items": {}
+                        },
+                        "totals": {},
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "studentId",
+                        "view",
+                        "mode",
+                        "rulesVersion",
+                        "setupVersion",
+                        "computedAt",
+                        "engineVersion",
+                        "categories",
+                        "steps",
+                        "totals",
+                        "reasons"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "finalOverrideVersion": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "trace",
+                    "lines"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/assignments/{assignmentId}/release/preview": {
+      "get": {
+        "operationId": "previewRelease",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "setup",
+                        "release"
+                      ]
+                    },
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "studentId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "from": {
+                            "type": "object",
+                            "properties": {
+                              "percent": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "letter": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "percent",
+                              "letter"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "to": {
+                            "type": "object",
+                            "properties": {
+                              "percent": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "letter": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "percent",
+                              "letter"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "studentId",
+                          "name",
+                          "from",
+                          "to"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "letterChanges": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "unchanged": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "notSent": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "submissionId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "studentId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "const": "ai-draft-not-reviewed"
+                          }
+                        },
+                        "required": [
+                          "submissionId",
+                          "studentId",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "changes",
+                    "letterChanges",
+                    "unchanged",
+                    "notSent",
+                    "hash"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/assignments/{assignmentId}/unrelease": {
+      "post": {
+        "operationId": "unreleaseGrades",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "assignmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{courseId}/gradebook/events": {
+      "get": {
+        "operationId": "listGradeEvents",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "studentId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "assignmentId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "score",
+                "override",
+                "excuse",
+                "unexcuse",
+                "missing",
+                "extension",
+                "late-waiver",
+                "final-override",
+                "release",
+                "unrelease",
+                "setup",
+                "undo"
+              ]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "courseId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "studentId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "assignmentId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "score",
+                              "override",
+                              "excuse",
+                              "unexcuse",
+                              "missing",
+                              "extension",
+                              "late-waiver",
+                              "final-override",
+                              "release",
+                              "unrelease",
+                              "setup",
+                              "undo"
+                            ]
+                          },
+                          "before": {},
+                          "after": {},
+                          "reason": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "by": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "at": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "batchId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "undoOf": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "rulesVersion": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "seq": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "requestFingerprint": {
+                            "type": "string"
+                          },
+                          "result": {},
+                          "batchResult": {}
+                        },
+                        "required": [
+                          "id",
+                          "courseId",
+                          "studentId",
+                          "assignmentId",
+                          "kind",
+                          "before",
+                          "after",
+                          "reason",
+                          "by",
+                          "at",
+                          "batchId",
+                          "undoOf",
+                          "rulesVersion"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/gradebook/events/{eventId}/undo": {
+      "post": {
+        "operationId": "undoGradeEvent",
+        "tags": [
+          "assignments"
+        ],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": "grades:write",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/courses/{courseId}/grades/me": {
+      "get": {
+        "operationId": "getMyGrade",
+        "tags": [
+          "courses"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "studentId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "student",
+                            "held"
+                          ]
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "weighted",
+                            "points"
+                          ]
+                        },
+                        "rulesVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "setupVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "computedAt": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "engineVersion": {
+                          "type": "string"
+                        },
+                        "categories": {
+                          "type": "array",
+                          "items": {}
+                        },
+                        "steps": {
+                          "type": "array",
+                          "items": {}
+                        },
+                        "totals": {},
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "studentId",
+                        "view",
+                        "mode",
+                        "rulesVersion",
+                        "setupVersion",
+                        "computedAt",
+                        "engineVersion",
+                        "categories",
+                        "steps",
+                        "totals",
+                        "reasons"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "assignmentId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "graded",
+                              "late",
+                              "missing",
+                              "excused",
+                              "dropped",
+                              "override",
+                              "held",
+                              "to-grade",
+                              "not-submitted",
+                              "not-due",
+                              "extra-credit",
+                              "what-if"
+                            ]
+                          },
+                          "score": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "feedback": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "studentNote": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "assignmentId",
+                          "state",
+                          "score",
+                          "feedback",
+                          "studentNote"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "trace",
+                    "lines",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": null,
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courses/{courseId}/grades/me/what-if": {
+      "post": {
+        "operationId": "whatIfMyGrade",
+        "tags": [
+          "courses"
+        ],
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trace": {
+                      "type": "object",
+                      "properties": {
+                        "studentId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "student",
+                            "held"
+                          ]
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "weighted",
+                            "points"
+                          ]
+                        },
+                        "rulesVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "setupVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "computedAt": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "engineVersion": {
+                          "type": "string"
+                        },
+                        "categories": {
+                          "type": "array",
+                          "items": {}
+                        },
+                        "steps": {
+                          "type": "array",
+                          "items": {}
+                        },
+                        "totals": {},
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "studentId",
+                        "view",
+                        "mode",
+                        "rulesVersion",
+                        "setupVersion",
+                        "computedAt",
+                        "engineVersion",
+                        "categories",
+                        "steps",
+                        "totals",
+                        "reasons"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "delta": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "changedReasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "needed": {
+                      "anyOf": [
+                        {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "assignmentId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "score": {
+                                  "type": "number",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": [
+                                "assignmentId",
+                                "score"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "unreachable": {
+                                  "type": "boolean",
+                                  "const": true
+                                }
+                              },
+                              "required": [
+                                "unreachable"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "trace",
+                    "delta",
+                    "changedReasons",
+                    "needed"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "API error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "x-scope": null,
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scores": {
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "assignmentId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "score": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "assignmentId",
+                        "score"
+                      ]
+                    }
+                  },
+                  "target": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "letter": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "letter"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "percent": {
+                            "type": "number",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "percent"
+                        ]
+                      }
+                    ]
+                  },
+                  "solveFor": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "scores"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/tutor/settings": {
@@ -19350,6 +24379,23 @@
             "items": {
               "$ref": "#/components/schemas/Block"
             }
+          },
+          "categoryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "extraCredit": {
+            "type": "boolean"
+          },
+          "countsTowardGrade": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -23744,6 +28790,56 @@
                 },
                 "released": {
                   "type": "boolean"
+                },
+                "submissionVersion": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "itemStateVersion": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "display": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "graded",
+                        "late",
+                        "missing",
+                        "excused",
+                        "dropped",
+                        "override",
+                        "held",
+                        "to-grade",
+                        "not-submitted",
+                        "not-due",
+                        "extra-credit",
+                        "what-if"
+                      ]
+                    },
+                    "adjusted": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "adjusted",
+                    "label"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -23760,6 +28856,37 @@
             "minimum": 0
           },
           "possible": {
+            "type": "number",
+            "minimum": 0
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "percent": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "letter": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "percent",
+              "letter"
+            ],
+            "additionalProperties": false
+          },
+          "finalOverrideVersion": {
             "type": "number",
             "minimum": 0
           }
@@ -26612,6 +31739,49 @@
                 "type": "null"
               }
             ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "student",
+              "recorded"
+            ]
+          },
+          "feedbackDraft": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "provenance": {
+                    "$ref": "#/components/schemas/Provenance"
+                  },
+                  "createdAt": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "text",
+                  "provenance",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deleted": {
+            "type": "boolean"
           }
         },
         "required": [

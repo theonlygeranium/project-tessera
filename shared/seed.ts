@@ -5,6 +5,8 @@ import type {
   Adaptation, Announcement, ApiToken, Assignment, Block, BuilderSession, Certificate, CompletionEvent, Course, CourseTemplate, FileRecord, Id, Institution, Invitation, Lesson, LessonProgress, ManagerConsent, Module, Outcome, OutcomeLink, Program, ReportingLine, Requirement, Rubric, Submission, TestOut, Timestamp, TutorSetting, User,
 } from './domain';
 import type { FileVersion, GenerationJob, StoredFormat, StoredScan, StoredTutorSession, TestOutAttempt } from './repo';
+import type { GradebookSetup, StudentItemState, CourseGradeOverride, GradeEvent } from './domain';
+import { seedGradebook } from './seed-gradebook';
 
 export interface SeedData {
   institution: Institution;
@@ -43,6 +45,10 @@ export interface SeedData {
   certificates?: Certificate[];
   reportingLines?: ReportingLine[];
   managerConsents?: ManagerConsent[];
+  gradebookSetups?: GradebookSetup[];
+  studentItemStates?: StudentItemState[];
+  finalOverrides?: CourseGradeOverride[];
+  gradeEvents?: GradeEvent[];
 }
 
 /** Demo "now". The seed's timestamps sit in the week before it. */
@@ -296,6 +302,7 @@ export function seedData(): SeedData {
   }];
   const reportingLines: ReportingLine[] = [{ managerId: 'u-sam', reportId: 'u-dana', createdBy: 'u-admin', createdAt: t(15) }];
 
-  return { institution, users, courses, enrollments, modules, lessons, blocks, assignments, submissions, announcements, reads, progress, adaptations: [], builderSessions: [], generationJobs: [], apiTokens: [], invitations: [], files: [], fileVersions: [], scans: [], formats: [], tutorSettings: [], tutorSessions: [],
+  const gradebook = seedGradebook(courses[0]);
+  return { institution, users:[...users,...gradebook.users], courses:[...courses,...gradebook.courses], enrollments:[...enrollments,...gradebook.enrollments], modules:[...modules,...gradebook.modules], lessons, blocks, assignments:[...assignments,...gradebook.assignments], submissions:[...submissions,...gradebook.submissions], announcements, reads, progress, adaptations: [], builderSessions: [], generationJobs: [], apiTokens: [], invitations: [], files: [], fileVersions: [], scans: [], formats: [], tutorSettings: [], tutorSessions: [],gradebookSetups:gradebook.gradebookSetups,studentItemStates:gradebook.studentItemStates,
     programs: [], templates: [], rubrics: [], outcomeLinks: [], requirements, completionEvents, testOuts, testOutAttempts: [], certificates: [], reportingLines, managerConsents: [] };
 }

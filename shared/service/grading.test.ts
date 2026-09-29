@@ -33,12 +33,12 @@ describe('grading service',()=>{
     await dispatch(service,teacher,'gradeSubmission',{submissionId:submitted.id,criteria:rubric,score:8,feedback:draft.feedback,feedbackOrigin:'ai',feedbackProvenance:draft.provenance});
     expect((await dispatch(service,student,'getMySubmission',{assignmentId:id}))?.grade).toBeNull();
     let book=await dispatch(service,teacher,'getGradebook',{courseId:'c-stat110'});
-    expect(book.rows.find(x=>x.student.id==='u-priya')).toMatchObject({total:0,possible:10});
+    expect(book.rows.find(x=>x.student.id==='u-priya')).toMatchObject({total:0,possible:0});
     await dispatch(service,teacher,'releaseGrades',{assignmentId:id});
     expect((await dispatch(service,student,'getMySubmission',{assignmentId:id}))?.grade?.score).toBe(8);
     book=await dispatch(service,teacher,'getGradebook',{courseId:'c-stat110'});
     expect(book.rows.find(x=>x.student.id==='u-priya')).toMatchObject({total:8,possible:10});
-    expect((await dispatch(service,teacher,'exportGradebook',{courseId:'c-stat110'})).csv).toContain('"Student","Email"');
+    const csv=await dispatch(service,teacher,'exportGradebook',{courseId:'c-stat110'});expect('csv' in csv&&csv.csv).toContain('Student,Email');
   });
   it('restricts assignment visibility to published enrolled students and honors AI policy',async()=>{
     const repo=new MemoryRepo(seedData()),teacher=await context(repo,'u-okafor'),student=await context(repo,'u-priya'),outsider=await context(repo,'u-jordan');
@@ -87,6 +87,6 @@ describe('review 4: gradebook access', () => {
   it('lets an administrator read the gradebook and its CSV', async () => {
     const repo = new MemoryRepo(seedData()), admin = await context(repo, 'u-admin');
     expect((await dispatch(service, admin, 'getGradebook', { courseId: 'c-stat110' })).rows.length).toBeGreaterThan(0);
-    expect((await dispatch(service, admin, 'exportGradebook', { courseId: 'c-stat110' })).csv).toContain('"Student"');
+    const csv = await dispatch(service, admin, 'exportGradebook', { courseId: 'c-stat110' }); expect('csv' in csv && csv.csv).toContain('Student,Email');
   });
 });
