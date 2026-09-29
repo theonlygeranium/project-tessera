@@ -11,6 +11,7 @@ import { MemoryRepo, service } from '../../shared/service/index';
 import type { ServiceContext } from '../../shared/service/context';
 import { seedData } from '../../shared/seed';
 import type { DesignSession, FileRecord, SourceSpan } from '../../shared/domain';
+import { ApiError } from '../../shared/api';
 
 interface Key {
   file: string; code: string; title: string; credits: number | null; termWeeks: number | null; termStart: string | null; termEnd: string | null;
@@ -159,7 +160,15 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
   } as unknown as ServiceContext['documents'];
   const ctx: ServiceContext = { repo, ai: client, user: await repo.getUser('u-okafor'), now: () => new Date().toISOString(), newId: prefix => `${prefix}-${++n}`, documents };
   const t0 = Date.now();
-  let session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', fileId: file.id, consent: { syllabusOnly: true, rememberProfile: false } });
+  const createInput = { courseId: 'c-stat110' as const, sourceKind: 'syllabus' as const, fileId: file.id, consent: { syllabusOnly: true as const, rememberProfile: false } };
+  let session;
+  try {
+    session = await service.createDesignSession(ctx, createInput);
+  } catch (error) {
+    // Eval set is instructor-curated; confirm past the possible-roster gate the way the UI would.
+    if (!(error instanceof ApiError) || (error.details as { reason?: string } | undefined)?.reason !== 'possible-roster') throw error;
+    session = await service.createDesignSession(ctx, { ...createInput, consent: { ...createInput.consent, confirmedNoStudentRoster: true } });
+  }
   let extractedAt = 0;
   while (Date.now() - t0 < 600_000) {
     session = await service.advanceDesignSession(ctx, { sessionId: session.id });
