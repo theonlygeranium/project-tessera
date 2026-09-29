@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gradebook setup with live check</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="../../docs/assets/ai-voice.css">
+<script src="../../docs/assets/ai-voice.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+button,input,select{font-family:inherit}
+.btn{height:34px;padding:0 13px;border-radius:9px;border:1px solid #d5cfc4;background:#fff;font-size:13px;font-weight:500;color:#1c1b19;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;box-sizing:border-box}
+.btn-p{border:none;background:{{accent}};color:#fff;font-weight:600}
+.btn-s{height:28px;padding:0 10px;font-size:12px;border-radius:7px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#ebe6dd;color:#3a3833;white-space:nowrap}
+.chip-ok{background:#e4f2e8;color:#1f5a37}.chip-warn{background:#fbf1dc;color:#7a5310}.chip-err{background:#fbe7e4;color:#7a2a20}.chip-ai{background:#eeebf8;color:#3f3380}.chip-acc{background:#e3f0ee;color:#0a4f49}
+.card{background:#fff;border:1px solid #e3ded4;border-radius:12px}
+.lbl{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5f5b54;margin:0}
+.h1{font-family:'Fraunces',Georgia,serif;font-weight:500;font-size:24px;margin:0;letter-spacing:-.005em}
+.h2{font-family:'Fraunces',Georgia,serif;font-weight:500;font-size:18px;margin:0}
+.muted{color:#5f5b54}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.kbd{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;padding:1px 5px;border-radius:5px;background:#ebe6dd;color:#3a3833}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.seg{display:inline-flex;padding:3px;border-radius:9px;background:#ebe6dd;gap:2px}
+.seg button{height:28px;padding:0 10px;border:0;border-radius:7px;background:none;color:#5f5b54;font-size:12.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:#fff;color:#1c1b19;font-weight:600;box-shadow:0 1px 2px rgba(28,27,25,.08)}
+.tabs{display:flex;gap:4px}
+.tabs a{height:30px;padding:0 12px;border-radius:8px;display:inline-flex;align-items:center;font-size:13px;font-weight:500;color:#5f5b54;text-decoration:none;border:1px solid transparent}
+.tabs a[aria-current="page"]{background:#fff;border-color:#e3ded4;color:#1c1b19;font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+input[type=checkbox],input[type=radio]{width:16px;height:16px;accent-color:{{accent}};margin:0;flex-shrink:0}
+.tin{height:32px;border:1px solid #d5cfc4;border-radius:8px;padding:0 10px;font-size:13px;background:#fff;box-sizing:border-box;color:#1c1b19}
+
+.st{width:100%;border-collapse:collapse;font-size:13px}
+.st th{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#5f5b54;text-align:left;padding:0 10px 8px;border-bottom:1px solid #e3ded4;white-space:nowrap}
+.st td{padding:6px 10px;border-bottom:1px solid #ede8df;vertical-align:middle}
+.st tr:last-child td{border-bottom:0}
+.wt{display:inline-flex;align-items:center;gap:4px}
+.wt input{width:52px;height:30px;border:1px solid #d5cfc4;border-radius:7px;text-align:right;padding:0 8px;font-size:13px;font-weight:600;box-sizing:border-box;font-variant-numeric:tabular-nums;color:#1c1b19;background:#fff}
+.wt input.chg{background:#fff;border-color:#1c1b19}
+.wt input.focus{outline:3px solid #1f4f9c;outline-offset:1px;border-color:#1f4f9c}
+.sm{width:44px;height:30px;border:1px solid #d5cfc4;border-radius:7px;text-align:right;padding:0 8px;font-size:13px;box-sizing:border-box;background:#fff;color:#1c1b19}
+.was{font-size:11px;color:#5f5b54;margin-left:4px;white-space:nowrap}
+.ck{display:flex;gap:10px;padding:10px 0;border-top:1px solid #ede8df}
+.ck:first-child{border-top:0}
+.ck .t{font-size:13px;font-weight:600}
+.ck p{margin:2px 0 0;font-size:12.5px;line-height:1.45;color:#3a3833}
+.pass{display:flex;align-items:flex-start;gap:6px;font-size:12px;line-height:1.35;color:#3a3833;padding:2px 0}.pass svg{flex-shrink:0;margin-top:1px}
+.opt{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.4}
+.opt input{margin-top:2px}
+.ltr{display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 0;border-radius:7px;background:#faf8f4;border:1px solid #ede8df;min-width:0;flex:1}
+.ltr b{font-size:13px}.ltr span{font-size:11px;color:#5f5b54;font-variant-numeric:tabular-nums}
+.imp td{padding:4px 0;border-bottom:1px solid #ede8df;font-size:12.5px;font-variant-numeric:tabular-nums}
+.imp td:not(:first-child){text-align:right}
+
+</style>
+</helmet>
+<div data-ai-style="marginalia" style="width: 1440px; height: 900px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; background: #f4f1eb; color: #1c1b19; font-size: 13.5px; line-height: 1.4; overflow: hidden">
+  <header style="height: 52px; flex-shrink: 0; box-sizing: border-box; padding: 0 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e3ded4; background: #faf8f4">
+    <div style="width: 30px; height: 30px; border-radius: 8px; background: {{accent}}; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h16"/></svg></div>
+    <nav aria-label="Instructor" style="display: flex; gap: 4px; font-size: 13px; font-weight: 500"><a href="#today" style="padding: 6px 10px; border-radius: 7px; text-decoration: none; color: #5f5b54">Today</a><a href="#create" style="padding: 6px 10px; border-radius: 7px; text-decoration: none; color: #5f5b54">Create</a><a href="#grade" aria-current="page" style="padding: 6px 10px; border-radius: 7px; text-decoration: none; color: #0e6b63; background: #e3f0ee; font-weight: 600">Grade</a><a href="#insights" style="padding: 6px 10px; border-radius: 7px; text-decoration: none; color: #5f5b54">Insights</a></nav>
+    <div style="flex-grow: 1"></div>
+    <div style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid #d5cfc4; background: #fff; width: 340px; box-sizing: border-box; color: #5f5b54">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <span style="flex-grow: 1; font-size: 13px">Search or type a command…</span>
+      <span class="kbd">⌘K</span>
+    </div>
+    <div style="width: 32px; height: 32px; border-radius: 50%; background: #c7d7d3; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #2f4d48" aria-label="Dr. Adaeze Okafor" role="img">AO</div>
+  </header>
+  <div style="padding: 16px 24px 12px; display: flex; align-items: flex-end; gap: 20px; flex-shrink: 0">
+    <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+      <nav aria-label="Breadcrumb" style="font-size: 12.5px; color: #5f5b54; display: flex; gap: 6px"><a href="#courses" style="color: #5f5b54; text-decoration: none">My courses</a><span aria-hidden="true">/</span><a href="#course" style="color: #5f5b54; text-decoration: none">STAT 110 · Reasoning with Data</a><span aria-hidden="true">/</span><span style="color: #1c1b19">Grades</span></nav>
+      <div style="display: flex; align-items: baseline; gap: 14px">
+        <h1 class="h1">Gradebook</h1>
+        <span class="muted" style="font-size: 13px">Fall 2026 · Section 04 · 12 students · Meridian State</span>
+      </div>
+    </div>
+    <nav aria-label="Gradebook views" class="tabs" style="margin-left: 8px; margin-bottom: 1px"><a href="#grid" >Grid</a><a href="#setup" aria-current="page">Setup</a><a href="#release" >Release</a><a href="#history" >History</a></nav>
+    <div style="flex-grow: 1"></div>
+    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 1px">
+      <span class="chip chip-acc" style="height: 24px">2 unsaved changes</span>
+      <button type="button" class="btn">Discard</button>
+      <button type="button" class="btn btn-p">Save setup · 12 grades change</button>
+    </div>
+  </div>
+  <div style="flex-grow: 1; min-height: 0; display: flex; gap: 16px; padding: 0 24px 20px">
+    <main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+    <section class="card" aria-labelledby="cat-h" style="padding: 16px 18px 12px">
+      <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px">
+        <h2 id="cat-h" class="h2">Categories and weights</h2>
+        <span class="muted" style="font-size: 12.5px">From your syllabus, p. 3 · each category is averaged, then weighted</span>
+        <button type="button" class="btn btn-s" style="margin-left: auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add category</button>
+      </div>
+      <table class="st">
+        <thead><tr><th scope="col" style="width: 17%">Category</th><th scope="col" style="width: 17%">Weight</th><th scope="col">Items</th><th scope="col" style="width: 12%">Drop lowest</th><th scope="col" style="width: 12%">Keep at least</th><th scope="col" style="width: 11%">Late penalty</th></tr></thead>
+        <tbody><tr><td style="font-weight: 600">Homework</td><td><span class="wt"><input class="" value="15" aria-label="Homework weight, percent">%</span></td><td style="color: #3a3833">4 graded · 1 to come · 1 extra credit</td><td><input class="sm" value="1" aria-label="Homework: drop lowest"></td><td><span class="num">2</span></td><td style="color: #3a3833">Applies</td></tr><tr><td style="font-weight: 600">Quizzes</td><td><span class="wt"><input class="" value="20" aria-label="Quizzes weight, percent">%</span></td><td style="color: #3a3833">3 graded · 2 to come</td><td><input class="sm" value="1" aria-label="Quizzes: drop lowest"></td><td><span class="num">2</span></td><td style="color: #3a3833">Applies</td></tr><tr><td style="font-weight: 600">Midterm</td><td><span class="wt"><input class="chg" value="25" aria-label="Midterm weight, percent">%</span><span class="was">was 20%</span></td><td style="color: #3a3833">1 graded</td><td><span class="muted">None</span></td><td><span class="muted">–</span></td><td style="color: #3a3833">Exempt</td></tr><tr><td style="font-weight: 600">Project</td><td><span class="wt"><input class="chg focus" value="35" aria-label="Project weight, percent">%</span><span class="was">was 40%</span></td><td style="color: #3a3833">2 graded · 1 to come</td><td><span class="muted">None</span></td><td><span class="muted">–</span></td><td style="color: #3a3833">Applies</td></tr><tr><td style="font-weight: 600">Participation</td><td><span class="wt"><input class="" value="5" aria-label="Participation weight, percent">%</span></td><td style="color: #3a3833"><span class="chip chip-warn"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>No items yet</span></td><td><span class="muted">None</span></td><td><span class="muted">–</span></td><td style="color: #3a3833">Exempt</td></tr></tbody>
+      </table>
+      <div style="display: flex; align-items: center; gap: 14px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e3ded4">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 7px">
+          <div role="img" aria-label="Weights: Homework 15, Quizzes 20, Midterm 25, Project 35, Participation 5; total 100 percent" style="display: flex; gap: 2px; border-radius: 999px; overflow: hidden"><div title="Homework 15%" style="width: 15%; height: 10px; background: #0e6b63"></div><div title="Quizzes 20%" style="width: 20%; height: 10px; background: #3f8f86"></div><div title="Midterm 25%" style="width: 25%; height: 10px; background: #7fb5ad"></div><div title="Project 35%" style="width: 35%; height: 10px; background: #1c4f4a"></div><div title="Participation 5%" style="width: 5%; height: 10px; background: #c9c2b5"></div></div>
+          <div style="display: flex; gap: 14px; font-size: 11.5px; color: #3a3833"><span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 2px; background: #0e6b63"></span>Homework 15%</span><span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 2px; background: #3f8f86"></span>Quizzes 20%</span><span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 2px; background: #7fb5ad"></span>Midterm 25%</span><span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 2px; background: #1c4f4a"></span>Project 35%</span><span style="display: inline-flex; align-items: center; gap: 5px"><span style="width: 9px; height: 9px; border-radius: 2px; background: #c9c2b5"></span>Participation 5%</span></div>
+        </div>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #1f5a37; white-space: nowrap"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Total 100%</span>
+      </div>
+    </section>
+    <section class="card" aria-labelledby="pol-h" style="padding: 14px 18px">
+      <h2 id="pol-h" class="h2" style="margin-bottom: 10px">Late, missing and excused work</h2>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px">
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span class="lbl" style="display: flex; align-items: center; gap: 6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9a6a12" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Late</span>
+          <div style="font-size: 13px; line-height: 1.9">Deduct <input class="sm" value="10" aria-label="Percent deducted per day"> % per day late, for up to <input class="sm" value="3" aria-label="Maximum days late"> days. After that it&#39;s marked missing.</div>
+          <span class="muted" style="font-size: 12px; line-height: 1.4">Two students have extended due dates; lateness counts from their own date.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span class="lbl" style="display: flex; align-items: center; gap: 6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b3382c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg>Missing</span>
+          <label class="opt"><input type="radio" name="miss" checked>Counts as 0 once the due date passes</label>
+          <label class="opt"><input type="radio" name="miss">Left out until it&#39;s graded</label>
+          <label class="opt"><input type="checkbox">Missing zeros can be dropped</label>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span class="lbl" style="display: flex; align-items: center; gap: 6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5f5b54" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></svg>Excused</span>
+          <span style="font-size: 13px; line-height: 1.45">Left out of both earned and possible points, as if the item didn&#39;t exist for that student.</span>
+          <span class="muted" style="font-size: 12px; line-height: 1.4">A reason is always required. It stays private to instructors; the student sees &ldquo;Excused&rdquo; unless you add a note for them.</span>
+        </div>
+      </div>
+    </section>
+    <div style="display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 14px">
+      <section class="card" aria-labelledby="ec-h" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 8px">
+        <h2 id="ec-h" class="h2">Extra credit</h2>
+        <span style="font-size: 13px; line-height: 1.45">Extra credit items add earned points without adding possible points.</span>
+        <div style="font-size: 13px">Cap each category at <input class="sm" value="100" style="width: 52px" aria-label="Category cap, percent"> %</div>
+      </section>
+      <section class="card" aria-labelledby="ls-h" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: baseline; gap: 10px"><h2 id="ls-h" class="h2">Letter grades</h2><span class="muted" style="font-size: 12px">Meridian State standard scheme</span></div>
+        <div style="display: flex; gap: 5px"><div class="ltr"><b>A</b><span>93+</span></div><div class="ltr"><b>A-</b><span>90+</span></div><div class="ltr"><b>B+</b><span>87+</span></div><div class="ltr"><b>B</b><span>83+</span></div><div class="ltr"><b>B-</b><span>80+</span></div><div class="ltr"><b>C+</b><span>77+</span></div><div class="ltr"><b>C</b><span>73+</span></div><div class="ltr"><b>C-</b><span>70+</span></div><div class="ltr"><b>D</b><span>60+</span></div><div class="ltr"><b>F</b><span>below 60</span></div></div>
+        <span class="muted" style="font-size: 12px; line-height: 1.4">Rounded to one decimal place, half up. The letter comes from the rounded number, so it always matches what students see.</span>
+      </section>
+    </div>
+    </main>
+    <aside aria-label="Setup check and impact" style="width: 420px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px">
+    <section class="card" aria-labelledby="chk-h" style="padding: 14px 16px 12px">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <h2 id="chk-h" class="h2">Setup check</h2>
+        <span class="chip" style="margin-left: auto">Checks as you edit</span>
+      </div>
+      <div style="display: flex; gap: 14px; font-size: 12.5px; margin: 8px 0 2px; color: #3a3833"><span><strong>0</strong> to fix</span><span style="color: #7a5310"><strong>2</strong> to review</span><span style="color: #1f5a37"><strong>7</strong> passed</span></div>
+      <div role="list" aria-label="Setup check results">
+        <div class="ck" role="listitem"><span style="margin-top: 1px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9a6a12" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span><div style="min-width: 0"><div class="t" style="color: #7a5310">Participation has no graded items</div><p>Until something is graded, its 5% is shared across the other four categories. Students see this line in their breakdown.</p><div style="display: flex; gap: 6px; margin-top: 8px"><button type="button" class="btn btn-s">Add an item</button><button type="button" class="btn btn-s">Set weight to 0%</button></div></div></div>
+        <div class="ck" role="listitem"><span style="margin-top: 1px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9a6a12" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span><div style="min-width: 0"><div class="t" style="color: #7a5310">Drop lowest starts before all quizzes are in</div><p>2 of 5 quizzes are still to come, so each student&#39;s dropped quiz can change as they&#39;re graded. Tell students now so the change isn&#39;t a surprise.</p><div style="display: flex; gap: 6px; margin-top: 8px"><button type="button" class="btn btn-s">Add a note to the student view</button><button type="button" class="btn btn-s">Dismiss</button></div></div></div>
+      </div>
+      <details open style="border-top: 1px solid #ede8df; padding-top: 8px">
+        <summary style="font-size: 12.5px; font-weight: 600; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>7 checks passed</summary>
+        <div style="margin-top: 4px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px"><div class="pass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Weights total 100%</div><div class="pass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Drop rules keep 2 or more scores</div><div class="pass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Letters cover 0 to 100, no gaps</div><div class="pass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Late penalty stops at 3 days</div><div class="pass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Extra credit is capped at 100%</div><div class="pass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Every item has a category</div><div class="pass"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2e7d4f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>No item counts twice</div></div>
+      </details>
+    </section>
+    <section class="card" aria-labelledby="imp-h" style="padding: 14px 16px">
+      <div style="display: flex; align-items: baseline; gap: 8px"><h2 id="imp-h" class="h2">If you save</h2><span class="muted" style="font-size: 12px">Midterm 20 → 25%, Project 40 → 35%</span></div>
+      <p style="margin: 6px 0 6px; font-size: 13px; line-height: 1.45"><strong>12 current grades change</strong>, and <strong>one letter grade changes</strong>: Hannah Brooks moves from C+ to B-.</p>
+      <table style="width: 100%; border-collapse: collapse" class="imp" aria-label="Largest changes"><tbody><tr><td style="font-weight: 600">Hannah Brooks</td><td class="muted">79.9% C+</td><td>→</td><td style="font-weight: 600">80.0% B-</td><td class="muted" style="width: 44px">+0.1</td></tr><tr><td style="font-weight: 600">Diego Ramírez</td><td class="muted">66.3% D</td><td>→</td><td style="font-weight: 600">67.2% D</td><td class="muted" style="width: 44px">+0.9</td></tr><tr><td style="font-weight: 600">Priya Raman</td><td class="muted">88.1% B+</td><td>→</td><td style="font-weight: 600">87.6% B+</td><td class="muted" style="width: 44px">−0.5</td></tr></tbody></table>
+      <p class="muted" style="margin: 8px 0 0; font-size: 12px; line-height: 1.4">9 more change by 0.3 points or less. Scores stay the same; only the calculation changes. Students see the new grade once you save. Logged, and can be undone.</p>
+    </section>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#0e6b63","options":["#0e6b63","#1f4f9c","#7a3e8f","#a24f1f"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#0e6b63' };
+  }
+}
+</script>
+</body>
+</html>
