@@ -23,6 +23,114 @@ const MAX_CHARS = 60_000;
 const SAMPLE = seed as DesignSource;
 // Generic table-column vocabulary, not assessment titles, marks a boundary after roster rows.
 const TABLE_VOCABULARY = /\b(?:points|score|weight|date|week|topic|title|due|assignment|percent|total|description)\b/i;
+const NAME_PART = String.raw`\p{Lu}\p{L}*(?:[-'’]\p{Lu}?\p{L}+)*`;
+const PERSON = new RegExp(String.raw`(?:${NAME_PART}|\p{Lu}\.)[\s,]+(?:\p{Lu}\.[\s,]+)?${NAME_PART}(?:[\s,]+${NAME_PART})?`, 'u');
+const STUDENT_ID = /\b\d{6,}\b|\b[A-Za-z]+\d{5,}\b|\b(?:student\s*)?id\s*[:#-]?\s*[A-Za-z0-9]+\b/i;
+const EMAIL = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/i;
+const STUDENT_EMAIL = /[\w.+-]+@(?:[\w.-]*student[\w.-]*|students?\.)[\w.-]*\.[A-Za-z]{2,}/i;
+const ROSTER_LABEL = /^\s*(?:(?:student|class|course)\s+roster|enrollment\s+list)\s*[\p{P}]?\s*$/iu;
+const FACULTY_PREFIX = /^\s*(?:instructor|faculty|professor|office)(?:\s+contact)?\s*:/i;
+const FACULTY_CONTACT = new RegExp(String.raw`^\s*(?:(?:Dr|Prof)\.?\s+)?${NAME_PART}\s+${NAME_PART}`, 'u');
+const ASSESSMENT_TITLE = /^(?:practice assignment|final exam|midterm exam|research paper|research project|reading response|studio practice|lab report|weekly quizzes|course total|participation|essay|assignment|quiz|exam|project)$/i;
+const ASSESSMENT_WORD = /\b(?:assignment|exercise|exam|quiz|project|essay|paper|practice|participation|lab|homework|response|activity|assessment|test|presentation|discussion)\b/i;
+const LOWER_PERSON = /\p{L}{2,}(?:[-'’]\p{L}+)*[\s,]+\p{L}{2,}(?:[-'’]\p{L}+)*(?:[\s,]+\p{L}{2,})?/u;
+
+function assessmentTitleHasIdentity(title: string): boolean {
+  if (EMAIL.test(title) || STUDENT_ID.test(title)) return true;
+  // Assessment labels such as "Homework Assignment" are themselves two capitalized words.
+  const remainder = title.replace(/^(?:(?:homework|practice|weekly|final|midterm|research|reading|studio|lab|course)\s+)?(?:assignment|exercise|exam|quiz(?:zes)?|project|essay|paper|practice|participation|report|response|activity|assessment|test|presentation|discussion|total)\b/i, '');
+  return (PERSON.test(remainder) || LOWER_PERSON.test(remainder));
+}
+
+function cells(line: string, delimiter: string): string[] {
+  if (delimiter !== ',') return line.split(delimiter).map(cell => cell.trim());
+  const row: string[] = []; let cell = '', quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '"') { if (quoted && line[i + 1] === '"') { cell += '"'; i++; } else quoted = !quoted; }
+    else if (line[i] === ',' && !quoted) { row.push(cell.trim()); cell = ''; }
+    else cell += line[i];
+  }
+  row.push(cell.trim()); return row;
+}
+function tableHeader(line: string): { delimiter: string; columns: number; nameColumns: number[]; idColumns: number[] } | null {
+  for (const delimiter of ['|', '\t', ',']) {
+    if (!line.includes(delimiter)) continue;
+    const row = cells(line, delimiter).map(cell => cell.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim());
+    const nameColumns = row.flatMap((cell, index) => /^(?:name|student name|learner|full name|first name|last name|student)$/.test(cell) ? [index] : []);
+    const idColumns = row.flatMap((cell, index) => /^(?:id|student id|sid|student number|email|e mail|username|user name)$/.test(cell) ? [index] : []);
+    if (nameColumns.length && idColumns.length) return { delimiter, columns: row.length, nameColumns, idColumns };
+  }
+  return null;
+}
+
+function assessmentHeaderCells(line: string): string[] | null {
+  for (const delimiter of ['|', '\t', ',']) {
+    if (!line.includes(delimiter)) continue;
+    const row = cells(line, delimiter).map(cell => cell.toLowerCase().replace(/\s+/g, ' ').trim());
+    if (row.length >= 2 && /^(?:assignment(?: name)?|assessment(?: name)?|activity|task|title)$/.test(row[0]) && /^(?:points?|score|weight|percent|total)$/.test(row[1])) return row;
+  }
+  return null;
+}
+
+function assessmentHeader(line: string): boolean {
+  return assessmentHeaderCells(line)?.slice(2).every(cell => !cell) ?? false;
+}
+
+function numericAssessmentRow(line: string, inAssessmentTable: boolean): boolean {
+  for (const delimiter of ['|', '\t', ',']) {
+    if (!line.includes(delimiter)) continue;
+    const row = cells(line, delimiter);
+    const assessmentTitle = ASSESSMENT_TITLE.test(row[0]) || inAssessmentTable && ASSESSMENT_WORD.test(row[0]);
+    if (row.length < 2 || !assessmentTitle || assessmentTitleHasIdentity(row[0])) continue;
+    if (row.slice(1).every(cell => /^\d+(?:\.\d+)?\s*(?:points?|pts?|%|\/\s*\d+)?$/i.test(cell))) return true;
+  }
+  return false;
+}
+
+function possibleIdentityRow(line: string, inAssessmentTable = false): boolean {
+  if (FACULTY_PREFIX.test(line)) {
+    const extra = line.split(/[|\t;,]/).slice(1).join(' ');
+    const facultyContact = FACULTY_CONTACT.exec(line.slice(line.indexOf(':') + 1));
+    const afterFaculty = facultyContact ? line.slice(line.indexOf(':') + 1 + facultyContact[0].length) : extra;
+    const identifierAt = [EMAIL.exec(afterFaculty)?.index, STUDENT_ID.exec(afterFaculty)?.index].filter((index): index is number => index !== undefined).sort((a, b) => a - b)[0];
+    const beforeIdentifier = identifierAt === undefined ? '' : afterFaculty.slice(0, identifierAt);
+    const labelled = /\b(?:student|learner|enrollee)\s*:\s*(.*)/i.exec(line.slice(line.indexOf(':') + 1))?.[1] ?? '';
+    return ((EMAIL.test(extra) || STUDENT_ID.test(extra)) && (PERSON.test(extra) || LOWER_PERSON.test(extra)))
+      || (identifierAt !== undefined && (PERSON.test(beforeIdentifier) || LOWER_PERSON.test(beforeIdentifier)))
+      || Boolean(labelled && (PERSON.test(labelled) || LOWER_PERSON.test(labelled) || EMAIL.test(labelled) || STUDENT_ID.test(labelled)));
+  }
+  if (numericAssessmentRow(line, inAssessmentTable)) return false;
+  // Bound regex work on a long OCR line while still examining its full length.
+  for (let offset = 0; offset < line.length; offset += 900) {
+    const part = line.slice(offset, offset + 1000);
+    const identifier = STUDENT_ID.test(part) || EMAIL.test(part);
+    const bareNumberRow = /[|\t,]\s*\d+\s*(?:[|\t,]|$)/.test(part);
+    if (!identifier && !bareNumberRow) continue;
+    const sameCellName = PERSON.test(part) || LOWER_PERSON.test(part);
+    const splitName = ['|', '\t', ','].some(delimiter => {
+      if (!part.includes(delimiter)) return false;
+      const row = cells(part, delimiter);
+      return row.length >= 3 && row.slice(0, 2).every(cell => /^\p{L}{2,}(?:[-'’]\p{L}+)*$/u.test(cell)) && (STUDENT_ID.test(row.slice(2).join(' ')) || EMAIL.test(row.slice(2).join(' ')));
+    });
+    if (sameCellName || splitName) return true;
+  }
+  return false;
+}
+
+// This is a pause for instructor review, not another redaction rule.
+function hasPossibleRoster(source: DesignSource): boolean {
+  let inAssessmentTable = false;
+  for (const section of source.sections) {
+    for (const line of [section.heading, ...(section.lines ?? section.text.split(/\r?\n/))]) {
+      if (!line.trim()) { inAssessmentTable = false; continue; }
+      if (tableHeader(line) || ROSTER_LABEL.test(line)) return true;
+      if (assessmentHeader(line)) { inAssessmentTable = true; continue; }
+      if (possibleIdentityRow(line, inAssessmentTable)) return true;
+      if (inAssessmentTable && !numericAssessmentRow(line, true)) inAssessmentTable = false;
+    }
+  }
+  return false;
+}
 
 /**
  * Headings set in small caps often come out of a PDF as "C ATALOG D ESCRIPTION". In a short
@@ -55,15 +163,14 @@ function cleanSource(source: DesignSource): { source: DesignSource; problems: Pr
     }
   });
   const running = new Set([...repeated].filter(([, seen]) => seen.size >= Math.ceil(pages.size / 2)).map(([key]) => key));
-  const flattened = source.sections.flatMap((section, sectionIndex) => (section.lines ?? section.text.split('\n')).map(joinSmallCaps)
-    .filter(line => !running.has(line.trim().toLocaleLowerCase().replace(/\d/g, '#').replace(/\s+/g, ' ')))
-    .map(line => ({ line, sectionIndex })));
+  const flattened = source.sections.flatMap((section, sectionIndex) => [
+    ...(section.heading ? [{ line: section.heading, sectionIndex, heading: true }] : []),
+    ...(section.lines ?? section.text.split('\n')).map(joinSmallCaps)
+      .filter(line => !running.has(line.trim().toLocaleLowerCase().replace(/\d/g, '#').replace(/\s+/g, ' ')))
+      .map(line => ({ line, sectionIndex, heading: false })),
+  ]);
   // Best-effort pre-model redaction: names without IDs and unusual layouts can remain.
-  const namePart = String.raw`\p{Lu}\p{L}*(?:[-'’]\p{Lu}?\p{L}+)*`;
-  const person = new RegExp(String.raw`(?:${namePart}|\p{Lu}\.)[\s,]+(?:\p{Lu}\.[\s,]+)?${namePart}(?:[\s,]+${namePart})?`, 'u');
-  const studentId = /\b\d{6,}\b|\b[A-Za-z]+\d{5,}\b|\b(?:student\s*)?id\s*[:#-]?\s*[A-Za-z0-9]+\b/i;
-  const email = /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/i;
-  const studentEmail = /[\w.+-]+@(?:[\w.-]*student[\w.-]*|students?\.)[\w.-]*\.[A-Za-z]{2,}/i;
+  const person = PERSON, studentId = STUDENT_ID, email = EMAIL, studentEmail = STUDENT_EMAIL;
   const standaloneRow = (line: string) => {
     if (line.length > 1000 || !(studentId.test(line) || email.test(line))) return false;
     const match = person.exec(line);
@@ -74,50 +181,44 @@ function cleanSource(source: DesignSource): { source: DesignSource; problems: Pr
     if (/^\s*[^|]+\|\s*\d+\s*$/.test(line) && match[0].trim().split(/\s+/).length === 2 && !/[.'’\-]/u.test(match[0])) return false;
     return true;
   };
-  const cells = (line: string, delimiter: string) => {
-    if (delimiter !== ',') return line.split(delimiter).map(cell => cell.trim());
-    const row: string[] = []; let cell = '', quoted = false;
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === '"') { if (quoted && line[i + 1] === '"') { cell += '"'; i++; } else quoted = !quoted; }
-      else if (line[i] === ',' && !quoted) { row.push(cell.trim()); cell = ''; }
-      else cell += line[i];
-    }
-    row.push(cell.trim()); return row;
-  };
-  const headerCell = (cell: string) => cell.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
-  const tableHeader = (line: string): { delimiter: string; columns: number; nameColumns: number[]; idColumns: number[] } | null => {
-    for (const delimiter of ['|', '\t', ',']) {
-      if (!line.includes(delimiter)) continue;
-      const row = cells(line, delimiter).map(headerCell);
-      const nameColumns = row.flatMap((cell, index) => /^(?:name|student name|learner|full name|first name|last name|student)$/.test(cell) ? [index] : []);
-      const idColumns = row.flatMap((cell, index) => /^(?:id|student id|sid|student number|email|e mail|username|user name)$/.test(cell) ? [index] : []);
-      if (nameColumns.length && idColumns.length) return { delimiter, columns: row.length, nameColumns, idColumns };
-    }
-    return null;
-  };
   const kept = source.sections.map(() => [] as string[]);
+  const headings = source.sections.map(() => '');
   let table: ReturnType<typeof tableHeader> = null;
+  let headingIdentityBlock = false;
   for (let index = 0; index < flattened.length; index++) {
-    const { line, sectionIndex } = flattened[index];
+    const { line, sectionIndex, heading } = flattened[index];
     const header = tableHeader(line);
-    if (header) { table = header; stripped++; continue; }
+    if (header) { table = header; headingIdentityBlock = false; stripped++; continue; }
+    if (heading) {
+      if (possibleIdentityRow(line)) { headingIdentityBlock = true; stripped++; continue; }
+      // A new, ordinary section heading ends a roster table without losing the heading.
+      table = null;
+      headingIdentityBlock = false;
+    }
+    if (!heading && headingIdentityBlock) {
+      if (possibleIdentityRow(line)) { stripped++; continue; }
+      headingIdentityBlock = false;
+    }
     if (table && line.trim()) {
       const row = cells(line, table.delimiter);
       const nameShaped = row.length === table.columns && (row.slice(0, 2).some(cell => !TABLE_VOCABULARY.test(cell.trim().split(/\s+/, 1)[0] ?? '') && person.test(cell)) || table.nameColumns.length > 1 && row.slice(0, 2).every(cell => /^\p{Lu}[\p{L}'’.-]*$/u.test(cell)));
       if (!(TABLE_VOCABULARY.test(line) && !email.test(line) && !studentId.test(line) && !nameShaped)) { stripped++; continue; }
     }
     table = null;
-    if (standaloneRow(line)) { stripped++; continue; }
+    if (!heading && (((FACULTY_PREFIX.test(line) || assessmentHeaderCells(line)?.slice(2).some(Boolean)) && possibleIdentityRow(line))
+      || (!numericAssessmentRow(line, true) && ASSESSMENT_WORD.test(line) && possibleIdentityRow(line))
+      || standaloneRow(line))) { stripped++; continue; }
     if (remaining <= 0) { clipped = true; clippedAt ??= source.sections[sectionIndex].page; continue; }
     const part = line.slice(0, remaining);
-    kept[sectionIndex].push(part);
+    if (heading) headings[sectionIndex] = part;
+    else kept[sectionIndex].push(part);
     remaining -= part.length + 1;
     if (part.length < line.length) { clipped = true; clippedAt ??= source.sections[sectionIndex].page; }
   }
-  const sections = source.sections.map((section, index) => ({ ...section, lines: kept[index], text: kept[index].join('\n') })).filter(section => section.lines.length);
+  const sections = source.sections.map((section, index) => ({ ...section, heading: headings[index], lines: kept[index], text: kept[index].join('\n') })).filter(section => section.heading || section.lines.length);
   if (stripped) problems.push({ code: 'missing-field', message: 'I removed a table that appears to contain student names or IDs before reading this source.', spans: [] });
   if (clipped) problems.push({ code: 'missing-field', message: clippedAt === null ? 'The document is longer than I can read in one pass; I read the first 60,000 characters.' : `The document is longer than I can read in one pass; I read pages 1–${clippedAt}.`, spans: [] });
-  const chars = sections.reduce((sum, section) => sum + section.text.length, 0);
+  const chars = sections.reduce((sum, section) => sum + section.heading.length + section.text.length, 0);
   return { source: { ...source, sections, chars }, problems };
 }
 
@@ -140,6 +241,9 @@ async function sourceFor(ctx: ServiceContext, input: Input<'createDesignSession'
     if (!engine) throw new ApiError('unsupported', "Uploads aren't available in demo mode. Use the sample syllabus or paste the text.");
     const extracted = await engine.extract(file);
     source = { kind: input.sourceKind, fileId: file.id, version: file.version, name: file.name, sections: extracted.sections.map(section => ({ page: section.page ?? null, heading: section.heading, level: section.level, text: section.text, lines: section.lines ?? section.text.split('\n') })), chars: 0, ocr: extracted.ocr };
+  }
+  if (!input.sample && hasPossibleRoster(source) && input.consent.confirmedNoStudentRoster !== true) {
+    throw new ApiError('invalid', 'This source may include a student roster or names beside emails or IDs. Remove those lines, or confirm this source has no student roster, then try again. Nothing has been sent to the model.', { reason: 'possible-roster' });
   }
   return cleanSource(source);
 }

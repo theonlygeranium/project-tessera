@@ -27,8 +27,10 @@ export function DesignStart() {
   const [sourceKind, setSourceKind] = useState<'syllabus' | 'brief'>('syllabus');
   const [consent, setConsent] = useState(false);
   const [remember, setRemember] = useState(false);
+  const [confirmedNoStudentRoster, setConfirmedNoStudentRoster] = useState(false);
   const [created, setCreated] = useState('');
   const [localError, setLocalError] = useState('');
+  const sourceChanged = () => { setConfirmedNoStudentRoster(false); create.reset(); };
   const progress = useApiQuery('advanceDesignSession', { sessionId: created }, { enabled: !!created, refetchInterval: created ? 1200 : false });
   useEffect(() => { if (progress.data?.stage === 'read') navigate(paths.teach.designSession(courseId, progress.data.id)); }, [progress.data?.stage, progress.data?.id, courseId, navigate]);
   const available = files.data?.items.filter(file => file.kind === 'pdf' || file.kind === 'docx') ?? [];
@@ -38,7 +40,7 @@ export function DesignStart() {
     if (choice === 'paste' && !text.trim()) { setLocalError('Paste the syllabus or brief text first.'); return; }
     setLocalError('');
     try {
-      const result = await create.mutateAsync({ courseId, sourceKind: choice === 'paste' ? sourceKind : 'syllabus', ...(choice === 'sample' ? { sample: true as const } : choice === 'paste' ? { text, name: sourceKind === 'brief' ? 'Pasted training brief' : 'Pasted syllabus' } : { fileId: choice }), consent: { syllabusOnly: true, rememberProfile: remember } });
+      const result = await create.mutateAsync({ courseId, sourceKind: choice === 'paste' ? sourceKind : 'syllabus', ...(choice === 'sample' ? { sample: true as const } : choice === 'paste' ? { text, name: sourceKind === 'brief' ? 'Pasted training brief' : 'Pasted syllabus' } : { fileId: choice }), consent: { syllabusOnly: true, rememberProfile: remember, ...(confirmedNoStudentRoster ? { confirmedNoStudentRoster: true } : {}) } });
       setCreated(result.id);
     } catch { /* Mutation error is rendered below. */ }
   };
@@ -55,20 +57,20 @@ export function DesignStart() {
         <h2>Start from a syllabus</h2>
         <p className={styles.intro}>Upload your syllabus and I'll read it the way an instructional designer would: what it asks students to be able to do, how that is assessed, how the term is paced. Then I'll ask what I can't tell from the document, and only after that propose ways to structure the course. Nothing reaches students until you keep the drafts and publish.</p>
         <section className={`${styles.card} ${styles.uploadCard}`} aria-labelledby="upload-heading"><h2 id="upload-heading">Drop a syllabus here, or choose a file</h2><p>PDF or DOCX · up to 25 MB · scanned PDFs are read with OCR first · one syllabus per course</p>
-          {dataMode === 'mock' ? <StatusNotice tone="info">Uploads aren't available in demo mode. Use the sample syllabus or paste the text.</StatusNotice> : <UploadFile courseId={courseId} visibility="staff" accept=".pdf,.docx" hint="PDF or DOCX, up to 25 MB. Only staff can see this source until you share it." onUploaded={file => setChoice(file.id)} />}
+          {dataMode === 'mock' ? <StatusNotice tone="info">Uploads aren't available in demo mode. Use the sample syllabus or paste the text.</StatusNotice> : <UploadFile courseId={courseId} visibility="staff" accept=".pdf,.docx" hint="PDF or DOCX, up to 25 MB. Only staff can see this source until you share it." onUploaded={file => { setChoice(file.id); sourceChanged(); }} />}
         </section>
       <section className={styles.card} aria-labelledby="choose-heading"><h2 id="choose-heading">Or use a file already in this course</h2>
             {files.isPending ? <Loading label="Loading files" /> : files.error ? <ErrorNotice error={files.error} onRetry={() => void files.refetch()} /> : <div className={styles.sourceList}>
-              {available.map(file => <label key={file.id} className={styles.choice}><input type="radio" name="source" value={file.id} checked={choice === file.id} onChange={() => setChoice(file.id)} />{file.name} · {file.kind.toUpperCase()}</label>)}
-              <label className={styles.choice}><input type="radio" name="source" value="sample" checked={choice === 'sample'} onChange={() => setChoice('sample')} />Sample syllabus (fictional): STAT110_Syllabus_Fall2026.pdf</label>
-              <label className={styles.choice}><input type="radio" name="source" value="paste" checked={choice === 'paste'} onChange={() => setChoice('paste')} />Paste text instead</label>
+              {available.map(file => <label key={file.id} className={styles.choice}><input type="radio" name="source" value={file.id} checked={choice === file.id} onChange={() => { setChoice(file.id); sourceChanged(); }} />{file.name} · {file.kind.toUpperCase()}</label>)}
+              <label className={styles.choice}><input type="radio" name="source" value="sample" checked={choice === 'sample'} onChange={() => { setChoice('sample'); sourceChanged(); }} />Sample syllabus (fictional): STAT110_Syllabus_Fall2026.pdf</label>
+              <label className={styles.choice}><input type="radio" name="source" value="paste" checked={choice === 'paste'} onChange={() => { setChoice('paste'); sourceChanged(); }} />Paste text instead</label>
             </div>}
-            {choice === 'paste' && <><fieldset><legend>What kind of source is this?</legend><label className={styles.check}><input type="radio" name="source-kind" checked={sourceKind === 'syllabus'} onChange={() => setSourceKind('syllabus')} />Syllabus</label><label className={styles.check}><input type="radio" name="source-kind" checked={sourceKind === 'brief'} onChange={() => setSourceKind('brief')} />Training brief or competency list</label></fieldset><FormField label="Paste syllabus or brief text" required>{control => <TextArea {...control} rows={9} value={text} onChange={event => setText(event.target.value)} />}</FormField></>}
+            {choice === 'paste' && <><fieldset><legend>What kind of source is this?</legend><label className={styles.check}><input type="radio" name="source-kind" checked={sourceKind === 'syllabus'} onChange={() => { setSourceKind('syllabus'); sourceChanged(); }} />Syllabus</label><label className={styles.check}><input type="radio" name="source-kind" checked={sourceKind === 'brief'} onChange={() => { setSourceKind('brief'); sourceChanged(); }} />Training brief or competency list</label></fieldset><FormField label="Paste syllabus or brief text" required>{control => <TextArea {...control} rows={9} value={text} onChange={event => { setText(event.target.value); sourceChanged(); }} />}</FormField></>}
           </section></main>
           <aside className={styles.stack} aria-label="How we work together">
             <AiContent kind="note" who="Design partner" source="before reading anything"><p>You are the subject-matter expert and the instructor of record. I handle sequencing, alignment, scaffolding and quality checks, and I show you the evidence behind every suggestion. I won't propose a structure until you've confirmed what I understood.</p></AiContent>
             <section className={styles.card} aria-labelledby="scope-heading"><h2 id="scope-heading">What I'll use, and what I won't</h2><ul>
-              <li><strong>Only this syllabus.</strong> No rosters, grades or student work. Recognizable roster rows and lines pairing a student name with an ID or student email are removed before analysis.</li>
+              <li><strong>Only this syllabus.</strong> No rosters, grades or student work. If it looks like this source may contain a roster, I'll stop and ask before reading it. Recognizable roster rows are still removed before analysis.</li>
               <li><strong>Yours.</strong> The syllabus and everything drafted from it belong to you. Nothing is used to train a model.</li>
               <li><strong>Cited.</strong> Every claim I make points to the page it came from. Readings come only from your syllabus; where one is missing I leave a placeholder, never an invented citation.</li>
               <li><strong>Drafts only.</strong> I write nothing to the course until you approve a preview, and one action undoes everything I added.</li>
@@ -80,7 +82,9 @@ export function DesignStart() {
           </section>
           <section className={styles.card}><p><strong>{institution.name} {designAllowed ? 'allows' : 'has turned off'} Start from a syllabus</strong> for this program. Model: Palmyra-X6 via Tessera's gateway. Set by your administrator.</p></section>
           {localError && <StatusNotice tone="error">{localError}</StatusNotice>}
-          {create.error && <StatusNotice tone="error">{create.error.message}</StatusNotice>}
+          {create.error && (typeof create.error.details === 'object' && create.error.details !== null && 'reason' in create.error.details && create.error.details.reason === 'possible-roster'
+            ? <StatusNotice tone="error" title="Reading paused">{create.error.message}<label className={styles.check}><input type="checkbox" checked={confirmedNoStudentRoster} onChange={event => setConfirmedNoStudentRoster(event.target.checked)} />I removed any student roster, or this source has no student roster — continue.</label></StatusNotice>
+            : <StatusNotice tone="error">{create.error.message}</StatusNotice>)}
           {progress.data?.provisioning?.error && <StatusNotice tone="error">{progress.data.provisioning.error}</StatusNotice>}
           </aside>
         </form>

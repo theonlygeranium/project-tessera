@@ -12,6 +12,8 @@ describe('design operation input contracts', () => {
   it('requires true consent and exactly one source', () => {
     const schema = OPERATIONS.createDesignSession.input;
     expect(schema.safeParse(create).success).toBe(true);
+    expect(schema.safeParse({ ...create, consent: { ...create.consent, confirmedNoStudentRoster: true } }).success).toBe(true);
+    expect(schema.safeParse({ ...create, consent: { ...create.consent, confirmedNoStudentRoster: 'yes' } }).success).toBe(false);
     expect(schema.safeParse({ ...create, text: undefined, fileId: 'f-1' }).success).toBe(true);
     expect(schema.safeParse({ ...create, text: undefined, sample: true }).success).toBe(true);
     expect(schema.safeParse({ ...create, consent: { ...create.consent, syllabusOnly: false } }).success).toBe(false);

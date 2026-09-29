@@ -247,7 +247,7 @@ describe('design partner service', () => {
   it('removes roster-like table rows before they reach the AI', async () => {
     const ctx = await context();
     const text = 'Course notes\nStudent | ID\nAvery Smith | 1001\nBlair Jones | 1002\nCasey Brown | 1003\nPolicies\nAttendance required.';
-    const started = await service.createDesignSession(ctx, { ...sample, sample: undefined, text });
+    const started = await service.createDesignSession(ctx, { ...sample, sample: undefined, text, consent: { ...sample.consent, confirmedNoStudentRoster: true } });
     expect(started.source.sections[0].text).not.toContain('Avery Smith');
     await service.advanceDesignSession(ctx, { sessionId: started.id });
     const ready = await service.advanceDesignSession(ctx, { sessionId: started.id });
@@ -259,6 +259,16 @@ describe('design partner service', () => {
     const started = await service.createDesignSession({ ...ctx, documents }, { ...sample, sample: undefined, fileId: file.id });
     expect(documents!.extract).toHaveBeenCalledWith({ ...file, visibility: 'course' });
     expect(started.source).toMatchObject({ fileId: file.id, version: 1, ocr: true });
+  });
+  it('pauses a roster found in an extracted file before saving a session or job', async () => {
+    const ctx = await context(); await ctx.repo.putFile(file);
+    const documents = { extract: vi.fn(async () => ({ sections: [{ page: 1, heading: '', level: 0, text: 'Name | Email\nAvery Example | avery@example.edu', lines: ['Name | Email', 'Avery Example | avery@example.edu'] }], ocr: false })) } as unknown as ServiceContext['documents'];
+    const saveSession = vi.spyOn(ctx.repo, 'putDesignSession');
+    const saveJob = vi.spyOn(ctx.repo, 'putGenerationJob');
+    await expect(service.createDesignSession({ ...ctx, documents }, { ...sample, sample: undefined, fileId: file.id })).rejects.toMatchObject({ code: 'invalid', details: { reason: 'possible-roster' } });
+    expect(documents!.extract).toHaveBeenCalledOnce();
+    expect(saveSession).not.toHaveBeenCalled();
+    expect(saveJob).not.toHaveBeenCalled();
   });
   it('removes page furniture repeated on at least half of three PDF pages', async () => {
     const ctx = await context(); await ctx.repo.putFile(file);
@@ -348,7 +358,7 @@ describe('design partner service', () => {
   it('keeps ordinary tables that mention students and strips a real roster', async () => {
     const ctx = await context();
     const rows = ['9 | Oct 18–24 | Justice and the political. | Checkpoint 8', '10 | Oct 25–31 | Applied ethics case (student choice from a set). Essay due. | Essay', '11 | Nov 1–7 | Meaning and absurdity. | Checkpoint 9', '12 | Nov 8–12 | Synthesis and final. | Final exam', 'Student name | Student ID | Email', 'Rivera, Ana | 1234567 | ana@example.edu', 'Chen, Li | 2345678 | li@example.edu', 'Okoro, Sam | 3456789 | sam@example.edu'];
-    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: rows.join('\n'), consent: { syllabusOnly: true, rememberProfile: false } });
+    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: rows.join('\n'), consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     const text = session.source.sections.map(section => section.lines.join('\n')).join('\n');
     expect(text).toContain('10 | Oct 25–31');
     expect(text).toContain('12 | Nov 8–12');

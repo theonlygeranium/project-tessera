@@ -140,6 +140,9 @@
                       },
                       "rememberProfile": {
                         "type": "boolean"
+                      },
+                      "confirmedNoStudentRoster": {
+                        "type": "boolean"
                       }
                     },
                     "required": [

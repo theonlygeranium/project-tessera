@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fixtureAi } from '../shared/ai';
 import { ROUTES } from '../shared/api';
-import type { DesignSession } from '../shared/domain';
+import type { DesignSession, FileRecord } from '../shared/domain';
 import type { Repo } from '../shared/repo';
 import { seedData } from '../shared/seed';
 import { MemoryRepo, service } from '../shared/service';
@@ -11,7 +11,7 @@ import { coveredWeeks } from '../shared/design/plan';
 import { D1Repo } from './d1-repo';
 import { createTestDb } from './test/d1-shim';
 import { findFileRoute } from './api/files';
-import { palmyraClient } from './ai/palmyra';
+import { palmyraClient, sourceText } from './ai/palmyra';
 
 const at = '2026-09-28T12:00:00.000Z';
 async function setup(kind: 'memory' | 'd1') {
@@ -32,6 +32,271 @@ async function options(ctx: ServiceContext, session: DesignSession) {
 }
 
 for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integration`, () => {
+  it('pauses possible rosters before persistence, jobs, background work, or AI', async () => {
+    const ctx = await setup(kind);
+    const run = vi.fn(fixtureAi.run);
+    const ai = { run } as ServiceContext['ai'];
+    const background = { startGeneration: vi.fn(async () => {}) };
+    const runCtx = { ...ctx, ai, background };
+    const saveSession = vi.spyOn(ctx.repo, 'putDesignSession');
+    const saveJob = vi.spyOn(ctx.repo, 'putGenerationJob');
+    const baseline = await ctx.repo.listDesignSessions('c-stat110');
+    for (const text of [
+      'Course notes\nName | Email\nCasey Sample | casey@example.edu',
+      'Course notes\nName | Email\nCasey Sample | casey@example.edu\n\nAvery Example | avery@example.edu',
+      'Course notes\nName | ID\nCasey Sample | 1234567\n\nAvery Example | 7654321',
+      'Course notes\nAvery Example | 7654321',
+      'Course notes\nAvery Example | 1234',
+      'Course notes\nAvery Example, 1234',
+      'Course notes\nAvery Example\t1234',
+      'Course notes\nPat Example, pexample@university.example.edu',
+    ]) {
+      await expect(service.createDesignSession(runCtx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false } })).rejects.toMatchObject({ code: 'invalid', details: { reason: 'possible-roster' }, message: expect.stringContaining('Nothing has been sent to the model') });
+      expect(await ctx.repo.listDesignSessions('c-stat110')).toEqual(baseline);
+    }
+    expect(saveSession).not.toHaveBeenCalled();
+    expect(saveJob).not.toHaveBeenCalled();
+    expect(background.startGeneration).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('keeps recognizable roster rows out of extraction after instructor confirmation', async () => {
+    const ctx = await setup(kind);
+    for (const text of [
+      'Course notes\nName | Email\nCasey Sample | casey@example.edu\n\nAvery Example | avery@example.edu',
+      'Course notes\nName | ID\nCasey Sample | 1234567\n\nAvery Example | 7654321',
+    ]) {
+      const run = vi.fn(fixtureAi.run);
+      const ai = { run } as ServiceContext['ai'];
+      const session = await service.createDesignSession({ ...ctx, ai }, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
+      expect(session.source.sections.map(section => section.text).join('\n')).not.toContain('Casey Sample');
+      expect(run).not.toHaveBeenCalled();
+      await service.advanceDesignSession({ ...ctx, ai }, { sessionId: session.id });
+      expect(JSON.stringify(run.mock.calls)).not.toContain('Casey Sample');
+      expect(run).toHaveBeenCalled();
+    }
+  });
+
+  it('gates DOCX heading rosters and removes heading and body identities before extraction', async () => {
+    const ctx = await setup(kind);
+    const file: FileRecord = { id: `heading-docx-${kind}`, courseId: 'c-stat110', name: 'Fictional syllabus.docx', kind: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 100, key: 'files/fictional-docx', version: 1, uploadedBy: 'u-okafor', uploadedAt: at, scan: null };
+    await ctx.repo.putFile(file);
+    for (const [heading, lines, retained] of [
+      ['Name | Email', ['Casey Sample | casey@example.edu', 'Week 1 | Evidence'], 'Week 1 | Evidence'],
+      ['Casey Sample | casey@example.edu', ['Course objectives', 'Discuss evidence.'], 'Discuss evidence.'],
+      ['Casey Sample | casey@example.edu', ['Avery Example | avery@example.edu', 'Course objectives'], 'Course objectives'],
+    ] as const) {
+      const documents = { extract: vi.fn(async () => ({ sections: [{ page: null, heading, level: 1, text: lines.join('\n'), lines: [...lines] }], ocr: false })) } as unknown as ServiceContext['documents'];
+      const run = vi.fn(fixtureAi.run);
+      const runCtx = { ...ctx, documents, ai: { run } as ServiceContext['ai'] };
+      const input = { courseId: 'c-stat110', sourceKind: 'syllabus' as const, fileId: file.id, consent: { syllabusOnly: true as const, rememberProfile: false } };
+      const sessions = await ctx.repo.listDesignSessions('c-stat110');
+      await expect(service.createDesignSession(runCtx, input)).rejects.toMatchObject({ code: 'invalid', details: { reason: 'possible-roster' } });
+      expect(await ctx.repo.listDesignSessions('c-stat110')).toEqual(sessions);
+      expect(run).not.toHaveBeenCalled();
+      const session = await service.createDesignSession(runCtx, { ...input, consent: { ...input.consent, confirmedNoStudentRoster: true } });
+      expect(JSON.stringify(session.source.sections.map(section => ({ heading: section.heading, lines: section.lines, text: section.text })))).not.toContain('Casey Sample');
+      expect(JSON.stringify(session.source.sections)).not.toContain('casey@example.edu');
+      expect(sourceText(session.source.sections, 60_000)).not.toContain('Casey Sample');
+      expect(sourceText(session.source.sections, 60_000)).not.toContain('casey@example.edu');
+      expect(sourceText(session.source.sections, 60_000)).not.toContain('Avery Example');
+      expect(session.source.sections.map(section => section.text).join('\n')).toContain(retained);
+      await service.advanceDesignSession(runCtx, { sessionId: session.id });
+      const extractInputs = run.mock.calls.filter(([task]) => task === 'syllabus-extract').map(([, aiInput]) => JSON.stringify(aiInput));
+      expect(extractInputs).toHaveLength(1);
+      expect(extractInputs[0]).not.toContain('Casey Sample');
+      expect(extractInputs[0]).not.toContain('casey@example.edu');
+    }
+    const rosterHeading = { extract: vi.fn(async () => ({ sections: [{ page: null, heading: 'Student roster:', level: 1, text: 'Casey Sample\nAvery Example', lines: ['Casey Sample', 'Avery Example'] }], ocr: false })) } as unknown as ServiceContext['documents'];
+    await expect(service.createDesignSession({ ...ctx, documents: rosterHeading }, { courseId: 'c-stat110', sourceKind: 'syllabus', fileId: file.id, consent: { syllabusOnly: true, rememberProfile: false } })).rejects.toMatchObject({ code: 'invalid', details: { reason: 'possible-roster' } });
+    const ordinaryHeading = { extract: vi.fn(async () => ({ sections: [{ page: null, heading: 'Course objectives', level: 1, text: 'Discuss evidence.', lines: ['Discuss evidence.'] }], ocr: false })) } as unknown as ServiceContext['documents'];
+    const ordinary = await service.createDesignSession({ ...ctx, documents: ordinaryHeading }, { courseId: 'c-stat110', sourceKind: 'syllabus', fileId: file.id, consent: { syllabusOnly: true, rememberProfile: false } });
+    expect(ordinary.source.sections[0].heading).toBe('Course objectives');
+    expect(sourceText(ordinary.source.sections, 60_000)).toContain('[§ Course objectives]');
+  });
+
+  it('gates appended student identities in faculty lines and headings, then removes them before extraction', async () => {
+    const ctx = await setup(kind);
+    const identity = 'Instructor: Dr. Pat Example | Student: Casey Sample | casey@example.edu';
+    const file: FileRecord = { id: `faculty-heading-${kind}`, courseId: 'c-stat110', name: 'Fictional syllabus.docx', kind: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 100, key: 'files/faculty-heading', version: 1, uploadedBy: 'u-okafor', uploadedAt: at, scan: null };
+    await ctx.repo.putFile(file);
+    const documents = { extract: vi.fn(async () => ({ sections: [{ page: null, heading: identity, level: 1, text: 'Course objectives\nDiscuss evidence.', lines: ['Course objectives', 'Discuss evidence.'] }], ocr: false })) } as unknown as ServiceContext['documents'];
+    for (const source of [
+      { text: `Course notes\n${identity}\nDiscuss evidence.` },
+      { text: 'Course notes\nFaculty: Dr. Pat Example | Student: Casey Sample\nDiscuss evidence.' },
+      { fileId: file.id },
+    ]) {
+      const run = vi.fn(fixtureAi.run);
+      const background = { startGeneration: vi.fn(async () => {}) };
+      const runCtx = { ...ctx, documents, ai: { run } as ServiceContext['ai'], background };
+      const saveSession = vi.spyOn(ctx.repo, 'putDesignSession');
+      const saveJob = vi.spyOn(ctx.repo, 'putGenerationJob');
+      const baseline = await ctx.repo.listDesignSessions('c-stat110');
+      const input = { courseId: 'c-stat110', sourceKind: 'syllabus' as const, ...source, consent: { syllabusOnly: true as const, rememberProfile: false } };
+      await expect(service.createDesignSession(runCtx, input)).rejects.toMatchObject({ code: 'invalid', details: { reason: 'possible-roster' } });
+      expect(await ctx.repo.listDesignSessions('c-stat110')).toEqual(baseline);
+      expect(saveSession).not.toHaveBeenCalled();
+      expect(saveJob).not.toHaveBeenCalled();
+      expect(background.startGeneration).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+      saveSession.mockRestore(); saveJob.mockRestore();
+
+      const session = await service.createDesignSession({ ...ctx, documents, ai: { run } as ServiceContext['ai'] }, { ...input, consent: { ...input.consent, confirmedNoStudentRoster: true } });
+      const fields = JSON.stringify(session.source.sections);
+      expect(fields).not.toContain('Casey Sample');
+      expect(fields).not.toContain('casey@example.edu');
+      expect(sourceText(session.source.sections, 60_000)).not.toContain('Casey Sample');
+      expect(sourceText(session.source.sections, 60_000)).not.toContain('casey@example.edu');
+      await service.advanceDesignSession({ ...ctx, ai: { run } as ServiceContext['ai'] }, { sessionId: session.id });
+      const extractInputs = run.mock.calls.filter(([task]) => task === 'syllabus-extract').map(([, aiInput]) => JSON.stringify(aiInput));
+      expect(extractInputs).toHaveLength(1);
+      expect(extractInputs[0]).not.toContain('Casey Sample');
+      expect(extractInputs[0]).not.toContain('casey@example.edu');
+    }
+  });
+
+  it('gates identity cells appended to an assessment header, then removes them before extraction', async () => {
+    const ctx = await setup(kind);
+    const run = vi.fn(fixtureAi.run);
+    const background = { startGeneration: vi.fn(async () => {}) };
+    const runCtx = { ...ctx, ai: { run } as ServiceContext['ai'], background };
+    const saveSession = vi.spyOn(ctx.repo, 'putDesignSession');
+    const saveJob = vi.spyOn(ctx.repo, 'putGenerationJob');
+    const baseline = await ctx.repo.listDesignSessions('c-stat110');
+    const input = { courseId: 'c-stat110', sourceKind: 'syllabus' as const, text: 'Assignment | Points | Casey Sample | casey@example.edu\nHomework Assignment | 10', consent: { syllabusOnly: true as const, rememberProfile: false } };
+    await expect(service.createDesignSession(runCtx, input)).rejects.toMatchObject({ code: 'invalid', details: { reason: 'possible-roster' } });
+    expect(await ctx.repo.listDesignSessions('c-stat110')).toEqual(baseline);
+    expect(saveSession).not.toHaveBeenCalled();
+    expect(saveJob).not.toHaveBeenCalled();
+    expect(background.startGeneration).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    saveSession.mockRestore(); saveJob.mockRestore();
+
+    const session = await service.createDesignSession({ ...ctx, ai: { run } as ServiceContext['ai'] }, { ...input, consent: { ...input.consent, confirmedNoStudentRoster: true } });
+    expect(JSON.stringify(session.source.sections)).not.toContain('Casey Sample');
+    expect(JSON.stringify(session.source.sections)).not.toContain('casey@example.edu');
+    expect(sourceText(session.source.sections, 60_000)).not.toContain('Casey Sample');
+    expect(session.source.sections[0].text).toContain('Homework Assignment | 10');
+    await service.advanceDesignSession({ ...ctx, ai: { run } as ServiceContext['ai'] }, { sessionId: session.id });
+    const extractInputs = run.mock.calls.filter(([task]) => task === 'syllabus-extract').map(([, aiInput]) => JSON.stringify(aiInput));
+    expect(extractInputs).toHaveLength(1);
+    expect(extractInputs[0]).not.toContain('Casey Sample');
+    expect(extractInputs[0]).not.toContain('casey@example.edu');
+  });
+
+  it('gates comma-appended learner identities in faculty paste and headings', async () => {
+    const ctx = await setup(kind);
+    const identity = 'Instructor: Dr. Pat Example, Learner: Casey Sample, casey@example.edu';
+    const file: FileRecord = { id: `comma-faculty-${kind}`, courseId: 'c-stat110', name: 'Fictional syllabus.docx', kind: 'docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 100, key: 'files/comma-faculty', version: 1, uploadedBy: 'u-okafor', uploadedAt: at, scan: null };
+    await ctx.repo.putFile(file);
+    const documents = { extract: vi.fn(async () => ({ sections: [{ page: null, heading: identity, level: 1, text: 'Course objectives\nDiscuss evidence.', lines: ['Course objectives', 'Discuss evidence.'] }], ocr: false })) } as unknown as ServiceContext['documents'];
+    for (const source of [{ text: `${identity}\nCourse objectives\nDiscuss evidence.` }, { fileId: file.id }]) {
+      const run = vi.fn(fixtureAi.run);
+      const background = { startGeneration: vi.fn(async () => {}) };
+      const runCtx = { ...ctx, documents, ai: { run } as ServiceContext['ai'], background };
+      const saveSession = vi.spyOn(ctx.repo, 'putDesignSession');
+      const saveJob = vi.spyOn(ctx.repo, 'putGenerationJob');
+      const baseline = await ctx.repo.listDesignSessions('c-stat110');
+      const input = { courseId: 'c-stat110', sourceKind: 'syllabus' as const, ...source, consent: { syllabusOnly: true as const, rememberProfile: false } };
+      await expect(service.createDesignSession(runCtx, input)).rejects.toMatchObject({ code: 'invalid', details: { reason: 'possible-roster' } });
+      expect(await ctx.repo.listDesignSessions('c-stat110')).toEqual(baseline);
+      expect(saveSession).not.toHaveBeenCalled();
+      expect(saveJob).not.toHaveBeenCalled();
+      expect(background.startGeneration).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+      saveSession.mockRestore(); saveJob.mockRestore();
+
+      const confirmedCtx = { ...ctx, documents, ai: { run } as ServiceContext['ai'] };
+      const session = await service.createDesignSession(confirmedCtx, { ...input, consent: { ...input.consent, confirmedNoStudentRoster: true } });
+      const sourceFields = JSON.stringify(session.source.sections);
+      expect(sourceFields).not.toContain('Casey Sample');
+      expect(sourceFields).not.toContain('casey@example.edu');
+      expect(sourceText(session.source.sections, 60_000)).not.toContain('Casey Sample');
+      expect(sourceText(session.source.sections, 60_000)).not.toContain('casey@example.edu');
+      expect(sourceFields).toContain('Discuss evidence.');
+      await service.advanceDesignSession(confirmedCtx, { sessionId: session.id });
+      const extractInputs = run.mock.calls.filter(([task]) => task === 'syllabus-extract').map(([, aiInput]) => JSON.stringify(aiInput));
+      expect(extractInputs).toHaveLength(1);
+      expect(extractInputs[0]).not.toContain('Casey Sample');
+      expect(extractInputs[0]).not.toContain('casey@example.edu');
+    }
+  });
+
+  it('gates identity inside assessment title cells with email or numeric ID', async () => {
+    const ctx = await setup(kind);
+    for (const [text, identity] of [
+      ['Assignment | Points\nHomework Assignment — Casey Sample (casey@example.edu) | 10\nHomework Assignment | 10', 'casey@example.edu'],
+      ['Homework Assignment — Casey Sample | 1234567\nPractice Assignment | 7654321', '1234567'],
+    ] as const) {
+      const run = vi.fn(fixtureAi.run);
+      const background = { startGeneration: vi.fn(async () => {}) };
+      const runCtx = { ...ctx, ai: { run } as ServiceContext['ai'], background };
+      const saveSession = vi.spyOn(ctx.repo, 'putDesignSession');
+      const saveJob = vi.spyOn(ctx.repo, 'putGenerationJob');
+      const baseline = await ctx.repo.listDesignSessions('c-stat110');
+      const input = { courseId: 'c-stat110', sourceKind: 'syllabus' as const, text, consent: { syllabusOnly: true as const, rememberProfile: false } };
+      await expect(service.createDesignSession(runCtx, input)).rejects.toMatchObject({ code: 'invalid', details: { reason: 'possible-roster' } });
+      expect(await ctx.repo.listDesignSessions('c-stat110')).toEqual(baseline);
+      expect(saveSession).not.toHaveBeenCalled();
+      expect(saveJob).not.toHaveBeenCalled();
+      expect(background.startGeneration).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+      saveSession.mockRestore(); saveJob.mockRestore();
+
+      const confirmedCtx = { ...ctx, ai: { run } as ServiceContext['ai'] };
+      const session = await service.createDesignSession(confirmedCtx, { ...input, consent: { ...input.consent, confirmedNoStudentRoster: true } });
+      const sourceFields = JSON.stringify(session.source.sections);
+      expect(sourceFields).not.toContain('Casey Sample');
+      expect(sourceFields).not.toContain(identity);
+      expect(sourceText(session.source.sections, 60_000)).not.toContain('Casey Sample');
+      expect(sourceText(session.source.sections, 60_000)).not.toContain(identity);
+      expect(sourceFields).toContain(identity === '1234567' ? 'Practice Assignment | 7654321' : 'Homework Assignment | 10');
+      await service.advanceDesignSession(confirmedCtx, { sessionId: session.id });
+      const extractInputs = run.mock.calls.filter(([task]) => task === 'syllabus-extract').map(([, aiInput]) => JSON.stringify(aiInput));
+      expect(extractInputs).toHaveLength(1);
+      expect(extractInputs[0]).not.toContain('Casey Sample');
+      expect(extractInputs[0]).not.toContain(identity);
+    }
+  });
+
+  it('pauses ambiguous identity rows and explicit roster labels while accepting grading tables', async () => {
+    const ctx = await setup(kind);
+    const consent = { syllabusOnly: true as const, rememberProfile: false };
+    const input = (text: string) => ({ courseId: 'c-stat110', sourceKind: 'syllabus' as const, text, consent });
+    for (const text of [
+      'Practice Assignment | Casey Sample | casey@example.edu',
+      'Practice Assignment | Casey Sample | 1234567',
+      'casey sample | casey@example.edu',
+      'Casey | Sample | casey@example.edu',
+      'Casey | Sample | 1234567',
+      'Instructor: Dr. Pat Example, Enrollee: Casey Sample',
+      'Instructor: Dr. Pat Example, Learner: casey@example.edu',
+      'Instructor: Dr. Pat Example Casey Sample casey@example.edu',
+      'Student roster\nCasey Sample\nAvery Example',
+      'CLASS ROSTER:\nCasey Sample',
+      'Course roster.\nCasey Sample',
+      'Enrollment list!\nCasey Sample',
+    ]) {
+      await expect(service.createDesignSession(ctx, input(text))).rejects.toMatchObject({ code: 'invalid', details: { reason: 'possible-roster' } });
+    }
+    for (const text of [
+      'Practice Assignment | 1234567',
+      'Assignment | Points\nHomework Assignment | 10\nLab Exercise | 20',
+      'Instructor: Dr. Pat Example\nOffice: Science Hall 1024',
+    ]) {
+      await expect(service.createDesignSession(ctx, input(text))).resolves.toMatchObject({ stage: 'start' });
+    }
+    await expect(service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', sample: true, consent })).resolves.toMatchObject({ stage: 'start' });
+  });
+
+  it('does not pause assessment rows, faculty contact, or the sample', async () => {
+    const ctx = await setup(kind);
+    const text = ['Course notes', 'Practice Assignment | 1234567', 'Essay | 20', 'Final Exam | 200', 'Participation | 10', 'Instructor: Dr. Pat Example', 'Office: Science Hall 1024'].join('\n');
+    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false } });
+    expect(session.source.sections[0].text).toContain('Practice Assignment | 1234567');
+    await expect(service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', sample: true, consent: { syllabusOnly: true, rememberProfile: false } })).resolves.toMatchObject({ stage: 'start' });
+  });
+
   it('hides staff-only source bytes, metadata, and derived formats until explicit sharing', async () => {
     const ctx = await setup(kind);
     const objects = new Map<string, Uint8Array>();
@@ -126,7 +391,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
   it('removes two-row rosters and standalone name/ID lines before any model input', async () => {
     const ctx = await setup(kind);
     const text = ['Week 1 | Evidence and claims', 'Student Name | Student ID', 'Avery Example | 1234567', 'Casey Sample | 2345678', 'Week 2 | Compare sources', 'Jordan Placeholder | kj@student.example.edu'].join('\n');
-    const source = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false } });
+    const source = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     const cleaned = source.source.sections.map(section => section.text).join('\n');
     expect(cleaned).toContain('Week 1 | Evidence');
     for (const name of ['Avery Example', 'Casey Sample', 'Jordan Placeholder']) expect(cleaned).not.toContain(name);
@@ -136,7 +401,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
     expect(prompt).not.toContain('Avery Example');
     expect(prompt).not.toContain('Jordan Placeholder');
     expect((await ctx.repo.getDesignSession(source.id))!.extraction!.problems.some(problem => problem.message.includes('removed a table'))).toBe(true);
-    const oneRow = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: 'Student Name | Student ID\nFictional Student | 3456789\nWeek 1 | Evidence', consent: { syllabusOnly: true, rememberProfile: false } });
+    const oneRow = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: 'Student Name | Student ID\nFictional Student | 3456789\nWeek 1 | Evidence', consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     expect(oneRow.source.sections.map(section => section.text).join('\n')).not.toContain('Fictional Student');
   });
 
@@ -145,7 +410,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
     const surviving = ['Final Exam | 200', 'Research Paper | 150', 'Midterm Exam 100', 'Course Total | 1000', 'Lab Report, 120', 'Pat Example, pexample@university.example.edu', 'Instructor: Dr. Pat Example', 'Office: Science Hall 1024', 'Weekly Quizzes | 10 @ 10 points'];
     const removed = ['Avery Example | 1234567', 'Casey Sample | 2345678', 'Jordan Placeholder | kj@student.example.edu', 'Jordan Sample 20231234', 'Riley Test, Student ID 7654321'];
     const text = [...surviving, 'Student Name | Student ID', ...removed.slice(0, 2), 'Week 1 | Evidence', ...removed.slice(2)].join('\n');
-    const source = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false } });
+    const source = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     const saved = source.source.sections.map(section => section.text).join('\n');
     let prompt = '';
     const ai = { run: async (task: never, input: never) => { if (task === 'syllabus-extract') prompt = JSON.stringify(input); return fixtureAi.run(task, input); } } as ServiceContext['ai'];
@@ -154,7 +419,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
     for (const line of removed) { expect(saved).not.toContain(line); expect(prompt).not.toContain(line); }
     expect(source.source.sections.map(section => section.text).join('\n')).not.toContain('Student Name | Student ID');
     expect((await ctx.repo.getDesignSession(source.id))!.extraction!.problems.some(problem => problem.message.includes('removed a table'))).toBe(true);
-    const variants = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: ['Name | ID | Email', 'Taylor Example | A0012345 | te@example.edu', 'Student | Email', 'Morgan Example | me@student.example.edu', '', 'Office: Science Hall 1024', 'Lee Example A0012345', 'Pat Example, pexample@university.example.edu'].join('\n'), consent: { syllabusOnly: true, rememberProfile: false } });
+    const variants = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: ['Name | ID | Email', 'Taylor Example | A0012345 | te@example.edu', 'Student | Email', 'Morgan Example | me@student.example.edu', '', 'Office: Science Hall 1024', 'Lee Example A0012345', 'Pat Example, pexample@university.example.edu'].join('\n'), consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     const variantText = variants.source.sections.map(section => section.text).join('\n');
     for (const name of ['Taylor Example', 'Morgan Example', 'Lee Example']) expect(variantText).not.toContain(name);
     expect(variantText).toContain('Pat Example, pexample@university.example.edu');
@@ -165,7 +430,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
     const removed = ['Alex Q. Example | 1234567', 'Jean-Luc D’Exemple | 2345678', "Jean-Luc D'Exemple | 2345678", 'Riley Test | 7654321', 'Émile Référence | A123456', 'Final Exam | 1234567'];
     const surviving = ['Final Exam | 200', 'Research Paper | 150', 'Midterm Exam 100', 'Course Total | 1000', 'Lab Report, 120', 'Pat Example, pexample@university.example.edu', 'Instructor: Dr. Pat Example', 'Office: Science Hall 1024', 'Weekly Quizzes | 10 @ 10 points'];
     const text = ['Student Name | Student ID', ...removed, '', ...surviving].join('\n');
-    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false } });
+    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     const saved = (await ctx.repo.getDesignSession(session.id))!.source.sections.map(section => section.text).join('\n');
     let prompt = '';
     const ai = { run: async (task: never, input: never) => { if (task === 'syllabus-extract') prompt = JSON.stringify(input); return fixtureAi.run(task, input); } } as ServiceContext['ai'];
@@ -205,7 +470,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
       ...removed.slice(14, 16), '', ...removed.slice(16), '',
       'Name,Student ID', '"Avery, Morgan Example",3456789', '', ...surviving.slice(7),
     ].join('\n');
-    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false } });
+    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     const saved = session.source.sections.map(section => section.text).join('\n');
     let prompt = '';
     const ai = { run: async (task: never, input: never) => { if (task === 'syllabus-extract') prompt = JSON.stringify(input); return fixtureAi.run(task, input); } } as ServiceContext['ai'];
@@ -219,7 +484,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
   it('recognizes split person columns and username headers with ragged rows', async () => {
     const ctx = await setup(kind);
     const text = ['First Name | Last Name | Student Number', 'Avery | Example | ABC', '| | A12', 'Week | Topic', 'Week 1 | Evidence', 'Learner,User Name', 'Casey Sample,casey7', '', 'Participation,10'].join('\n');
-    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false } });
+    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     const saved = session.source.sections.map(section => section.text).join('\n');
     for (const removed of ['First Name | Last Name | Student Number', 'Avery | Example | ABC', '| | A12', 'Learner,User Name', 'Casey Sample,casey7']) expect(saved).not.toContain(removed);
     for (const kept of ['Week | Topic', 'Week 1 | Evidence', 'Participation,10']) expect(saved).toContain(kept);
@@ -231,7 +496,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
       const removed = [join('Name', 'ID'), join('Avery Example', 'ABC'), join('Full Name', 'Points', 'ID'), join('Casey Sample', '10', 'XYZ')];
       const grading = [join('Assignment Name', 'Points'), join(delimiter === ' | ' ? 'Practice Assignment' : 'Essay', delimiter === ' | ' ? '1234567' : '20'), join('Week', 'Topic'), join('Week 1', 'Evidence')];
       const ctx = await setup(kind);
-      const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: [...removed, ...grading].join('\n'), consent: { syllabusOnly: true, rememberProfile: false } });
+      const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: [...removed, ...grading].join('\n'), consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
       const saved = session.source.sections.map(section => section.text).join('\n');
       let prompt = '';
       const ai = { run: async (task: never, input: never) => { if (task === 'syllabus-extract') prompt = (input as { sections: { text: string }[] }).sections.map(section => section.text).join('\n'); return fixtureAi.run(task, input); } } as ServiceContext['ai'];
@@ -243,7 +508,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
 
   it('keeps an uppercase non-roster header after a roster block', async () => {
     const ctx = await setup(kind);
-    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: ['NAME | ID', 'Avery Example | ABC', 'ASSIGNMENT NAME | POINTS', 'Practice Assignment | 1234567'].join('\n'), consent: { syllabusOnly: true, rememberProfile: false } });
+    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: ['NAME | ID', 'Avery Example | ABC', 'ASSIGNMENT NAME | POINTS', 'Practice Assignment | 1234567'].join('\n'), consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     const saved = session.source.sections.map(section => section.text).join('\n');
     expect(saved).not.toContain('Avery Example');
     expect(saved).toContain('ASSIGNMENT NAME | POINTS');
@@ -270,7 +535,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
     ];
     for (const [index, probe] of cases.entries()) {
       const ctx = await setup(kind);
-      const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: probe.text.join('\n'), consent: { syllabusOnly: true, rememberProfile: false } });
+      const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text: probe.text.join('\n'), consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
       const saved = session.source.sections.flatMap(section => section.lines).join('\n');
       let prompt = '';
       const ai = { run: async (task: never, input: never) => { if (task === 'syllabus-extract') prompt = (input as { sections: { text: string }[] }).sections.map(section => section.text).join('\n'); return fixtureAi.run(task, input); } } as ServiceContext['ai'];
@@ -283,7 +548,7 @@ for (const kind of ['memory', 'd1'] as const) describe(`${kind} Night 4 integrat
   it('removes unseparated assessment rows after rosters but keeps separated and standalone rows', async () => {
     const ctx = await setup(kind);
     const text = ['Name | ID', 'Avery Example | ABC', 'Participation | 10', 'Essay | 20', 'Final Exam | 200', '', 'Participation | 10', 'Essay | 20', 'Final Exam | 200', 'Reading Response | 100', 'Studio Practice | 120', 'Practice Assignment | 1234567'].join('\n');
-    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false } });
+    const session = await service.createDesignSession(ctx, { courseId: 'c-stat110', sourceKind: 'syllabus', text, consent: { syllabusOnly: true, rememberProfile: false, confirmedNoStudentRoster: true } });
     const saved = session.source.sections.flatMap(section => section.lines);
     let prompt = '';
     const ai = { run: async (task: never, input: never) => { if (task === 'syllabus-extract') prompt = (input as { sections: { text: string }[] }).sections.map(section => section.text).join('\n'); return fixtureAi.run(task, input); } } as ServiceContext['ai'];
