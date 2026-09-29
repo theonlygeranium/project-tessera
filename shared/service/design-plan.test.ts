@@ -90,6 +90,35 @@ describe('syllabus provision plan', () => {
     expect(entries.find(entry => entry.assignment.replaces === 'Final exam')?.module.lessons[0].week).toBe(16);
     expect(entries.filter(entry => entry.module.lessons[0].week === 16).reduce((sum, entry) => sum + entry.assignment.points, 0)).toBeLessThan(50);
   });
+  it('splits a component counted as N @ X points across content modules', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const row = session.extraction!.schedule[0];
+    session.extraction!.schedule = Array.from({ length: 10 }, (_, index) => ({ ...row, week: index + 1, topic: `Topic ${index + 1}`, due: '', empty: false }));
+    const template = session.options![0].modules[0];
+    session.options![0].modules = session.extraction!.schedule.map(row => ({ ...template, title: row.topic, weeks: [row.week] }));
+    session.extraction!.assessments = [
+      { id: 'projects', title: 'Projects – 500 points (5 @ 100 points each)', weightPercent: 50, dueAt: null, format: 'project', span: { page: 2, text: 'Projects – 500 points (5 @ 100 points each)' } },
+      { id: 'exam', title: 'Final exam', weightPercent: 50, dueAt: null, format: 'exam', span: null },
+    ];
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const entries = plan.modules.flatMap(module => (module.assignments ?? []).map(assignment => ({ module, assignment })));
+    const projects = entries.filter(entry => entry.assignment.replaces === 'Projects – 500 points (5 @ 100 points each)');
+    expect(projects).toHaveLength(5);
+    expect(projects.map(entry => entry.assignment.title)).toEqual([
+      'Projects – 500 points 1',
+      'Projects – 500 points 2',
+      'Projects – 500 points 3',
+      'Projects – 500 points 4',
+      'Projects – 500 points 5',
+    ]);
+    expect(projects.reduce((sum, entry) => sum + entry.assignment.points, 0)).toBeCloseTo(50, 8);
+    expect(new Set(projects.map(entry => entry.module.key)).size).toBeGreaterThan(1);
+    const content = plan.modules.filter(module => module.key.startsWith('module-'));
+    const lastShare = projects.filter(entry => entry.module.key === content.at(-1)?.key).reduce((sum, entry) => sum + entry.assignment.points, 0) / 50;
+    expect(lastShare).toBeLessThanOrEqual(0.5);
+  });
   it('exports formula-leading plan text as inert CSV cells', async () => {
     const { ctx, sessionId } = await setup();
     await service.previewProvisionPlan(ctx, { sessionId });

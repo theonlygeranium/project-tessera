@@ -84,7 +84,7 @@ function occurrenceNames(title: string, due: string, topic: string): string[] {
   });
 }
 const statedWeek = (text: string) => /\bweek\s*(\d{1,2})\b/i.exec(text)?.[1];
-const countOf = (text: string) => /\(\s*(\d{1,2})\s*\)/.exec(text)?.[1];
+const countOf = (text: string) => (/\(\s*(\d{1,2})\s*@\s*\d+(?:\.\d+)?\s*(?:points?|pts?)\b[^)]*\)/i.exec(text) ?? /(\d{1,2})\s*@\s*\d+(?:\.\d+)?\s*(?:points?|pts?)\b/i.exec(text) ?? /\(\s*(\d{1,2})\s*\)/.exec(text))?.[1];
 const isBreak = (text: string) => /\b(?:break|holiday|recess|no class)\b/i.test(text);
 function shares(total: number, count: number): number[] {
   const units = Math.round(total * 10000);
@@ -204,7 +204,7 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
         const target = content[Math.round((i + 0.5) * content.length / n - 0.5)] ?? content[content.length - 1];
         if (!target) return;
         const week = contentWeek(target);
-        add(target, `${item.title.replace(/\s*\(\s*\d+\s*\)/, '').trim()} ${i + 1}`, pointShares[i], weightShares[i] ?? null, week, `${count ? `${count} stated instances` : 'Recurring'} spread across content modules; Week ${week}.`, null, i + 1);
+        add(target, `${item.title.replace(/\s*\(\s*\d{1,2}\s*@\s*\d+(?:\.\d+)?\s*(?:points?|pts?)[^)]*\)/i, '').replace(/\s+\d{1,2}\s*@\s*\d+(?:\.\d+)?\s*(?:points?|pts?)(?:\s+each)?/i, '').replace(/\s*\(\s*\d+\s*\)/, '').trim()} ${i + 1}`, pointShares[i], weightShares[i] ?? null, week, `${count ? `${count} stated instances` : 'Recurring'} spread across content modules; Week ${week}.`, null, i + 1);
       });
       continue;
     }
