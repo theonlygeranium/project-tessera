@@ -13210,6 +13210,17 @@
                                       }
                                     ]
                                   },
+                                  "raw": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                        "minimum": 0
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
                                   "label": {
                                     "type": "string"
                                   }
@@ -28820,6 +28831,17 @@
                       ]
                     },
                     "adjusted": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "raw": {
                       "anyOf": [
                         {
                           "type": "number",
