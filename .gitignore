@@ -22,5 +22,6 @@ reports/e2e/
 
 # Real syllabi and answer keys for tools/syllabus_eval.mjs: never commit them
 tests/fixtures/syllabus/private/
-reports/syllabus-eval.json
+reports/syllabus-eval*.json
+reports/syllabus-review*.html
 tools/.syllabus-eval.mjs
