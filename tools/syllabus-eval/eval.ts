@@ -216,15 +216,32 @@ async function runOne(path: string, key: Key, run: number, client: AiClient): Pr
       const readingsCited = plan.readings.every(r => r.span && r.span.text);
       checks.push({ id: 'P3', pass: plan.outcomes.length === (session.confirmedOutcomes ?? []).length && placed.length === components.length && readingsCited,
         detail: `${plan.modules.length} modules, ${plan.counts.lessons} lessons, ${plan.counts.assignments} assignments; outcomes ${plan.outcomes.length}/${(session.confirmedOutcomes ?? []).length}; graded components placed ${placed.length}/${components.length}; readings ${plan.readings.length} (all cited: ${readingsCited}); placeholders ${plan.placeholders}` });
-      // P7: graded work lands where the syllabus puts it, not all in the last module.
-      const graded = plan.modules.map(m => ({ m, items: [...((m as { assignments?: { replaces: string | null; points: number }[] }).assignments ?? []), ...(m.assignment ? [m.assignment] : [])].filter(a => a.replaces) }));
+      // P7: graded work lands where the syllabus puts it, not dumped in the last module.
+      // Deduplicate assignment vs assignments[0]. A heavy final correctly dated in the last
+      // week is not a dump — when dumpShare is 0, lastShare may exceed 50%.
+      const graded = plan.modules.map(m => {
+        const raw = [...((m as { assignments?: { key?: string; replaces: string | null; points: number; placement?: string }[] }).assignments ?? [])];
+        if (m.assignment && !raw.some(a => a.key === (m.assignment as { key?: string }).key)) raw.push(m.assignment as typeof raw[number]);
+        return { m, items: raw.filter(a => a.replaces) };
+      });
       const totalPoints = graded.reduce((n, g) => n + g.items.reduce((k, a) => k + a.points, 0), 0);
       const content = graded.filter(g => !/^(start here|wrap-up)$/i.test(g.m.title));
-      const lastShare = totalPoints ? (content.at(-1)?.items.reduce((k, a) => k + a.points, 0) ?? 0) / totalPoints : 0;
-      const recurring = components.filter(a => /\(\s*\d+\s*\)|\d+\s*@\s*\d+|weekly|each week|labs?\b|checkpoints|discussions|quizzes|homework/i.test(a.title));
+      const lastItems = content.at(-1)?.items ?? [];
+      const lastShare = totalPoints ? lastItems.reduce((k, a) => k + a.points, 0) / totalPoints : 0;
+      const dumpShare = totalPoints ? lastItems.filter(a => /no due week found/i.test(a.placement ?? '')).reduce((k, a) => k + a.points, 0) / totalPoints : 0;
+      // Recurring = explicit multi-count or inherently multi activity. Bare "quizzes"/"homework"
+      // only count when the title/span shows multiple instances (N @, Modules list, each module).
+      const recurring = components.filter(a => {
+        const text = `${a.title} ${a.span?.text ?? ''}`;
+        if (/\(\s*\d+\s*\)|\d+\s*@\s*\d+|weekly|each week|each module|every module|per module/i.test(text)) return true;
+        if (/\b(?:labs?|checkpoints|discussions)\b/i.test(a.title)) return true;
+        if (/\b(?:quizzes|homework)\b/i.test(a.title)) return /\bmodules?\s*\d|\beach\s+modules?\b|\bevery\s+modules?\b|\bper\s+modules?\b|\d+\s*@/i.test(text);
+        return false;
+      });
       const split = recurring.filter(a => graded.flatMap(g => g.items).filter(i => i.replaces === a.title).length >= 2);
-      checks.push({ id: 'P7', pass: lastShare <= 0.5 && split.length === recurring.length,
-        detail: `last content module holds ${Math.round(lastShare * 100)}% of graded points; recurring components split ${split.length}/${recurring.length}; graded assignments ${graded.flatMap(g => g.items).length}` });
+      const placementOk = dumpShare <= 0.5 && (lastShare <= 0.5 || dumpShare === 0);
+      checks.push({ id: 'P7', pass: placementOk && split.length === recurring.length,
+        detail: `last content module holds ${Math.round(lastShare * 100)}% of graded points (dump ${Math.round(dumpShare * 100)}%); recurring components split ${split.length}/${recurring.length}; graded assignments ${graded.flatMap(g => g.items).length}` });
       session = await service.applyProvisionPlan(ctx, { sessionId: session.id, hash: plan.hash });
       // A failed lesson is recorded and the job goes on: poll until provisioning ends.
       while (Date.now() - t2 < 1_800_000 && session.stage === 'provisioning') session = await service.advanceDesignSession(ctx, { sessionId: session.id });

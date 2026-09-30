@@ -456,6 +456,153 @@ describe('syllabus provision plan', () => {
     expect(explicitAssessmentPoints(span('Mini-project: 20 points. Project: points to be confirmed.'), 'Project')).toBeNull();
     expect(explicitAssessmentPoints(span('Quiz – 10 points. Project – 40 points.'), 'Project')).toBe(40);
   });
+
+
+  it('places homework from source prose when the assessment span is thin', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const row = session.extraction!.schedule[0];
+    session.extraction!.schedule = Array.from({ length: 8 }, (_, index) => ({ ...row, week: index + 1, topic: `Module ${index + 1}`, due: '', dates: '', empty: false }));
+    session.extraction!.profile.termStart = { value: '2014-02-02', origin: 'extracted', confidence: 1, spans: [] };
+    const template = session.options![0].modules[0];
+    session.options![0].modules = session.extraction!.schedule.map(r => ({ ...template, title: r.topic, weeks: [r.week] }));
+    session.extraction!.assessments = [
+      { id: 'h', title: 'Homework assignments', weightPercent: 20, dueAt: null, format: 'homework', span: { page: 1, text: 'Homework assignments 20%' } },
+      { id: 'd', title: 'Discussion Board Postings', weightPercent: 20, dueAt: null, format: 'discussion', span: { page: 1, text: 'Discussion Board Postings 20%' } },
+      { id: 'f', title: 'Final Exam', weightPercent: 60, dueAt: null, format: 'exam', span: { page: 1, text: 'Final Exam 60%' } },
+    ];
+    session.source.sections = [
+      { page: 1, heading: 'Grading', level: 2, text: 'Homework assignments 20%', lines: ['Homework assignments 20%', 'Homework assignments - due at the conclusion of Modules 2, 3, 5, and 6', 'Discussion Board Postings - due at the conclusion of each module', 'Final Exam 60%'] },
+    ];
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const entries = plan.modules.flatMap(module => (module.assignments ?? []).map(assignment => ({ module, assignment })));
+    const homework = entries.filter(e => e.assignment.replaces === 'Homework assignments');
+    expect(homework).toHaveLength(4);
+    expect(homework.map(e => e.module.lessons[0].week).sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual([2, 3, 5, 6]);
+    expect(entries.filter(e => e.assignment.replaces === 'Discussion Board Postings').length).toBeGreaterThanOrEqual(4);
+    expect(entries.some(e => e.assignment.replaces === 'Homework assignments' && /no due week found/i.test(e.assignment.placement ?? ''))).toBe(false);
+  });
+
+  it('places ETT229-style N @ aggregates and dated individual projects', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const row = session.extraction!.schedule[0];
+    session.extraction!.schedule = Array.from({ length: 15 }, (_, index) => ({ ...row, week: index + 1, topic: `Week ${index + 1}`, due: '', dates: '', empty: false }));
+    session.extraction!.profile.termStart = { value: '2014-08-25', origin: 'extracted', confidence: 1, spans: [] };
+    const template = session.options![0].modules[0];
+    session.options![0].modules = session.extraction!.schedule.map(r => ({ ...template, title: r.topic, weeks: [r.week] }));
+    session.extraction!.assessments = [
+      { id: 'projects', title: 'Projects (5 @ 100 points each)', weightPercent: 83.33, dueAt: null, format: 'project', span: { page: 2, text: 'Projects (5 @ 100 points each)' } },
+      { id: 'journals', title: 'Journal Reflections (4 @ 25 points each)', weightPercent: 16.67, dueAt: null, format: 'journal', span: { page: 2, text: 'Journal Reflections (4 @ 25 points each)' } },
+    ];
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const entries = plan.modules.flatMap(module => (module.assignments ?? []).map(assignment => ({ module, assignment })));
+    const projects = entries.filter(e => e.assignment.replaces === 'Projects (5 @ 100 points each)');
+    const journals = entries.filter(e => e.assignment.replaces === 'Journal Reflections (4 @ 25 points each)');
+    expect(projects).toHaveLength(5);
+    expect(journals).toHaveLength(4);
+    const content = plan.modules.filter(m => m.key.startsWith('module-'));
+    const total = entries.filter(e => e.assignment.replaces).reduce((n, e) => n + e.assignment.points, 0);
+    const lastShare = entries.filter(e => e.module.key === content.at(-1)?.key && e.assignment.replaces).reduce((n, e) => n + e.assignment.points, 0) / total;
+    expect(lastShare).toBeLessThanOrEqual(0.5);
+  });
+  it('places individual numbered projects by due dates in their spans', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const row = session.extraction!.schedule[0];
+    session.extraction!.schedule = Array.from({ length: 15 }, (_, index) => ({ ...row, week: index + 1, topic: `Week ${index + 1}`, due: '', dates: '', empty: false }));
+    session.extraction!.profile.termStart = { value: '2014-08-25', origin: 'extracted', confidence: 1, spans: [] };
+    const template = session.options![0].modules[0];
+    session.options![0].modules = session.extraction!.schedule.map(r => ({ ...template, title: r.topic, weeks: [r.week] }));
+    session.extraction!.assessments = [
+      { id: 'p1', title: 'Project #1: Resume', weightPercent: 16.67, dueAt: null, format: 'project', span: { page: 2, text: 'Project #1: Resume due Monday, 9/15' } },
+      { id: 'p2', title: 'Project #2: Newsletter', weightPercent: 16.67, dueAt: null, format: 'project', span: { page: 2, text: 'Project #2: Newsletter due Monday, 10/6' } },
+      { id: 'p3', title: 'Project #3: Digital Portfolio', weightPercent: 16.67, dueAt: null, format: 'project', span: { page: 2, text: 'Project #3: Digital Portfolio due Monday, 10/27' } },
+      { id: 'p4', title: 'Project #4: Assessment Rubric', weightPercent: 16.67, dueAt: null, format: 'project', span: { page: 2, text: 'Project #4: Assessment Rubric due Monday, 11/17' } },
+      { id: 'p5', title: 'Project #5: Mail Merge Letter', weightPercent: 16.67, dueAt: null, format: 'project', span: { page: 2, text: 'Project #5: Mail Merge Letter due Monday, 12/08' } },
+      { id: 'j1', title: 'Journal Reflection #1', weightPercent: 4.17, dueAt: null, format: 'journal', span: { page: 2, text: 'Journal Reflection #1 due Monday, 9/8' } },
+      { id: 'j2', title: 'Journal Reflection #2', weightPercent: 4.17, dueAt: null, format: 'journal', span: { page: 2, text: 'Journal Reflection #2 due Monday, 10/13' } },
+      { id: 'j3', title: 'Journal Reflection #3', weightPercent: 4.17, dueAt: null, format: 'journal', span: { page: 2, text: 'Journal Reflection #3 due Monday, 11/3' } },
+      { id: 'j4', title: 'Journal Reflection #4', weightPercent: 4.17, dueAt: null, format: 'journal', span: { page: 2, text: 'Journal Reflection #4 due Monday, 12/08' } },
+    ];
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const entries = plan.modules.flatMap(module => (module.assignments ?? []).map(assignment => ({ module, assignment })));
+    const content = plan.modules.filter(m => m.key.startsWith('module-'));
+    const total = entries.filter(e => e.assignment.replaces).reduce((n, e) => n + e.assignment.points, 0);
+    const lastShare = entries.filter(e => e.module.key === content.at(-1)?.key && e.assignment.replaces).reduce((n, e) => n + e.assignment.points, 0) / total;
+    expect(lastShare).toBeLessThanOrEqual(0.5);
+    expect(new Set(entries.filter(e => e.assignment.replaces).map(e => e.module.key)).size).toBeGreaterThan(3);
+  });
+  it('places MPH530-style module and each-module dues from assessment spans', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const row = session.extraction!.schedule[0];
+    session.extraction!.schedule = Array.from({ length: 8 }, (_, index) => ({ ...row, week: index + 1, topic: `Module ${index + 1}`, due: '', dates: `2/${2 + index * 7}-2/${8 + index * 7}`, empty: false }));
+    session.extraction!.profile.termStart = { value: '2014-02-02', origin: 'extracted', confidence: 1, spans: [] };
+    const template = session.options![0].modules[0];
+    session.options![0].modules = session.extraction!.schedule.map(r => ({ ...template, title: r.topic, weeks: [r.week] }));
+    session.extraction!.assessments = [
+      { id: 'q', title: 'Online Quizzes', weightPercent: 10, dueAt: null, format: 'quiz', span: { page: 1, text: 'Online Quizzes 10%. Online Quiz - due at conclusion of Module 1' } },
+      { id: 'h', title: 'Homework assignments', weightPercent: 20, dueAt: null, format: 'homework', span: { page: 1, text: 'Homework assignments 20%. Homework assignments - due at the conclusion of Modules 2, 3, 5, and 6' } },
+      { id: 'm', title: 'Midterm Exam', weightPercent: 10, dueAt: null, format: 'exam', span: { page: 1, text: 'Midterm Exam 10%. Midterm Exam - proctored during the week of March 3' } },
+      { id: 'f', title: 'Final Exam', weightPercent: 30, dueAt: null, format: 'exam', span: { page: 1, text: 'Final Exam 30%. Final Exam - due March 28, 2014' } },
+      { id: 'c', title: 'Case Study', weightPercent: 10, dueAt: null, format: 'project', span: { page: 1, text: 'Case Study 10%. Case Study - due at the end of Module 7' } },
+      { id: 'd', title: 'Discussion Board Postings', weightPercent: 20, dueAt: null, format: 'discussion', span: { page: 1, text: 'Discussion Board Postings 20%. Discussion Board Postings - due at the conclusion of each module' } },
+    ];
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const entries = plan.modules.flatMap(module => (module.assignments ?? []).map(assignment => ({ module, assignment })));
+    const homework = entries.filter(e => e.assignment.replaces === 'Homework assignments');
+    const discussions = entries.filter(e => e.assignment.replaces === 'Discussion Board Postings');
+    expect(homework.length).toBeGreaterThanOrEqual(4);
+    expect(discussions.length).toBeGreaterThanOrEqual(4);
+    expect(entries.find(e => e.assignment.replaces === 'Case Study')?.module.lessons[0].week).toBe(7);
+    const content = plan.modules.filter(m => m.key.startsWith('module-'));
+    const total = entries.filter(e => e.assignment.replaces).reduce((n, e) => n + e.assignment.points, 0);
+    const lastShare = entries.filter(e => e.module.key === content.at(-1)?.key && e.assignment.replaces).reduce((n, e) => n + e.assignment.points, 0) / total;
+    expect(lastShare).toBeLessThanOrEqual(0.5);
+  });
+  it('places unique titled work by matching the schedule due column', async () => {
+    const { ctx, sessionId } = await setup();
+    const session = (await ctx.repo.getDesignSession(sessionId))!;
+    const row = session.extraction!.schedule[0];
+    const dues: Record<number, string> = {
+      1: 'Introduction Paper', 2: 'Quiz 1', 3: 'Quiz 2', 5: 'PowerPoint Presentation 1',
+      6: 'Quiz 3', 7: '3 Page Paper – Social Media', 9: 'PowerPoint Presentation 2',
+      11: 'Case Analysis', 12: 'Quiz 4', 13: '3 Page Paper – Technology in Schools', 15: 'Final Project',
+    };
+    session.extraction!.schedule = Array.from({ length: 16 }, (_, index) => ({ ...row, week: index + 1, topic: `Topic ${index + 1}`, due: dues[index + 1] ?? '', dates: '', empty: false }));
+    session.extraction!.profile.termStart = { value: '2016-08-22', origin: 'extracted', confidence: 1, spans: [] };
+    const template = session.options![0].modules[0];
+    session.options![0].modules = session.extraction!.schedule.map(r => ({ ...template, title: r.topic, weeks: [r.week] }));
+    session.extraction!.assessments = [
+      { id: 'a1', title: 'Introduction Paper', weightPercent: 2, dueAt: null, format: 'paper', span: null },
+      { id: 'a2', title: 'Quiz 1 – Concept/definition of Technology', weightPercent: 2, dueAt: null, format: 'quiz', span: null },
+      { id: 'a3', title: 'Quiz 2 – Access to Technology', weightPercent: 2, dueAt: null, format: 'quiz', span: null },
+      { id: 'a4', title: 'Quiz 3 – Internet History', weightPercent: 2, dueAt: null, format: 'quiz', span: null },
+      { id: 'a5', title: 'Quiz 4 – Laws and Requirements', weightPercent: 2, dueAt: null, format: 'quiz', span: null },
+      { id: 'a6', title: 'PowerPoint Presentation 1 – Access to Technology', weightPercent: 10, dueAt: null, format: 'presentation', span: null },
+      { id: 'a7', title: 'PowerPoint Presentation 2 – Mobile Apps', weightPercent: 10, dueAt: null, format: 'presentation', span: null },
+      { id: 'a8', title: '3 Page Paper – Social Media', weightPercent: 10, dueAt: null, format: 'paper', span: null },
+      { id: 'a9', title: '3 Page Paper – Technology in Schools', weightPercent: 10, dueAt: null, format: 'paper', span: null },
+      { id: 'a10', title: 'Case Analysis – Cyber Ethics', weightPercent: 20, dueAt: null, format: 'paper', span: null },
+      { id: 'a11', title: 'Final Project', weightPercent: 30, dueAt: null, format: 'project', span: null },
+    ];
+    await ctx.repo.putDesignSession(session);
+    const plan = await service.previewProvisionPlan(ctx, { sessionId });
+    const entries = plan.modules.flatMap(module => (module.assignments ?? []).map(assignment => ({ module, assignment })));
+    expect(entries.find(e => e.assignment.replaces === 'Introduction Paper')?.module.lessons[0].week).toBe(1);
+    expect(entries.find(e => e.assignment.replaces === 'Case Analysis – Cyber Ethics')?.module.lessons[0].week).toBe(11);
+    expect(entries.find(e => e.assignment.replaces === 'Final Project')?.module.lessons[0].week).toBe(15);
+    const content = plan.modules.filter(m => m.key.startsWith('module-'));
+    const total = entries.filter(e => e.assignment.replaces).reduce((n, e) => n + e.assignment.points, 0);
+    const lastShare = entries.filter(e => e.module.key === content.at(-1)?.key && e.assignment.replaces).reduce((n, e) => n + e.assignment.points, 0) / total;
+    expect(lastShare).toBeLessThanOrEqual(0.5);
+  });
+
   it('never reports an item that no longer exists as kept', async () => {
     const { ctx, sessionId } = await setup();
     const plan = await service.previewProvisionPlan(ctx, { sessionId });
