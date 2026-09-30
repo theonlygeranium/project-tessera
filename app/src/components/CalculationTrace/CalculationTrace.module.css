@@ -1,0 +1,13 @@
+.root { min-width: 0; max-width: 100%; color: var(--ink); }
+.root h3 { font: 600 20px var(--font-serif); margin: 0 0 10px; }
+.scroll { width: 0; min-width: 100%; overflow-x: auto; }
+.root table { width: max-content; min-width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.root th, .root td { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.root thead { background: var(--surface-alt); }
+.root td { white-space: nowrap; }
+.reasons { margin: 5px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.reasons li { margin: 3px 0; }
+.arithmetic { overflow-wrap: anywhere; padding: 10px; background: var(--surface-alt); border-radius: var(--radius-sm); font: 12px/1.5 var(--font-mono); }
+.provenance { color: var(--muted); font-size: 12px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+@media (forced-colors: active) { .root th, .root td { border-color: CanvasText; } }

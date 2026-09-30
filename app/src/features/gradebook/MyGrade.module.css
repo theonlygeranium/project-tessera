@@ -1,0 +1,30 @@
+.page { display: grid; gap: 16px; max-width: min(760px, 100%); width: 100%; box-sizing: border-box; margin-inline: auto; padding-bottom: 48px; color: var(--ink); font: 15px/1.5 var(--font-sans); min-width: 0; }
+.stack { display: grid; gap: 16px; min-width: 0; max-width: 100%; }
+.hero, .card { min-width: 0; max-width: 100%; box-sizing: border-box; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.hero { background: var(--surface-alt); }
+.hero p { margin: 0; color: var(--muted); }
+.card h2 { margin: 0 0 10px; font: 600 22px var(--font-serif); }
+.cardHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cardHead h2 { margin: 0; }
+.card > p { color: var(--ink-2); }
+.grade { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.grade strong { font: 600 64px/1.1 var(--font-serif); font-variant-numeric: tabular-nums; }
+.grade span { font: 600 26px var(--font-serif); }
+.items { margin: 0; padding: 0; list-style: none; }
+.items li { padding: 12px 0; border-top: 1px solid var(--line); }
+.items li > div:first-child { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.items span { color: var(--ink-2); }
+.items p { margin: 6px 0 0; }
+.inputs { display: grid; gap: 10px; }
+.inputs label { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); font-weight: 600; }
+.inputs label > span { color: var(--ink-2); font-size: 13px; font-weight: 400; }
+.inputs label > div { display: flex; align-items: center; gap: 8px; }
+.inputs input { box-sizing: border-box; width: 110px; min-height: 44px; padding: 8px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.aim { display: flex; gap: 12px; flex-wrap: wrap; }
+.aim label { display: grid; gap: 5px; flex: 1 1 160px; }
+.aim select { width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.page button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--control-line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.page a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-dark); }
+.page button:focus-visible, .page input:focus-visible, .page select:focus-visible, .page a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.private { margin: 0; color: var(--ink-2); }
+@media (max-width: 420px) { .hero, .card { padding: 14px; } .grade strong { font-size: 42px; } .grade span { font-size: 20px; } }

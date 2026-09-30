@@ -2,6 +2,8 @@ import type { Adaptation, Announcement, Assignment, Block, BuilderSession, Cours
 import type { Repo, Enrollment, StoredAnnouncement, AnnouncementRead, StoredProgress, FileVersion, StoredScan, StoredFormat, GenerationJob, StoredTutorSession, StoredReadinessItem, TestOutAttempt } from '../repo';
 import type { SeedData } from '../seed';
 import { ApiError } from '../api';
+import type { CourseGradeOverride, GradebookSetup, StudentItemState, GradeEvent } from '../domain';
+import type { GradeBatch, GradeSnapshot, GradeWrite, GradeWriteResult } from '../repo';
 
 declare const structuredClone: <T>(value: T) => T;
 const copy = <T>(value: T): T => structuredClone(value);
@@ -23,7 +25,12 @@ const byNewest = (a: { publishedAt: string | null; createdAt: string }, b: { pub
 
 export class MemoryRepo implements Repo {
   private data: SeedData & { readinessItems: StoredReadinessItem[] };
-  constructor(seed: SeedData) { this.data = this.withNight3(seed); }
+  private gradebookSetups: GradebookSetup[] = [];
+  private studentItemStates: StudentItemState[] = [];
+  private finalOverrides: CourseGradeOverride[] = [];
+  private gradeEvents: GradeEvent[] = [];
+  private gradeBatches: GradeBatch[] = [];
+  constructor(seed: SeedData) { this.data = this.withNight3(seed); this.loadGradebook(seed); }
   async getInstitution(): Promise<Institution> { return copy(this.data.institution); }
   async putInstitution(value: Institution) { this.data.institution = normalized(value); }
   async getUser(id: string): Promise<User | null> { return copy(this.data.users.find(x => x.id === id) ?? null); }
@@ -39,6 +46,7 @@ export class MemoryRepo implements Repo {
   async listEnrollments(filter: { courseId?: string; userId?: string }): Promise<Enrollment[]> {
     return copy(this.data.enrollments.filter(x => (!filter.courseId || x.courseId === filter.courseId) && (!filter.userId || x.userId === filter.userId)).sort((a,b) => a.courseId.localeCompare(b.courseId) || a.userId.localeCompare(b.userId)));
   }
+  async listCourseStudents(courseId:string):Promise<User[]>{const ids=new Set(this.data.enrollments.filter(e=>e.courseId===courseId).map(e=>e.userId));return copy(this.data.users.filter(u=>u.role==='student'&&ids.has(u.id)).sort((a,b)=>cmp(a.name,b.name)||cmp(a.id,b.id)));}
   async setEnrollments(courseId: string, userIds: string[]) {
     this.data.enrollments = this.data.enrollments.filter(x => x.courseId !== courseId);
     this.data.enrollments.push(...[...new Set(userIds)].map(userId => ({ courseId, userId })));
@@ -49,7 +57,7 @@ export class MemoryRepo implements Repo {
   async getModule(id: string): Promise<Module | null> { return copy(this.data.modules.find(x => x.id === id) ?? null); }
   async listModules(courseId: string): Promise<Module[]> { return copy(this.data.modules.filter(x => x.courseId === courseId).sort(byPosition)); }
   async putModule(value: Module) { this.upsert(this.data.modules, normalized(value)); }
-  async deleteModule(id: string) { this.data.modules = this.data.modules.filter(x => x.id !== id); }
+  async deleteModule(id: string) { const ids=new Set(this.data.assignments.filter(a=>a.moduleId===id).map(a=>a.id));if(this.data.submissions.some(s=>ids.has(s.assignmentId))||this.studentItemStates.some(s=>ids.has(s.assignmentId)))throw new ApiError('conflict','Module has grade history.');this.data.modules = this.data.modules.filter(x => x.id !== id); }
   async getLesson(id: string): Promise<Lesson | null> { return copy(this.data.lessons.find(x => x.id === id) ?? null); }
   async listLessons(filter: { courseId?: string; moduleId?: string }): Promise<Lesson[]> {
     const positions = new Map(this.data.modules.map(x => [x.id, x.position]));
@@ -82,18 +90,20 @@ export class MemoryRepo implements Repo {
   }
   async putBlock(value: Block) { this.upsert(this.data.blocks, normalized(value)); }
   async deleteBlock(id: string) { this.data.blocks = this.data.blocks.filter(x => x.id !== id); }
-  async getAssignment(id: string): Promise<Assignment | null> { return copy(this.data.assignments.find(x => x.id === id) ?? null); }
+  async getAssignment(id: string): Promise<Assignment | null> { const a=this.data.assignments.find(x => x.id === id); return a ? {categoryId:null,extraCredit:false,countsTowardGrade:true,...copy(a)} : null; }
   async listAssignments(filter: { courseId?: string; moduleId?: string }): Promise<Assignment[]> {
     const positions = new Map(this.data.modules.map(x => [x.id, x.position]));
     return copy(this.data.assignments.filter(x => (!filter.courseId || x.courseId === filter.courseId) && (!filter.moduleId || x.moduleId === filter.moduleId))
-      .sort((a,b) => (positions.get(a.moduleId) ?? 0) - (positions.get(b.moduleId) ?? 0) || a.position - b.position || a.id.localeCompare(b.id)));
+      .sort((a,b) => (positions.get(a.moduleId) ?? 0) - (positions.get(b.moduleId) ?? 0) || a.position - b.position || a.id.localeCompare(b.id)).map(a=>({categoryId:null,extraCredit:false,countsTowardGrade:true,...a})));
   }
   async putAssignment(value: Assignment) { this.upsert(this.data.assignments, value); }
-  async deleteAssignment(id: string) { this.data.assignments = this.data.assignments.filter(x => x.id !== id); this.data.submissions = this.data.submissions.filter(x => x.assignmentId !== id); }
-  async getSubmission(id: string): Promise<Submission | null> { return copy(this.data.submissions.find(x => x.id === id) ?? null); }
-  async listSubmissions(filter: { assignmentId?: string; studentId?: string }): Promise<Submission[]> {
-    return copy(this.data.submissions.filter(x => (!filter.assignmentId || x.assignmentId === filter.assignmentId) && (!filter.studentId || x.studentId === filter.studentId))
-      .sort((a,b) => a.studentId.localeCompare(b.studentId) || b.attempt - a.attempt || b.submittedAt.localeCompare(a.submittedAt)));
+  async deleteAssignment(id: string) { if(this.data.submissions.some(s=>s.assignmentId===id)||this.studentItemStates.some(s=>s.assignmentId===id))throw new ApiError('conflict','Assignment has grade history.');this.data.assignments = this.data.assignments.filter(x => x.id !== id); }
+  async getSubmission(id: string): Promise<Submission | null> { const s=this.data.submissions.find(x => x.id === id && !x.deleted); return s ? this.publicSubmission(s) : null; }
+  private publicSubmission(s: Submission): Submission { return {id:s.id,assignmentId:s.assignmentId,studentId:s.studentId,attempt:s.attempt,state:s.state,text:s.text,fileId:s.fileId,link:s.link,submittedAt:s.submittedAt,grade:copy(s.grade),version:s.version??0,source:s.source??'student',feedbackDraft:copy(s.feedbackDraft??null),...(s.deleted ? {deleted:true} : {})}; }
+  async listSubmissions(filter: { assignmentId?: string; studentId?: string; courseId?: string; includeDeleted?: boolean }): Promise<Submission[]> {
+    const ids = filter.courseId ? new Set(this.data.assignments.filter(a => a.courseId === filter.courseId).map(a => a.id)) : null;
+    return copy(this.data.submissions.filter(x => (filter.includeDeleted || !x.deleted) && (!filter.assignmentId || x.assignmentId === filter.assignmentId) && (!filter.studentId || x.studentId === filter.studentId) && (!ids || ids.has(x.assignmentId)))
+      .sort((a,b) => a.studentId.localeCompare(b.studentId) || b.attempt - a.attempt || b.submittedAt.localeCompare(a.submittedAt)).map(s=>this.publicSubmission(s)));
   }
   async putSubmission(value: Submission) { this.upsert(this.data.submissions, value); }
   async getTutorSetting(kind: ActivityKind, id: string) { return copy(this.data.tutorSettings.find(x => x.activityKind === kind && x.activityId === id) ?? null); }
@@ -252,8 +262,71 @@ export class MemoryRepo implements Repo {
   async deleteReportingLine(managerId: string, reportId: string) { this.data.reportingLines = this.data.reportingLines!.filter(x => x.managerId !== managerId || x.reportId !== reportId); this.data.managerConsents = this.data.managerConsents!.filter(x => x.managerId !== managerId || x.reportId !== reportId); }
   async listManagerConsents(filter: { managerId?: string; reportId?: string }) { return copy(this.data.managerConsents!.filter(x => (!filter.managerId || x.managerId === filter.managerId) && (!filter.reportId || x.reportId === filter.reportId)).sort((a, b) => cmp(a.managerId, b.managerId) || cmp(a.reportId, b.reportId))); }
   async putManagerConsent(value: ManagerConsent) { const i = this.data.managerConsents!.findIndex(x => x.managerId === value.managerId && x.reportId === value.reportId); if (i < 0) this.data.managerConsents!.push(copy(value)); else this.data.managerConsents![i] = copy(value); }
-  async isEmpty(): Promise<boolean> { return this.data.users.length === 0; }
-  async reset(seed: SeedData) { this.data = this.withNight3(seed); }
+  async getGradebookSetup(courseId: string) { return copy(this.gradebookSetups.find(x => x.courseId === courseId) ?? null); }
+  async putGradebookSetup(value: GradebookSetup, expectedVersion: number, event: GradeEvent) { return this.applyGradeWrites([{ kind: 'setup', value, expectedVersion }], [event]); }
+  async listStudentItemStates(filter: { courseId: string; studentId?: string; assignmentId?: string }) { return copy(this.studentItemStates.filter(x => x.courseId === filter.courseId && (!filter.studentId || x.studentId === filter.studentId) && (!filter.assignmentId || x.assignmentId === filter.assignmentId)).sort((a,b) => cmp(a.studentId,b.studentId) || cmp(a.assignmentId,b.assignmentId))); }
+  async putStudentItemState(value: StudentItemState, expectedVersion: number, event: GradeEvent) { return this.applyGradeWrites([{ kind: 'state', value, expectedVersion }], [event]); }
+  async getFinalOverride(courseId: string, studentId: string) { return copy(this.finalOverrides.find(x => x.courseId === courseId && x.studentId === studentId && (x.letter !== null || x.percent !== null)) ?? null); }
+  async listFinalOverrides(courseId:string){return copy(this.finalOverrides.filter(x=>x.courseId===courseId && (x.letter !== null || x.percent !== null)).sort((a,b)=>cmp(a.studentId,b.studentId)));}
+  async listFinalOverrideRevisions(courseId:string){return copy(this.finalOverrides.filter(x=>x.courseId===courseId).sort((a,b)=>cmp(a.studentId,b.studentId)));}
+  async putFinalOverride(value: CourseGradeOverride | { courseId: string; studentId: string; clear: true }, expectedVersion: number, event: GradeEvent) { return this.applyGradeWrites([{ kind: 'final', value, expectedVersion }], [event]); }
+  async appendGradeEvent(event: GradeEvent) { if (event.batchId) throw new ApiError('conflict','Batched events require a reservation.'); if (this.gradeEvents.some(x => x.id === event.id)) throw new ApiError('conflict','Duplicate grade event.'); this.gradeEvents.push(copy({...event,seq:1+Math.max(0,...this.gradeEvents.filter(x=>x.courseId===event.courseId).map(x=>x.seq??0))})); }
+  async getGradeEvent(id: string) { return copy(this.gradeEvents.find(x => x.id === id) ?? null); }
+  async getGradeBatch(courseId: string, batchId: string) { return copy(this.gradeBatches.find(x => x.courseId === courseId && x.batchId === batchId) ?? null); }
+  async listGradeEvents(filter: { courseId: string; studentId?: string; assignmentId?: string; kind?: GradeEvent['kind']; batchId?: string; cursor?: string; limit?: number }) {
+    const all = this.gradeEvents.filter(x => x.courseId === filter.courseId && (!filter.studentId || x.studentId === filter.studentId) && (!filter.assignmentId || x.assignmentId === filter.assignmentId) && (!filter.kind || x.kind === filter.kind) && (!filter.batchId || x.batchId === filter.batchId))
+      .sort((a,b) => (b.seq??0)-(a.seq??0));
+    let cursor:number|null=null;try{if(filter.cursor){const value:unknown=JSON.parse(atob(filter.cursor));if(typeof value!=='number'||!Number.isInteger(value)||value<1)throw new Error('Bad cursor');cursor=value;}}catch{throw new ApiError('invalid','Invalid event cursor.');}
+    const after = cursor !== null ? all.filter(x => (x.seq??0) < cursor) : all;
+    const items = after.slice(0, Math.max(1,Math.min(100,filter.limit ?? 20)));
+    return { items: copy(items), nextCursor: after.length > items.length ? btoa(JSON.stringify(items.at(-1)!.seq)) : null };
+  }
+  private matchesGradeSnapshot(snapshot: GradeSnapshot): boolean {
+    const courseId=snapshot.courseId,same=(left:unknown,right:unknown)=>JSON.stringify(left)===JSON.stringify(right);
+    const setup=this.gradebookSetups.find(x=>x.courseId===courseId);
+    const positions=new Map(this.data.modules.map(x=>[x.id,x.position]));
+    const assignments=this.data.assignments.filter(x=>x.courseId===courseId)
+      .sort((a,b)=>(positions.get(a.moduleId)??0)-(positions.get(b.moduleId)??0)||a.position-b.position||a.id.localeCompare(b.id))
+      .map(a=>({categoryId:null,extraCredit:false,countsTowardGrade:true,...a}));
+    const ids=new Set(this.data.enrollments.filter(e=>e.courseId===courseId).map(e=>e.userId));
+    const studentIds=this.data.users.filter(u=>u.role==='student'&&ids.has(u.id))
+      .sort((a,b)=>cmp(a.name,b.name)||cmp(a.id,b.id)).map(u=>u.id);
+    const assignmentIds=new Set(assignments.map(a=>a.id));
+    const submissions=this.data.submissions.filter(s=>assignmentIds.has(s.assignmentId))
+      .sort((a,b)=>cmp(a.studentId,b.studentId)||b.attempt-a.attempt||cmp(b.submittedAt,a.submittedAt))
+      .map(s=>this.publicSubmission(s));
+    const states=this.studentItemStates.filter(s=>s.courseId===courseId)
+      .sort((a,b)=>cmp(a.studentId,b.studentId)||cmp(a.assignmentId,b.assignmentId));
+    const finals=this.finalOverrides.filter(f=>f.courseId===courseId).sort((a,b)=>cmp(a.studentId,b.studentId));
+    return (setup?same(setup,snapshot.setup):snapshot.setup.version===0)
+      && same(assignments,snapshot.assignments)&&same(studentIds,snapshot.studentIds)
+      && same(submissions,snapshot.submissions)&&same(states,snapshot.states)
+      && same(finals,snapshot.finalRevisions);
+  }
+  async applyGradeWrites(writes: GradeWrite[], events: GradeEvent[], snapshot?: GradeSnapshot, batch?: GradeBatch): Promise<GradeWriteResult> {
+    if (events.some(e => e.batchId && (!batch || e.courseId !== batch.courseId || e.batchId !== batch.batchId || e.by !== batch.by || e.requestFingerprint !== batch.fingerprint)))
+      return {ok:false,conflicts:[{key:'batch:unreserved',current:null}]};
+    const current = (w: GradeWrite): unknown => w.kind === 'setup' ? this.gradebookSetups.find(x => x.courseId === w.value.courseId) : w.kind === 'state' ? this.studentItemStates.find(x => x.assignmentId === w.value.assignmentId && x.studentId === w.value.studentId) : w.kind === 'final' ? this.finalOverrides.find(x => x.courseId === w.value.courseId && x.studentId === w.value.studentId) : w.kind === 'submission' && w.create ? [...this.data.submissions].filter(x => x.assignmentId === w.value.assignmentId && x.studentId === w.value.studentId).sort((a,b)=>b.attempt-a.attempt||b.submittedAt.localeCompare(a.submittedAt))[0] : this.data.submissions.find(x => x.id === w.value.id);
+    const key = (w: GradeWrite) => w.kind === 'setup' ? `setup:${w.value.courseId}` : w.kind === 'state' ? `state:${w.value.assignmentId}:${w.value.studentId}` : w.kind === 'final' ? `final:${w.value.courseId}:${w.value.studentId}` : `submission:${w.value.id}`;
+    const conflicts = writes.flatMap(w => { const row = current(w) as {id?:string;version?:number}|undefined; const valid = w.kind === 'submission' && !w.create ? !!row && (row.version ?? 0) === w.expectedVersion : w.kind === 'submission' && w.create && w.priorId ? !!row && row.id===w.priorId && (row.version??0)===w.expectedVersion : w.expectedVersion === 0 ? !row : !!row && row.version === w.expectedVersion; return valid ? [] : [{ key:key(w), current:copy(row ?? null) }]; });
+    if (snapshot && !this.matchesGradeSnapshot(snapshot)) conflicts.push({key:`snapshot:${snapshot.courseId}`,current:null});
+    if (batch && (this.gradeBatches.some(x => x.courseId === batch.courseId && x.batchId === batch.batchId) || this.gradeEvents.some(e => e.courseId === batch.courseId && e.batchId === batch.batchId))) conflicts.push({key:`batch:${batch.courseId}:${batch.batchId}`,current:null});
+    if (conflicts.length || events.some(e => this.gradeEvents.some(x => x.id === e.id))) return {ok:false,conflicts};
+    if (batch) this.gradeBatches.push(copy(batch));
+    for (const w of writes) {
+      if (w.kind === 'setup') this.upsertBy(this.gradebookSetups, w.value, x => x.courseId);
+      else if (w.kind === 'state') this.upsertBy(this.studentItemStates, w.value, x => `${x.assignmentId}:${x.studentId}`);
+      else if (w.kind === 'final') { if ('clear' in w.value) { const old=this.finalOverrides.find(x=>x.courseId===w.value.courseId&&x.studentId===w.value.studentId)!; this.upsertBy(this.finalOverrides,{...old,letter:null,percent:null,reason:'',version:old.version+1},x=>`${x.courseId}:${x.studentId}`); } else this.upsertBy(this.finalOverrides, w.value, x => `${x.courseId}:${x.studentId}`); }
+      else if(w.kind==='submission-delete') { const old=this.data.submissions.find(x=>x.id===w.value.id)!; this.upsert(this.data.submissions,{...old,deleted:true,grade:null,version:(old.version??0)+1}); }
+      else this.upsert(this.data.submissions, w.value);
+    }
+    for(const e of events)this.gradeEvents.push(copy({...e,seq:1+Math.max(0,...this.gradeEvents.filter(x=>x.courseId===e.courseId).map(x=>x.seq??0))}));
+    return {ok:true,versions:writes.map(w => ({key:key(w),version:'clear' in w.value ? w.expectedVersion+1 : w.value.version ?? 0}))};
+  }
+  async isEmpty(): Promise<boolean> { return this.data.users.length === 0 && !this.gradebookSetups.length && !this.studentItemStates.length && !this.finalOverrides.length && !this.gradeEvents.length && !this.gradeBatches.length; }
+  async reset(seed: SeedData) { this.data = this.withNight3(seed); this.loadGradebook(seed); }
+  private loadGradebook(seed: SeedData) { this.gradebookSetups = copy(seed.gradebookSetups ?? []); this.studentItemStates = copy(seed.studentItemStates ?? []); this.finalOverrides = copy(seed.finalOverrides ?? []); this.gradeEvents = copy(seed.gradeEvents ?? []).map((event,index)=>({...event,seq:event.seq??index+1})); this.gradeBatches = []; }
+  private upsertBy<T>(items: T[], value: T, key: (value:T)=>string) { const i=items.findIndex(x=>key(x)===key(value)); if(i<0) items.push(copy(value)); else items[i]=copy(value); }
   private withNight3(seed: SeedData): SeedData & { readinessItems: StoredReadinessItem[] } {
     return copy({ ...seed, programs: seed.programs ?? [], templates: seed.templates ?? [], rubrics: (seed.rubrics ?? []).map(r => ({ ...r, source: 'custom' as const, builtIn: false })), readinessItems: [],
       outcomes: seed.outcomes ?? seed.courses.flatMap(course => course.outcomes.flatMap((value, i) => value.trim() ? [{ id: `${course.id}-o${i + 1}`, courseId: course.id, code: `O${i + 1}`, text: value, position: i }] : [])),

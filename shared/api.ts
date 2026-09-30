@@ -21,6 +21,7 @@ import type {
   MyVisibility, Outcome, PageTranscription, OutcomeLink, Program, ReadinessPolicy, ReadinessResult, RequiredTraining, Requirement,
   RequirementAudience, Rubric, RubricCheckKind, AutomaticCheck, StudentTestOut, TemplateChangeSet, TemplateModule,
   TestOut, LessonVariant, ReportingLine, TrainingStatus, VariantAudience, VariantDiff,
+  GradebookSetup, SetupCheck, GradeChangeSet, GradeEvent, GradeEventKind, CalculationTrace, CourseGradeResult, CellState,
 } from './domain';
 
 /** Every API route lives under this prefix (D-020). `/api` without a version is an alias during Night 2. */
@@ -185,18 +186,33 @@ export interface ApiSpec {
   listAssignments: { input: { courseId: Id }; output: Assignment[] };
   getAssignment: { input: { assignmentId: Id }; output: Assignment };
   /** `instructions` accepts heading, text, and callout blocks only. */
-  updateAssignment: { input: { assignmentId: Id } & Partial<Pick<Assignment, 'title' | 'dueAt' | 'points' | 'submissionType' | 'rubric' | 'position'>> & { instructions?: BlockInput[] }; output: Assignment };
+  updateAssignment: { input: { assignmentId: Id } & Partial<Pick<Assignment, 'title' | 'dueAt' | 'points' | 'submissionType' | 'rubric' | 'position' | 'categoryId' | 'extraCredit' | 'countsTowardGrade'>> & { instructions?: BlockInput[] }; output: Assignment };
   deleteAssignment: { input: { assignmentId: Id }; output: Ok };
   publishAssignment: { input: { assignmentId: Id }; output: Assignment };
   listSubmissions: { input: { assignmentId: Id } & PageInput; output: Page<Submission & { student: Pick<User, 'id' | 'name' | 'email'> }> };
   submit: { input: { assignmentId: Id; text?: string; fileId?: Id; link?: string }; output: Submission };
   getMySubmission: { input: { assignmentId: Id }; output: Submission | null };
   gradeSubmission: { input: { submissionId: Id; criteria: Grade['criteria']; score: number; feedback: string; feedbackOrigin: 'human' | 'ai'; feedbackProvenance?: Provenance | null }; output: Submission };
+  discardFeedbackDraft: { input: { submissionId: Id }; output: Submission };
   /** AI-drafted feedback from the rubric result and the submission (a draft, D-003). */
   draftFeedback: { input: { submissionId: Id; criteria: Grade['criteria'] }; output: { feedback: string; provenance: Provenance } };
-  releaseGrades: { input: { assignmentId: Id }; output: Ok };
-  getGradebook: { input: { courseId: Id }; output: { assignments: Pick<Assignment, 'id' | 'title' | 'points' | 'dueAt'>[]; rows: GradebookRow[] } };
-  exportGradebook: { input: { courseId: Id }; output: { csv: string } };
+  releaseGrades: { input: { assignmentId: Id; hash?: string }; output: Ok & { released?: Id[]; notSent?: GradeChangeSet['notSent'] } };
+  getGradebook: { input: { courseId: Id; view?: 'student' | 'held' }; output: { assignments: Pick<Assignment, 'id' | 'title' | 'points' | 'dueAt'>[]; rows: GradebookRow[]; setup?: { rulesVersion: number; mode: GradebookSetup['mode'] } } };
+  exportGradebook: { input: { courseId: Id; format?: 'csv' | 'json'; view?: 'student' | 'held' }; output: { csv: string } | CourseGradeResult[] };
+  getGradebookSetup: { input: { courseId: Id }; output: GradebookSetup };
+  previewGradebookSetup: { input: { courseId: Id; setup: GradebookSetup }; output: { checks: SetupCheck[]; changeSet: GradeChangeSet } };
+  saveGradebookSetup: { input: { courseId: Id; setup: GradebookSetup; expectedVersion: number; hash: string }; output: GradebookSetup };
+  dismissSetupCheck: { input: { courseId: Id; code: SetupCheck['code']; target: string }; output: GradebookSetup };
+  updateGradeCells: { input: { courseId: Id; batchId: Id; partial?: boolean; changes: { assignmentId: Id; studentId: Id; op: 'score'|'clear'|'excuse'|'unexcuse'|'mark-missing'|'clear-missing'|'override'|'clear-override'|'extend'|'waive-late'; value?: number | Timestamp | null; reason?: string; studentNote?: string; expectedVersion: number }[] }; output: { cells: ({ ok: true; version: number; display: { state: CellState; adjusted: number | null; label: string } } | { conflict: true; current: { value: unknown; by: Id | null; at: Timestamp | null } })[] } };
+  setFinalOverride: { input: { courseId: Id; studentId: Id; letter?: string | null; percent?: number | null; reason: string; expectedVersion: number }; output: { ok: true; version: number } };
+  clearFinalOverride: { input: { courseId: Id; studentId: Id; reason: string; expectedVersion: number }; output: { ok: true; version: number } };
+  explainGrade: { input: { courseId: Id; studentId: Id; view?: 'student' | 'held' }; output: { trace: CalculationTrace; lines: string[] } };
+  previewRelease: { input: { assignmentId: Id }; output: GradeChangeSet };
+  unreleaseGrades: { input: { assignmentId: Id }; output: Ok };
+  listGradeEvents: { input: { courseId: Id; studentId?: Id; assignmentId?: Id; kind?: GradeEventKind; cursor?: string; limit?: number }; output: Page<GradeEvent> };
+  undoGradeEvent: { input: { eventId: Id }; output: Ok };
+  getMyGrade: { input: { courseId: Id }; output: { trace: CalculationTrace; lines: string[]; items: { assignmentId: Id; state: CellState; score: number | null; feedback: string | null; feedbackOrigin?: Grade['feedbackOrigin']; feedbackProvenance?: Provenance | null; studentNote: string | null }[] } };
+  whatIfMyGrade: { input: { courseId: Id; scores: { assignmentId: Id; score: number }[]; target?: { letter: string } | { percent: number }; solveFor?: Id }; output: { trace: CalculationTrace; delta: number | null; changedReasons: string[]; needed: { assignmentId: Id; score: number } | { unreachable: true } | null } };
 
   // Tutor (D-005, plan §5.4)
   getTutorSetting: { input: { activityKind: 'lesson' | 'assignment'; activityId: Id }; output: TutorSetting | null };
@@ -462,10 +478,25 @@ export const ROUTES: { [K in Operation]: Route } = {
   submit: { method: 'POST', path: '/assignments/:assignmentId/submissions', access: STUDENT, scope: null },
   getMySubmission: { method: 'GET', path: '/assignments/:assignmentId/submissions/me', access: STUDENT, scope: null },
   gradeSubmission: { method: 'POST', path: '/submissions/:submissionId/grade', access: INSTRUCTOR, scope: 'grades:write' },
+  discardFeedbackDraft: { method: 'POST', path: '/submissions/:submissionId/discard-feedback-draft', access: INSTRUCTOR, scope: 'grades:write' },
   draftFeedback: { method: 'POST', path: '/submissions/:submissionId/draft-feedback', access: INSTRUCTOR, scope: 'ai:run' },
   releaseGrades: { method: 'POST', path: '/assignments/:assignmentId/release', access: INSTRUCTOR, scope: 'grades:write' },
   getGradebook: { method: 'GET', path: '/courses/:courseId/gradebook', access: STAFF, scope: 'grades:read' },
   exportGradebook: { method: 'GET', path: '/courses/:courseId/gradebook/export', access: STAFF, scope: 'grades:read' },
+  getGradebookSetup: { method: 'GET', path: '/courses/:courseId/gradebook/setup', access: STAFF, scope: 'grades:read' },
+  previewGradebookSetup: { method: 'POST', path: '/courses/:courseId/gradebook/setup/preview', access: STAFF, scope: 'grades:read' },
+  saveGradebookSetup: { method: 'PUT', path: '/courses/:courseId/gradebook/setup', access: INSTRUCTOR, scope: 'grades:write' },
+  dismissSetupCheck: { method: 'POST', path: '/courses/:courseId/gradebook/setup/dismiss', access: INSTRUCTOR, scope: 'grades:write' },
+  updateGradeCells: { method: 'PATCH', path: '/courses/:courseId/gradebook/cells', access: INSTRUCTOR, scope: 'grades:write' },
+  setFinalOverride: { method: 'PUT', path: '/courses/:courseId/gradebook/students/:studentId/final', access: INSTRUCTOR, scope: 'grades:write' },
+  clearFinalOverride: { method: 'DELETE', path: '/courses/:courseId/gradebook/students/:studentId/final', access: INSTRUCTOR, scope: 'grades:write' },
+  explainGrade: { method: 'GET', path: '/courses/:courseId/gradebook/students/:studentId/trace', access: STAFF, scope: 'grades:read' },
+  previewRelease: { method: 'GET', path: '/assignments/:assignmentId/release/preview', access: INSTRUCTOR, scope: 'grades:read' },
+  unreleaseGrades: { method: 'POST', path: '/assignments/:assignmentId/unrelease', access: INSTRUCTOR, scope: 'grades:write' },
+  listGradeEvents: { method: 'GET', path: '/courses/:courseId/gradebook/events', access: STAFF, scope: 'grades:read' },
+  undoGradeEvent: { method: 'POST', path: '/gradebook/events/:eventId/undo', access: INSTRUCTOR, scope: 'grades:write' },
+  getMyGrade: { method: 'GET', path: '/courses/:courseId/grades/me', access: STUDENT, scope: null },
+  whatIfMyGrade: { method: 'POST', path: '/courses/:courseId/grades/me/what-if', access: STUDENT, scope: null },
 
   getTutorSetting: { method: 'GET', path: '/tutor/settings', access: 'signed-in', scope: 'content:read' },
   setTutorSetting: { method: 'PUT', path: '/tutor/settings', access: INSTRUCTOR, scope: 'content:write' },

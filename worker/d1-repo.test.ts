@@ -324,14 +324,14 @@ describe('D1Repo', () => {
     await repo.reset(seedData());
     await expectSeed(repo);
     expect(await repo.listUsers({ role: 'instructor' })).toHaveLength(2);
-    expect(await repo.listEnrollments({ userId: 'u-priya' })).toHaveLength(2);
+    expect(await repo.listEnrollments({ userId: 'u-priya' })).toHaveLength(3);
     expect((await repo.listAnnouncements({ courseIds: ['c-stat110'] })).map((announcement) => announcement.id)).toEqual([
       'a-stat-draft', 'a-stat-office', 'a-stat-welcome',
     ]);
     expect(await repo.listProgress({ lessonIds: [] })).toEqual([]);
     expect(await repo.listProgress({ userId: 'u-marcus' })).toHaveLength(2);
     expect((await repo.listLessons({ moduleId: 'm-stat-1' })).map((lesson) => lesson.id)).toEqual(['l-stat-1', 'l-stat-2']);
-    expect((await repo.listCourses()).map((course) => course.code)).toEqual(['COMM 120', 'OPS 101', 'STAT 110']);
+    expect((await repo.listCourses()).map((course) => course.code)).toEqual(['COMM 120', 'OPS 101', 'STAT 110', 'STAT 110-04']);
   });
 });
 

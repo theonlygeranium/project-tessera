@@ -1,0 +1,9 @@
+.cell { min-height: 40px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 2px; padding: 3px 8px; box-sizing: border-box; color: var(--ink); font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+.number { font-size: 13.5px; font-weight: 600; }
+.missing { background: var(--error-soft); color: var(--error-text); }
+.excused, .held, .dropped, .notsubmitted, .notdue { color: var(--muted); }
+.dropped .number { text-decoration: line-through; }
+.override { color: var(--ink-3); }
+.raw { font-size: 10px; color: var(--muted); }
+.editing { background: var(--surface); }
+.active { outline: 3px solid var(--focus); outline-offset: -3px; border-radius: var(--radius-sm); }

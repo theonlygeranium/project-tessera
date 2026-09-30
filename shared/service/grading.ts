@@ -1,11 +1,16 @@
-import type { Assignment, Grade, GradebookRow, RubricCriterion, Submission } from '../domain';
+import type { Assignment, Grade, RubricCriterion, Submission } from '../domain';
 import type { BlockInput } from '../api';
 import type { Service, ServiceContext } from './context';
 import { aiEnabled, canReachCourse, canTeach, fail, moduleFor, required, user } from './helpers';
 import { validateBlockContent } from './validate';
+import { parseTimestamp } from '../grading';
 
 const validPoints = (n: number) => Number.isFinite(n) && n >= 0 ? n : fail('invalid', 'Points must be nonnegative.');
-const due = (value: string | null) => value === null || !Number.isNaN(Date.parse(value)) ? value : fail('invalid', 'Due date is invalid.');
+const due = (value: string | null) => {
+  if (value === null) return null;
+  try { parseTimestamp(value, 'dueAt'); return value; }
+  catch { return fail('invalid', 'dueAt: Use a valid calendar timestamp with timezone.'); }
+};
 const type = (value: Assignment['submissionType']) => ['text','file','link'].includes(value) ? value : fail('invalid', 'Submission type is invalid.');
 async function assignment(ctx: ServiceContext, id: string, teaching = false) {
   const a = await ctx.repo.getAssignment(id) ?? fail('not-found', 'Assignment not found.');
@@ -49,29 +54,8 @@ function instructionBlocks(ctx: ServiceContext, id: string, blocks: BlockInput[]
   }) as Assignment['instructions'];
 }
 function current(items: Submission[]) { return items[0] ?? null; }
-function studentView(s: Submission | null): Submission | null { return s ? s.grade?.releasedAt ? s : { ...s, grade: null } : null; }
-async function book(ctx: ServiceContext, courseId: string) {
-  // Instructors of the course and administrators (the route is STAFF).
-  if (user(ctx).role === 'administrator') await canReachCourse(ctx, courseId); else await canTeach(ctx, courseId);
-  const assignments = (await ctx.repo.listAssignments({ courseId })).filter(a => a.status === 'published');
-  const students = await Promise.all((await ctx.repo.listEnrollments({ courseId })).map(e => ctx.repo.getUser(e.userId)));
-  const submissions = await ctx.repo.listSubmissions({});
-  const rows: GradebookRow[] = students.filter((x): x is NonNullable<typeof x> => !!x && x.role === 'student').sort((a,b) => a.name.localeCompare(b.name)).map(student => {
-    let total = 0, possible = 0;
-    const cells = assignments.map(a => {
-      const s = current(submissions.filter(x => x.assignmentId === a.id && x.studentId === student.id));
-      const released = !!s?.grade?.releasedAt;
-      // Every published assignment counts toward what's possible; only released grades count as earned.
-      possible += a.points;
-      if (released) total += s!.grade!.score;
-      return { assignmentId: a.id, score: released ? s!.grade!.score : null, state: s?.state ?? 'missing', released };
-    });
-    return { student: { id: student.id, name: student.name, email: student.email }, cells, total, possible };
-  });
-  return { assignments: assignments.map(({ id,title,points,dueAt }) => ({ id,title,points,dueAt })), rows };
-}
-const csv = (v: unknown) => `"${String(v ?? '').replaceAll('"','""')}"`;
-export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAssignment'|'updateAssignment'|'deleteAssignment'|'publishAssignment'|'listSubmissions'|'submit'|'getMySubmission'|'gradeSubmission'|'draftFeedback'|'releaseGrades'|'getGradebook'|'exportGradebook'> = {
+function studentView(s: Submission | null): Submission | null { return s ? s.grade?.releasedAt ? { ...s, feedbackDraft:null } : { ...s, grade: null, feedbackDraft:null } : null; }
+export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAssignment'|'updateAssignment'|'deleteAssignment'|'publishAssignment'|'listSubmissions'|'submit'|'getMySubmission'|'gradeSubmission'|'discardFeedbackDraft'|'draftFeedback'> = {
   createAssignment: async (ctx, input) => {
     const m = await moduleFor(ctx, input.moduleId); await canTeach(ctx, m.courseId);
     const siblings = await ctx.repo.listAssignments({ moduleId: m.id });
@@ -90,6 +74,9 @@ export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAss
     if (input.dueAt !== undefined) a.dueAt = due(input.dueAt);
     if (input.points !== undefined) a.points = validPoints(input.points);
     if (input.submissionType !== undefined) a.submissionType = type(input.submissionType);
+    if (input.categoryId !== undefined) { const setup=await ctx.repo.getGradebookSetup(a.courseId); if(input.categoryId!==null && !setup?.categories.some(c=>c.id===input.categoryId)) fail('invalid','Category does not belong to this course.'); a.categoryId=input.categoryId; }
+    if (input.extraCredit !== undefined) a.extraCredit=input.extraCredit;
+    if (input.countsTowardGrade !== undefined) a.countsTowardGrade=input.countsTowardGrade;
     if (input.rubric !== undefined) a.rubric = rubric(input.rubric);
     if (input.instructions !== undefined) a.instructions = instructionBlocks(ctx, a.id, input.instructions);
     if (input.position !== undefined) {
@@ -123,10 +110,14 @@ export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAss
       if (!f || f.courseId !== a.courseId || f.uploadedBy !== user(ctx).id) fail('invalid','Upload your file to this course, then submit it.');
     }
     if (a.submissionType === 'link' && !/^https?:\/\/[^\s]+$/i.test(link)) fail('invalid','Enter an http or https link.');
-    const previous = current(await ctx.repo.listSubmissions({ assignmentId:a.id,studentId:user(ctx).id }));
+    const revisions = await ctx.repo.listSubmissions({ assignmentId:a.id,studentId:user(ctx).id,includeDeleted:true });
+    const previous = current(revisions.filter(s => !s.deleted));
+    const tombstone = !previous ? revisions.find(s => s.deleted) : null;
     if (previous && (previous.attempt >= 2 || previous.state !== 'submitted')) fail('conflict','This submission cannot be replaced.');
-    const s: Submission = { id:ctx.newId('sub'),assignmentId:a.id,studentId:user(ctx).id,attempt:(previous?.attempt ?? 0)+1,state:'submitted',text:a.submissionType==='text'?text:'',fileId:a.submissionType==='file'?fileId:null,link:a.submissionType==='link'?link:'',submittedAt:ctx.now(),grade:null };
-    await ctx.repo.putSubmission(s); return s;
+    const s: Submission = { id:tombstone?.id ?? ctx.newId('sub'),assignmentId:a.id,studentId:user(ctx).id,attempt:(previous?.attempt ?? (tombstone?.source === 'recorded' ? 0 : tombstone?.attempt) ?? 0)+1,state:'submitted',text:a.submissionType==='text'?text:'',fileId:a.submissionType==='file'?fileId:null,link:a.submissionType==='link'?link:'',submittedAt:ctx.now(),grade:null,version:revisions.length ? Math.max(...revisions.map(r=>r.version??0))+1 : 0,source:'student',feedbackDraft:null };
+    const result=await ctx.repo.applyGradeWrites([{kind:'submission',value:s,expectedVersion:(tombstone??previous)?.version??0,...(tombstone?{}:{create:true,priorId:previous?.id})}],[]);
+    if(!result.ok)fail('conflict','Submission changed.');
+    return s;
   },
   getMySubmission: async (ctx, { assignmentId }) => { await assignment(ctx, assignmentId); return studentView(current(await ctx.repo.listSubmissions({ assignmentId,studentId:user(ctx).id }))!); },
   gradeSubmission: async (ctx, input) => {
@@ -137,21 +128,38 @@ export const grading: Pick<Service, 'listAssignments'|'createAssignment'|'getAss
     if (!Number.isFinite(input.score) || input.score < 0 || input.score > a.points) fail('invalid','Score exceeds assignment points.');
     if (input.feedbackOrigin !== 'human' && input.feedbackOrigin !== 'ai') fail('invalid','Feedback origin is invalid.');
     if (input.feedbackOrigin === 'ai' && !input.feedbackProvenance) fail('invalid','AI feedback needs its source.');
-    s.state='graded'; s.grade={ score:input.score,criteria:input.criteria,feedback:input.feedback.trim(),feedbackOrigin:input.feedbackOrigin,feedbackProvenance:input.feedbackOrigin==='ai' ? input.feedbackProvenance ?? null : null,gradedBy:user(ctx).id,gradedAt:ctx.now(),releasedAt:null };
-    await ctx.repo.putSubmission(s); return s;
+    const before={...s};const expectedVersion=s.version??0;
+    s.state='graded'; s.grade={ score:input.score,criteria:input.criteria,feedback:input.feedback.trim(),feedbackOrigin:input.feedbackOrigin,feedbackProvenance:input.feedbackOrigin==='ai' ? input.feedbackProvenance ?? null : null,gradedBy:user(ctx).id,gradedAt:ctx.now(),releasedAt:null };s.feedbackDraft=null;s.version=expectedVersion+1;
+    const setup=await ctx.repo.getGradebookSetup(a.courseId);
+    const event={id:ctx.newId('ge'),courseId:a.courseId,studentId:s.studentId,assignmentId:a.id,kind:'score' as const,before,after:s,reason:null,by:user(ctx).id,at:ctx.now(),batchId:null,undoOf:null,rulesVersion:setup?.rulesVersion??0};
+    const result=await ctx.repo.applyGradeWrites([{kind:'submission',value:s,expectedVersion}],[event]);if(!result.ok)fail('conflict','Submission changed.');return s;
+  },
+  discardFeedbackDraft: async (ctx, { submissionId }) => {
+    const {s,a}=await submission(ctx,submissionId);
+    if (current(await ctx.repo.listSubmissions({ assignmentId:a.id,studentId:s.studentId }))?.id !== s.id) fail('conflict','Only the current submission can have its feedback draft discarded.');
+    if (s.state === 'returned' || s.grade?.releasedAt) fail('conflict','Released grades cannot be changed.');
+    if (!s.feedbackDraft) fail('conflict','There is no feedback draft to discard.');
+    const expectedVersion=s.version??0;
+    const saved={...s,feedbackDraft:null,version:expectedVersion+1};
+    const write=await ctx.repo.applyGradeWrites([{kind:'submission',value:saved,expectedVersion}],[]);
+    if(!write.ok)fail('conflict','Submission changed while discarding feedback.');
+    return saved;
   },
   draftFeedback: async (ctx, { submissionId,criteria }) => {
     const {s,a} = await submission(ctx,submissionId); await aiEnabled(ctx); checkedCriteria(a,criteria);
+    if (s.state === 'returned' || s.grade?.releasedAt) fail('invalid','Released submissions cannot receive a feedback draft.');
+    if (current(await ctx.repo.listSubmissions({ assignmentId:a.id,studentId:s.studentId }))?.id !== s.id) fail('conflict','Only the current submission can receive a feedback draft.');
     const c = await ctx.repo.getCourse(a.courseId);
     const result = await ctx.ai.run('feedback',{ courseTitle:c?.title ?? '',assignmentTitle:a.title,rubric:a.rubric,criteria,submissionText:s.text || s.link || (s.fileId ? 'File submission' : '') });
-    return { feedback:result.output.feedback,provenance:{model:result.model,task:'feedback',generatedAt:ctx.now(),sources:[],summary:`Feedback draft from rubric results for ${a.title}` } };
-  },
-  releaseGrades: async (ctx, { assignmentId }) => { await assignment(ctx,assignmentId,true); for (const s of await ctx.repo.listSubmissions({ assignmentId })) if (s.state === 'graded' && s.grade) { s.state='returned'; s.grade.releasedAt=ctx.now(); await ctx.repo.putSubmission(s); } return {ok:true}; },
-  getGradebook: async (ctx, { courseId }) => book(ctx,courseId),
-  exportGradebook: async (ctx, { courseId }) => {
-    const b = await book(ctx,courseId);
-    const lines = [[ 'Student','Email',...b.assignments.map(a => a.title),'Total','Possible' ].map(csv).join(',')];
-    for (const row of b.rows) lines.push([row.student.name,row.student.email,...row.cells.map(c => c.score ?? ''),row.total,row.possible].map(csv).join(','));
-    return {csv:lines.join('\r\n')+'\r\n'};
+    if (current(await ctx.repo.listSubmissions({ assignmentId:a.id,studentId:s.studentId }))?.id !== s.id) fail('conflict','Submission changed while drafting feedback.');
+    const feedback = result.output.feedback.trim();
+    if (!feedback || feedback.length > 2000) fail('invalid','Feedback draft must be between 1 and 2000 characters.');
+    const createdAt=ctx.now();
+    const provenance={model:result.model,task:'feedback' as const,generatedAt:createdAt,sources:[],summary:`Feedback draft from rubric results for ${a.title}` };
+    const expectedVersion=s.version??0;
+    const saved={...s,feedbackDraft:{text:feedback,provenance,createdAt},version:expectedVersion+1};
+    const write=await ctx.repo.applyGradeWrites([{kind:'submission',value:saved,expectedVersion}],[]);
+    if(!write.ok) fail('conflict','Submission changed while drafting feedback.');
+    return { feedback,provenance };
   },
 };

@@ -31,6 +31,9 @@ const TOOLS: Tool[] = [
   { name: 'create_assignment', operation: 'createAssignment', description: 'Create an unpublished assignment for a person to review.', readOnly: false },
   { name: 'list_announcements', operation: 'listAnnouncements', description: 'List announcements visible to the token owner.', readOnly: true },
   { name: 'create_announcement', operation: 'createAnnouncement', description: 'Create an unpublished announcement draft for a person to review.', readOnly: false },
+  { name: 'gradebook_get', operation: 'getGradebook', description: 'Read released gradebook results for a course.', readOnly: true },
+  { name: 'gradebook_explain', operation: 'explainGrade', description: 'Explain a course grade from its calculation trace.', readOnly: true },
+  { name: 'gradebook_setup_preview', operation: 'previewGradebookSetup', description: 'Preview a draft gradebook setup and its impact.', readOnly: true },
 ];
 
 // D-003: agents cannot publish or unpublish lessons or assignments, keep or

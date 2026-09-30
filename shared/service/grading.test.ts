@@ -9,6 +9,31 @@ const id='asg-stat-1';
 const rubric=[{criterionId:'criterion-question',levelId:'clear',points:5,comment:'Clear question'},{criterionId:'criterion-reason',levelId:'clear',points:5,comment:'Good reason'}];
 
 describe('grading service',()=>{
+  it('discards an ungraded feedback draft without saving a score',async()=>{
+    const repo=new MemoryRepo(seedData()),teacher=await context(repo,'u-okafor'),student=await context(repo,'u-priya');
+    const submitted=await dispatch(service,student,'submit',{assignmentId:id,text:'A question about variability'});
+    await dispatch(service,teacher,'draftFeedback',{submissionId:submitted.id,criteria:rubric});
+    const drafted=(await repo.getSubmission(submitted.id))!;
+    expect(drafted.grade).toBeNull();
+    await expect(dispatch(service,student,'discardFeedbackDraft',{submissionId:submitted.id})).rejects.toMatchObject({code:'forbidden'});
+    const saved=await dispatch(service,teacher,'discardFeedbackDraft',{submissionId:submitted.id});
+    expect(saved).toMatchObject({state:'submitted',grade:null,feedbackDraft:null,version:(drafted.version??0)+1});
+    expect(await repo.getSubmission(submitted.id)).toMatchObject(saved);
+  });
+  it('persists feedback as a versioned draft until a person keeps it',async()=>{
+    const repo=new MemoryRepo(seedData()),teacher=await context(repo,'u-okafor');
+    const original=(await repo.listSubmissions({courseId:'stat110-04',assignmentId:'draft'})).find(s=>s.studentId==='u-priya')!;
+    const draft=await dispatch(service,teacher,'draftFeedback',{submissionId:original.id,criteria:original.grade!.criteria});
+    const saved=await repo.getSubmission(original.id);
+    expect(saved?.feedbackDraft).toMatchObject({text:draft.feedback,provenance:draft.provenance});
+    expect(saved?.version).toBe((original.version??0)+1);
+    const preview=await dispatch(service,teacher,'previewRelease',{assignmentId:'draft'});
+    expect(preview.notSent.map(x=>x.submissionId)).toContain(original.id);
+    const released=await dispatch(service,teacher,'releaseGrades',{assignmentId:'draft',hash:preview.hash});
+    expect(released.released).not.toContain(original.id);
+    await dispatch(service,teacher,'gradeSubmission',{submissionId:original.id,criteria:original.grade!.criteria,score:original.grade!.score,feedback:draft.feedback,feedbackOrigin:'ai',feedbackProvenance:draft.provenance});
+    expect((await repo.getSubmission(original.id))?.feedbackDraft).toBeNull();
+  });
   it('requires the correct submission field, allows one replacement, and blocks late or graded replacement',async()=>{
     const repo=new MemoryRepo(seedData()),student=await context(repo,'u-priya'),teacher=await context(repo,'u-okafor');
     await expect(dispatch(service,student,'submit',{assignmentId:id})).rejects.toMatchObject({code:'invalid'});
@@ -33,12 +58,12 @@ describe('grading service',()=>{
     await dispatch(service,teacher,'gradeSubmission',{submissionId:submitted.id,criteria:rubric,score:8,feedback:draft.feedback,feedbackOrigin:'ai',feedbackProvenance:draft.provenance});
     expect((await dispatch(service,student,'getMySubmission',{assignmentId:id}))?.grade).toBeNull();
     let book=await dispatch(service,teacher,'getGradebook',{courseId:'c-stat110'});
-    expect(book.rows.find(x=>x.student.id==='u-priya')).toMatchObject({total:0,possible:10});
+    expect(book.rows.find(x=>x.student.id==='u-priya')).toMatchObject({total:0,possible:0});
     await dispatch(service,teacher,'releaseGrades',{assignmentId:id});
     expect((await dispatch(service,student,'getMySubmission',{assignmentId:id}))?.grade?.score).toBe(8);
     book=await dispatch(service,teacher,'getGradebook',{courseId:'c-stat110'});
     expect(book.rows.find(x=>x.student.id==='u-priya')).toMatchObject({total:8,possible:10});
-    expect((await dispatch(service,teacher,'exportGradebook',{courseId:'c-stat110'})).csv).toContain('"Student","Email"');
+    const csv=await dispatch(service,teacher,'exportGradebook',{courseId:'c-stat110'});expect('csv' in csv&&csv.csv).toContain('Student,Email');
   });
   it('restricts assignment visibility to published enrolled students and honors AI policy',async()=>{
     const repo=new MemoryRepo(seedData()),teacher=await context(repo,'u-okafor'),student=await context(repo,'u-priya'),outsider=await context(repo,'u-jordan');
@@ -87,6 +112,6 @@ describe('review 4: gradebook access', () => {
   it('lets an administrator read the gradebook and its CSV', async () => {
     const repo = new MemoryRepo(seedData()), admin = await context(repo, 'u-admin');
     expect((await dispatch(service, admin, 'getGradebook', { courseId: 'c-stat110' })).rows.length).toBeGreaterThan(0);
-    expect((await dispatch(service, admin, 'exportGradebook', { courseId: 'c-stat110' })).csv).toContain('"Student"');
+    const csv = await dispatch(service, admin, 'exportGradebook', { courseId: 'c-stat110' }); expect('csv' in csv && csv.csv).toContain('Student,Email');
   });
 });

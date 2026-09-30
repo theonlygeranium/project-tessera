@@ -1,0 +1,9 @@
+.root { min-width: 0; max-width: 100%; color: var(--ink); }
+.root h2 { margin: 0 0 8px; font: 600 22px var(--font-serif); }
+.scroll { width: 0; min-width: 100%; overflow-x: auto; }
+.root table { width: max-content; min-width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.root caption { text-align: left; color: var(--muted); font-size: 12px; }
+.root th, .root td { padding: 7px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.root thead { background: var(--surface-alt); }
+.reassurance { color: var(--muted); font-size: 12px; }
+@media (forced-colors: active) { .root th, .root td { border-color: CanvasText; } }

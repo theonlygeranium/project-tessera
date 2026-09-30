@@ -41,9 +41,18 @@ describe('/mcp', () => {
     expect(body.result.tools.map(t => t.name)).toEqual([
       'list_courses', 'get_course_outline', 'import_course', 'create_course', 'create_module', 'create_lesson', 'get_lesson', 'save_blocks',
       'get_course_access', 'get_lesson_access', 'list_files', 'get_file_access', 'generate_at_scope', 'get_generation_job', 'generate_element',
-      'list_assignments', 'get_assignment', 'create_assignment', 'list_announcements', 'create_announcement',
+      'list_assignments', 'get_assignment', 'create_assignment', 'list_announcements', 'create_announcement', 'gradebook_get', 'gradebook_explain', 'gradebook_setup_preview',
     ]);
     expect(body.result.tools.every(t => t.inputSchema.type === 'object')).toBe(true);
+  });
+
+  it('checks grades:read for every gradebook read tool',async()=>{
+    const env=testEnv();const narrow=await token(env,'u-okafor',['courses:read']);const reader=await token(env,'u-okafor',['grades:read']);
+    const setup=await (await call(env,'/api/v1/courses/stat110-04/gradebook/setup',{headers:{cookie:'tessera_user=u-okafor'}})).json();
+    for(const [name,args] of [['gradebook_get',{courseId:'stat110-04'}],['gradebook_explain',{courseId:'stat110-04',studentId:'u-priya'}],['gradebook_setup_preview',{courseId:'stat110-04',setup}]] as const){
+      const denied=await (await post(env,narrow,rpc('tools/call',{name,arguments:args}))).json() as {result:{isError:boolean;content:{text:string}[]}};expect(denied.result.isError).toBe(true);expect(denied.result.content[0].text).toContain('grades:read');
+      const allowed=await (await post(env,reader,rpc('tools/call',{name,arguments:args}))).json() as {result:{isError?:boolean;structuredContent:unknown}};expect(allowed.result.isError).not.toBe(true);expect(allowed.result.structuredContent).toBeTruthy();
+    }
   });
 
   it('imports a course, lists it, and reports missing scopes as tool errors', async () => {
