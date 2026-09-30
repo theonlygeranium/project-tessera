@@ -1,7 +1,7 @@
-.root { min-width: 0; color: var(--ink); }
+.root { min-width: 0; max-width: 100%; color: var(--ink); }
 .root h3 { font: 600 20px var(--font-serif); margin: 0 0 10px; }
-.scroll { overflow-x: auto; }
-.root table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.scroll { width: 0; min-width: 100%; overflow-x: auto; }
+.root table { width: max-content; min-width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .root th, .root td { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .root thead { background: var(--surface-alt); }
 .root td { white-space: nowrap; }

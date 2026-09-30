@@ -1,6 +1,6 @@
-.page { display: grid; gap: 16px; max-width: 760px; margin-inline: auto; padding-bottom: 48px; color: var(--ink); font: 15px/1.5 var(--font-sans); }
-.stack { display: grid; gap: 16px; min-width: 0; }
-.hero, .card { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+.page { display: grid; gap: 16px; max-width: min(760px, 100%); width: 100%; box-sizing: border-box; margin-inline: auto; padding-bottom: 48px; color: var(--ink); font: 15px/1.5 var(--font-sans); min-width: 0; }
+.stack { display: grid; gap: 16px; min-width: 0; max-width: 100%; }
+.hero, .card { min-width: 0; max-width: 100%; box-sizing: border-box; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
 .hero { background: var(--surface-alt); }
 .hero p { margin: 0; color: var(--muted); }
 .card h2 { margin: 0 0 10px; font: 600 22px var(--font-serif); }
@@ -27,4 +27,4 @@
 .page a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-dark); }
 .page button:focus-visible, .page input:focus-visible, .page select:focus-visible, .page a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .private { margin: 0; color: var(--ink-2); }
-@media (max-width: 420px) { .hero, .card { padding: 14px; } .grade strong { font-size: 54px; } }
+@media (max-width: 420px) { .hero, .card { padding: 14px; } .grade strong { font-size: 42px; } .grade span { font-size: 20px; } }
