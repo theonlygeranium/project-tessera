@@ -86,6 +86,91 @@ function occurrenceNames(title: string, due: string, topic: string): string[] {
 const statedWeek = (text: string) => /\bweek\s*(\d{1,2})\b/i.exec(text)?.[1];
 const countOf = (text: string) => (/\(\s*(\d{1,2})\s*@\s*\d+(?:\.\d+)?\s*(?:points?|pts?)\b[^)]*\)/i.exec(text) ?? /(\d{1,2})\s*@\s*\d+(?:\.\d+)?\s*(?:points?|pts?)\b/i.exec(text) ?? /\(\s*(\d{1,2})\s*\)/.exec(text))?.[1];
 const isBreak = (text: string) => /\b(?:break|holiday|recess|no class)\b/i.test(text);
+const eachModule = (text: string) => /\b(?:each|every|per)\s+modules?\b/i.test(text);
+/** Prefer the assessment span; when it is thin, pull source lines that mention the title. */
+function placementBlob(session: DesignSession, item: { title: string; span: SourceSpan | null }): string {
+  const span = item.span?.text ?? '';
+  const rich = `${item.title} ${span}`;
+  if (statedModules(rich).length || eachModule(rich) || statedWeek(rich) || statedCalendarDate(rich, null)) return rich;
+  const needle = item.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(w => w.length > 3).slice(0, 4);
+  if (!needle.length || !session.source?.sections?.length) return rich;
+  const cue = /\b(?:due|modules?\s*\d|each\s+modules?|every\s+modules?|per\s+modules?|week\s*\d)\b/i;
+  const hits = session.source.sections.flatMap(section => {
+    const lines = [section.heading, ...(section.lines ?? section.text.split(/\n/))].map(line => line.trim()).filter(Boolean);
+    // Also join adjacent lines so "Homework assignments" + next-line module list still matches.
+    const windows = lines.flatMap((line, i) => [line, [line, lines[i + 1] ?? ''].join(' '), [lines[i - 1] ?? '', line].join(' ')]);
+    return windows.filter(line => {
+      const lower = line.toLowerCase();
+      const hitsNeedle = needle.filter(w => lower.includes(w)).length;
+      return hitsNeedle >= Math.min(2, needle.length) || (hitsNeedle >= 1 && cue.test(line));
+    });
+  });
+  const unique = [...new Set(hits.map(h => h.trim()).filter(Boolean))].slice(0, 8);
+  return unique.length ? `${rich} ${unique.join(' ')}` : rich;
+}
+/** Module numbers named in prose: "Module 7", "Modules 2, 3, 5, and 6". */
+export function statedModules(text: string): number[] {
+  const found = new Set<number>();
+  for (const match of text.matchAll(/\bmodules?\s*((?:\d{1,2}\s*(?:,?\s*(?:and|&)\s*|,\s*|\s+through\s+|\s*[–—-]\s*)?)+)/gi)) {
+    const chunk = match[1];
+    const nums = [...chunk.matchAll(/\d{1,2}/g)].map(m => Number(m[0])).filter(n => n >= 1 && n <= 52);
+    if (/\bthrough\b|[–—-]/.test(chunk) && nums.length >= 2) {
+      const [first, last] = [Math.min(...nums), Math.max(...nums)];
+      for (let n = first; n <= last; n++) found.add(n);
+    } else nums.forEach(n => found.add(n));
+  }
+  return [...found].sort((a, b) => a - b);
+}
+const monthIndex = (name: string) => ['january','february','march','april','may','june','july','august','september','october','november','december'].findIndex(m => m.startsWith(name.toLowerCase().slice(0, 3)));
+/** Calendar due date in a title or span: 9/15, 9/15/14, March 28, 2014, week of March 3. */
+export function statedCalendarDate(text: string, termStart: string | null): string | null {
+  const start = termStart && Number.isFinite(Date.parse(termStart)) ? new Date(termStart) : null;
+  const yearOf = (explicit: number | null, month: number) => {
+    if (explicit != null) return explicit < 100 ? 2000 + explicit : explicit;
+    if (!start) return new Date().getUTCFullYear();
+    const y = start.getUTCFullYear();
+    // Term crossing New Year: a January date after an August start belongs to y+1.
+    return month < start.getUTCMonth() ? y + 1 : y;
+  };
+  const named = /\b(?:week\s+of\s+)?(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:,?\s*(\d{2,4}))?\b/i.exec(text);
+  if (named) {
+    const month = monthIndex(named[1]);
+    const day = Number(named[2]);
+    const year = yearOf(named[3] ? Number(named[3]) : null, month);
+    if (month >= 0 && day >= 1 && day <= 31) return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+  const numeric = /\b(?:due(?:\s+(?:on|by))?\s+)?(?:(?:mon|tue|wed|thu|fri|sat|sun)\w*,?\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/i.exec(text);
+  if (numeric) {
+    const month = Number(numeric[1]) - 1;
+    const day = Number(numeric[2]);
+    const year = yearOf(numeric[3] ? Number(numeric[3]) : null, month);
+    if (month >= 0 && month <= 11 && day >= 1 && day <= 31) return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+  return null;
+}
+/** Map a calendar ISO date onto a schedule row whose dates cover that day (2/2-2/8 or Feb 2–8). */
+export function weekForCalendarDate(date: string, schedule: { week: number; dates: string; due: string }[], termStart: string | null): number | null {
+  const at = Date.parse(date);
+  if (!Number.isFinite(at)) return null;
+  const day = new Date(at);
+  const month = day.getUTCMonth() + 1;
+  const number = day.getUTCDate();
+  for (const row of schedule) {
+    const text = `${row.dates} ${row.due}`;
+    if (new RegExp(`\\b${month}\\s*[\/.–—-]\\s*${number}\\b`).test(text)) return row.week;
+    const monthName = day.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+    if (new RegExp(`\\b${monthName}\\w*\\s+${number}\\b`, 'i').test(text)) return row.week;
+    // Inclusive numeric ranges like 2/2-2/8 or 3/2-3/8.
+    const range = /(\d{1,2})\/(\d{1,2})\s*[–—-]\s*(\d{1,2})\/(\d{1,2})/.exec(row.dates);
+    if (range) {
+      const y = day.getUTCFullYear();
+      const from = Date.parse(`${y}-${range[1].padStart(2, '0')}-${range[2].padStart(2, '0')}`);
+      const to = Date.parse(`${y}-${range[3].padStart(2, '0')}-${range[4].padStart(2, '0')}`);
+      if (Number.isFinite(from) && Number.isFinite(to) && at >= from && at <= to + 86400000 - 1) return row.week;
+    }
+  }
+  return weekOf(date, termStart);
+}
 function shares(total: number, count: number): number[] {
   const units = Math.round(total * 10000);
   const base = Math.floor(units / count);
@@ -173,16 +258,50 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
       add(start, item.title, points, weightPercent, null, 'Coursewide participation is recorded here; no submission is due.');
       continue;
     }
-    const stated = statedWeek(`${item.title} ${item.span?.text ?? ''}`);
-    const dateWeek = item.dueAt ? scheduledDateWeek(item.dueAt) ?? weekOf(item.dueAt, (session.effectiveProfile ?? session.extraction.profile).termStart.value) : null;
+    const blob = `${item.title} ${item.span?.text ?? ''}`;
+    const termStart = (session.effectiveProfile ?? session.extraction.profile).termStart.value;
+    const stated = statedWeek(blob);
+    const modulesNamed = statedModules(blob);
+    const calendar = item.dueAt ?? statedCalendarDate(blob, termStart);
+    const dateWeek = calendar ? weekForCalendarDate(calendar, session.extraction.schedule, termStart) ?? scheduledDateWeek(calendar) ?? weekOf(calendar, termStart) : null;
     const final = /\bfinal\s*(?:exam|assessment|test)\b/i.test(item.title);
-    if (item.dueAt || stated || final) {
-      const requested = final ? Math.max(...content.flatMap(moduleWeeks)) : stated ? Number(stated) : dateWeek;
+    const placeOne = (requested: number | null, note: string, dueAt: string | null = null) => {
       const target = requested ? moduleForWeek(requested) : content[content.length - 1];
-      if (!target) continue;
+      if (!target) return false;
       const actual = requested && moduleWeeks(target).includes(requested) && !breakWeeks.has(requested) ? requested : contentWeek(target);
-      const note = final ? 'Final exam placed in the last content module.' : requested !== actual ? `Syllabus says Week ${requested}; placed in nearest content module, Week ${actual}.` : item.dueAt ? `Placed by syllabus due date ${item.dueAt}.` : `Placed by syllabus Week ${requested}.`;
-      add(target, item.title, points, weightPercent, actual, note, item.dueAt);
+      const resolved = requested !== actual && requested != null ? `${note} Placed in nearest content module, Week ${actual}.` : note;
+      add(target, item.title, points, weightPercent, actual, resolved, dueAt);
+      return true;
+    };
+    if (final) {
+      placeOne(Math.max(...content.flatMap(moduleWeeks)), 'Final exam placed in the last content module.', item.dueAt);
+      continue;
+    }
+    if (item.dueAt || stated) {
+      const requested = stated ? Number(stated) : dateWeek;
+      placeOne(requested, item.dueAt ? `Placed by syllabus due date ${item.dueAt}.` : `Placed by syllabus Week ${requested}.`, item.dueAt);
+      continue;
+    }
+    if (modulesNamed.length) {
+      const pointShares = shares(points, modulesNamed.length);
+      const weightShares = weightPercent === null ? [] : shares(weightPercent, modulesNamed.length);
+      modulesNamed.forEach((week, n) => {
+        const target = moduleForWeek(week);
+        if (target) add(target, modulesNamed.length === 1 ? item.title : `${item.title.replace(/\s*\(\s*\d{1,2}\s*@\s*\d+(?:\.\d+)?\s*(?:points?|pts?)[^)]*\)/i, '').trim()} ${n + 1}`, pointShares[n], weightShares[n] ?? null, week, `Syllabus names Module ${week}.`, null, n + 1);
+      });
+      continue;
+    }
+    if (eachModule(blob)) {
+      const weeks = content.map(contentWeek).filter((week): week is number => week !== null);
+      const n = weeks.length || content.length;
+      const pointShares = shares(points, n);
+      const weightShares = weightPercent === null ? [] : shares(weightPercent, n);
+      (weeks.length ? weeks : content.map((_, i) => i)).forEach((weekOrIndex, i) => {
+        const target = weeks.length ? moduleForWeek(weekOrIndex) : content[weekOrIndex];
+        if (!target) return;
+        const week = weeks.length ? weekOrIndex : contentWeek(target);
+        add(target, `${item.title} ${i + 1}`, pointShares[i], weightShares[i] ?? null, week, `Due each module; Week ${week}.`, null, i + 1);
+      });
       continue;
     }
     const occurrences = session.extraction.schedule.flatMap(row => row.empty || isBreak(`${row.topic} ${row.due}`) ? [] : occurrenceNames(item.title, row.due, row.topic).map(title => ({ title, week: row.week })));
@@ -195,8 +314,12 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
       });
       continue;
     }
-    const count = Number(countOf(`${item.title} ${item.span?.text ?? ''}`));
-    if (count > 0 || /\b(?:weekly|each week|per module)\b/i.test(`${item.title} ${item.span?.text ?? ''}`)) {
+    if (calendar && dateWeek) {
+      placeOne(dateWeek, `Placed by syllabus due date ${calendar}.`, `${calendar}T23:59:00.000Z`);
+      continue;
+    }
+    const count = Number(countOf(blob));
+    if (count > 0 || /\b(?:weekly|each week|per module)\b/i.test(blob)) {
       const n = count || content.length;
       const pointShares = shares(points, n);
       const weightShares = weightPercent === null ? [] : shares(weightPercent, n);
@@ -207,6 +330,39 @@ export function previewProvisionPlan(session: DesignSession, snapshot: CourseSna
         add(target, `${item.title.replace(/\s*\(\s*\d{1,2}\s*@\s*\d+(?:\.\d+)?\s*(?:points?|pts?)[^)]*\)/i, '').replace(/\s+\d{1,2}\s*@\s*\d+(?:\.\d+)?\s*(?:points?|pts?)(?:\s+each)?/i, '').replace(/\s*\(\s*\d+\s*\)/, '').trim()} ${i + 1}`, pointShares[i], weightShares[i] ?? null, week, `${count ? `${count} stated instances` : 'Recurring'} spread across content modules; Week ${week}.`, null, i + 1);
       });
       continue;
+    }
+    // Last resort: pull due/module cues from source lines that mention this title.
+    const enriched = placementBlob(session, item);
+    if (enriched !== blob) {
+      const modulesFromSource = statedModules(enriched);
+      if (modulesFromSource.length) {
+        const pointShares = shares(points, modulesFromSource.length);
+        const weightShares = weightPercent === null ? [] : shares(weightPercent, modulesFromSource.length);
+        modulesFromSource.forEach((week, n) => {
+          const target = moduleForWeek(week);
+          if (target) add(target, modulesFromSource.length === 1 ? item.title : `${item.title} ${n + 1}`, pointShares[n], weightShares[n] ?? null, week, `Syllabus names Module ${week}.`, null, n + 1);
+        });
+        continue;
+      }
+      if (eachModule(enriched)) {
+        const weeks = content.map(contentWeek).filter((week): week is number => week !== null);
+        const n = weeks.length || content.length;
+        const pointShares = shares(points, n);
+        const weightShares = weightPercent === null ? [] : shares(weightPercent, n);
+        (weeks.length ? weeks : content.map((_, i) => i)).forEach((weekOrIndex, i) => {
+          const target = weeks.length ? moduleForWeek(weekOrIndex) : content[weekOrIndex];
+          if (!target) return;
+          const week = weeks.length ? weekOrIndex : contentWeek(target);
+          add(target, `${item.title} ${i + 1}`, pointShares[i], weightShares[i] ?? null, week, `Due each module; Week ${week}.`, null, i + 1);
+        });
+        continue;
+      }
+      const cal = statedCalendarDate(enriched, termStart);
+      const calWeek = cal ? weekForCalendarDate(cal, session.extraction.schedule, termStart) ?? weekOf(cal, termStart) : null;
+      if (cal && calWeek) {
+        placeOne(calWeek, `Placed by syllabus due date ${cal}.`, `${cal}T23:59:00.000Z`);
+        continue;
+      }
     }
     const target = content[content.length - 1];
     if (target) {
