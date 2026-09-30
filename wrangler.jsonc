@@ -93,7 +93,7 @@
       "ACCESS_GROUP_ID": "bc58d922-3aa0-43e9-8539-118f4e110550",
       "OCR_INSTANCES": "1",
       "ACCESS_TEAM_DOMAIN": "little-brook-5f84.cloudflareaccess.com",
-      "ACCESS_AUD": "97c83cba8bf51d22c61e77f174b69318dc2cf542178fd0201443eaebf0f59a4d",
+      "ACCESS_AUD": "87812bb9fbbdd7b8bfc537e3f42688cfac00219a5370d2c11813a229f0621e33",
       "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/f69a6a0cad6e417b182bac1559292bf6/tessera/custom-writer/v1/chat/completions"
     }
   }
