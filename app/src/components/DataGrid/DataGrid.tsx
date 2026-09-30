@@ -36,7 +36,7 @@ const GridRow = memo(function GridRow<Row>({ row, rowIndex, columns, rowKey, row
       const here = active.row === rowIndex && active.col === colIndex;
       const editingHere = !!edit && edit.rowKey === id && edit.columnKey === column.key;
       const range = rowIndex >= Math.min(active.row, active.fromRow) && rowIndex <= Math.max(active.row, active.fromRow) && colIndex >= Math.min(active.col, active.fromCol) && colIndex <= Math.max(active.col, active.fromCol);
-      return <td key={column.key} id={`grade-grid-${id}-${column.key}`} ref={here ? focus : undefined} role="gridcell" aria-label={column.ariaLabel?.(row)} aria-selected={range} aria-readonly={!!column.readOnly} tabIndex={here ? 0 : -1} className={[styles.value, column.tint && styles.bandAlt, colIndex === columns.length - 1 && styles.current, range && styles.range].filter(Boolean).join(' ')} onFocus={() => {
+      return <td key={column.key} id={`grade-grid-${id}-${column.key}`} ref={here ? focus : undefined} role="gridcell" aria-label={column.ariaLabel?.(row)} aria-selected={range} aria-readonly={!!column.readOnly} tabIndex={here && !editingHere ? 0 : -1} className={[styles.value, column.tint && styles.bandAlt, colIndex === columns.length - 1 && styles.current, range && styles.range].filter(Boolean).join(' ')} onFocus={() => {
         if (!here) {
           if (edit && (edit.rowKey !== id || edit.columnKey !== column.key)) cancelEdit();
           setCell({ row: rowIndex, col: colIndex, fromRow: rowIndex, fromCol: colIndex });
@@ -86,7 +86,7 @@ function DataGridInner<Row>({ caption, rows, columns, rowKey, rowName, density =
     const current = clamp(cellRef.current);
     const next = { row: Math.max(0, Math.min(rows.length - 1, row)), col: Math.max(0, Math.min(columns.length - 1, col)), fromRow: extend ? current.fromRow : Math.max(0, Math.min(rows.length - 1, row)), fromCol: extend ? current.fromCol : Math.max(0, Math.min(columns.length - 1, col)) };
     setCell(next);
-    requestAnimationFrame(() => document.getElementById(`grade-grid-${rowKey(rows[next.row])}-${columns[next.col].key}`)?.focus());
+    requestAnimationFrame(() => { const el = document.getElementById(`grade-grid-${rowKey(rows[next.row])}-${columns[next.col].key}`); el?.focus(); el?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
   }
   async function commit(nextRow: number, nextCol: number) {
     if (!edit || !visible) return;

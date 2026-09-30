@@ -34,7 +34,12 @@ export function seedGradebook(baseCourse: Course): Pick<SeedData,
       email: `${id.slice(2)}@meridian.example.edu`,
       role: 'student',
       initials: name.split(' ').map(x => x[0]).join(''),
-      profile: null
+      // Completed profile so student grade / what-if pages are reachable in mock (priya stays onboarding-only in base seed).
+      profile: {
+        goals: ['finish-degree'], goalNote: '', weeklyMinutes: 120, language: 'en', readingLevel: 'standard',
+        accessibility: { captions: false, reducedMotion: false, largerText: false, screenReader: false },
+        reminders: 'weekly', completedAt: '2026-01-15T00:00:00.000Z',
+      },
     };
   });
   const priya = goldenInput('u-priya');

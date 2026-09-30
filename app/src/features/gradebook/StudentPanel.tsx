@@ -54,7 +54,7 @@ export function StudentPanel({ courseId, row, assignments, onClose, onNavigate }
       else setError('');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save the change.'); }
   }
-  return <aside className={styles.panel} aria-label={`${row.student.name} grade details`} onKeyDown={event => {
+  return <aside className={styles.panel} tabIndex={0} aria-label={`${row.student.name} grade details`} onKeyDown={event => {
     if (event.key === 'Escape') { event.preventDefault(); onClose(); }
     if (!['INPUT', 'TEXTAREA', 'BUTTON', 'A'].includes((event.target as HTMLElement).tagName) && !event.altKey && !event.ctrlKey && !event.metaKey) {
       if (event.key.toLowerCase() === 'j') onNavigate(1);

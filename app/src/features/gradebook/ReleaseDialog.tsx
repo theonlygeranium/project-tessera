@@ -57,7 +57,7 @@ export function ReleaseDialog({ courseId, assignments, initialId, rows, onClose 
     if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   }
-  return <div className={styles.backdrop}><div ref={dialog} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="release-title" tabIndex={-1} onKeyDown={keyDown}>
+  return <div className={styles.backdrop}><div ref={dialog} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="release-title" tabIndex={0} onKeyDown={keyDown}>
     <header><div><p>What students will see</p><h2 id="release-title">Release {title} to {ready.length} {ready.length === 1 ? 'student' : 'students'}</h2></div><button type="button" onClick={onClose} aria-label="Close release dialog">×</button></header>
     {assignments.length > 1 && <label className={styles.picker}>Assignment<select value={assignmentId} disabled={release.isPending || unrelease.isPending} onChange={event => { setAssignmentId(event.target.value); setUndone(false); setConflict(false); }}>{assignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}</select></label>}
     {preview.isPending || submissions.isPending ? <p>Preparing release preview…</p> : preview.error || submissions.error ? <StatusNotice tone="error">Could not prepare release preview. <button type="button" onClick={() => void refresh()}>Retry</button></StatusNotice> : <>
@@ -65,7 +65,7 @@ export function ReleaseDialog({ courseId, assignments, initialId, rows, onClose 
       {error && <StatusNotice tone="error" live="assertive">{error}</StatusNotice>}
       {released !== null && <StatusNotice tone="success" action={<button type="button" onClick={() => void undo()} disabled={release.isPending || unrelease.isPending}>Undo release</button>}>Grades released. {now - released.at >= 60000 && 'Students may have seen them.'}</StatusNotice>}
       {undone && <StatusNotice tone="success">Release undone. Grades are held again.</StatusNotice>}
-      {ready.length ? <div className={styles.scroll}><table><thead><tr><th scope="col">Student</th><th scope="col">Current grade now → after</th><th scope="col">Feedback sent</th></tr></thead><tbody>{ready.map(s => {
+      {ready.length ? <div className={styles.scroll} tabIndex={0} role="region" aria-label="Students ready for release"><table><thead><tr><th scope="col">Student</th><th scope="col">Current grade now → after</th><th scope="col">Feedback sent</th></tr></thead><tbody>{ready.map(s => {
         const changed = change.get(s.studentId);
         const current = rows.find(r => r.student.id === s.studentId)?.result ?? { percent: null, letter: null };
         return <tr key={s.id}><th scope="row">{rows.find(r => r.student.id === s.studentId)?.student.name ?? 'Student'}</th><td>{grade(changed?.from ?? current)} → {grade(changed?.to ?? current)}</td><td><FeedbackSent grade={s.grade} /></td></tr>;
