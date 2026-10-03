@@ -34,3 +34,12 @@ It ends on the course workspace with the setup checklist from `course-help`, alr
 - Which import formats matter first, if import is in Night 4?
 
 **Evidence to cite when planning:** principle #3 (consistency; report §2), principle #11 (previewable change sets; D-003), and the builder's plan-first design (principle #1).
+
+## Start from a syllabus: the design partner (owner-approved, 2026-09-28)
+
+A second entry mode of Build with AI, and the first "How to start" option in the guided New-course flow above once that exists. The instructor uploads a syllabus (PDF/DOCX) or pastes a training brief; the AI, labelled **Design partner**, produces an instructional read with page citations, asks what the document can't answer, has the instructor confirm outcomes, proposes three architectures with trade-offs, previews a change set, and provisions drafts only.
+
+- **Spec (normative, with decisions D-030 to D-036):** `handoff/SYLLABUS-DESIGN-PARTNER-SPEC.md`
+- **Artboards:** `design/canvas/Syllabus{Start,Read,Approaches,Preview,Review}.dc.html` (row G; gallery slugs `syllabus-*`)
+- **Research and recommendations:** `research/syllabus-design-partner/`
+- **Fixtures and feasibility test:** `tests/fixtures/syllabus/`, `worker/access/syllabus-extraction.test.ts`

@@ -79,5 +79,50 @@
     "description": "Manager view and sharing control (D-025): a manager sees required-training completion only for people who opted in, with a count but no names for the rest; the employee turns sharing on or off per manager and sees exactly what is and isn't shared.",
     "w": 1440,
     "h": 900
+  },
+  {
+    "file": "screens/syllabus-start.html",
+    "slug": "syllabus-start",
+    "group": "Instructor",
+    "title": "G \u00b7 Start from a syllabus (instructor)",
+    "description": "Start from a syllabus: upload a PDF or DOCX, the scope and consent panel, and the design partner's 'how we work together' statement before anything is read.",
+    "w": 1440,
+    "h": 900
+  },
+  {
+    "file": "screens/syllabus-read.html",
+    "slug": "syllabus-read",
+    "group": "Instructor",
+    "title": "G \u00b7 Instructional read + Confirm",
+    "description": "Instructional read of the syllabus: course profile with extracted/inferred/missing states and page citations, outcome audit and alignment matrix, workload against the credit-hour budget, and the questions the partner needs answered before proposing anything.",
+    "w": 1440,
+    "h": 1120
+  },
+  {
+    "file": "screens/syllabus-approaches.html",
+    "slug": "syllabus-approaches",
+    "group": "Instructor",
+    "title": "G \u00b7 Three approaches",
+    "description": "Three named course architectures side by side, each with fit rationale citing the syllabus, trade-offs, a one-line evidence caveat and a workload curve; overlays; pick or combine; a required one-sentence 'why this fits'.",
+    "w": 1440,
+    "h": 1180
+  },
+  {
+    "file": "screens/syllabus-preview.html",
+    "slug": "syllabus-preview",
+    "group": "Instructor",
+    "title": "G \u00b7 Preview what will be created",
+    "description": "The change set before anything is written: modules, lessons, assessments, outcomes and alignment links that will be added, template compliance, readiness forecast, nothing renamed or removed.",
+    "w": 1440,
+    "h": 1040
+  },
+  {
+    "file": "screens/syllabus-review.html",
+    "slug": "syllabus-review",
+    "group": "Instructor",
+    "title": "G \u00b7 Review module by module",
+    "description": "Review module by module: starter content as labeled drafts with slots for the instructor's own material, 'why this module' with framework citations, the design partner's next steps, and the readiness bar.",
+    "w": 1440,
+    "h": 1120
   }
 ]

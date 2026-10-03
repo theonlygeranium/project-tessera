@@ -78,6 +78,39 @@ SCREENS = {
         "Manager view and sharing control (D-025): a manager sees required-training completion only for people who opted in, "
         "with a count but no names for the rest; the employee turns sharing on or off per manager and sees exactly what is and isn't shared.",
     ),
+    "SyllabusStart.dc.html": (
+        "syllabus-start",
+        "Instructor",
+        "Start from a syllabus: upload a PDF or DOCX, the scope and consent panel, "
+        "and the design partner's 'how we work together' statement before anything is read.",
+    ),
+    "SyllabusRead.dc.html": (
+        "syllabus-read",
+        "Instructor",
+        "Instructional read of the syllabus: course profile with extracted/inferred/missing states and page "
+        "citations, outcome audit and alignment matrix, workload against the credit-hour budget, and the "
+        "questions the partner needs answered before proposing anything.",
+    ),
+    "SyllabusApproaches.dc.html": (
+        "syllabus-approaches",
+        "Instructor",
+        "Three named course architectures side by side, each with fit rationale citing the syllabus, "
+        "trade-offs, a one-line evidence caveat and a workload curve; overlays; pick or combine; "
+        "a required one-sentence 'why this fits'.",
+    ),
+    "SyllabusPreview.dc.html": (
+        "syllabus-preview",
+        "Instructor",
+        "The change set before anything is written: modules, lessons, assessments, outcomes and alignment "
+        "links that will be added, template compliance, readiness forecast, nothing renamed or removed.",
+    ),
+    "SyllabusReview.dc.html": (
+        "syllabus-review",
+        "Instructor",
+        "Review module by module: starter content as labeled drafts with slots for the instructor's own "
+        "material, 'why this module' with framework citations, the design partner's next steps, and the "
+        "readiness bar.",
+    ),
 }
 
 FAVICON = '<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e6b63%22/%3E%3Cpath d=%22M9 11h14M9 16h9M9 21h14%22 stroke=%22white%22 stroke-width=%222.4%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">'

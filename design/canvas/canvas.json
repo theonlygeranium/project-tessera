@@ -72,6 +72,41 @@
       "w": 1440,
       "h": 900,
       "title": "F · Manager view and sharing control (industry)"
+    },
+    "SyllabusStart.dc.html": {
+      "x": 0,
+      "y": 3720,
+      "w": 1440,
+      "h": 900,
+      "title": "G · Start from a syllabus (instructor)"
+    },
+    "SyllabusRead.dc.html": {
+      "x": 1520,
+      "y": 3720,
+      "w": 1440,
+      "h": 1120,
+      "title": "G · Instructional read + Confirm"
+    },
+    "SyllabusApproaches.dc.html": {
+      "x": 3040,
+      "y": 3720,
+      "w": 1440,
+      "h": 1180,
+      "title": "G · Three approaches"
+    },
+    "SyllabusPreview.dc.html": {
+      "x": 4560,
+      "y": 3720,
+      "w": 1440,
+      "h": 1040,
+      "title": "G · Preview what will be created"
+    },
+    "SyllabusReview.dc.html": {
+      "x": 6080,
+      "y": 3720,
+      "w": 1440,
+      "h": 1120,
+      "title": "G · Review module by module"
     }
   },
   "order": [
@@ -83,7 +118,12 @@
     "AdminConsole.dc.html",
     "LearningProfile.dc.html",
     "TutorSettings.dc.html",
-    "ManagerView.dc.html"
+    "ManagerView.dc.html",
+    "SyllabusStart.dc.html",
+    "SyllabusRead.dc.html",
+    "SyllabusApproaches.dc.html",
+    "SyllabusPreview.dc.html",
+    "SyllabusReview.dc.html"
   ],
   "notes": {
     "t1": {
@@ -119,6 +159,20 @@
       "y": 1240,
       "w": 420,
       "text": "Why these screens differ from Canvas\n\n1. Plan-first generation (Brief → Outline → Draft → Review → Publish) with human checkpoints.\n2. Provenance chips + review-coverage meter on every AI-touched block.\n3. Policy-bound Socratic tutor: instructor sets hint-only / explain / open per activity; tutor cites course sources.\n4. Persona variants generated from one master course.\n5. ⌘K palette turns natural language into a previewable change set.\n6. QM/WCAG 2.2 linter runs before publish.",
+      "fill": "purple"
+    },
+    "t4": {
+      "x": 0,
+      "y": 3480,
+      "text": "Syllabus design partner (instructor) · proposal for Night 4",
+      "kind": "title1",
+      "maxW": 7500
+    },
+    "s3": {
+      "x": 7600,
+      "y": 3720,
+      "w": 420,
+      "text": "Start from a syllabus\n\nThe AI is the Design partner, not a generator: it reads the syllabus, cites the page behind every claim, asks before proposing, offers three approaches with trade-offs, previews the change set, and provisions drafts only. Spec: handoff/SYLLABUS-DESIGN-PARTNER-SPEC.md. Research: research/syllabus-design-partner/.",
       "fill": "purple"
     }
   },

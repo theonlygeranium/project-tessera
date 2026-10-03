@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Instructional read and confirm</title>
+<link rel="stylesheet" href="../assets/ai-voice.css">
+<script src="../assets/ai-voice.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#f4f1eb;color:#1c1b19}
+a{color:#0e6b63}a:hover{color:#0a4f49}
+.btn{height:36px;padding:0 14px;border-radius:9px;border:1px solid #d5cfc4;background:#fff;font-family:inherit;font-size:13px;font-weight:500;color:#1c1b19;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn-p{border:none;background:#0e6b63;color:#fff;font-weight:600}
+.btn-s{height:28px;padding:0 10px;font-size:12px;border-radius:7px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#ebe6dd;color:#5f5b54;white-space:nowrap}
+.chip-ok{background:#e4f2e8;color:#1f5a37}.chip-warn{background:#fbf1dc;color:#7a5310}.chip-err{background:#fbe7e4;color:#7a2a20}.chip-ai{background:#eeebf8;color:#3f3380}.chip-acc{background:#e3f0ee;color:#0a4f49}
+.card{background:#fff;border:1px solid #e3ded4;border-radius:12px}
+.lbl{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5f5b54}
+.h2{font-family:'Fraunces',Georgia,serif;font-weight:500;font-size:20px;margin:0}
+.muted{color:#5f5b54}
+.cite{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;color:#5b4baf;background:#f7f5fc;border-radius:4px;padding:1px 5px;white-space:nowrap}
+.step{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:500;color:#5f5b54}
+.step .n{width:20px;height:20px;border-radius:50%;border:2px solid #d5cfc4;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:10px}
+.step.done{color:#0e6b63;font-weight:600}.step.done .n{border:none;background:#0e6b63}
+.step.cur{color:#1c1b19;font-weight:600}.step.cur .n{border-color:#0e6b63;background:#fff;color:#0e6b63}
+.bar{width:20px;height:2px;background:#d5cfc4;margin:0 6px}.bar.done{background:#0e6b63}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#5f5b54;padding:6px 5px;border-bottom:1px solid #e3ded4}
+td{padding:6px 5px;border-bottom:1px solid #ede8df;vertical-align:top}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#0e6b63}
+.dot-o{display:inline-block;width:10px;height:10px;border-radius:50%;border:1.5px solid #c9c2b5;box-sizing:border-box}
+.dot-w{display:inline-block;width:10px;height:10px;border-radius:2px;background:#9a6a12}
+input[type=checkbox],input[type=radio]{width:16px;height:16px;accent-color:#0e6b63;margin:0;flex-shrink:0}
+.q{display:flex;flex-direction:column;gap:5px;padding:8px 0;border-bottom:1px solid #ede8df}
+.opt{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer}
+.tin{height:32px;border:1px solid #d5cfc4;border-radius:8px;padding:0 10px;font-family:inherit;font-size:13px;background:#fff}
+</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230e6b63%22/%3E%3Cpath d=%22M9 11h14M9 16h9M9 21h14%22 stroke=%22white%22 stroke-width=%222.4%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<style>
+html,body{margin:0;background:#e9e5dd}
+.tessera-stage{display:flex;justify-content:center;padding:24px 16px 48px;box-sizing:border-box;min-height:100vh}
+.tessera-frame{transform-origin:top left;box-shadow:0 18px 50px rgba(28,27,25,.18);border-radius:16px;overflow:hidden;background:#f4f1eb}
+.tessera-bar{position:fixed;left:0;right:0;bottom:0;height:40px;display:flex;align-items:center;gap:14px;padding:0 16px;
+  background:rgba(28,27,25,.92);color:#f4f1eb;font:500 13px/1 'IBM Plex Sans',system-ui,sans-serif;z-index:10}
+.tessera-bar a{color:#9fd8cf;text-decoration:none}.tessera-bar a:hover{text-decoration:underline}
+.tessera-bar span{opacity:.75}
+body.tessera-embed{background:transparent}
+body.tessera-embed .tessera-stage{padding:0;min-height:0;display:block}
+body.tessera-embed .tessera-frame{box-shadow:none;border-radius:0}
+body.tessera-embed .tessera-bar{display:none}
+</style>
+</head>
+<body>
+<div class="tessera-stage"><div><div class="tessera-frame" data-w="1440" data-h="1120">
+<div data-ai-style="marginalia" style="width: 1440px; height: 1120px; box-sizing: border-box; display: flex; flex-direction: column; background: #f4f1eb; color: #1c1b19; font-size: 14px; line-height: 1.45; overflow: hidden">
+
+  <header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid #e3ded4; background: #faf8f4">
+    <a href="syllabus-start.html" aria-label="Back to start" style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; text-decoration: none; color: #5f5b54; white-space: nowrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>Start</a>
+    <div style="width: 1px; height: 20px; background: #e3ded4"></div>
+    <div style="font-size: 15px; font-weight: 600; white-space: nowrap; flex-shrink: 0">STAT 110 · Reasoning with Data</div>
+    <span class="chip">STAT110_Syllabus_Fall2026.pdf</span>
+    <div style="flex-grow: 1"></div>
+    <ol aria-label="Design partner stages" style="list-style: none; margin: 0; padding: 0; display: flex; align-items: center">
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Start</li><li class="bar done"></li>
+      <li class="step done"><span class="n"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Read</li><li class="bar done"></li>
+      <li class="step cur" aria-current="step"><span class="n">3</span>Confirm</li><li class="bar"></li>
+      <li class="step"><span class="n">4</span>Approaches</li><li class="bar"></li>
+      <li class="step"><span class="n">5</span>Preview</li><li class="bar"></li>
+      <li class="step"><span class="n">6</span>Review</li>
+    </ol>
+    <div style="flex-grow: 1"></div>
+    <button type="button" class="btn">Export read</button>
+  </header>
+
+  <div style="flex-grow: 1; display: flex; gap: 24px; padding: 22px 28px; min-height: 0; box-sizing: border-box">
+
+    <!-- Left: the instructional read -->
+    <main style="width: 900px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; min-height: 0">
+      <div class="ai ai--note">
+        <div class="ai-who">Design partner <span class="ai-src">· read of your syllabus, 9 pages, 48 s</span></div>
+        <div class="ai-body">Here is what I understood. STAT 110 is a 3-credit, 15-week introductory course with six outcomes<sup class="ai-ref">1</sup>, five graded components<sup class="ai-ref">2</sup>, and a 13-row weekly schedule<sup class="ai-ref">3</sup>. Four outcomes are clearly assessed; two are not, and one uses a verb I can't observe. Estimated workload sits under budget except in week 11. Everything below cites its page; tell me where I'm wrong.</div>
+        <div class="ai-cites"><span class="ai-cite" data-n="1">Syllabus p. 2, "Learning outcomes"</span><span class="ai-cite" data-n="2">p. 3, "Grading"</span><span class="ai-cite" data-n="3">p. 4–5, "Course schedule" (table)</span></div>
+      </div>
+
+      <div style="display: flex; gap: 14px; min-height: 0">
+        <!-- Course profile -->
+        <section class="card" style="width: 300px; flex-shrink: 0; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px" aria-labelledby="profile-h">
+          <h2 id="profile-h" class="lbl" style="margin: 0">Course profile</h2>
+          <dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; font-size: 12.5px">
+            <div><dt class="muted" style="font-size: 11px">Credits · term</dt><dd style="margin: 0; font-weight: 600">3 · 15 weeks <span class="cite">p. 1</span></dd></div>
+            <div><dt class="muted" style="font-size: 11px">Meets</dt><dd style="margin: 0; font-weight: 600">Tue/Thu · 75 min <span class="cite">p. 1</span></dd></div>
+            <div><dt class="muted" style="font-size: 11px">Modality</dt><dd style="margin: 0; font-weight: 600">In person <span class="chip chip-warn" style="font-size: 10px; padding: 1px 6px">inferred</span></dd></div>
+            <div><dt class="muted" style="font-size: 11px">Level · prerequisite</dt><dd style="margin: 0; font-weight: 600">100 · none <span class="cite">p. 1</span></dd></div>
+            <div><dt class="muted" style="font-size: 11px">Enrolment</dt><dd style="margin: 0; font-weight: 600"><span class="chip chip-err" style="font-size: 10px; padding: 1px 6px">missing · asked</span></dd></div>
+            <div><dt class="muted" style="font-size: 11px">Textbook</dt><dd style="margin: 0; font-weight: 600">OpenIntro Statistics, 4e <span class="cite">p. 2</span></dd></div>
+            <div><dt class="muted" style="font-size: 11px">Workload budget</dt><dd style="margin: 0; font-weight: 600">9 h/week · 135 h <span class="chip chip-warn" style="font-size: 10px; padding: 1px 6px">from credits</span></dd></div>
+            <div><dt class="muted" style="font-size: 11px">Schedule</dt><dd style="margin: 0; font-weight: 600">13 topics, 14 weeks <span class="chip chip-err" style="font-size: 10px; padding: 1px 6px">conflict · asked</span></dd></div>
+          </dl>
+          <div style="border-top: 1px solid #ede8df; padding-top: 10px; display: flex; flex-direction: column; gap: 6px">
+            <span class="lbl">Learner-centeredness</span>
+            <div style="font-size: 12.5px"><strong>24 / 46 · transitional</strong> <span class="muted">(Palmer, Bach &amp; Streifer)</span></div>
+            <div style="font-size: 12px; color: #3a3833">Strong on assessment variety; the schedule lists topics without activities <span class="cite">p. 4</span>; policies outweigh rationale 3:1 <span class="cite">p. 6–8</span>.</div>
+            <a href="#rubric" style="font-size: 12px">See each score and its passage</a>
+          </div>
+        </section>
+
+        <!-- Objective audit + alignment matrix -->
+        <section class="card" style="flex-grow: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0" aria-labelledby="align-h">
+          <div style="display: flex; align-items: center; justify-content: space-between">
+            <h2 id="align-h" class="lbl" style="margin: 0">Outcomes and how they're assessed</h2>
+            <span class="muted" style="font-size: 12px">Verbatim from p. 2 · Bloom level is my reading</span>
+          </div>
+          <table>
+            <thead><tr><th style="width: 30px">#</th><th style="width: 182px">Outcome (as written)</th><th style="width: 64px">Level</th><th style="width: 34px; text-align: center" title="Weekly quizzes 15%">Quiz</th><th style="width: 34px; text-align: center" title="Homework 20%">HW</th><th style="width: 34px; text-align: center" title="Midterm 20%">Mid</th><th style="width: 34px; text-align: center" title="Project 40%">Proj</th><th style="width: 34px; text-align: center" title="Participation 5%">Part.</th></tr></thead>
+            <tbody>
+              <tr><td>O1</td><td>Tell a statistical question from a non-statistical one</td><td>Understand</td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td></tr>
+              <tr><td>O2</td><td>Understand variability in data <span class="chip chip-warn">verb not observable</span></td><td>—</td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td></tr>
+              <tr><td>O3</td><td>Describe the center and spread of a distribution</td><td>Apply</td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot-o"></span></td></tr>
+              <tr><td>O4</td><td>Design a simple study to answer a question <span class="chip chip-warn">only a multiple-choice midterm</span></td><td>Create</td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-w"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td></tr>
+              <tr><td>O5</td><td>Communicate findings to a non-technical audience</td><td>Evaluate</td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot"></span></td><td style="text-align: center"><span class="dot-o"></span></td></tr>
+              <tr><td>O6</td><td>Critique a statistical claim in the news <span class="chip chip-err">not assessed</span></td><td>Evaluate</td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td><td style="text-align: center"><span class="dot-o"></span></td></tr>
+            </tbody>
+          </table>
+          <div style="display: flex; gap: 16px; font-size: 11.5px" class="muted">
+            <span style="display: flex; align-items: center; gap: 5px"><span class="dot"></span>assessed <span class="cite">p. 3</span></span>
+            <span style="display: flex; align-items: center; gap: 5px"><span class="dot-w"></span>assessed, but the task can't show the verb</span>
+            <span style="display: flex; align-items: center; gap: 5px"><span class="dot-o"></span>not assessed</span>
+            <span style="margin-left: auto">Weights: 15 · 20 · 20 · 40 · 5 = 100 <span class="cite">p. 3</span></span>
+          </div>
+          <div style="font-size: 12.5px; color: #3a3833; border-top: 1px solid #ede8df; padding-top: 8px">Two graded components carry no stated purpose or criteria (homework, participation) <span class="cite">p. 3</span>. The midterm and project are the only summative checkpoints; the first graded feedback students receive is in week 4 <span class="cite">p. 4</span>.</div>
+        </section>
+      </div>
+
+      <!-- Workload -->
+      <section class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 8px" aria-labelledby="load-h">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <h2 id="load-h" class="lbl" style="margin: 0">Estimated student hours per week</h2>
+          <span style="font-size: 12.5px"><strong>7.4 h average</strong> against a 9 h budget · <strong style="color: #7a5310">week 11 · 12.5 h</strong> (midterm and project draft together <span class="cite">p. 5</span>)</span>
+          <span class="muted" style="font-size: 11.5px; margin-left: auto">Rates: 34 pages/h textbook, 2 h per problem set, project 30 h total · <a href="#rates">edit assumptions</a></span>
+        </div>
+        <div style="position: relative; height: 96px; display: flex; align-items: flex-end; gap: 6px; padding-top: 6px">
+          <div style="position: absolute; left: 0; right: 0; top: 30px; border-top: 1.5px dashed #c9c2b5"></div>
+          <div style="position: absolute; right: 0; top: 14px; font-size: 10.5px; color: #5f5b54">9 h budget</div>
+          <div style="flex-grow: 1; height: 52px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 58px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 60px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 64px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 58px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 62px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 60px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 22px; background: #d5cfc4; border-radius: 3px 3px 0 0" title="Week 8: no topic listed"></div>
+          <div style="flex-grow: 1; height: 62px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 66px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 90px; background: #9a6a12; border-radius: 3px 3px 0 0" title="Week 11: 12.5 hours"></div>
+          <div style="flex-grow: 1; height: 56px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 54px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 68px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+          <div style="flex-grow: 1; height: 40px; background: #0e6b63; border-radius: 3px 3px 0 0"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 10.5px" class="muted"><span>Week 1</span><span>Week 8 · empty row</span><span>Week 11</span><span>Week 15</span></div>
+      </section>
+    </main>
+
+    <!-- Right: what I need from you -->
+    <aside class="card" aria-labelledby="need-h" style="flex-grow: 1; min-width: 0; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; overflow: hidden">
+      <h2 id="need-h" class="h2" style="font-size: 18px">What I need from you</h2>
+      <p class="muted" style="margin: 0 0 4px; font-size: 12.5px">Four things the document doesn't say, then your outcomes. I ask before proposing. Skip any.</p>
+
+      <div class="q">
+        <div style="font-size: 13px"><strong>1.</strong> The schedule has no topic in week 8 of a 14-week table, in a 15-week term. <span class="cite">p. 4</span></div>
+        <div style="display: flex; gap: 14px; flex-wrap: wrap">
+          <label class="opt"><input type="radio" name="q1" checked>Midterm exam week</label>
+          <label class="opt"><input type="radio" name="q1">Fall break</label>
+          <label class="opt"><input type="radio" name="q1">Something else</label>
+        </div>
+      </div>
+      <div class="q">
+        <div style="font-size: 13px"><strong>2.</strong> Enrolment isn't stated. Roughly how many students? Case discussion and peer review depend on it.</div>
+        <input type="text" class="tin" aria-label="Approximate enrolment" placeholder="e.g. 60" value="120" style="width: 120px">
+      </div>
+      <div class="q">
+        <div style="font-size: 13px"><strong>3.</strong> The project is 40% with one due date, Dec 4. <span class="cite">p. 3</span> Milestones with feedback, or is the single deadline deliberate?</div>
+        <div style="display: flex; gap: 14px; flex-wrap: wrap">
+          <label class="opt"><input type="radio" name="q3" checked>Add milestones</label>
+          <label class="opt"><input type="radio" name="q3">Keep one deadline</label>
+        </div>
+      </div>
+      <div class="q">
+        <div style="font-size: 13px"><strong>4.</strong> Outcome 6, "Critique a statistical claim in the news", isn't assessed by anything I can find. <span class="cite">p. 2–3</span></div>
+        <div style="display: flex; gap: 14px; flex-wrap: wrap">
+          <label class="opt"><input type="radio" name="q4" checked>Assess it (propose how)</label>
+          <label class="opt"><input type="radio" name="q4">It's inside the project</label>
+          <label class="opt"><input type="radio" name="q4">Drop it</label>
+        </div>
+      </div>
+      <div class="q" style="border-bottom: none">
+        <div style="font-size: 13px"><strong>5.</strong> In a sentence or two: how do you like to teach this course, and what do you want from this redesign?</div>
+        <textarea class="tin" aria-label="Teaching approach and goals" rows="2" style="height: 44px; padding: 6px 10px; resize: none">I want them working with real data from week 1. Less lecture, more "what does this number mean". The project is the point of the course.</textarea>
+      </div>
+
+      <div style="border-top: 1px solid #e3ded4; margin-top: 4px; padding-top: 10px; display: flex; flex-direction: column; gap: 6px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span class="lbl">Confirm your outcomes</span>
+          <span class="muted" style="font-size: 11.5px">Your words stay; rewrites are labelled suggestions</span>
+        </div>
+        <label class="opt"><input type="checkbox" checked><span>O1 Tell a statistical question from a non-statistical one</span></label>
+        <label class="opt"><input type="checkbox" checked><span>O2 Understand variability in data · <a href="#o2">see suggested rewrite</a></span></label>
+        <label class="opt"><input type="checkbox" checked><span>O3 Describe the center and spread of a distribution</span></label>
+        <label class="opt"><input type="checkbox" checked><span>O4 Design a simple study to answer a question</span></label>
+        <label class="opt"><input type="checkbox" checked><span>O5 Communicate findings to a non-technical audience</span></label>
+        <label class="opt"><input type="checkbox" checked><span>O6 Critique a statistical claim in the news</span></label>
+        <div class="ai ai--block" data-state="draft" style="margin-top: 4px">
+          <div class="ai-who">Suggested rewrite of O2 <span class="ai-src">· from your O2 and the p. 4 topics</span></div>
+          <div class="ai-body" style="font-size: 13.5px">Explain why two samples from the same population differ, using spread and sampling variability.</div>
+          <div class="ai-actions"><button type="button" class="btn btn-s btn-p">Use this</button><button type="button" class="btn btn-s">Edit</button><button type="button" class="btn btn-s">Keep mine</button></div>
+        </div>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 10px; display: flex; align-items: center; gap: 12px">
+        <a href="syllabus-approaches.html" class="btn btn-p" style="text-decoration: none; white-space: nowrap">Confirm and show approaches</a>
+        <span class="muted" style="font-size: 12px">Saved to your record</span>
+      </div>
+    </aside>
+  </div>
+</div>
+</div></div></div>
+<nav class="tessera-bar" aria-label="Site"><a href="../index.html">← All screens</a><span>G · Instructional read + Confirm</span><span>1440×1120</span></nav>
+<script>
+(function(){
+  var frame=document.querySelector('.tessera-frame');
+  var w=parseInt(frame.dataset.w,10), h=parseInt(frame.dataset.h,10);
+  var stage=document.querySelector('.tessera-stage');
+  var embed=/[?&]embed=1/.test(location.search);
+  if(embed){document.body.classList.add('tessera-embed');}
+  function fit(){
+    if(embed){frame.style.transform='none';frame.style.width=w+'px';frame.style.height=h+'px';return;}
+    var avail=stage.clientWidth-32;
+    var s=Math.min(1,avail/w);
+    frame.style.transform='scale('+s+')';
+    frame.style.width=w+'px';
+    frame.style.height=h+'px';
+    frame.parentElement.style.width=(w*s)+'px';
+    frame.parentElement.style.height=(h*s)+'px';
+  }
+  window.addEventListener('resize',fit);fit();
+})();
+</script>
+</body>
+</html>
